@@ -12,6 +12,7 @@ This repository provides a comprehensive toolkit for GMAT test-takers and educat
 * An interactive tool to map GMAT scale scores to percentiles and estimate total scores.
 * An Item Response Theory (IRT)-based simulation tool to track ability (theta) estimates and analyze question difficulty.
 * An Excel VBA macro to annotate score reports with detailed insights for educational analysis.
+* A structured Standard Operating Procedure (SOP) for detailed score report analysis, outlining steps from data cleaning to personalized practice suggestions.  
 
 ## Key Features
 
@@ -130,12 +131,23 @@ This repository provides a comprehensive toolkit for GMAT test-takers and educat
 #### Example Output
 ![Annotated Excel Sample](/images/annotated-excel-sample.png)
 
+### 4. Analysis Templates
+
+This repository includes a standardized analysis template based on Dustin’s Standard Operating Procedure (SOP) for dissecting GMAT score reports. The template, detailed in [analysis-template-dustin.md](./analysis-template-dustin.md), provides an 8-step framework to:
+
+* Clean and validate score data (e.g., filtering guessed or unanswered questions).
+* Analyze time management and performance by question type and difficulty.
+* Diagnose specific weaknesses with detailed obstacle identification.
+* Formulate tailored practice plans with progressive difficulty and timed training.
+
+This SOP is ideal for educators and test-takers aiming to systematically improve performance. Integrate it with the Excel VBA annotations and IRT simulation outputs for a comprehensive analysis workflow.
+
 ## Files
 
 * `scale-percentile-simulation.ipynb`: Interactive tool for GMAT score percentile mapping and total score estimation with tangent analysis.
 * `irt-simulation-tool.ipynb`: IRT-based simulation tool for theta estimation, difficulty analysis, and Excel output.
 * `score-excel-vba.bas`: Excel VBA macro for annotating GMAT score reports with overtime, too-fast, incorrect, unusual, and unusual slow conditions.
-* `requirements.txt`: List of required Python libraries for the Jupyter Notebooks.
+* `analysis-template-dustin.md`Markdown file containing the full SOP table with descriptions, purposes, and examples.
 
 ## Recommended Usage Workflow
 
