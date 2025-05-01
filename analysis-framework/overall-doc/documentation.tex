@@ -1,0 +1,566 @@
+\documentclass{article}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc} % Input encoding
+\usepackage[T1]{fontenc}    % Font encoding
+\usepackage{amsmath}        % Math formulas (though not heavily used here)
+\usepackage{graphicx}       % Including images (if any)
+\usepackage{listings}       % Code blocks
+\usepackage[margin=1in]{geometry} % Set margins
+\usepackage{hyperref}       % Clickable links (URLs, references)
+\usepackage{abstract}       % For the abstract environment
+\usepackage{color}          % Required for textcolor in listings postbreak hook
+\usepackage{enumitem}       % For the enumerate environment
+
+% --- 全局排版設置 ---
+\sloppy             % 全局放寬排版要求，減少Overfull hbox
+\hbadness=10000     % 提高underfull hbox警告閾值，減少不必要的警告
+
+% --- Listing Configuration ---
+% Basic configuration for code listings (adjust as needed)
+\lstset{
+  basicstyle=\ttfamily\small, % font type and size
+  breaklines=true,            % automatically break long lines
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space}, % symbol for broken lines
+  language=bash               % default language
+}
+
+% --- Document Metadata ---
+\title{A Unified Diagnostic Framework for GMAT Quantitative, Data Insights, and Verbal Sections}
+\author{Yuchen Teng} %%%%<<< You might want to verify/change this
+\date{\today}
+
+% --- Document Start ---
+\begin{document}
+
+% 全域設置緩解排版問題
+\sloppy
+\hbadness=4000
+
+\maketitle
+
+\begin{abstract}
+This paper presents a unified diagnostic framework for analyzing student performance in the quantitative (Q), data insights (DI), and verbal (V) sections of the GMAT. The framework employs a standardized chapter-based methodology to move beyond simple accuracy metrics, aiming to identify root causes of errors and inefficiencies. Core inputs include per-question data (time, correctness, type, difficulty, skill/domain), and overall test metrics. The analysis progresses through evaluating time strategy and data validity, conducting multidimensional performance analysis specific to each section\'s constructs, diagnosing error patterns (considering time, difficulty, and potential carelessness), applying coverage rules to detect widespread weaknesses, and generating personalized practice recommendations. The final output is a comprehensive diagnostic summary delivered in natural language, providing actionable insights and guidance for targeted student improvement. This unified structure ensures consistency in the analysis while accommodating the unique characteristics of each GMAT section.
+\end{abstract}
+
+\section{Introduction}
+
+The Graduate Management Admission Test (GMAT) assesses critical reasoning, quantitative, data analysis, and verbal skills essential for graduate business programs. Effective preparation requires not only content mastery, but also strategic test-taking skills and an understanding of individual strengths and weaknesses. While numerous resources exist for practice, a systematic and standardized approach to diagnosing performance across all scored sections (Quantitative, Data Insights, Verbal) can significantly enhance study efficiency.
+
+This paper introduces a unified diagnostic framework designed to provide in-depth analysis of student performance on the GMAT. Unlike simple score reports, this framework delves into the underlying reasons for errors and time inefficiencies, considering factors such as time pressure, question type, difficulty level, specific skills or content domains, and behavioral patterns.
+
+The framework follows a consistent nine-chapter structure for analyzing each section (Q, DI, V), ensuring a comparable depth of insight while adapting the specific metrics and logic to the nuances of each section. This structure facilitates the following.
+
+\begin{enumerate}
+    \item \textbf{Standardized Input:} Defining core data requirements (Chapter 0).
+    \item \textbf{Time \& Validity Assessment:} Evaluating Pacing and Filtering Unreliable Data (Chapter 1).
+    \item \textbf{Multi-Dimensional Performance Analysis:} Examining performance across relevant section-specific dimensions (Chapter 2).
+    \item \textbf{Root Cause Diagnosis:} Classifying errors and exploring the underlying causes (Chapter 3).
+    \item \textbf{Section-Specific Analyses:} Investigating efficiency and patterns (Chapters 4 \& 5, adapted per section).
+    \item \textbf{Coverage Assessment:} Identifying pervasive skill/type weaknesses (Chapter 6).
+    \item \textbf{Personalized Recommendations:} Generating actionable practice plans (Chapter 7).
+    \item \textbf{Synthesized Reporting:} Delivering a comprehensive, natural language summary (Chapter 8).
+\end{enumerate}
+
+By applying this unified framework, students and instructors can gain a holistic understanding of performance, identify specific areas requiring intervention, and develop targeted strategies for improvement throughout the GMAT exam. The subsequent sections detail the methodology applied within each chapter of this framework.
+
+\textit{Note on Document Purpose:} This document serves primarily as a technical report detailing the design, logic, and implementation rationale behind the unified GMAT diagnostic framework. It is intended as comprehensive documentation for users of the associated analysis tools (e.g., on GitHub) and as a methodological reference outlining the systematic approach developed. While initial parameters are informed by practical experience and preliminary testing, the core contribution presented here is the formalization of the diagnostic process itself.
+
+Although experienced GMAT instructors often provide valuable information based on score reports, traditional analysis can suffer from subjectivity and inconsistency. Relying solely on intuition or anecdotal patterns introduces variability and hinders iterative refinement. Recognizing these limitations, the main motivation behind developing this unified diagnostic framework was to establish a more scientific, systematic, and objective approach. The goal is to enhance the efficiency, accuracy, and reliability of GMAT performance diagnosis by replacing purely experiential interpretation with a structured, parameterized, and verifiable methodology. The goal is to enhance the efficiency, accuracy, and reliability of GMAT performance diagnosis by replacing purely experiential interpretation with a structured, parameterized, and verifiable methodology.
+
+\section{Methodology: The Diagnostic Framework}
+
+\subsection{Framework Development Methodology}
+
+The construction of this unified framework followed a rigorous, data-driven process aimed at codifying expert diagnostic reasoning into a formal system:
+
+\begin{enumerate}
+    \item \textbf{Pattern Extraction:} A substantial corpus of GMAT score report analysis consultations was transcribed and analyzed to identify recurring logical patterns and diagnostic heuristics employed in expert interpretation.
+    \item \textbf{Logic Formalization:} These extracted patterns were augmented with detailed, step-by-step analytical procedures and logical rules, explicitly articulating the complete diagnostic workflow.
+    \item \textbf{Ambiguity Resolution \& Parameterization:} Subjective or ambiguous concepts inherent in informal analysis (e.g., "significant time pressure," "unusually fast response") were replaced with precise, quantitative definitions and operationalized as parameters within the framework (e.g., specific time thresholds, relative speed calculations). All key analytical elements were parameterized.
+    \item \textbf{System Structuring:} The relationships between parameters and analytical steps were formalized as functions, integrating the components into a cohesive, structured system mirroring the chapter-based flow.
+    \item \textbf{Logical Validation:} The integrity of the framework was systematically verified to ensure internal consistency, eliminating contradictions, undefined elements, unused parameters/functions, and logical dead ends, thereby creating a closed-loop system.
+    \item \textbf{Empirical Testing \& Preliminary Validation:} The framework was implemented (initially via rule-based AI simulation) and tested against real GMAT score report data. Initial comparisons against independent expert analyses indicated high congruence (over 90\%) in diagnostic conclusions, providing preliminary validation for the core logic. Discrepancies were investigated, leading to initial calibration and refinement of specific rules and parameters. \textit{However, comprehensive statistical validation across diverse datasets and detailed reporting of these validation results are beyond the scope of this particular document and constitute a key area for future work (see Section 4).}
+\end{enumerate}
+
+During the formalization of expert heuristics into parameters and functions, as well as in the subsequent code implementation and documentation phases, AI-powered assistant tools were utilized to enhance efficiency and aid in maintaining logical consistency throughout the system.
+
+The resulting framework, detailed in the subsequent chapter descriptions (2.1 through 2.8), represents a formalized and validated system for GMAT diagnostic analysis.
+
+The framework analyzes performance through a series of sequential chapters, applied consistently to Q, DI, and V sections, with necessary adaptations for section-specific features.
+
+\subsection{Chapter 0: Core Input Data and Configuration}
+
+\textbf{Objective:} Define the foundational data structures, parameters, and pre-processing steps required for analysis.
+
+\textbf{Required Input CSV Structure:}
+For the analysis scripts to function correctly, the input CSV file (e.g., \texttt{testset-q.csv}) must contain specific columns with data in the expected format. While column names can sometimes be adapted during implementation, the following represents the ideal structure and data types:
+
+\begin{itemize}
+    \item \texttt{question\_id}: Unique identifier for each question (String or Integer).
+    \item \texttt{question\_time}: Response time for the question in minutes (Numeric, e.g., Float or Integer).
+    \item \texttt{is\_correct}: Indicator of correctness (Boolean: \texttt{True}/\texttt{False}, or Integer: \texttt{1}/\texttt{0}).
+    \item \texttt{question\_difficulty}: Numeric difficulty value (Numeric). The source might differ (e.g., \texttt{DI\_b}, \texttt{V\_b}), but it's mapped internally.
+    \item \texttt{question\_position}: Sequence number of the question in the test (Integer, 1-indexed).
+    \item \texttt{question\_type}: Category of the question (String). Specific values depend on the section:
+        \begin{itemize}
+            \item Q: 'Real' or 'Pure'.
+            \item DI: 'DS', 'TPA', 'MSR', or 'GT'.
+            \item V: 'CR' or 'RC'.
+        \end{itemize}
+    \item \texttt{question\_fundamental\_skill} (Required for Q and V): Core skill or domain tested (String, e.g., 'Rates/Ratio/Percent', 'Identify Stated Idea').
+    \item \texttt{content\_domain} (Required for DI): Classification as 'Math Related' or 'Non-Math Related' (String).
+\end{itemize}
+
+\textbf{Overall Metrics (Derived or Input):}
+While not always direct columns, the analysis requires:
+\begin{itemize}
+    \item \texttt{total\_test\_time} (Total minutes spent).
+    \item \texttt{max\_allowed\_time} (Standard 45 minutes per section).
+    \item \texttt{total\_number\_of\_questions}.
+\end{itemize}
+
+\textbf{Common Inputs:}
+\begin{itemize}
+    \item \textbf{Per-Question:} Requires fields such as \texttt{question\_id} (Identifier), \texttt{question\_time} (Response Time in minutes), \texttt{is\_correct} (Correctness as Boolean), \texttt{question\_difficulty} (Numeric value, potentially section-specific source like \texttt{DI\_b} or \texttt{V\_b}), \texttt{question\_position} (Sequence number).
+    \item \textbf{Overall:} Requires \texttt{total\_test\_time} (Total minutes), \texttt{max\_allowed\_time} (standardized at 45 minutes per section), and \texttt{total\_number\_of\_questions}.
+\end{itemize}
+
+\textbf{Section-Specific Inputs \& Pre-processing:}
+\begin{itemize}
+    \item \textbf{Quant (Q):}
+    \begin{itemize}
+        \item Inputs: \texttt{question\_type} categorized as 'Real' (word problems) or 'Pure' (computation/concept); \texttt{question\_fundamental\_skill} representing core mathematical areas, e.g.:
+            \begin{itemize}
+                \item \texttt{Rates/Ratio/Percent}
+                \item \texttt{Value/Order/Factor}
+                \item \texttt{Equal/Unequal/ALG}
+                \item \texttt{Counting/Sets/Series/Prob/Stats}
+            \end{itemize}
+        \item Pre-processing: Calculate \texttt{average\_time\_per\_type}, \texttt{max\_correct\_difficulty\_per\_skill}. Numerical conversions and handling of missing values are performed.
+    \end{itemize}
+    \item \textbf{Data Insights (DI):}
+    \begin{itemize}
+        \item Inputs: \texttt{question\_type} ('DS', 'TPA', 'MSR', 'GT'); \texttt{content\_domain} ('Math Related'/'Non-Math Related'). Note: \texttt{Fundamental Skills} are typically not tracked for DI.
+        \item Pre-processing: Calculate \texttt{average\_time\_per\_type}, \texttt{max\_correct\_difficulty\_per\_combination} (based on \texttt{question\_type} and \texttt{content\_domain}). A key step involves identifying \texttt{MSR} item sets (typically 3 questions) and estimating \texttt{msr\_reading\_time} based on the time differential between the first question and the average of the subsequent two: \texttt{reading\_time = time\_q1 - (time\_q2 + time\_q3) / 2}.
+    \end{itemize}
+    \item \textbf{Verbal (V):}
+    \begin{itemize}
+        \item Inputs: \texttt{question\_type} ('CR'/'RC'); \texttt{question\_fundamental\_skill}, e.g.:
+            \begin{itemize}
+                \item \texttt{Plan/Construct}
+                \item \texttt{Identify Stated Idea}
+                \item \texttt{Identify Inferred Idea}
+                \item \texttt{Analysis/Critique}
+            \end{itemize}
+        \item Pre-processing: Identify \texttt{RC} passage groups (consecutive RC questions, usually 3-4). Calculate the following:
+            \begin{itemize}
+                \item \texttt{rc\_group\_id}
+                \item \texttt{questions\_in\_group}
+                \item \texttt{group\_total\_time}
+                \item \texttt{average\_time\_per\_type}
+                \item \texttt{first\_third\_average\_time\_per\_type}
+            \end{itemize}
+            Estimate \texttt{rc\_reading\_time} using a similar logic to MSR:
+            \texttt{reading\_time = time\_q1 - average\_time\_of\_other\_qs\_in\_group}.
+    \end{itemize}
+\end{itemize}
+
+\textbf{Implementation Context:} Data ingestion typically involves reading CSV files using libraries like \texttt{pandas}. Pre-processing includes data type conversion (e.g., \texttt{pd.to\_numeric}), handling missing data (\texttt{dropna}), mapping raw inputs (e.g., full question type names to abbreviations like 'CR'), renaming columns for consistency, and computing the derived metrics mentioned above. Configuration parameters (thresholds, factors) are defined constants within the implementation.
+
+\textbf{Rationale:} Establishes a consistent, clean, and enriched data foundation crucial for reliable and comparable diagnostics across sections.
+
+\subsection{Chapter 1: Overall Time Strategy and Data Validity Assessment}
+
+\textbf{Objective:} Evaluate overall pacing, assess time pressure, establish section-appropriate overtime criteria, and identify potentially invalid data points resulting from rushed end-section performance.
+
+\textbf{Operational Logic:}
+\begin{enumerate}
+    \item \textbf{Calculate Time Difference (\texttt{time\_diff}):} Computed as \texttt{max\_allowed\_time} - \texttt{total\_test\_time}.
+    \item \textbf{Determine Time Pressure Status (\texttt{time\_pressure}):} This Boolean flag is determined by section-specific rules, generally combining \texttt{time\_diff} with evidence of rushed responses in the final third of the test.
+    \begin{itemize}
+        \item Q/DI: \texttt{time\_pressure} = \texttt{True} if \texttt{time\_diff} $\leq$ 3.0 minutes AND \texttt{question\_time} < 1.0 minute for any question in the last third.
+        \item V: \texttt{time\_pressure} = \texttt{True} if \texttt{time\_diff} < 1.0 minute (stricter threshold reflecting higher sensitivity to time constraints in Verbal).
+        \item A user override option (\texttt{user\_override\_time\_pressure}) allows manual setting of this flag.
+    \end{itemize}
+    \item \textbf{Establish Overtime Thresholds/Rules:} These criteria are dynamically set based on the \texttt{time\_pressure} status and vary by section and question type.
+    \begin{itemize}
+        \item \textbf{Q:} A single \texttt{overtime\_threshold} (e.g., 2.5 min if \texttt{time\_pressure}, 3.0 min otherwise).
+        \item \textbf{DI:} Type-specific thresholds (e.g., \texttt{overtime\_threshold\_ds}: 2.0 min if \texttt{time\_pressure}, 2.5 otherwise) and \texttt{MSR} group rules (\texttt{msr\_group\_target\_time}: 6.0 min if \texttt{time\_pressure}, 7.0 otherwise). Includes \texttt{MSR} single-question time analysis thresholds (\texttt{msr\_reading\_threshold}=1.5 min, \texttt{msr\_single\_q\_threshold}=1.5 min).
+        \item \textbf{V:} Separate thresholds/rules for \texttt{CR} (\texttt{overtime\_threshold\_cr}: 2.0 min if \texttt{time\_pressure}, 2.5 otherwise) and \texttt{RC} (e.g., \texttt{rc\_group\_target\_time} for 3Q group: 6.0 min if \texttt{time\_pressure}, 7.0 otherwise; \texttt{rc\_individual\_q\_threshold}=2.0 min). V also includes a preliminary check for \texttt{reading\_comprehension\_barrier\_inquiry} based on estimated \texttt{rc\_reading\_time} exceeding thresholds (e.g., >2.0 min for 3Q group).
+    \end{itemize}
+    \item \textbf{Identify Invalid Data (\texttt{is\_invalid}):} This flag identifies questions likely answered without genuine effort due to time constraints. The unified logic flags questions in the final third (\texttt{question\_position} > \texttt{Total Number of Questions} * 2/3) with \texttt{question\_time} < 1.0 minute, \textbf{but only if \texttt{time\_pressure} == \texttt{True}}.
+    \item \textbf{Global Rule - Data Filtering and Overtime Flagging:}
+    \begin{itemize}
+        \item First, apply the \texttt{is\_invalid} flag based on the logic above.
+        \item Create a filtered dataset by removing questions marked \texttt{is\_invalid}. \textbf{All subsequent analyses (Chapters 2-7) exclusively use this filtered data.}
+        \item Second, using the filtered dataset, apply the established overtime thresholds/rules to flag remaining questions with \texttt{overtime} = \texttt{True} (or section-specific variants like \texttt{group\_overtime} in V, \texttt{msr\_group\_overtime} in DI).
+    \end{itemize}
+\end{enumerate}
+
+\textbf{Implementation Context:} Boolean flags (\texttt{time\_pressure}, \texttt{is\_invalid}, \texttt{overtime}) are added as columns to the \texttt{pandas} DataFrame. Thresholds are assigned to variables based on conditional logic applied to the \texttt{time\_pressure} status. Filtering is achieved via DataFrame slicing (e.g., \texttt{df\_filtered = df[\textasciitilde df['is\_invalid']]}).
+
+\textbf{Rationale:} Ensures analyses are based on reliable data reflecting genuine effort and capability, while setting context-aware standards for time efficiency. Explicitly filtering invalid data before overtime flagging prevents misinterpreting rushed guesses as slow performance.
+
+\subsection{Chapter 2: Multi-Dimensional Performance Analysis}
+
+\textbf{Objective:} Analyze performance accuracy and efficiency across key dimensions relevant to each section, using the \textbf{filtered dataset}.
+
+\textbf{Operational Logic:}
+\begin{itemize}
+    \item \textbf{Difficulty Level Standardization:} Raw numeric \texttt{question\_difficulty} values are mapped to standardized categorical bands (e.g., "Low / 505+", "Medium / 605+", "High / 705+") using a consistent mapping function across sections. This facilitates comparison and interpretation.
+    \item \textbf{Performance Metric Calculation:} For each relevant dimension or combination, calculate key metrics using the filtered data: total count, number of errors (\texttt{is\_correct}==\texttt{False}), number of overtime instances (\texttt{overtime}==\texttt{True}), error rate, and overtime rate. Division by zero is handled gracefully (e.g., returning 0.0 or NaN).
+\end{itemize}
+
+\textbf{Section-Specific Analysis Dimensions \& Metrics:}
+\begin{itemize}
+    \item \textbf{Quant (Q):}
+    \begin{itemize}
+        \item The primary dimensions analyzed for Quant section are: \texttt{question\_type} ('Real'/'Pure'), \texttt{question\_fundamental\_skill}, and \texttt{difficulty\_label}.
+        \item Analysis: Compares error rates and overtime rates between 'Real' and 'Pure'. Identifies significant differences based on absolute count difference ($\geq$ 2) in errors or overtime instances, setting flags (\texttt{poor\_real}, \texttt{slow\_pure}, etc.).
+    \end{itemize}
+    \item \textbf{Data Insights (DI):}
+    \begin{itemize}
+        \item Dimensions: \texttt{content\_domain} ('Math Related'/'Non-Math Related'), \texttt{question\_type} ('DS', 'TPA', 'MSR', 'GT'), \texttt{difficulty\_label}.
+        \item Analysis: Calculates error and overtime rates per dimension/combination. Identifies significant differences between \texttt{content\_domain}s based on absolute count difference ($\geq$ 2), setting flags (\texttt{poor\_math\_related}, \texttt{slow\_non\_math\_related}, etc.).
+    \end{itemize}
+    \item \textbf{Verbal (V):}
+    \begin{itemize}
+        \item Dimensions: \texttt{question\_fundamental\_skill}, \texttt{difficulty\_label}, \texttt{question\_type} ('CR'/'RC').
+        \item Analysis: Calculates error rates per dimension/combination. Identifies difficulty ranges and skills with the highest error concentration.
+    \end{itemize}
+\end{itemize}
+
+\textbf{Implementation Context:} \texttt{pandas} \texttt{groupby()} operations combined with \texttt{agg()} or \texttt{size().unstack()} are used extensively to compute metrics across dimensions. Error and overtime rates are calculated element-wise, often requiring intermediate steps to handle potential zero denominators (e.g., replacing 0 with \texttt{np.nan} before division). Significance flags are set using conditional logic based on the calculated metric differences.
+
+\textbf{Rationale:} Pinpoint specific areas (types, skills, domains, difficulties) where accuracy or efficiency challenges exist within the valid performance data, providing focus for root cause diagnosis and practice planning.
+
+\subsection{Chapter 3: Root Cause Diagnosis and Analysis}
+
+\textbf{Objective:} Investigate the underlying reasons (\"why") for errors and inefficiencies identified in previous chapters, utilizing the \textbf{filtered dataset}.
+
+\textbf{Core Concepts \& Operational Framework:}
+\begin{enumerate}
+    \item \textbf{Time Performance Classification:} Categorizes each valid question\'s time relative to the average for its type. Required metrics (\texttt{average\_time\_per\_type}) are pre-calculated from the filtered data.
+    \begin{itemize}
+        \item \texttt{is\_relatively\_fast}: \texttt{question\_time} < (\texttt{average\_time\_per\_type} * 0.75). The 0.75 factor is a configurable parameter.
+        \item \texttt{is\_slow}: Determined by the \texttt{overtime} flag (or its variants) applied in Chapter 1 based on the filtered data.
+        \item \texttt{is\_normal\_time}: Default state if neither \texttt{is\_relatively\_fast} nor \texttt{is\_slow}.
+    \end{itemize}
+    \item \textbf{Special Focus Error (\texttt{special\_focus\_error}, SFE):} This critical flag identifies instability in foundational knowledge.
+    \begin{itemize}
+        \item Definition: An error is classified as SFE under the following condition:
+        \texttt{is\_correct} == False AND \texttt{question\_difficulty} < \texttt{max\_mastered\_difficulty}.
+        \item \texttt{max\_mastered\_difficulty} is calculated per \texttt{question\_fundamental\_skill} (for Q/V) or per \texttt{question\_type}/\texttt{content\_domain} combination (for DI section) by finding the maximum \texttt{question\_difficulty} among correctly answered questions within that category in the filtered data.
+        \item Handling: SFE-flagged questions receive priority in subsequent reporting and recommendation generation.
+    \end{itemize}
+    \item \textbf{Diagnostic Label Assignment:} Based on the time performance classification and SFE status, each question is assigned diagnostic labels. These labels encapsulate the primary findings regarding potential root causes (e.g., \"Slow \& Wrong\", \"Fast \& Wrong\", \"SFE\"). These labels, rather than complex scenarios, serve as the core input for generating targeted recommendations in Chapter 7 and the narrative summary in Chapter 8. The detailed follow-up actions (student recall, evidence review, qualitative analysis) are presented as guidance in Chapter 8.
+\end{enumerate}
+
+\textbf{Implementation Context:} The logic is implemented within the main analysis loop iterating through the filtered DataFrame. Time classification and SFE flags (serving as primary diagnostic labels) are computed for each question. These labels are stored, often alongside brief descriptive notes derived from the combination (e.g., potential cause hypotheses like \"calculation barrier\" for DI Math Slow \& Wrong), for use in generating detailed diagnostic text and recommendations in Chapters 7 and 8.
+
+\textbf{Rationale:} Moves beyond identifying \textit{what} is wrong to systematically classifying \textit{why} using standardized diagnostic labels, enabling the development of targeted and effective improvement strategies by providing structured inputs for subsequent planning and reporting.
+
+\subsection{Chapters 4 \& 5: Section-Specific Analyses, Patterns, and Carelessness}
+
+\textbf{Objective:} Conduct further analyses tailored to section characteristics, examine efficiency in correct answers, and assess behavioral patterns like carelessness, using the \textbf{filtered dataset}.
+
+\textbf{Synthesized Analyses \& Operationalization:}
+\begin{itemize}
+    \item \textbf{Analysis of Correct but Overtime Questions:}
+    \begin{itemize}
+        \item Identification: Filter questions where \texttt{is\_correct} == True AND \texttt{is\_slow} (or equivalent overtime flag) == True.
+        \item Data Recorded: \texttt{question\_id}, \texttt{question\_type}, \texttt{question\_fundamental\_skill} (if applicable), \texttt{question\_time}.
+        \item Purpose: These instances trigger recommendations in Chapter 7 aimed at improving fluency and efficiency.
+    \end{itemize}
+    \item \textbf{Special Pattern Observation (Early-Stage Rapid Responses):}
+    \begin{itemize}
+        \item Identification: We check for questions meeting these criteria:
+        Located in the first third (\texttt{question\_position} $\leq$ \texttt{total\_number\_of\_questions} / 3) AND \texttt{question\_time} < 1.0 minute (absolute threshold).
+        \item Reporting: If found, an alert regarding potential pacing issues or \texttt{flag for review} risks is included in the Chapter 8 summary.
+    \end{itemize}
+    \item \textbf{Carelessness Assessment (\texttt{carelessness\_issue}):}
+    \begin{itemize}
+        \item Calculation: Determine \texttt{fast\_wrong\_rate} = (Count of \texttt{is\_relatively\_fast} AND \texttt{is\_correct} == False) / (Total count of \texttt{is\_relatively\_fast}). Requires prior calculation of the \texttt{is\_relatively\_fast} flag from Chapter 3. Handle division by zero if no questions were relatively fast.
+        \item Flagging: If \texttt{fast\_wrong\_rate} > 0.25 (configurable threshold), set \texttt{carelessness\_issue} = \texttt{True}.
+        \item Reporting: If flagged, the Chapter 8 summary includes a note about potential carelessness.
+    \end{itemize}
+    \item \textbf{Core Skill/Type Reference (Context for Verbal):} The detailed breakdown of \texttt{CR} and \texttt{RC} sub-types, originally presented as a separate chapter in the Verbal source document, serves as reference material for interpreting Chapter 3 diagnoses and formulating Chapter 7 recommendations for the Verbal section. It is not an active analytical step itself but provides necessary classification context.
+\end{itemize}
+
+\textbf{Implementation Context:} These analyses are typically performed after the main Chapter 3 loop. Identification involves conditional filtering of the DataFrame. Rate calculations use simple aggregation and division. Flags are stored for use in Chapter 8 report generation.
+
+\textbf{Rationale:} These chapters refine the diagnosis by examining efficiency patterns even in correct responses, identifying potential test-taking habits (pacing, carelessness), and providing necessary contextual classification (for Verbal), thereby adding further layers to the performance understanding.
+
+\subsection{Chapter 6: Fundamental Ability / Skill / Type Coverage Rules}
+
+\textbf{Objective:} Determine if pervasive weakness exists across an entire \texttt{fundamental\_skill} (Q/V) or \texttt{question\_type} (DI), warranting foundational reinforcement rather than solely addressing individual errors, using the \textbf{filtered dataset}.
+
+\textbf{Operational Logic:}
+\begin{enumerate}
+    \item \textbf{Calculate Performance Rates:} For each \texttt{fundamental\_skill} (Q/V) or \texttt{question\_type} (DI), compute the overall \texttt{error\_rate} and \texttt{overtime\_rate} using the filtered data.
+    \item \textbf{Trigger Override:} A coverage rule is triggered if, for a given skill/type, \texttt{error\_rate} > 0.5 \textbf{OR} \texttt{overtime\_rate} > 0.5. The 0.5 (50\%) threshold is a configurable parameter. Set \texttt{skill\_override\_triggered}[\textit{Skill}] (Q/V) or \texttt{override\_triggered}[\textit{Type}] (DI) = \texttt{True}.
+    \item \textbf{Determine Macroscopic Parameters (If Triggered):} These parameters guide the foundational practice recommendations.
+    \begin{itemize}
+        \item \textbf{Macroscopic Difficulty (\texttt{Y\_agg}):} Identify the minimum \texttt{question\_difficulty} among all error or overtime questions within the triggered skill/type. Map this minimum difficulty to the standardized 6-level label (e.g., "Low / 505+", "Medium / 605+").
+        \item \textbf{Macroscopic Time Limit (\texttt{Z\_agg}):}
+        \begin{itemize}
+            \item Q: Fixed at 2.5 minutes.
+            \item DI: Based on the maximum \texttt{question\_time} observed within the triggered type, rounded down to the nearest 0.5 minutes (\texttt{floor(max\_time\_triggering * 2) / 2}).
+            \item V: (Not explicitly defined in source V doc, but implied standard times). Can be unified using a similar logic to DI or fixed values per type (e.g., CR 2.5 min, RC 2.0 min).
+        \end{itemize}
+    \end{itemize}
+\end{enumerate}
+
+\textbf{Implementation Context:} Performance rates are calculated using \texttt{groupby()} on the filtered DataFrame. The override trigger logic involves conditional checks on these rates. If triggered, \texttt{Y\_agg} is determined by finding the minimum difficulty in the relevant subset and applying the standard mapping function; \texttt{Z\_agg} is calculated based on the rules above. Results are typically stored in dictionaries mapping skills/types to their override status and associated \texttt{Y\_agg}/\texttt{Z\_agg} values.
+
+\textbf{Rationale:} Acts as a crucial gating mechanism for practice planning. If a fundamental area shows systemic weakness (high error/overtime rate), the framework prioritizes broad, foundational practice (macroscopic recommendation) over potentially numerous, less effective fixes for individual symptoms (microscopic recommendations).
+
+\subsection{Chapter 7: Practice Planning and Recommendations}
+
+\textbf{Objective:} Translate all diagnostic findings from the filtered data analysis into a specific, actionable, and personalized practice plan.
+
+\textbf{Operational Logic:}
+\begin{enumerate}
+    \item \textbf{Identify Recommendation Triggers:} Collate all instances requiring recommendations:
+    \begin{itemize}
+        \item Individual questions flagged as incorrect (\texttt{is\_correct}==False) or correct but overtime (\texttt{is\_correct}==True AND \texttt{is\_slow}==True) based on Chapters 3 \& 4 analyses.
+        \item Skills (Q/V) or Types (DI) flagged by the override rule (\texttt{skill\_override\_triggered} / \texttt{override\_triggered}) in Chapter 6.
+    \end{itemize}
+    \item \textbf{Generate Recommendations (Iterative Process):}
+    \begin{itemize}
+        \item \textbf{Exemption Check:} Before generating a case-specific recommendation for a skill (Q/V) or type/domain combination (DI), check if it exhibits stable performance. This is determined by calculating \texttt{num\_correct\_not\_overtime} (count of correct and non-overtime questions) for that category. If \texttt{num\_correct\_not\_overtime} > 2 (configurable threshold), the category is considered exempt, and case-specific recommendations for it are skipped. Exemption notes are recorded.
+        \item \textbf{Override Check:} If a skill/type has its override flag set (\texttt{True} from Chapter 6), generate \textbf{only one Macroscopic Recommendation} for that entire skill/type, using the pre-calculated \texttt{Y\_agg} and \texttt{Z\_agg}. This recommendation emphasizes foundational practice. Mark the skill/type as processed to prevent adding further case-specific suggestions for it.
+        \item \textbf{Generate Case-Specific Recommendation (If not overridden or exempt):} For each triggering incorrect/overtime question:
+        \begin{enumerate}
+            \item Determine Practice Difficulty (\texttt{Y}): Map the original question's difficulty (\texttt{D}) to the standardized 6-level label.
+            \item Determine Starting Practice Time Limit (\texttt{Z}): Employ a unified calculation rule across sections:
+            \begin{itemize}
+                \item Define \texttt{target\_time} based on question type (Q: 2.0; DI: Type-specific e.g., DS=2.0, TPA=3.0; V: CR=2.0, RC=1.5).
+                \item Calculate \texttt{base\_time} = \texttt{question\_time} - 0.5 (if \texttt{is\_slow}) else \texttt{question\_time}.
+                \item Calculate \texttt{Z\_raw} = \texttt{floor(base\_time * 2) / 2}.
+                \item Set \texttt{Z} = \texttt{max(Z\_raw, target\_time)}.
+            \end{itemize}
+            \item Construct Suggestion Text: Include skill/type/domain, brief issue description (from Ch 3/4), difficulty \texttt{Y}, time \texttt{Z}, and target time.
+            \item Apply Annotations:
+            \begin{itemize}
+                \item Prepend "\textit{Fundamental mastery potentially unstable:}" or similar if triggered by \texttt{special\_focus\_error} (from Ch 3).
+                \item Append volume alert like "\textbf{(Requires increased practice volume...)}" if \texttt{Z} significantly exceeds \texttt{target\_time} (e.g., \texttt{Z} - \texttt{target\_time} > 2.0 min).
+            \end{itemize}
+        \end{enumerate}
+    \end{itemize}
+    \item \textbf{Organize and Finalize Output:}
+    \begin{itemize}
+        \item Group all generated recommendations (macroscopic, case-specific, exemption notes) by \texttt{fundamental\_skill} (Q/V) or \texttt{question\_type} (DI).
+        \item Apply Focus Rules: Adjust recommendation text based on Chapter 2 flags (e.g., if \texttt{poor\_real} in Q, suggest higher proportion of 'Real' questions for relevant skills; similar logic for DI domains).
+        \item Prioritize/Highlight SFE-related recommendations within the grouped list.
+        \item Sort the final list of recommendations (e.g., by priority derived from SFE status or override status).
+    \end{itemize}
+\end{enumerate}
+
+\textbf{Implementation Context:} This logic typically resides in the latter part of the main analysis function. Exemption checks require pre-calculating \texttt{num\_correct\_not\_overtime} per category. Recommendation generation involves iterating through triggers, applying conditional logic for exemption/override, calculating Y/Z using helper functions or inline logic, formatting text strings with annotations, and storing them (e.g., in a list of dictionaries). Focus rules are applied during the final organization phase. To enhance the fluency and clarity of the generated report, AI-powered tools may optionally be utilized to assist in synthesizing the findings and recommendations into user-friendly prose.
+
+\textbf{Rationale:} Provides a holistic, actionable summary translating complex quantitative diagnostics and parameterized recommendations into clear, user-friendly insights and next steps, maximizing the practical value of the analysis for the student.
+
+\subsection{Chapter 8: Diagnostic Summary and Subsequent Actions}
+
+\textbf{Objective:} Synthesize all analysis findings and recommendations into a comprehensive, easily understandable report for the student, \textbf{using exclusively natural language}.
+
+\textbf{Report Structure and Content Synthesis:}
+\begin{enumerate}
+    \item \textbf{Opening Summary:} This initial section synthesizes key findings from Chapter 1, including: the assessed \texttt{time\_pressure} status (described naturally, e.g., "significant time pressure was likely experienced"), total time usage relative to the limit, and whether any data was deemed invalid due to end-section rushing (e.g., "analysis excludes X questions answered hastily at the end under pressure").
+    \item \textbf{Performance Overview:} Summarizes Chapter 2 results descriptively: Relative performance across key dimensions (Q: 'Real' vs. 'Pure'; DI: 'Math Related' vs. 'Non-Math Related', types 'DS', 'TPA', etc.; V: Skill performance, 'CR' vs. 'RC') and difficulty levels (e.g., "Errors were concentrated in the High difficulty range," "Performance on 'Math Related' DI questions was significantly weaker than 'Non-Math Related'"). Mention reading time assessment for V if flagged.
+    \item \textbf{Core Problem Diagnosis:} Translates Chapter 3 findings into narrative form: Describes primary error patterns identified (e.g., "A tendency towards calculation errors in Pure Quant questions was observed," "Difficulties in interpreting complex graph relationships under time pressure were noted in GT questions," "Logical flaws in evaluating assumptions were apparent in CR questions"). \textbf{Crucially highlights SFE findings} using descriptive language (e.g., "Particular attention is needed for errors occurring on questions below your typical mastery level in [Skill/Type], suggesting instability in applying fundamental concepts."). Includes MSR-specific time issues for DI if detected.
+    \item \textbf{Pattern Observation:} Integrates Chapter 5 alerts: Notes risks associated with early-stage rapid responses or potential carelessness if the \texttt{carelessness\_issue} flag was triggered (e.g., "A pattern of rapid, incorrect answers suggests that focusing on accuracy over speed may be beneficial").
+    \item \textbf{Foundational Consolidation Advisory:} Explicitly states which skills/types require systematic foundational work based on Chapter 6 override triggers (e.g., "Systematic review and practice of the fundamentals for [Skill/Type] is recommended due to overall performance patterns").
+    \item \textbf{Practice Plan Presentation:} Presents the full, organized list of recommendations generated in Chapter 7, ensuring clarity and including all annotations (priority, volume alerts, focus rules, exemptions) in natural language descriptions within the recommendation text itself.
+    \item \textbf{Guidance for Subsequent Actions:} Provides actionable next steps:
+    \begin{itemize}
+        \item \textbf{Guiding Reflection Questions:} Poses targeted, open-ended questions based on the specific diagnoses to prompt student self-assessment (incorporating MSR-specific questions for DI).
+        \item \textbf{Secondary Evidence Review Suggestion:} Explains \textit{when} (e.g., uncertain recall, need pattern confirmation) and \textit{how} (e.g., review recent logs, focus on specific error types) to use past practice data.
+        \item \textbf{Qualitative Analysis Suggestion:} Explains \textit{when} (e.g., root cause remains unclear after other steps) and \textit{how} (e.g., provide detailed walkthroughs for specific problem types) to engage in deeper analysis, potentially with an advisor.
+    \end{itemize}
+\end{enumerate}
+
+\textbf{Core Constraint Adherence:} The implementation generating this chapter\'s output must rigorously avoid exposing internal variable names (e.g., \texttt{time\_pressure}, \texttt{is\_invalid}, \texttt{special\_focus\_error}), flags (\texttt{poor\_real}), numerical thresholds (e.g., \texttt{0.75}, \texttt{2.0}, \texttt{0.5}), or calculation details (e.g., \texttt{floor(base\_time*2)/2}). All findings must be translated into clear, easily understandable, descriptive prose suitable for the end-user (student).
+
+\textbf{Implementation Context:} This is typically handled by a dedicated \texttt{generate\_report\_*} function that receives all computed metrics, flags, lists, and generated recommendation texts as arguments. It uses conditional statements (\texttt{if/else}) and formatted strings (\texttt{f-strings}) to assemble the report sections based on the presence and values of these inputs, ensuring adherence to the natural language constraint.
+
+\textbf{Rationale:} Provides a holistic, actionable summary translating complex quantitative diagnostics and parameterized recommendations into clear, user-friendly insights and next steps, maximizing the practical value of the analysis for the student.
+
+\subsection{Illustrative Example: Simplified Question Journey}
+
+To illustrate how the framework processes a single question, consider this simplified hypothetical example for a Quant ('Pure') question:
+
+\textbf{Input Data:}
+\begin{itemize}
+    \item \texttt{question\_id}: Q5
+    \item \texttt{question\_time}: 3.2 min
+    \item \texttt{is\_correct}: False
+    \item \texttt{question\_difficulty}: 650
+    \item \texttt{question\_position}: 10 (out of 21)
+    \item \texttt{question\_type}: 'Pure'
+    \item \texttt{question\_fundamental\_skill}: 'Algebra'
+    \item (Assume \texttt{total\_test\_time} = 43 min, \texttt{max\_allowed\_time} = 45 min, implies \texttt{time\_pressure} = False based on Q/DI rule)
+    \item (Assume \texttt{average\_time\_per\_type} for 'Pure' = 2.1 min)
+    \item (Assume \texttt{max\_mastered\_difficulty} for 'Algebra' = 700)
+\end{itemize}
+
+\textbf{Framework Steps Applied:}
+\begin{enumerate}
+    \item \textbf{Chapter 1 (Validity/Overtime):} 
+        \begin{itemize}
+            \item \texttt{time\_pressure} is False. 
+            \item \texttt{question\_position} is not in the last third, and \texttt{question\_time} > 1.0 min $\rightarrow$ \texttt{is\_invalid} = False. (Data is valid).
+            \item The \texttt{overtime\_threshold} for Q (no pressure) is 3.0 min. Since 3.2 min > 3.0 min $\rightarrow$ \texttt{overtime} = True.
+        \end{itemize}
+    \item \textbf{Chapter 2 (Performance - Context):} This question contributes to the overall metrics for 'Pure' type, 'Algebra' skill, and the corresponding difficulty band (e.g., "Medium / 605+").
+    \item \textbf{Chapter 3 (Root Cause):}
+        \begin{itemize}
+            \item Time Classification: 3.2 min is not < (2.1 * 0.75) $\rightarrow$ \texttt{is\_relatively\_fast} = False. Since \texttt{overtime} is True $\rightarrow$ \texttt{is\_slow} = True.
+            \item SFE Check: \texttt{is\_correct} is False, and \texttt{question\_difficulty} (650) < \texttt{max\_mastered\_difficulty} (700) $\rightarrow$ \texttt{special\_focus\_error} = True.
+            \item Scenario: Slow \& Wrong \& SFE.
+        \end{itemize}
+    \item \textbf{Chapter 6 (Coverage - Check):} Check if 'Algebra' skill has \texttt{error\_rate} or \texttt{overtime\_rate} > 50%. (Assume for this example it does not $\rightarrow$ \texttt{skill\_override\_triggered}['Algebra'] = False).
+    \item \textbf{Chapter 7 (Recommendation):}
+        \begin{enumerate}
+            \item Trigger: Incorrect question (Q5).
+            \item Exemption/Override: Not exempt (based on other Algebra questions) and not overridden.
+            \item Y (Difficulty): Map 650 to label (e.g., "Medium / 605+").
+            \item Z (Time): \texttt{is\_slow} is True. \texttt{base\_time} = 3.2 - 0.5 = 2.7. \texttt{Z\_raw} = floor(2.7 * 2) / 2 = floor(5.4) / 2 = 5.0 / 2 = 2.5. \texttt{target\_time} for Q is 2.0. \texttt{Z} = max(2.5, 2.0) = 2.5 min.
+            \item Annotation: Prepend "*Fundamental mastery potentially unstable:* Practice Algebra ('Pure') problems at Medium / 605+ difficulty, starting with a 2.5 min time limit (target 2.0 min)."
+        \end{enumerate}
+\end{enumerate}
+This example shows the flow from raw data through flagging (overtime, SFE) to a specific, annotated recommendation based on the framework's rules.
+
+\subsection{Implementation Details}
+
+The unified diagnostic framework described herein has been implemented as a set of Python scripts (\texttt{gmat\_q\_analyzer.py}, \texttt{gmat\_di\_analyzer.py}, \texttt{gmat\_v\_analyzer.py}), one for each GMAT section. The development followed an iterative process involving requirements analysis based on the methodological documents (\texttt{en-gmat-\*.md}), coding, testing with sample datasets (\texttt{testset-\*.csv}), debugging, and refinement based on analysis outcomes and evolving reporting requirements.
+
+\textbf{Core Technologies:}
+\begin{itemize}
+    \item \textbf{Python:} The primary programming language.
+    \item \textbf{Pandas:} Extensively used for data manipulation, including reading CSV files, data cleaning (handling missing values, type conversion), filtering, grouping, aggregation, and time-series operations where applicable. DataFrame structures are central to storing and processing the per-question data and analytical results.
+    \item \textbf{NumPy:} Utilized for numerical operations, handling potential \texttt{NaN} values, and creating placeholder data structures (e.g., spacer rows using \texttt{np.nan}).
+    \item \textbf{Argparse:} Employed for command-line argument parsing, allowing users to specify input/output file paths and optional flags (e.g., overriding \texttt{time\_pressure} status).
+\end{itemize}
+
+\textbf{Development Challenges \& Solutions:}
+\begin{itemize}
+    \item \textbf{Environment \& Dependencies:} Initial challenges included resolving Python interpreter path issues and managing dependencies (\texttt{pandas}, \texttt{numpy}). The use of Python virtual environments (\texttt{venv}) was adopted to ensure consistent and isolated execution environments, addressing \texttt{externally-managed-environment} errors related to PEP 668.
+    \item \textbf{Data Inconsistencies:} Handling variations in input CSV formats, such as extra commas in headers or differing column names (e.g., \texttt{V\_b}, \texttt{DI\_b} vs. a consistent \texttt{question\_difficulty}), required robust parsing logic (e.g., using \texttt{usecols} in \texttt{pd.read\_csv}, dynamic column renaming). Encoding issues were addressed by attempting multiple common encodings (\texttt{utf-8}, \texttt{gbk}, \texttt{cp950}).
+    \item \textbf{Logic Implementation:} Translating the sometimes complex, multi-conditional logic from the markdown documents into precise code required careful structuring, particularly for overtime calculations, SFE detection, and recommendation generation involving multiple interacting rules (override, exemption, focus). Helper functions were created to encapsulate reusable logic (e.g., difficulty mapping, safe division, Z-time calculation, MSR/RC group processing).
+    \item \textbf{Pandas Operations:} Specific \texttt{pandas} operations occasionally led to errors (e.g., ambiguity in boolean operations on DataFrames, errors during DataFrame initialization with specific structures like \texttt{[[]] * n}), necessitating refactoring to use element-wise operations or more robust initialization methods (\texttt{pd.DataFrame(np.nan, ...)}).
+    \item \textbf{Evolving Requirements:} The most significant evolution was the increasing demand for report granularity. Initial implementations produced summary-level reports, but later iterations required significant refactoring to generate detailed, per-question diagnostics, actions, reflections, and evidence prompts, necessitating the creation of \texttt{get\_detailed\_diagnosis\_*} functions and modifications to the main analysis loop and report generation logic across all three scripts.
+    \item \textbf{Debugging:} Identifying the root cause of errors often involved tracing data flow through the DataFrame, checking intermediate values, and verifying that conditional logic correctly handled edge cases (e.g., division by zero, empty data subsets after filtering). \texttt{NameError} and \texttt{KeyError} issues were common during refactoring, requiring careful checking of variable scope and dictionary key handling.
+\end{itemize}
+
+\textbf{Output Data Format (Annotated CSV):}
+In addition to the natural language summary report, the Python scripts generate an output CSV file (e.g., \texttt{testset-q-analyzed.csv}). This file contains all the original input data plus several new columns representing the diagnostic flags calculated during the analysis. Key added columns include:
+
+\begin{itemize}
+    \item \texttt{difficulty\_label}: The standardized difficulty category (e.g., "Medium / 605+").
+    \item \texttt{time\_pressure}: Boolean flag indicating if overall time pressure was detected (Chapter 1).
+    \item \texttt{is\_invalid}: Boolean flag indicating if the question data was excluded due to extreme rushing under time pressure (Chapter 1).
+    \item \texttt{overtime} (or variants like \texttt{group\_overtime}): Boolean flag indicating if the question (or group) exceeded the calculated overtime threshold based on the *filtered* data (Chapter 1).
+    \item \texttt{is\_relatively\_fast}: Boolean flag indicating if the question was answered significantly faster than the average for its type (Chapter 3).
+    \item \texttt{is\_slow}: Boolean flag, essentially mirroring the \texttt{overtime} flag for consistency in time classification (Chapter 3).
+    \item \texttt{max\_mastered\_difficulty}: The highest difficulty level mastered within the relevant skill/type category based on correct answers (Chapter 3).
+    \item \texttt{special\_focus\_error}: A Boolean indicator signifying an error made on a question possessing a difficulty level inferior to the user's attained \texttt{max\_mastered\_difficulty} within that specific subject category (as specified in Chapter 3).
+    \item \texttt{skill\_override\_triggered} / \texttt{override\_triggered}: Boolean flag indicating if a coverage rule was triggered for the question's skill/type (Chapter 6).
+    \item \texttt{Recommendation\_Y}: The suggested practice difficulty level (String label).
+    \item \texttt{Recommendation\_Z}: The suggested starting practice time limit (Numeric, minutes).
+    \item \texttt{Diagnostic\_Notes}: Text field containing generated diagnostic comments or recommendation details.
+\end{itemize}
+This annotated CSV allows for detailed review and further analysis of the framework's per-question conclusions.
+
+\textbf{Current State:} The resulting Python scripts represent functional implementations of the diagnostic framework. They successfully ingest section-specific GMAT data, apply the complex analytical logic outlined in Chapters 0-7, handle various data edge cases, and produce detailed output CSV files containing both per-question diagnostic flags and a comprehensive, natural-language summary report adhering to the structure of Chapter 8. The scripts are designed to be run from the command line, providing a practical tool for automated GMAT performance analysis.
+
+\section{Conclusion}
+
+The primary value of this framework, as detailed in this technical report, lies in its systematic and unified approach to formalizing the complex process of GMAT performance diagnosis across multiple sections. It provides a transparent, structured, and potentially automatable methodology moving beyond simple metrics. 
+
+As documentation focused on the framework's design, readers should note its current limitations. The specific parameter values used in the implementation represent informed heuristics derived from initial analysis and expert consultation, rather than statistically optimized values derived from large-scale empirical validation. While preliminary comparisons to expert analysis are encouraging, rigorous validation of the framework's diagnostic accuracy and effectiveness remains a crucial next step for future development.
+
+The unified GMAT diagnostic framework presented offers a systematic, multi-faceted approach to analyzing student performance across the Quantitative, Data Insights, and Verbal sections. By adhering to a consistent chapter-based structure while accommodating section-specific nuances through parameterized logic and tailored analyses, the framework moves beyond superficial score reporting to identify root causes of errors and inefficiencies. Key strengths include:
+
+\begin{itemize}
+    \item \textbf{Comprehensive Scope:} Addresses time management, data validity, accuracy, efficiency, behavioral patterns, and foundational knowledge across all scored sections.
+    \item \textbf{Depth of Analysis:} Employs concepts like relative time performance, \texttt{special\_focus\_error} detection, and coverage rules to provide nuanced diagnoses based on operationalized parameters.
+    \item \textbf{Actionable Output:} Generates personalized practice plans with specific difficulty (\texttt{Y}/\texttt{Y\_agg}) and time (\texttt{Z}/\texttt{Z\_agg}) parameters, alongside structured guidance for self-reflection and further analysis.
+    \item \textbf{Standardization \& Adaptability:} Provides a consistent analytical process applicable to Q, DI, and V, ensuring comparable insights while respecting the unique demands of each section, as evidenced by the successful implementation across three distinct Python modules.
+\end{itemize}
+
+This framework, validated through empirical testing and refinement, empowers students and instructors with detailed, data-driven insights, facilitating more targeted preparation and ultimately aiming for improved GMAT performance.
+
+\section{Future Directions}
+
+Building upon the established framework and its current implementation, several avenues for future development and application are envisioned:
+
+\begin{enumerate}
+    \item \textbf{Web-Based Implementation:} To enhance accessibility and utility, the diagnostic framework is planned for implementation as an automated, user-facing tool integrated into a web platform. This would allow students to upload their score data (e.g., via CSV or potentially through direct API integration if available) and receive instant, standardized diagnostic reports through a user-friendly interface.
+    \item \textbf{Rigorous Parameter Optimization and Validation:} To move beyond the initial heuristic values presented herein, further refinement and rigorous validation of the framework's parameters (e.g., time thresholds, relative speed factors, SFE sensitivity, coverage rule percentages) and predictive accuracy are planned. Techniques such as Grid Search or other hyperparameter optimization methods could be employed to systematically evaluate different combinations of parameter values against larger datasets of student performance and subsequent improvement outcomes. The goal is to identify parameter sets that maximize the concordance between the framework's automated diagnosis and validated performance metrics or expert assessments, thereby optimizing the model's diagnostic and predictive effectiveness.
+    \item \textbf{Integration of Qualitative Feedback:} Explore methods to integrate qualitative student feedback (e.g., self-reported reasons for errors, confidence levels) directly into the diagnostic process, potentially refining the root cause analysis beyond purely quantitative data.
+    \item \textbf{Longitudinal Analysis:} Extend the framework to analyze performance trends over multiple test administrations or practice sessions for a single student, identifying patterns of improvement or persistent weaknesses.
+\end{enumerate}
+
+% --- Document End ---
+\end{document}
+
+\newpage % Start Appendix on a new page
+\appendix
+\section*{Appendix: Key Parameters and Heuristic Values}
+
+This appendix summarizes key parameters, thresholds, and heuristic values used throughout the diagnostic framework. These values are derived from expert consultation and preliminary data analysis. They represent the current configuration but may be subject to further refinement and validation based on larger datasets and ongoing research to optimize diagnostic accuracy and effectiveness.
+
+\vspace{1em} % Add some vertical space before the table
+
+\begin{tabular}{|l|p{8cm}|l|}
+\hline
+\textbf{Parameter Category} & \textbf{Parameter/Rule Description} & \textbf{Current Heuristic Value} \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Chapter 1: Time Strategy & Validity}} \\
+\hline
+Time Pressure (Q/DI) & Threshold for \texttt{time\_diff} (≤) AND Min time for last 1/3 question (<) to trigger \texttt{time\_pressure} & 3.0 min AND 1.0 min \\
+Time Pressure (V) & Threshold for \texttt{time\_diff} (<) to trigger \texttt{time\_pressure} & 1.0 min \\
+Invalid Data & Min time (<) for last 1/3 question when \texttt{time\_pressure} is True & 1.0 min \\
+Overtime Threshold (Q) & Base / Time Pressure & 3.0 min / 2.5 min \\
+Overtime Threshold (DI - DS) & Base / Time Pressure & 2.5 min / 2.0 min \\
+Overtime Threshold (DI - TPA) & Base / Time Pressure (Individual Question) & 3.5 min / 3.0 min \\
+Overtime Threshold (DI - MSR Group) & Base / Time Pressure (Target Time) & 7.0 min / 6.0 min \\
+Overtime Threshold (DI - MSR Single) & Reading Threshold / Single Question Threshold & 1.5 min / 1.5 min \\
+Overtime Threshold (V - CR) & Base / Time Pressure & 2.5 min / 2.0 min \\
+Overtime Threshold (V - RC Group 3Q) & Base / Time Pressure (Target Time) & 7.0 min / 6.0 min \\
+Overtime Threshold (V - RC Group 4Q) & Base / Time Pressure (Target Time) & 9.0 min / 8.0 min \\
+Overtime Threshold (V - RC Single) & Individual Question Threshold & 2.0 min \\
+RC Reading Time Barrier (V - 3Q Group) & Estimated reading time > & 2.0 min \\
+RC Reading Time Barrier (V - 4Q Group) & Estimated reading time > & 2.5 min \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Chapter 3: Root Cause Diagnosis}} \\
+\hline
+Relative Speed Factor & Multiplier for \texttt{average\_time\_per\_type} to determine \texttt{is\_relatively\_fast} (<) & 0.75 \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Chapter 5: Carelessness}} \\
+\hline
+Carelessness Threshold & \texttt{fast\_wrong\_rate} > & 0.25 (25%) \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Chapter 6: Coverage Rules}} \\
+\hline
+Coverage Threshold & \texttt{error\_rate} > OR \texttt{overtime\_rate} > & 0.5 (50%) \\
+Macroscopic Time (Z\_agg - Q) & Fixed value & 2.5 min \\
+Macroscopic Time (Z\_agg - DI/V) & Calculation based on max time in triggering set & See text \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Chapter 7: Recommendations}} \\
+\hline
+Exemption Threshold & \texttt{num\_correct\_not\_overtime} > & 2 \\
+Target Time (Q - Base) & Used in Z calculation & 2.0 min \\
+Target Time (DI - DS Base) & Used in Z calculation & 2.0 min \\
+Target Time (DI - TPA Base) & Used in Z calculation & 3.0 min \\
+Target Time (V - CR Base) & Used in Z calculation & 2.0 min \\
+Target Time (V - RC Base) & Used in Z calculation & 1.5 min \\
+Z Calc Adjustment (Slow) & Subtract from \texttt{question\_time} before rounding & 0.5 min \\
+Volume Alert Threshold & \texttt{Z} - \texttt{target\_time} > & 2.0 min \\
+\hline
+\end{tabular}
+
+\end{document}
