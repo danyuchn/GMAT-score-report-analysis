@@ -153,7 +153,7 @@
         <div class="slide">
             <h2>Abstract</h2>
             <p>This paper presents a unified diagnostic framework for analyzing student performance across GMAT Q, DI, and V sections. It employs a standardized, chapter-based methodology to identify root causes of errors and inefficiencies, moving beyond simple accuracy metrics.</p>
-            <p>Core inputs include per-question data and overall metrics. Analysis progresses through time/validity assessment, multi-dimensional performance analysis, error pattern diagnosis (time, difficulty, carelessness), coverage rule application, and personalized practice recommendations.</p>
+            <p>Core inputs include per-question data and overall metrics. Analysis progresses through time/validity assessment, multi-dimensional performance analysis, error pattern diagnosis (assigning diagnostic labels based on time, difficulty, carelessness), coverage rule application, and personalized practice recommendations.</p>
             <p>The final output is a natural language diagnostic summary providing actionable insights. This unified structure ensures consistency while accommodating section-specific characteristics.</p>
         </div>
 
@@ -177,7 +177,7 @@
                 <li>Ambiguity Resolution & Parameterization: Replaced subjective concepts (e.g., "high pressure") with quantitative definitions/parameters.</li>
                 <li>System Structuring: Formalized parameter/step relationships into functions within the chapter flow.</li>
                 <li>Logical Validation: Ensured internal consistency (no contradictions, undefined elements, dead ends).</li>
-                <li>Empirical Testing & Refinement: Tested framework against real data and expert analysis (>90% congruence), calibrating rules for higher accuracy.</li>
+                <li>Empirical Testing & Refinement: Tested framework against real data and expert analysis (>90% congruence), calibrating rules for higher accuracy. \emph{AI-powered assistants aided formalization and validation phases.}</li>
             </ol>
         </div>
 
@@ -250,29 +250,33 @@
         <div class="slide">
             <h2>2.4 Chapter 3: Root Cause Diagnosis (1/2)</h2>
             <h3>Objective</h3>
-            <p>Investigate *why* errors and inefficiencies occur, using the <strong>filtered dataset</strong>.</p>
+            <p>Investigate *why* errors and inefficiencies occur, assigning specific diagnostic labels using the <strong>filtered dataset</strong>.</p>
             <h3>Key Concepts & Framework</h3>
             <ul>
                 <li>Time Performance Classification (Relative to type average):
                     <ul><li><code>is_relatively_fast</code>: <code>question_time</code> < (<code>average_time_per_type</code> * 0.75)</li> <li><code>is_slow</code>: Determined by <code>overtime</code> flag from Ch1 (on filtered data)</li> <li><code>is_normal_time</code></li></ul>
                 </li>
-                 <li>Special Focus Error (<code>special_focus_error</code>): Critical flag for instability.
+                 <li>Special Focus Error (<code>special_focus_error</code>, SFE): Critical flag for instability.
                      <ul><li>Definition: An error (<code>is_correct</code>==False) on a question with <code>question_difficulty</code> < <code>max_mastered_difficulty</code> for its skill/type category.</li>
                      <li><code>max_mastered_difficulty</code> is calculated per category from correct answers in filtered data.</li>
                      <li>Handling: Receives priority in reporting and recommendations.</li>
                     </ul>
                 </li>
+                 <li>Diagnostic Label Assignment:
+                     <ul>
+                         <li>Based on Time Performance + Correctness + SFE status, assign labels (e.g., "Slow & Wrong", "Fast & Wrong", "SFE").</li>
+                         <li>These labels encapsulate findings and serve as core input for Ch7 recommendations & Ch8 summary.</li>
+                     </ul>
+                 </li>
             </ul>
-            <h3>Diagnostic Scenario Analysis</h3>
-             <p>Systematically analyze combinations of Time Performance + Correctness (e.g., Fast & Wrong, Slow & Correct).</p>
         </div>
 
          <!-- Slide 9: Chapter 3: Root Cause Diagnosis (2/2) -->
         <div class="slide">
             <h2>2.4 Chapter 3: Root Cause Diagnosis (2/2)</h2>
-             <h3>Diagnostic Scenario Analysis & Action Workflow</h3>
+             <h3>Understanding Diagnostic Labels</h3>
              <ul>
-                <li>Hypothesize Potential Causes (Section/Type specific):
+                <li>Contextual Potential Causes (Inform label interpretation, section/type specific):
                     <ul>
                         <li>Reading/Comprehension Barrier</li>
                         <li>Concept/Formula/Method Gap</li>
@@ -283,16 +287,16 @@
                          <li>(Context: DI Math vs Non-Math; Q Real vs Pure; V CR vs RC)</li>
                     </ul>
                 </li>
-                <li>Structured Diagnostic Actions:
+                 <li>Structured Follow-up (Guidance provided in Ch8):
                     <ol>
-                        <li><strong>Student Recall:</strong> Initial reflection on the specific error/bottleneck.</li>
-                        <li><strong>Secondary Evidence Review:</strong> If recall insufficient, analyze recent (2-4 wks) practice data for similar patterns (same category, aim 5-10 examples).</li>
-                        <li><strong>Qualitative Analysis:</strong> If ambiguity persists, use detailed problem walkthroughs for deeper consultant analysis.</li>
+                         <li>Student Recall: Initial reflection on specific error/bottleneck.</li>
+                         <li>Secondary Evidence Review: Analyze recent practice for similar patterns.</li>
+                         <li>Qualitative Analysis: Detailed problem walkthroughs for deeper analysis.</li>
                     </ol>
                 </li>
              </ul>
              <h3>Rationale</h3>
-            <p>Moves beyond *what* is wrong to systematically investigate *why*, enabling targeted improvement strategies.</p>
+             <p>Moves beyond *what* is wrong to systematically classify *why* using standardized diagnostic labels, enabling targeted improvement strategies through structured inputs for planning and reporting.</p>
         </div>
 
         <!-- Slide 10: Chapters 4 & 5: Efficiency, Patterns, Carelessness -->
@@ -348,6 +352,7 @@
                     </ul>
                 </li>
              </ol>
+             <p><em>Note: AI tools may optionally assist in synthesizing recommendation text for clarity, but the core logic remains rule-based.</em></p>
              <h3>Rationale</h3>
             <p>Provide concrete plan addressing broad weaknesses & specific errors with clear parameters and context-aware adjustments.</p>
         </div>
@@ -386,10 +391,11 @@
             <ol>
                 <li>Opening Summary: Time usage, assessed <code>time_pressure</code> status (described naturally), total time vs limit, invalid data indication (e.g., "analysis excludes X questions answered hastily...").</li>
                  <li>Performance Overview: Descriptive summary of Chapter 2 results (relative performance on dimensions like Q:Real/Pure, DI:Math/Non-Math, V:Skills; difficulty concentration). Mention V reading time if flagged.</li>
-                 <li>Core Problem Diagnosis: Narrative translation of Chapter 3 findings (primary error patterns). <strong>Crucially highlights SFE implications descriptively</strong> (e.g., "instability in applying fundamental concepts below mastery level..."). Include DI MSR time issues if detected.</li>
+                 <li>Core Problem Diagnosis: Narrative translation of Chapter 3 diagnostic labels (primary error patterns). <strong>Crucially highlights SFE implications descriptively</strong> (e.g., "instability in applying fundamental concepts below mastery level..."). Include DI MSR time issues if detected.</li>
                  <li>Pattern Observation: Integrate Chapter 5 alerts (risks from early rapid responses, potential carelessness if <code>carelessness_issue</code> triggered).</li>
                  <li>Foundational Consolidation Advisory: Explicitly state which skills/types require foundational work based on Chapter 6 override triggers.</li>
             </ol>
+            <p><strong>Constraint:</strong> Report generation must strictly avoid exposing internal variable names, flags, thresholds, or calculation details, translating all findings into clear prose.</p>
         </div>
 
          <!-- Slide 15: Chapter 8: Diagnostic Summary (2/2) -->
@@ -407,7 +413,7 @@
                 </li>
              </ol>
              <h3>Core Constraint Adherence</h3>
-             <p>The implementation generating this report must rigorously <strong>avoid exposing internal variable names</strong> (e.g., <code>time_pressure</code>, <code>special_focus_error</code>), flags (<code>poor_real</code>), numerical thresholds, or calculation details. All findings must be translated into clear, descriptive prose.</p>
+             <p>The implementation generating this report must rigorously <strong>avoid exposing internal variable names</strong> (e.g., <code>time_pressure</code>, <code>special_focus_error</code>), flags (<code>poor_real</code>), numerical thresholds, or calculation details. All findings must be translated into clear, descriptive prose, even if AI tools optionally assist in synthesis.</p>
              <h3>Rationale</h3>
              <p>Provide a holistic, actionable summary translating complex quantitative diagnostics into clear, user-friendly insights and next steps.</p>
         </div>
