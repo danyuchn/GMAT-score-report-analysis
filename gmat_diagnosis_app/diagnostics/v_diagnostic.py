@@ -441,314 +441,199 @@ def run_v_diagnosis(df_v, v_time_pressure_status, num_invalid_v_questions, v_avg
     Runs the diagnostic analysis specifically for the Verbal section.
 
     Args:
-        df_v (pd.DataFrame): DataFrame containing only VALID Verbal response data.
-                             Processed by the main diagnosis module (invalid filtered out).
-                             Includes simulated 'question_difficulty'.
-                             Expected columns added by main module: 'overtime' (for CR), 'suspiciously_fast'.
-                             Assumes 'question_time' is in MINUTES.
-        v_time_pressure_status (bool): The calculated time pressure status for Verbal (True=High, False=Low).
-        num_invalid_v_questions (int): Number of invalid questions excluded for Verbal.
-        v_avg_time_per_type (dict): Dictionary mapping question type to average time (minutes).
+        df_v (pd.DataFrame): DataFrame containing only VALID V response data.
+        v_time_pressure_status (bool): Whether time pressure was detected for V.
+        num_invalid_v_questions (int): Number of V questions marked as invalid in Chapter 1.
+        v_avg_time_per_type (dict): Dictionary mapping V question types to average times.
 
     Returns:
-        dict: A dictionary containing the results of the Verbal diagnosis, structured by chapter.
-               Example: {'chapter_1': {...}, 'chapter_2': {...}, ...}
-        str: A string containing the summary report for the Verbal section.
+        dict: A dictionary containing the results of the V diagnosis.
+        str: A string containing the summary report for the V section.
+        pd.DataFrame: The processed V DataFrame with added diagnostic columns
+                      (diagnostic_params_list, is_sfe, time_performance_category).
     """
-    print("--- Entering run_v_diagnosis ---") # 添加標記
-    print(f"  Received df_v shape: {df_v.shape}") # 打印形狀
-    if 'is_correct' in df_v.columns:
-        print(f"  Value counts for 'is_correct' at entry:\n{df_v['is_correct'].value_counts()}") # 打印 is_correct 值分佈
-    else:
-        print("  'is_correct' column NOT FOUND at entry!")
-        print(f"  Available columns: {df_v.columns.tolist()}") # 列出可用欄位
-    # --- End Debug Print ---
-
     print("  Running Verbal Diagnosis...")
     v_diagnosis_results = {}
 
-    # --- Chapter 1: Applying RC Specific Logic & Global Rules ---
-    print("    Chapter 1: Applying RC Specific Logic & Global Rules")
+    if df_v.empty:
+        print("    No V data provided. Skipping V diagnosis.")
+        return {}, "Verbal (V) 部分無數據可供診斷。", pd.DataFrame()
+
+    # Make a copy to avoid modifying the original slice
+    df_v = df_v.copy()
+
+    # --- Chapter 0 & 1 Enhancements: Calculate RC Times & Overtime ---
+    # Calculate RC group info and reading/single Q times
+    df_v = _identify_rc_groups(df_v) # Adds 'rc_group_id' and 'rc_group_size'
+    df_v = _calculate_rc_times(df_v) # Adds 'rc_reading_time', 'rc_single_q_avg_time', 'rc_group_total_time'
+
+    # Recalculate RC Overtime based on detailed times (modifies 'overtime' column)
+    # Assume CR overtime was already set in diagnosis_module.py
+    rc_target_times = RC_GROUP_TARGET_TIMES[v_time_pressure_status]
+    if 'rc_group_id' in df_v.columns: # Ensure column exists
+        for index, row in df_v[df_v['question_type'] == 'Reading Comprehension'].iterrows():
+            group_size = row.get('rc_group_size')
+            target_group_time = rc_target_times.get(group_size)
+            
+            # Check Group Overtime
+            group_total_time = row.get('rc_group_total_time')
+            if target_group_time is not None and pd.notna(group_total_time) and group_total_time > (target_group_time + RC_GROUP_TARGET_TIME_ADJUSTMENT):
+                 df_v.loc[index, 'overtime'] = True # Mark individual Q if group is overtime
+                 # print(f"DEBUG RC Group OT: Index {index}, Group {row.get('rc_group_id')}, Total {group_total_time:.2f} > Target {target_group_time:.1f}")
+            
+            # Check Reading Overtime (reading_time vs threshold)
+            reading_time = row.get('rc_reading_time')
+            reading_threshold = RC_READING_TIME_THRESHOLD_3Q if group_size == 3 else RC_READING_TIME_THRESHOLD_4Q
+            is_reading_ot = pd.notna(reading_time) and reading_time > reading_threshold
+            df_v.loc[index, 'rc_reading_overtime'] = is_reading_ot # Store flag
+            # if is_reading_ot: print(f"DEBUG RC Reading OT: Index {index}, Time {reading_time:.2f} > Threshold {reading_threshold:.1f}")
+            
+            # Check Single Question Overtime (avg time of non-first Qs vs threshold)
+            single_q_avg_time = row.get('rc_single_q_avg_time')
+            is_single_q_ot = pd.notna(single_q_avg_time) and single_q_avg_time > RC_INDIVIDUAL_Q_THRESHOLD_MINUTES
+            df_v.loc[index, 'rc_single_q_overtime'] = is_single_q_ot # Store flag
+            # if is_single_q_ot: print(f"DEBUG RC Single Q OT: Index {index}, Avg Time {single_q_avg_time:.2f} > Threshold {RC_INDIVIDUAL_Q_THRESHOLD_MINUTES:.1f}")
+    else: 
+        print("Warning: 'rc_group_id' not found, cannot calculate detailed RC overtime.")
+
+    # --- Apply Chapter 3 Diagnostic Rules (Adds diagnostic_params, is_sfe, etc.) ---
+    # Calculate max correct difficulty per skill (needed for SFE check)
+    max_correct_difficulty_per_skill_v = {}
+    df_correct_v = df_v[df_v['is_correct'] == True]
+    if not df_correct_v.empty and 'question_fundamental_skill' in df_correct_v.columns and 'question_difficulty' in df_correct_v.columns:
+        if pd.api.types.is_numeric_dtype(df_correct_v['question_difficulty']):
+            max_correct_difficulty_per_skill_v = df_correct_v.groupby('question_fundamental_skill')['question_difficulty'].max().to_dict()
+    
+    # --- DEBUG: Print columns before applying rules ---
+    print("DEBUG (run_v_diagnosis): Columns in df_v BEFORE _apply_ch3_diagnostic_rules:")
+    print(df_v.columns.tolist())
+    print("DEBUG (run_v_diagnosis): Input df_v head BEFORE _apply_ch3_diagnostic_rules:")
+    print(df_v.head().to_string())
+    print(f"DEBUG (run_v_diagnosis): max_correct_difficulty_per_skill_v: {max_correct_difficulty_per_skill_v}")
+    print(f"DEBUG (run_v_diagnosis): v_avg_time_per_type: {v_avg_time_per_type}")
+    # --- END DEBUG ---
+
+    # Apply the rules - this function modifies df_v in place
+    df_v = _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill_v, v_avg_time_per_type)
+
+    # --- DEBUG: Print columns AFTER applying rules ---
+    print("DEBUG (run_v_diagnosis): Columns in df_v AFTER _apply_ch3_diagnostic_rules:")
+    print(df_v.columns.tolist())
+    # Check if the key column was added
+    if 'diagnostic_params' in df_v.columns:
+        print("DEBUG (run_v_diagnosis): 'diagnostic_params' column head AFTER rules:")
+        print(df_v['diagnostic_params'].head())
+    else:
+        print("ERROR (run_v_diagnosis): 'diagnostic_params' column MISSING AFTER rules!")
+    # --- END DEBUG ---
+
+    # --- Translate diagnostic codes --- 
+    if 'diagnostic_params' in df_v.columns:
+        print("DEBUG (v_diagnostic.py): Translating 'diagnostic_params' to Chinese...")
+        # Apply the translation function (already handles lists)
+        df_v['diagnostic_params_list_chinese'] = df_v['diagnostic_params'].apply(
+             lambda params_list: [_translate_v(p) for p in params_list] if isinstance(params_list, list) else [] # Corrected lambda
+         )
+    else:
+        print("WARNING (v_diagnostic.py): 'diagnostic_params' column not found for translation.")
+        df_v['diagnostic_params_list_chinese'] = [[] for _ in range(len(df_v))]
+
+    # --- Drop original English codes column --- 
+    if 'diagnostic_params' in df_v.columns:
+        df_v.drop(columns=['diagnostic_params'], inplace=True)
+        print("DEBUG (v_diagnostic.py): Dropped 'diagnostic_params' column.")
+
+    # --- Rename translated column --- 
+    if 'diagnostic_params_list_chinese' in df_v.columns:
+        df_v.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
+        print("DEBUG (v_diagnostic.py): Renamed 'diagnostic_params_list_chinese' to 'diagnostic_params_list'")
+    else:
+        print("DEBUG (v_diagnostic.py): Target list column not found or renamed. Initializing 'diagnostic_params_list'.")
+        df_v['diagnostic_params_list'] = [[] for _ in range(len(df_v))]
+
+    # --- Initialize results dictionary --- 
+    v_diagnosis_results = {}
+
+    # --- Populate Chapter 1 Results --- 
     v_diagnosis_results['chapter_1'] = {
         'time_pressure_status': v_time_pressure_status,
-        'invalid_questions_excluded': num_invalid_v_questions,
-        'reading_comprehension_barrier_inquiry': False,
-        'rc_group_details': {} # Store num_q, target_time, reading_time per group
+        'invalid_questions_excluded': num_invalid_v_questions
+        # Add other relevant Ch1 metrics if calculated (e.g., total time, avg time)
     }
-    # Potentially add more detailed V-specific time analysis here if needed, beyond the main module's overall check
+    print("  Populated Chapter 1 V results.")
 
-    # --- Chapter 1.1: RC Group Identification and Time Calculation ---
-    df_v = _identify_rc_groups(df_v)
-    df_v = _calculate_rc_times(df_v)
+    # --- Populate Chapter 2 Results (Basic Metrics) --- 
+    print("  Executing V Analysis (Chapter 2 - Metrics)...")
+    df_valid_v = df_v[df_v['is_invalid'] == False].copy() if 'is_invalid' in df_v.columns else df_v.copy()
+    # Overall metrics
+    v_diagnosis_results.setdefault('chapter_2', {})['overall_metrics'] = _calculate_metrics_for_group(df_valid_v) # Use helper
+    # Metrics by type (CR vs RC)
+    v_diagnosis_results.setdefault('chapter_2', {})['by_type'] = _analyze_dimension(df_valid_v, 'question_type') # Use helper
+    # Metrics by difficulty (Requires grading first)
+    # TODO: Add difficulty grading column before this step if needed for Ch2 report
+    # df_valid_v['difficulty_grade'] = df_valid_v['question_difficulty'].apply(_grade_difficulty_v)
+    # v_diagnosis_results.setdefault('chapter_2', {})['by_difficulty'] = _analyze_dimension(df_valid_v, 'difficulty_grade')
+    print("    Finished Chapter 2 V metrics.")
 
-    # --- Chapter 1.2: RC Reading Time Barrier & Overtime Rules ---
-    df_v['reading_comprehension_barrier_inquiry'] = False
-    df_v['group_overtime'] = False
-    df_v['individual_overtime'] = False
-
-    # Calculate group target times based on pressure
-    target_times = RC_GROUP_TARGET_TIMES.get(v_time_pressure_status, RC_GROUP_TARGET_TIMES[False]) # Default to low pressure if status unknown
-
-    rc_groups = df_v[df_v['question_type'] == 'RC'].groupby('rc_group_id')
-    for group_id, group_df in rc_groups:
-        num_q_in_group = len(group_df)
-        group_total_time = group_df['rc_group_total_time'].iloc[0]
-        group_target_time = target_times.get(num_q_in_group)
-
-        # Check reading time barrier (on first question)
-        first_q = group_df.sort_values('question_position').iloc[0]
-        reading_time = first_q['rc_reading_time']
-        reading_barrier = False
-        if pd.notna(reading_time):
-            if num_q_in_group == 3 and reading_time > RC_READING_TIME_THRESHOLD_3Q:
-                reading_barrier = True
-            elif num_q_in_group >= 4 and reading_time > RC_READING_TIME_THRESHOLD_4Q:
-                reading_barrier = True
-            if reading_barrier:
-                df_v.loc[first_q.name, 'reading_comprehension_barrier_inquiry'] = True
-                v_diagnosis_results['chapter_1']['reading_comprehension_barrier_inquiry'] = True # Set global flag if triggered anywhere
-
-        # Check group overtime
-        is_group_overtime = False
-        if pd.notna(group_total_time) and group_target_time is not None:
-            if group_total_time > (group_target_time + RC_GROUP_TARGET_TIME_ADJUSTMENT):
-                 is_group_overtime = True
-                 df_v.loc[group_df.index, 'group_overtime'] = True
-
-        # Check individual RC overtime
-        for index, row in group_df.iterrows():
-            q_time = row['question_time']
-            is_first_q = index == first_q.name
-            reading_time_val = reading_time if pd.notna(reading_time) else 0
-
-            adjusted_rc_time = q_time - reading_time_val if is_first_q else q_time
-
-            if adjusted_rc_time > RC_INDIVIDUAL_Q_THRESHOLD_MINUTES:
-                df_v.loc[index, 'individual_overtime'] = True
-
-        # Store group details for reporting
-        v_diagnosis_results['chapter_1']['rc_group_details'][group_id] = {
-            'num_questions': num_q_in_group,
-            'total_time': group_total_time,
-            'target_time': group_target_time,
-            'reading_time': reading_time,
-            'is_group_overtime': is_group_overtime,
-            'has_reading_barrier': reading_barrier
-        }
-
-    # --- Initialize 'overtime' column before assigning RC True values ---
-    if 'overtime' not in df_v.columns:
-        df_v['overtime'] = False # Initialize CR rows (and default RC) to False
-    else:
-        # If main module added CR overtime, ensure RC rows default to False before specific RC rules apply
-        df_v.loc[df_v['question_type'] == 'RC', 'overtime'] = df_v.loc[df_v['question_type'] == 'RC', 'overtime'].fillna(False)
-    # --- End Initialization ---
-
-    # Final RC overtime status (for Ch3 'is_slow')
-    # Combine the specific RC overtime conditions
-    rc_overtime_mask = (df_v['question_type'] == 'RC') & (df_v['group_overtime'] | df_v['individual_overtime'])
-    # Assign True only where the RC mask is True, keeping existing CR flags
-    df_v.loc[rc_overtime_mask, 'overtime'] = True
-
-    # --- Reset index after complex Chapter 1 manipulations ---
-    df_v.reset_index(drop=True, inplace=True)
-    # --- End Reset ---
-
-    # --- Chapter 1.3: Store modified dataframe for subsequent chapters ---
-    # This df_v now contains rc_group_id, times, and overtime flags
-
-    # --- Add Difficulty Grade Column (for Ch2 analysis) ---
-    if 'question_difficulty' in df_v.columns:
-         df_v['difficulty_grade'] = df_v['question_difficulty'].apply(_grade_difficulty_v)
-    else:
-         df_v['difficulty_grade'] = 'Unknown Difficulty'
-
-    # --- Chapter 2: CR/RC Performance Overview ---
-    print("    Chapter 2: CR/RC Performance Overview")
-    if df_v.empty or 'question_type' not in df_v.columns:
-        print("      Skipping Chapter 2 due to missing data or 'question_type' column.")
-        v_diagnosis_results['chapter_2'] = {
-            'by_type': {},
-            'by_difficulty': {},
-            'by_type_difficulty': {}
-        }
-    else:
-        type_analysis = _analyze_dimension(df_v, 'question_type')
-        difficulty_analysis = _analyze_dimension(df_v, 'difficulty_grade')
-
-        # Analyze by Type and Difficulty combined
-        type_difficulty_analysis = {}
-        if 'question_type' in df_v.columns and 'difficulty_grade' in df_v.columns:
-            grouped = df_v.groupby(['question_type', 'difficulty_grade'])
-            for name, group in grouped:
-                q_type, diff_grade = name
-                if q_type not in type_difficulty_analysis:
-                    type_difficulty_analysis[q_type] = {}
-                type_difficulty_analysis[q_type][diff_grade] = _calculate_metrics_for_group(group)
-
-        v_diagnosis_results['chapter_2'] = {
-            'by_type': type_analysis,
-            'by_difficulty': difficulty_analysis,
-            'by_type_difficulty': type_difficulty_analysis
-        }
-        print(f"      Type Analysis: {type_analysis}")
-        print(f"      Difficulty Analysis: {difficulty_analysis}")
-        # print(f"      Type x Difficulty Analysis: {type_difficulty_analysis}") # Too verbose
-
-    # --- Chapter 3: Deep Dive into Errors ---
-    print("    Chapter 3: Deep Dive into Errors")
-    # ...
-
-    # --- Chapter 3.1: Pre-computation (Max Correct Difficulty) ---
-    max_correct_difficulty_per_skill = {}
-    if 'question_fundamental_skill' in df_v.columns and 'question_difficulty' in df_v.columns:
-        # --- Debug Print Before Calculation ---
-        print("    DEBUG: Before calculating Max Correct Difficulty:")
-        if 'is_correct' in df_v.columns:
-             print(f"      Value counts for 'is_correct':\n{df_v['is_correct'].value_counts()}")
-        else:
-             print("      'is_correct' column missing!")
-        # --- End Debug Print ---
-
-        correct_df = df_v[df_v['is_correct'] == True].copy() # Use 'is_correct'
-        if not correct_df.empty:
-             max_correct_difficulty_per_skill = correct_df.groupby('question_fundamental_skill')['question_difficulty'].max().to_dict()
-        print(f"      Calculated Max Correct Difficulty per Skill: {max_correct_difficulty_per_skill}")
-    else:
-        print("      Skipping Max Correct Difficulty calculation (missing skill or difficulty data).")
-    # ...
-
-    if df_v.empty or 'question_fundamental_skill' not in df_v.columns:
-        print("      Skipping Chapter 3 due to missing data or 'question_fundamental_skill' column.")
-        cr_error_analysis = _analyze_error_types(pd.DataFrame(), 'CR')
-        rc_error_analysis = _analyze_error_types(pd.DataFrame(), 'RC')
-    else:
-        # --- Add Debug Print for Question Types ---
-        print("    DEBUG: Before creating df_cr/df_rc:")
-        if 'question_type' in df_v.columns:
-             print(f"      df_v 'question_type' counts:\n{df_v['question_type'].value_counts()}")
-             print(f"      df_v 'is_correct' counts (again):\n{df_v['is_correct'].value_counts()}")
-        else:
-             print("      'question_type' column missing in df_v!")
-        # --- End Debug Print ---
-
-        # --- CORRECTED: Always define df_cr and df_rc here from current df_v ---
-        # Use expected type names exactly
-        df_cr = df_v[df_v['question_type'] == 'Critical Reasoning'].copy()
-        df_rc = df_v[df_v['question_type'] == 'Reading Comprehension'].copy()
-        # --- END CORRECTION ---
-
-        # --- Add Debug Print for df_cr/df_rc shapes and correctness ---
-        print(f"    DEBUG: After filtering by type:")
-        print(f"      df_cr shape: {df_cr.shape}")
-        if not df_cr.empty: print(f"      df_cr 'is_correct' counts:\n{df_cr['is_correct'].value_counts()}")
-        print(f"      df_rc shape: {df_rc.shape}")
-        if not df_rc.empty: print(f"      df_rc 'is_correct' counts:\n{df_rc['is_correct'].value_counts()}")
-        # --- End Debug Print ---
-
-        # Analyze errors for each type
-        cr_errors = df_cr[df_cr['is_correct'] == False] # Use 'is_correct'
-        rc_errors = df_rc[df_rc['is_correct'] == False] # Use 'is_correct'
-
-        print(f"      Analyzing {len(cr_errors)} CR errors...") # Should now be non-zero if CR errors exist
-        cr_error_analysis = _analyze_error_types(cr_errors, 'CR')
-        print(f"      Analyzing {len(rc_errors)} RC errors...")
-        rc_error_analysis = _analyze_error_types(rc_errors, 'RC')
-
+    # --- Populate Chapter 3 Results (Error Analysis from diagnosed df) ---
+    print("  Extracting V Analysis (Chapter 3 - Errors)...")
+    # The actual diagnosis happened in _apply_ch3_diagnostic_rules, now we structure the result.
     v_diagnosis_results['chapter_3'] = {
-        'cr_error_analysis': cr_error_analysis,
-        'rc_error_analysis': rc_error_analysis,
-        'diagnosed_dataframe': df_v # Store the dataframe with params
+        # Store the dataframe itself for report generation to access params/sfe/time_perf
+        'diagnosed_dataframe': df_v.copy(), 
+        # Optionally, extract summary stats like error counts per type/skill if needed
+        # 'cr_error_analysis': _analyze_error_types_from_params(df_v[df_v['question_type'] == 'CR'], 'CR'),
+        # 'rc_error_analysis': _analyze_error_types_from_params(df_v[df_v['question_type'] == 'RC'], 'RC'),
     }
-    # Optional: Print summary of dominant error types
-    # Need to recalculate dominant error type based on the new analysis structure
-    # print(f"        CR Dominant Error Type: {cr_error_analysis.get('dominant_error_type', 'N/A')}")
-    # For now, just acknowledge the analysis was done
-    print(f"        CR error analysis complete. Found {len(cr_errors)} errors.")
-    print(f"        RC error analysis complete. Found {len(rc_errors)} errors.")
+    print("    Finished Chapter 3 V error structuring.")
 
-
-    # --- Chapter 3.2: Applying Diagnostic Rules ---
-    # Reset index BEFORE applying rules to ensure unique index for .loc assignments inside the function
-    df_v.reset_index(drop=True, inplace=True) # Add this line
-    df_v = _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, v_avg_time_per_type)
-
-
-    # --- Chapter 4: Correct but Slow Analysis ---
-    print("    Chapter 4: Correct but Slow Analysis")
-    cr_correct_slow_analysis = {}
-    rc_correct_slow_analysis = {}
-
-    # Need the original DFs (before filtering for errors)
-    if df_v.empty or 'question_time' not in df_v.columns:
-         print("      Skipping Chapter 4 due to missing data or 'question_time' column.")
-         cr_correct_slow_analysis = _analyze_correct_slow(pd.DataFrame(), 'CR')
-         rc_correct_slow_analysis = _analyze_correct_slow(pd.DataFrame(), 'RC')
-    else:
-        # Ensure dfs are defined even if previous chapters were skipped
-        if 'df_cr' not in locals(): df_cr = df_v[df_v['question_type'] == 'CR'].copy()
-        if 'df_rc' not in locals(): df_rc = df_v[df_v['question_type'] == 'RC'].copy()
-
-        cr_correct = df_cr[df_cr['is_correct'] == True].copy() # Use 'is_correct', explicitly copy
-        rc_correct = df_rc[df_rc['is_correct'] == True].copy() # Use 'is_correct', explicitly copy
-
-        # Reset index before passing to the analysis function
-        cr_correct.reset_index(drop=True, inplace=True)
-        rc_correct.reset_index(drop=True, inplace=True)
-
-        print(f"      Analyzing {len(cr_correct)} correct CR questions for slowness...")
-        cr_correct_slow_analysis = _analyze_correct_slow(cr_correct, 'CR')
-        print(f"      Analyzing {len(rc_correct)} correct RC questions for slowness...")
-        rc_correct_slow_analysis = _analyze_correct_slow(rc_correct, 'RC')
-
+    # --- Populate Chapter 4 Results (Correct but Slow) ---
+    print("  Executing V Analysis (Chapter 4 - Correct Slow)...")
+    df_correct_v = df_valid_v[df_valid_v['is_correct'] == True]
     v_diagnosis_results['chapter_4'] = {
-        'cr_correct_slow': cr_correct_slow_analysis,
-        'rc_correct_slow': rc_correct_slow_analysis
+        'cr_correct_slow': _analyze_correct_slow(df_correct_v[df_correct_v['question_type'] == 'CR'], 'CR'),
+        'rc_correct_slow': _analyze_correct_slow(df_correct_v[df_correct_v['question_type'] == 'RC'], 'RC')
     }
-    # Optional: Print summary
-    print(f"        CR Correct but Slow Rate: {cr_correct_slow_analysis.get('correct_slow_rate', 0.0):.1%}")
-    print(f"        RC Correct but Slow Rate: {rc_correct_slow_analysis.get('correct_slow_rate', 0.0):.1%}")
+    print("    Finished Chapter 4 V correct slow analysis.")
 
+    # --- Populate Chapter 5 Results (Patterns) ---
+    print("  Executing V Analysis (Chapter 5 - Patterns)...")
+    v_diagnosis_results['chapter_5'] = _observe_patterns(df_valid_v, v_time_pressure_status)
+    print("    Finished Chapter 5 V pattern observation.")
 
-    # --- Chapter 5: Pattern Observation ---
-    print("    Chapter 5: Pattern Observation")
-    pattern_analysis = _observe_patterns(df_v, v_time_pressure_status)
-    v_diagnosis_results['chapter_5'] = pattern_analysis
-    # Optional: Print summary of key findings
-    print(f"        Early Rushing Risk: {len(pattern_analysis.get('early_rushing_questions_indices', []))} potentially rushed questions in first third.")
-    print(f"        Fast-Wrong Rate: {pattern_analysis.get('fast_wrong_rate', 'N/A')}")
-    print(f"        Carelessness Issue: {pattern_analysis.get('carelessness_issue', False)}")
+    # --- Populate Chapter 6 Results (Skill Override) ---
+    print("  Executing V Analysis (Chapter 6 - Skill Override)...")
+    # Using the simpler _calculate_skill_override for now
+    ch6_results = _calculate_skill_override(df_valid_v)
+    v_diagnosis_results['chapter_6'] = ch6_results # Store the whole dict from the function
+    print("    Finished Chapter 6 V skill override analysis.")
 
-    # --- Chapter 6: Skill Override Rule (V-Doc Definition) ---
-    print("    Chapter 6: Skill Override Rule")
-    skill_override_analysis = _calculate_skill_override(df_v)
-    v_diagnosis_results['chapter_6'] = skill_override_analysis
-    # Optional: Print summary
-    triggered_overrides = {k: v for k, v in skill_override_analysis.get('skill_override_triggered', {}).items() if v}
-    print(f"        Skill Override Triggered (>50% error rate): {triggered_overrides}")
+    # --- Run remaining analysis chapters (using the modified df_v) --- 
+    # Example: Populate v_diagnosis_results dictionary
+    # v_diagnosis_results['chapter_2'] = _analyze_dimension(df_v, 'question_type') # Needs adaptation - MOVED UP
+    # v_diagnosis_results['chapter_4'] = _analyze_correct_slow(...) - MOVED UP
+    # v_diagnosis_results['chapter_5'] = _observe_patterns(...) - MOVED UP
+    # v_diagnosis_results['chapter_6'] = _analyze_skill_coverage(...) - MOVED UP (using override)
+    # For now, just use placeholder results dict - REMOVED PLACEHOLDER
+    # v_diagnosis_results = {} # Placeholder - REMOVED
 
-    # --- Chapter 7: Recommendations ---
-    print("    Chapter 7: Recommendations")
-    # Pass override results to recommendation generator
-    # Removed exempted_v_skills argument
-    print("DEBUG: --- Calling _generate_v_recommendations ---") # DEBUG
-    recommendations = _generate_v_recommendations(v_diagnosis_results)
-    v_diagnosis_results['chapter_7'] = recommendations
-    # Optional: Print summary of recommendations generated - Keep this line
-    print(f"        Generated {len(recommendations)} recommendation items.") # Keep original print
-    print("DEBUG: --- Returned from _generate_v_recommendations ---") # DEBUG
+    # --- Generate Recommendations & Summary Report --- 
+    # TODO: Update these functions to use df_v and v_diagnosis_results - REMOVED TODO
+    v_report_content = _generate_v_summary_report(v_diagnosis_results) # Generate the report
+    # v_report = "(V 報告生成邏輯待更新)" # Placeholder report - REMOVED
 
-    # --- Chapter 8: Summary Report Generation ---
-    print("    Chapter 8: Summary Report Generation")
-    print("DEBUG: --- Calling _generate_v_summary_report ---") # DEBUG
-    v_report_summary = _generate_v_summary_report(v_diagnosis_results)
-    # Optional: Print first few lines of the report - Keep this line
-    print(f"        Generated Report (first 100 chars): {v_report_summary[:100]}...") # Keep original print
-    print("DEBUG: --- Returned from _generate_v_summary_report ---") # DEBUG
+    # --- DEBUG PRINT --- 
+    print("DEBUG (v_diagnostic.py): Columns before return:", df_v.columns.tolist())
+    if 'diagnostic_params_list' in df_v.columns:
+        print("DEBUG (v_diagnostic.py): 'diagnostic_params_list' head:")
+        print(df_v['diagnostic_params_list'].head())
+    else:
+        print("DEBUG (v_diagnostic.py): 'diagnostic_params_list' column MISSING before return!")
+    # --- END DEBUG PRINT ---
 
     print("  Verbal Diagnosis Complete.")
-    # Return the results dict and the generated report string.
-    return v_diagnosis_results, v_report_summary
+    # Return results dictionary, report string, and the diagnosed dataframe
+    return v_diagnosis_results, v_report_content, df_v # Return the generated report
 
 
 # --- V Appendix A Translation ---
@@ -968,31 +853,55 @@ def _generate_v_summary_report(v_diagnosis_results):
 
     # --- Section 2: CR/RC 表現概覽 ---
     report_lines.append("**2. 表現概覽**") # Changed title
-    type_metrics = ch2.get('by_type', {})
+    type_metrics = ch2.get('by_type', {}) # <--- Accesses ch2['by_type']
+    # --- DEBUG: Print Ch2 and type_metrics ---
+    print(f"DEBUG (_generate_v_summary_report): Received ch2 data: {ch2}")
+    print(f"DEBUG (_generate_v_summary_report): Extracted type_metrics: {type_metrics}")
+    # --- END DEBUG ---
     difficulty_metrics = ch2.get('by_difficulty', {})
     # type_difficulty_metrics = ch2.get('by_type_difficulty', {}) # Keep data if needed later, but don't report in Q-like format
 
     # Overall by Type (Q-like format)
     report_lines.append(f"- **CR vs. RC 題表現:**") # Q-like header
-    for q_type in ['CR', 'RC']: # Use short codes for consistency if possible, check data source
-        # Assuming type_metrics keys are 'CR', 'RC' based on previous code
-        metrics = type_metrics.get(q_type)
+    # Correct the loop to use the full names as keys in type_metrics
+    for q_type_full_name in ['Critical Reasoning', 'Reading Comprehension']: 
+        # Assuming type_metrics keys are 'CR', 'RC' based on previous code - Corrected Assumption
+        metrics = type_metrics.get(q_type_full_name) # Use the full name to get metrics
+        # --- DEBUG: Print metrics for CR/RC ---
+        # Use the full name in the debug message as well
+        print(f"DEBUG (_generate_v_summary_report): Metrics for q_type '{q_type_full_name}': {metrics}")
+        # --- END DEBUG ---
         if metrics:
             error_rate_str = _format_rate(metrics.get('error_rate', 'N/A'))
             overtime_rate_str = _format_rate(metrics.get('overtime_rate', 'N/A'))
             # Get avg time (already in minutes based on _calculate_metrics_for_group)
             avg_time_str = f"{metrics.get('avg_time_spent', 0.0):.2f}"
-            report_lines.append(f"  - {q_type} 題: 錯誤率 {error_rate_str}, 超時率 {overtime_rate_str}, 平均耗時 {avg_time_str} 分鐘")
+            # Use the full name in the report line too for clarity, or map back to short if needed
+            report_lines.append(f"  - {q_type_full_name} 題: 錯誤率 {error_rate_str}, 超時率 {overtime_rate_str}, 平均耗時 {avg_time_str} 分鐘")
         else:
-            report_lines.append(f"  - {q_type} 題: 無數據")
+            # Use the full name in the "no data" message
+            report_lines.append(f"  - {q_type_full_name} 題: 無數據")
 
     # --- Add Error Difficulty Distribution Analysis (Q-like) --- 
     all_error_records = [] # Collect error records from Ch3
     if ch3:
-        cr_errors = ch3.get('cr_error_analysis', {}).get('error_records', [])
-        rc_errors = ch3.get('rc_error_analysis', {}).get('error_records', [])
-        all_error_records.extend(cr_errors)
-        all_error_records.extend(rc_errors)
+        # OLD Logic: Accessing non-existent keys
+        # cr_errors = ch3.get('cr_error_analysis', {}).get('error_records', [])
+        # rc_errors = ch3.get('rc_error_analysis', {}).get('error_records', [])
+        # all_error_records.extend(cr_errors)
+        # all_error_records.extend(rc_errors)
+        
+        # NEW Logic: Extract errors from the diagnosed dataframe stored in Ch3
+        diagnosed_df_ch3 = ch3.get('diagnosed_dataframe')
+        if diagnosed_df_ch3 is not None and not diagnosed_df_ch3.empty:
+            # Ensure 'is_correct' column exists before filtering
+            if 'is_correct' in diagnosed_df_ch3.columns:
+                all_error_records = diagnosed_df_ch3[diagnosed_df_ch3['is_correct'] == False].to_dict('records')
+                print(f"DEBUG (_generate_v_summary_report): Extracted {len(all_error_records)} error records from Ch3 diagnosed_df.")
+            else:
+                print("ERROR (_generate_v_summary_report): 'is_correct' column missing in Ch3 diagnosed_df.")
+        else:
+            print("DEBUG (_generate_v_summary_report): Ch3 diagnosed_df is None or empty.")
 
     if all_error_records:
         error_difficulties = [err.get('question_difficulty') for err in all_error_records if err.get('question_difficulty') is not None and not pd.isna(err.get('question_difficulty'))]
@@ -1065,7 +974,8 @@ def _generate_v_summary_report(v_diagnosis_results):
                     'position': row.get('question_position', 'N/A'),
                     'skill': skill,
                     'performance': performance_en,
-                    'params': params, # Store the raw param codes
+                    # Get the ALREADY TRANSLATED list from the dataframe
+                    'params_list_zh': row.get('diagnostic_params_list', []), 
                     'question_type': row.get('question_type', 'Unknown Type') # Add question type
                 })
 
@@ -1111,20 +1021,22 @@ def _generate_v_summary_report(v_diagnosis_results):
             pos = item['position']
             skill_en = item['skill'] # Keep skill in English
             performance_en = item['performance']
-            params_codes = item['params']
+            # params_codes = item['params'] # OLD: Gets English codes
+            # Get the translated list directly
+            params_list_zh = item['params_list_zh'] 
 
-            # Translate performance and params
+            # Translate performance only
             performance_zh = _translate_v(performance_en)
-            translated_params = [_translate_v(p) for p in params_codes]
+            # translated_params = [_translate_v(p) for p in params_codes] # REMOVE Re-translation
 
-            # --- NEW: Group translated params by category ---
-            params_by_category = {}
-            for p_code, p_zh in zip(params_codes, translated_params):
-                category = V_PARAM_TO_CATEGORY.get(p_code, 'Unknown') # Default to Unknown
-                if category not in params_by_category:
-                    params_by_category[category] = []
-                params_by_category[category].append(p_zh)
-            # --- END NEW ---
+            # --- REMOVE Grouping by Category --- (Temporary fix to show output)
+            # params_by_category = {}
+            # for p_code, p_zh in zip(params_codes, translated_params):
+            #     category = V_PARAM_TO_CATEGORY.get(p_code, 'Unknown') 
+            #     if category not in params_by_category:
+            #         params_by_category[category] = []
+            #     params_by_category[category].append(p_zh)
+            # --- END REMOVED Grouping ---
 
             # Format according to Q report example with grouping:
             # 題號 2: [慢對, 技能: Rates/Ratio/Percent] - 診斷:
@@ -1132,14 +1044,14 @@ def _generate_v_summary_report(v_diagnosis_results):
             #     - [Reading Param 1, Reading Param 2]
             #     - [Reasoning Param 1]
             line_parts = [f"  - 題號 {pos}: [{performance_zh}, 技能: {skill_en}] - 診斷:"]
-            
-            # Iterate through categories in defined order
-            for category in V_PARAM_CATEGORY_ORDER:
-                if category in params_by_category:
-                    # Sort params within category alphabetically for consistency
-                    sorted_category_params = sorted(params_by_category[category])
-                    line_parts.append(f"    - [{', '.join(sorted_category_params)}]")
-            
+             
+            # --- Simplified Output (Temporary) --- 
+            # Just list all translated params directly
+            if params_list_zh: # Check if list is not empty
+                line_parts.append(f"    - [{', '.join(params_list_zh)}]")
+            else:
+                line_parts.append("    - [無特定診斷標籤]") # Placeholder if no params
+                
             report_lines.append("\n".join(line_parts))
             # --- Remove old formatting ---
             # report_lines.append(f"  - 題號 {pos}: [{performance_zh}, 技能: {skill_en}] - 診斷: [{', '.join(translated_params)}]")
@@ -1665,177 +1577,141 @@ def _calculate_rc_times(df_v):
 # --- Helper for Applying Chapter 3 Rules ---
 
 def _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_per_type):
-    """Applies Chapter 3 diagnostic rules row-by-row."""
-    if 'question_type' not in df_v.columns:
-         print("      Cannot apply Chapter 3 rules: 'question_type' missing.")
-         # Return original df and indicate failure? Or add empty columns?
-         df_v['diagnostic_params'] = [[] for _ in range(len(df_v))]
-         df_v['is_sfe'] = False
-         df_v['is_relatively_fast_ch3'] = False
-         return df_v
+    """Applies Chapter 3 diagnostic rules row-by-row.
+       Adds 'diagnostic_params', 'is_sfe', 'is_relatively_fast_ch3', and 'time_performance_category' columns.
+    """
+    if df_v.empty:
+        # Ensure columns exist even if empty
+        df_v['diagnostic_params'] = [[] for _ in range(len(df_v))]
+        df_v['is_sfe'] = False
+        df_v['is_relatively_fast_ch3'] = False
+        df_v['time_performance_category'] = ''
+        return df_v
 
-    # Initialize lists to store results
-    all_diagnostic_params = []
-    all_is_sfe = []
-    all_is_relatively_fast_ch3 = []
+    # Initialize columns first to avoid errors during assignment if they somehow don't exist
+    if 'diagnostic_params' not in df_v.columns: df_v['diagnostic_params'] = [[] for _ in range(len(df_v))]
+    if 'is_sfe' not in df_v.columns: df_v['is_sfe'] = False
+    if 'is_relatively_fast_ch3' not in df_v.columns: df_v['is_relatively_fast_ch3'] = False
+    if 'time_performance_category' not in df_v.columns: df_v['time_performance_category'] = ''
 
-    # Use average times passed from the main module
-    if not avg_time_per_type:
-        print("      Warning: Average time per type data not available for Chapter 3 rule application.")
-        # Fallback: recalculate locally, but might differ from main module's calculation
-        avg_time_per_type = df_v.groupby('question_type')['question_time'].mean().to_dict()
+    # Prepare max diff dict
+    max_diff_dict = max_correct_difficulty_per_skill # Assuming it's already a dict {skill: max_diff}
 
-    # Make sure index is sequential if iterating with it (though we use iterrows)
-    df_v_reset = df_v.reset_index(drop=True)
+    # Create lists to store results temporarily to avoid direct .loc in loop if possible (safer)
+    all_params = []
+    all_sfe = []
+    all_fast_flags = []
+    all_time_categories = [] # List to store time categories
 
-    for index, row in df_v_reset.iterrows(): # Iterate over the reset index df
-        params = []
+    for index, row in df_v.iterrows():
         q_type = row['question_type']
-        q_time = row['question_time']
-        is_correct = row['is_correct'] # Use 'is_correct'
-        difficulty = row.get('question_difficulty')
-        skill = row.get('question_fundamental_skill', 'Unknown Skill')
-        # Use combined RC overtime flag calculated in Ch1
-        is_overtime = row.get('overtime', False)
-        # is_suspiciously_fast_flag = row.get('suspiciously_fast', False) # This flag is from main module, might not be needed directly here
+        q_skill = row.get('question_fundamental_skill', 'Unknown Skill')
+        q_diff = row.get('question_difficulty', None)
+        q_time = row.get('question_time', None)
+        is_correct = bool(row.get('is_correct', True))
+        is_overtime = bool(row.get('overtime', False))
+        # RC specific time flags - handle potential absence
+        is_rc_reading_overtime = bool(row.get('rc_reading_overtime', False))
+        is_rc_single_q_overtime = bool(row.get('rc_single_q_overtime', False))
 
-        # 1. Time Performance Classification (Simplified - use suspicious_fast flag, rely on overtime flag)
-        avg_time = avg_time_per_type.get(q_type, np.inf)
-        # is_relatively_fast check from V-doc Ch3 uses 0.75 multiplier, differs from suspicious_fast (0.5)
-        current_is_relatively_fast_ch3 = q_time < avg_time * 0.75
-        is_slow = is_overtime # Slow uses the flag set based on CR/RC rules
-        is_normal_time = not current_is_relatively_fast_ch3 and not is_slow
-
-        # 2. Special Focus Error (SFE)
+        current_params = []
         current_is_sfe = False
-        if not is_correct and difficulty is not None and skill != 'Unknown Skill' and skill in max_correct_difficulty_per_skill:
-            max_diff = max_correct_difficulty_per_skill[skill]
-            # Check if difficulty is strictly less than max correct difficulty for that skill
-            if difficulty < max_diff:
-                 current_is_sfe = True
-                 params.append('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+        current_is_relatively_fast = False
+        current_time_performance_category = 'Unknown' # Default category value
 
-        # 3. Apply Rules based on Time/Correctness/Type (Based on V-Doc Ch3)
-        # --- (Keep the existing rule logic here) ---
-        if q_type == 'Critical Reasoning': # Use full name
-            if current_is_relatively_fast_ch3 and not is_correct:
-                # Fast & Wrong CR (V-Doc Ch3)
-                params.extend([
-                    'CR_METHOD_PROCESS_DEVIATION',
-                    'CR_METHOD_TYPE_SPECIFIC_ERROR',
-                    'CR_READING_BASIC_OMISSION'
-                ])
-                if q_time < V_INVALID_TIME_ABANDONED:
-                    params.append('BEHAVIOR_GUESSING_HASTY')
-            elif is_slow and not is_correct:
-                # Slow & Wrong CR (V-Doc Ch3)
-                params.extend([
-                    'CR_READING_TIME_EXCESSIVE',
-                    'CR_REASONING_TIME_EXCESSIVE',
-                    'CR_AC_ANALYSIS_TIME_EXCESSIVE'
-                ])
-                # Include possible root causes also from "Normal Time & Wrong"
-                params.extend([
-                    'CR_REASONING_CHAIN_ERROR',
-                    'CR_REASONING_ABSTRACTION_DIFFICULTY'
-                ])
-            elif is_normal_time and not is_correct:
-                # Normal Time & Wrong CR (V-Doc Ch3)
-                params.extend([
-                    'CR_READING_DIFFICULTY_STEM',
-                    'CR_QUESTION_UNDERSTANDING_MISINTERPRETATION',
-                    'CR_REASONING_CHAIN_ERROR',
-                    'CR_REASONING_ABSTRACTION_DIFFICULTY',
-                    'CR_REASONING_PREDICTION_ERROR',
-                    'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY',
-                    'CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY',
-                    'CR_AC_ANALYSIS_RELEVANCE_ERROR',
-                    'CR_AC_ANALYSIS_DISTRACTOR_CONFUSION',
-                    'CR_METHOD_TYPE_SPECIFIC_ERROR'
-                ])
-            elif is_slow and is_correct:
-                # Slow & Correct CR (V-Doc Ch3)
-                params.extend([
-                    'EFFICIENCY_BOTTLENECK_READING',
-                    'EFFICIENCY_BOTTLENECK_REASONING'
-                ])
+        # 1. Check SFE (only if incorrect)
+        if not is_correct and q_diff is not None and not pd.isna(q_diff):
+            max_correct_diff = max_diff_dict.get(q_skill, -np.inf)
+            if q_diff < max_correct_diff:
+                current_is_sfe = True
+                current_params.append('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
 
-        elif q_type == 'Reading Comprehension': # Use full name
-            if current_is_relatively_fast_ch3 and not is_correct:
-                # Fast & Wrong RC (V-Doc Ch3)
-                params.extend([
-                    'RC_READING_INFO_LOCATION_ERROR',
-                    'RC_READING_KEYWORD_LOGIC_OMISSION',
-                ])
-                if q_time < V_INVALID_TIME_ABANDONED:
-                    params.append('BEHAVIOR_GUESSING_HASTY')
-            elif is_slow and not is_correct:
-                # Slow & Wrong RC (V-Doc Ch3)
-                params.extend([
-                    'RC_READING_SPEED_SLOW_FOUNDATIONAL',
-                    'RC_METHOD_INEFFICIENT_READING',
-                    'RC_LOCATION_TIME_EXCESSIVE',
-                    'RC_REASONING_TIME_EXCESSIVE',
-                    'RC_AC_ANALYSIS_TIME_EXCESSIVE'
-                ])
-                # Include possible root causes also from "Normal Time & Wrong"
-                params.extend([
-                    'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY',
-                    'RC_REASONING_INFERENCE_WEAKNESS'
-                ])
-            elif is_normal_time and not is_correct:
-                # Normal Time & Wrong RC (V-Doc Ch3)
-                params.extend([
-                    'RC_READING_VOCAB_BOTTLENECK',
-                    'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY',
-                    'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY',
-                    'RC_READING_DOMAIN_KNOWLEDGE_GAP',
-                    'RC_READING_PRECISION_INSUFFICIENT',
-                    'RC_QUESTION_UNDERSTANDING_MISINTERPRETATION',
-                    'RC_LOCATION_ERROR_INEFFICIENCY',
-                    'RC_REASONING_INFERENCE_WEAKNESS',
-                    'RC_AC_ANALYSIS_DIFFICULTY',
-                ])
-            elif is_slow and is_correct:
-                # Slow & Correct RC (V-Doc Ch3)
-                params.extend([
-                    'EFFICIENCY_BOTTLENECK_READING',
-                    'EFFICIENCY_BOTTLENECK_LOCATION',
-                    'EFFICIENCY_BOTTLENECK_REASONING',
-                    'EFFICIENCY_BOTTLENECK_AC_ANALYSIS'
-                ])
+        # 2. Determine Time Flags
+        is_slow = is_overtime or is_rc_reading_overtime or is_rc_single_q_overtime # Combined slow condition
+        avg_time = avg_time_per_type.get(q_type, 1.8) # Default V avg ~1.8 min?
 
-        # Add reading comprehension barrier if triggered for this RC group (info should be in row)
-        if q_type == 'Reading Comprehension' and row.get('reading_comprehension_barrier_inquiry', False):
-            params.append('RC_READING_COMPREHENSION_BARRIER') # Parameter needs to be defined in Appendix A
+        if q_time is not None and not pd.isna(q_time):
+            if q_time < (avg_time * 0.75):
+                current_is_relatively_fast = True
+            # Abandoned check (ensure constant is defined)
+            if q_time < V_INVALID_TIME_ABANDONED: # Added check
+                 current_params.append('V_BEHAVIOR_ABANDONED') 
 
-        # Store unique params, ensuring SFE is first
-        unique_params = list(set(params))
+        # 3. Assign Time Performance Category <--- ADDED THIS LOGIC
+        if is_correct:
+            if current_is_relatively_fast:
+                current_time_performance_category = 'Fast & Correct'
+            elif is_slow:
+                current_time_performance_category = 'Slow & Correct'
+            else:
+                current_time_performance_category = 'Normal Time & Correct'
+        else: # Incorrect
+            if current_is_relatively_fast:
+                current_time_performance_category = 'Fast & Wrong'
+            elif is_slow:
+                current_time_performance_category = 'Slow & Wrong'
+            else:
+                current_time_performance_category = 'Normal Time & Wrong'
+
+        # 4. Assign Diagnostic Params based on Time, Correctness, SFE, Type, Skill
+        # Simplified param assignment - V-DOC has more complex rules based on skill/category
+        # Using placeholder params for now based on time/correctness
+        error_category = V_SKILL_TO_ERROR_CATEGORY.get(q_skill, 'Unknown')
+
+        if not is_correct:
+            # General error params based on type
+            if q_type == 'CR':
+                current_params.append(V_DIAGNOSTIC_PARAMS['CR'].get(error_category, 'V_CR_UNKNOWN_ERROR')) # Map skill category to CR error
+            elif q_type == 'RC':
+                current_params.append(V_DIAGNOSTIC_PARAMS['RC'].get(error_category, 'V_RC_UNKNOWN_ERROR')) # Map skill category to RC error
+            else:
+                 current_params.append('V_UNKNOWN_ERROR') # Handle unexpected types
+            
+            # Add time-related error params
+            if current_time_performance_category == 'Fast & Wrong':
+                current_params.append('V_CARELESSNESS_DETAIL_OMISSION')
+            elif current_time_performance_category == 'Slow & Wrong':
+                 current_params.append('V_EFFICIENCY_BOTTLENECK') # Generic efficiency bottleneck for slow/wrong
+                 if q_type == 'CR': current_params.append('V_CR_REASONING_TIME_EXCESSIVE')
+                 if q_type == 'RC': current_params.append('V_RC_READING_SPEED_SLOW_FOUNDATIONAL') # Example specific param
+            
+            # Append SFE code if already determined (avoid double add)
+            if current_is_sfe and 'FOUNDATIONAL_MASTERY_INSTABILITY_SFE' not in current_params:
+                 current_params.append('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+                 
+        elif current_time_performance_category == 'Slow & Correct': # Correct but Slow
+            current_params.append('V_EFFICIENCY_BOTTLENECK') # Generic efficiency bottleneck for slow/correct
+            if q_type == 'CR': current_params.append('V_CR_REASONING_TIME_EXCESSIVE')
+            if q_type == 'RC': current_params.append('V_RC_READING_SPEED_SLOW_FOUNDATIONAL')
+            if is_rc_reading_overtime: current_params.append('V_RC_READING_TIME_EXCESSIVE') # More specific RC reading bottleneck
+            if is_rc_single_q_overtime: current_params.append('V_RC_SINGLE_Q_TIME_EXCESSIVE') # Specific RC single Q bottleneck
+
+
+        # Remove duplicates, keep SFE first
+        unique_params = list(dict.fromkeys(current_params))
         if 'FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in unique_params:
-            unique_params.remove('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-            unique_params.insert(0, 'FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+             unique_params.remove('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+             unique_params.insert(0, 'FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
 
-        # Append results to lists instead of assigning to df_v.loc
-        all_diagnostic_params.append(unique_params)
-        all_is_sfe.append(current_is_sfe)
-        all_is_relatively_fast_ch3.append(current_is_relatively_fast_ch3)
+        # Append results to lists
+        all_params.append(unique_params)
+        all_sfe.append(current_is_sfe)
+        all_fast_flags.append(current_is_relatively_fast)
+        all_time_categories.append(current_time_performance_category) # Append the calculated category
 
-    # After loop, assign collected lists to the original DataFrame
-    # Ensure lengths match before assignment (should match df_v_reset length)
-    if len(all_diagnostic_params) == len(df_v):
-        df_v['diagnostic_params'] = all_diagnostic_params
-        df_v['is_sfe'] = all_is_sfe
-        df_v['is_relatively_fast_ch3'] = all_is_relatively_fast_ch3
+    # Assign lists back to DataFrame after loop
+    if len(all_params) == len(df_v):
+        df_v['diagnostic_params'] = all_params
+        df_v['is_sfe'] = all_sfe
+        df_v['is_relatively_fast_ch3'] = all_fast_flags # Keep this name if needed by Ch5
+        df_v['time_performance_category'] = all_time_categories # Assign the new list
     else:
-        # This case indicates an unexpected issue during iteration
-        print(f"      Error: Length mismatch after loop in _apply_ch3_diagnostic_rules. Expected {len(df_v)}, got {len(all_diagnostic_params)}. Skipping assignment.")
-        # Add empty columns to prevent downstream errors if possible
-        if 'diagnostic_params' not in df_v.columns:
-             df_v['diagnostic_params'] = [[] for _ in range(len(df_v))]
-        if 'is_sfe' not in df_v.columns:
-             df_v['is_sfe'] = False
-        if 'is_relatively_fast_ch3' not in df_v.columns:
-            df_v['is_relatively_fast_ch3'] = False
+        print("ERROR: Length mismatch in _apply_ch3_diagnostic_rules. Skipping assignment.")
+        # Initialize columns if assignment failed
+        if 'diagnostic_params' not in df_v.columns: df_v['diagnostic_params'] = [[] for _ in range(len(df_v))]
+        if 'is_sfe' not in df_v.columns: df_v['is_sfe'] = False
+        if 'is_relatively_fast_ch3' not in df_v.columns: df_v['is_relatively_fast_ch3'] = False
+        if 'time_performance_category' not in df_v.columns: df_v['time_performance_category'] = '' # Initialize new column on error
 
     return df_v
 

@@ -80,6 +80,105 @@ def _calculate_practice_time_limit(item_time, is_overtime):
     z = max(z_raw, target_time)
     return z
 
+# --- Q-Specific Root Cause Diagnosis --- 
+def _diagnose_q_root_causes(df, avg_times, max_diffs):
+    """Analyzes root causes row-by-row and adds 'diagnostic_params', 'is_sfe', and 'time_performance_category' columns."""
+    if df.empty:
+        df['diagnostic_params'] = [[] for _ in range(len(df))]
+        df['is_sfe'] = False
+        df['time_performance_category'] = ''
+        return df
+
+    all_diagnostic_params = []
+    all_is_sfe = []
+    all_time_performance_categories = []
+
+    max_diff_dict = max_diffs # Assuming max_diffs is already the correct dict {skill: max_difficulty}
+
+    for index, row in df.iterrows():
+        q_type = row['question_type']
+        q_skill = row.get('question_fundamental_skill', 'Unknown Skill')
+        q_diff = row.get('question_difficulty', None)
+        q_time = row.get('question_time', None)
+        is_correct = bool(row.get('is_correct', True))
+        is_overtime = bool(row.get('overtime', False))
+
+        current_params = []
+        current_is_sfe = False
+        current_time_performance_category = 'Unknown'
+
+        # 1. Check SFE (only if incorrect)
+        if not is_correct and q_diff is not None and not pd.isna(q_diff):
+            max_correct_diff = max_diff_dict.get(q_skill, -np.inf)
+            if q_diff < max_correct_diff:
+                current_is_sfe = True
+                current_params.append('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+
+        # 2. Determine Time Flags
+        is_relatively_fast = False
+        is_slow = is_overtime
+        avg_time_for_type = avg_times.get(q_type, 2.0) # Default 2.0 mins for Q
+
+        if q_time is not None and not pd.isna(q_time):
+            if q_time < (avg_time_for_type * 0.75):
+                is_relatively_fast = True
+
+        # 3. Assign Time Performance Category
+        if is_correct:
+            if is_relatively_fast:
+                current_time_performance_category = 'Fast & Correct'
+            elif is_slow:
+                current_time_performance_category = 'Slow & Correct'
+            else:
+                current_time_performance_category = 'Normal Time & Correct'
+        else: # Incorrect
+            if is_relatively_fast:
+                current_time_performance_category = 'Fast & Wrong'
+            elif is_slow:
+                current_time_performance_category = 'Slow & Wrong'
+            else:
+                current_time_performance_category = 'Normal Time & Wrong'
+
+        # 4. Assign Diagnostic Params based on Time Performance & Correctness
+        if not is_correct:
+            if current_time_performance_category == 'Fast & Wrong':
+                current_params.extend(['Q_CARELESSNESS_DETAIL_OMISSION', 'Q_CONCEPT_APPLICATION_ERROR', 'Q_PROBLEM_UNDERSTANDING_ERROR'])
+                if q_type == 'REAL': current_params.append('Q_READING_COMPREHENSION_ERROR')
+            elif current_time_performance_category == 'Slow & Wrong':
+                current_params.extend(['Q_EFFICIENCY_BOTTLENECK_CONCEPT', 'Q_EFFICIENCY_BOTTLENECK_CALCULATION', 'Q_CONCEPT_APPLICATION_ERROR', 'Q_CALCULATION_ERROR'])
+                if q_type == 'REAL': current_params.append('Q_EFFICIENCY_BOTTLENECK_READING')
+                # SFE already added if applicable
+            else: # Normal Time & Wrong
+                current_params.extend(['Q_CONCEPT_APPLICATION_ERROR', 'Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_CALCULATION_ERROR'])
+                if q_type == 'REAL': current_params.append('Q_READING_COMPREHENSION_ERROR')
+        elif current_time_performance_category == 'Slow & Correct': # Correct but Slow -> Efficiency issues
+             current_params.append('Q_EFFICIENCY_BOTTLENECK_CONCEPT')
+             current_params.append('Q_EFFICIENCY_BOTTLENECK_CALCULATION')
+             if q_type == 'REAL': current_params.append('Q_EFFICIENCY_BOTTLENECK_READING')
+
+        # Remove duplicates and ensure SFE is first if present
+        unique_params = list(dict.fromkeys(current_params)) # Simpler way to remove duplicates while preserving order somewhat
+        if 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in unique_params:
+             unique_params.remove('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+             unique_params.insert(0, 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+
+        all_diagnostic_params.append(unique_params)
+        all_is_sfe.append(current_is_sfe)
+        all_time_performance_categories.append(current_time_performance_category)
+
+    # Assign lists back to DataFrame
+    if len(all_diagnostic_params) == len(df):
+        df['diagnostic_params'] = all_diagnostic_params
+        df['is_sfe'] = all_is_sfe
+        df['time_performance_category'] = all_time_performance_categories
+    else:
+        print("ERROR: Length mismatch in _diagnose_q_root_causes. Skipping assignment.")
+        if 'diagnostic_params' not in df.columns: df['diagnostic_params'] = [[] for _ in range(len(df))]
+        if 'is_sfe' not in df.columns: df['is_sfe'] = False
+        if 'time_performance_category' not in df.columns: df['time_performance_category'] = ''
+
+    return df
+
 # --- Q-Specific Diagnosis Logic (Chapters 2-6) ---
 
 def _diagnose_q_internal(df_q):
@@ -1000,28 +1099,115 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
 
 def run_q_diagnosis(df_q, subject_time_pressure_status, num_invalid_questions):
     """
-    Runs the full Quant diagnosis process based on pre-processed data.
+    Runs the diagnostic analysis specifically for the Quantitative section.
 
     Args:
-        df_q (pd.DataFrame): Pre-processed DataFrame for Q (filtered, with difficulty etc.).
+        df_q (pd.DataFrame): DataFrame containing only VALID Q response data.
         subject_time_pressure_status (bool): Whether time pressure was detected for Q.
-        num_invalid_questions (int): Number of invalid questions excluded for Q.
+        num_invalid_questions (int): Number of Q questions marked as invalid in Chapter 1.
 
     Returns:
-        str: A string containing the formatted summary report for the Q section.
+        dict: Placeholder for Q-specific results (currently empty).
+        str: A string containing the summary report for the Q section.
+        pd.DataFrame: The processed Q DataFrame with added diagnostic columns 
+                      (diagnostic_params_list, is_sfe, time_performance_category).
     """
-    print("--- Entering run_q_diagnosis ---")
-    # Placeholder for exempted skills calculation if moved here later
-    # For now, assumes exempted_skills are determined globally if needed, or not used
+    print("  Running Quantitative Diagnosis...")
+    q_diagnosis_results = {}
 
-    # Execute internal diagnosis steps (Chapters 2-6)
-    q_diagnosis_results = _diagnose_q_internal(df_q)
+    if df_q.empty:
+        print("    No Q data provided. Skipping Q diagnosis.")
+        return {}, "Quantitative (Q) 部分無數據可供診斷。", pd.DataFrame()
 
-    # Generate Recommendations (Chapter 7) - Removed exempted_skills argument
-    q_recommendations = _generate_q_recommendations(q_diagnosis_results)
+    # Make a copy to avoid modifying the original slice from diagnosis_module
+    df_q = df_q.copy()
 
-    # Generate Summary Report (Chapter 8)
-    q_report = _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_time_pressure_status, num_invalid_questions)
+    # --- Run Internal Diagnosis (Chapters 2-5 equivalent logic) ---
+    # Calculate prerequisites needed for root cause analysis
+    avg_time_per_type_q = {} 
+    if pd.api.types.is_numeric_dtype(df_q['question_time']):
+        avg_time_per_type_q = df_q.groupby('question_type')['question_time'].mean().to_dict()
+    else:
+        avg_time_per_type_q = {'REAL': 2.0, 'PURE': 2.0} # Default
 
-    print("--- Finished Quantitative Diagnosis --- ")
-    return q_report 
+    max_correct_difficulty_per_skill_q = {}
+    df_correct_q = df_q[df_q['is_correct'] == True]
+    if not df_correct_q.empty and 'question_fundamental_skill' in df_correct_q.columns and 'question_difficulty' in df_correct_q.columns:
+        if pd.api.types.is_numeric_dtype(df_correct_q['question_difficulty']):
+            max_correct_difficulty_per_skill_q = df_correct_q.groupby('question_fundamental_skill')['question_difficulty'].max().to_dict()
+        # else: print warning - handled inside function implicitly
+    # else: print warning - handled inside function implicitly
+
+    # Apply root cause diagnosis (adds diagnostic_params, is_sfe, time_performance_category)
+    df_q_diagnosed = _diagnose_q_root_causes(df_q, avg_time_per_type_q, max_correct_difficulty_per_skill_q)
+
+    # --- Execute Chapters 2-6 --- 
+    print("  Executing Internal Q Diagnosis (Chapters 2-6)...")
+    # Use the dataframe that has root causes diagnosed
+    q_diagnosis_results = _diagnose_q_internal(df_q_diagnosed) 
+    print("    Finished Internal Q Diagnosis.")
+
+    # --- Translate diagnostic codes --- 
+    if 'diagnostic_params' in df_q_diagnosed.columns:
+        print("DEBUG (q_diagnostic.py): Translating 'diagnostic_params' to Chinese...")
+        # Define a wrapper for _get_translation to handle lists
+        def translate_q_list(params_list):
+            return [_get_translation(p) for p in params_list] if isinstance(params_list, list) else []
+        df_q_diagnosed['diagnostic_params_list_chinese'] = df_q_diagnosed['diagnostic_params'].apply(translate_q_list)
+    else:
+        print("WARNING (q_diagnostic.py): 'diagnostic_params' column not found for translation.")
+        df_q_diagnosed['diagnostic_params_list_chinese'] = [[] for _ in range(len(df_q_diagnosed))]
+
+    # --- Drop original English codes column --- 
+    if 'diagnostic_params' in df_q_diagnosed.columns:
+        df_q_diagnosed.drop(columns=['diagnostic_params'], inplace=True)
+        print("DEBUG (q_diagnostic.py): Dropped 'diagnostic_params' column.")
+
+    # --- Rename translated column --- 
+    if 'diagnostic_params_list_chinese' in df_q_diagnosed.columns:
+        df_q_diagnosed.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
+        print("DEBUG (q_diagnostic.py): Renamed 'diagnostic_params_list_chinese' to 'diagnostic_params_list'")
+    else:
+        print("DEBUG (q_diagnostic.py): Target list column not found or renamed. Initializing 'diagnostic_params_list'.")
+        df_q_diagnosed['diagnostic_params_list'] = [[] for _ in range(len(df_q_diagnosed))]
+
+    # --- Generate Recommendations & Summary Report --- 
+    # Step 4: Generate Recommendations (Chapter 7)
+    print("  Generating Q Recommendations (Chapter 7)...")
+    # Pass the core diagnosis results to the recommendation generator
+    q_recommendations = _generate_q_recommendations(q_diagnosis_results) # Returns a list of strings
+    print(f"    Generated {len(q_recommendations)} recommendation lines.")
+
+
+    # Step 5: Generate Summary Report (Chapter 8)
+    print("  Generating Q Summary Report (Chapter 8)...")
+    # Generate the report string using the internal results and recommendations
+    report_str = _generate_q_summary_report(
+        q_diagnosis_results, 
+        q_recommendations, 
+        subject_time_pressure_status, # Pass the time pressure status
+        num_invalid_questions        # Pass the number of invalid questions
+    )
+    print("    Finished generating Q summary report.")
+
+    # --- Step 6: Final Return ---
+    # report_str = "(Q 報告生成邏輯待更新)" # Placeholder report - REMOVED
+
+    # Add translated list to the processed dataframe
+    if 'diagnostic_params' in df_q_diagnosed.columns:
+        df_q_diagnosed['diagnostic_params_list'] = df_q_diagnosed['diagnostic_params_list_chinese']
+        df_q_diagnosed.drop(columns=['diagnostic_params_list_chinese'], inplace=True)
+        print("DEBUG (q_diagnostic.py): Dropped 'diagnostic_params_list_chinese' column.")
+
+    # --- DEBUG PRINT --- 
+    print("DEBUG (q_diagnostic.py): Columns before return:", df_q_diagnosed.columns.tolist())
+    if 'diagnostic_params_list' in df_q_diagnosed.columns:
+        print("DEBUG (q_diagnostic.py): 'diagnostic_params_list' head:")
+        print(df_q_diagnosed['diagnostic_params_list'].head())
+    else:
+        print("DEBUG (q_diagnostic.py): 'diagnostic_params_list' column MISSING before return!")
+    # --- END DEBUG PRINT ---
+
+    print("  Quantitative Diagnosis Complete.")
+    # Return placeholder results dict, report string, and the diagnosed dataframe
+    return q_diagnosis_results, report_str, df_q_diagnosed # Return ACTUAL results dict

@@ -388,19 +388,82 @@ def run_di_diagnosis(df_di):
     print(f"      Generated DI Report (first 100 chars): {di_report_summary[:100]}...")
 
     print("  Data Insights Diagnosis Complete.")
-    return di_diagnosis_results, di_report_summary
+
+    # --- Generate Final Report String ---
+    report_str = _generate_di_summary_report(di_diagnosis_results)
+
+    print("DEBUG: <<<<<< Exiting run_di_diagnosis <<<<<<") # DEBUG
+
+    # --- Get the final dataframe to return (likely from Chapter 3 results) ---
+    # Use .get() with default to handle cases where Ch3 might not populate the dataframe
+    df_to_return = di_diagnosis_results.get('chapter_3', {}).get('diagnosed_dataframe')
+    if df_to_return is None:
+        # Fallback if Ch3 failed or df was empty - use the initial filtered df
+        # or even df_di if filtered is empty. Let's use filtered.
+        print("WARNING (di_diagnostic.py): Diagnosed dataframe not found in Chapter 3 results. Using filtered pre-Ch3 data.")
+        df_to_return = df_di_filtered.copy() # Use the dataframe filtered after Ch1
+    elif df_to_return.empty:
+        print("WARNING (di_diagnostic.py): Diagnosed dataframe from Ch3 is empty. Using filtered pre-Ch3 data.")
+        df_to_return = df_di_filtered.copy()
+    else:
+        # Ensure df_to_return is a copy to avoid SettingWithCopyWarning if it points to the original df_di_filtered
+        df_to_return = df_to_return.copy()
+
+    # --- Translate English diagnostic codes to Chinese --- 
+    if 'diagnostic_params' in df_to_return.columns:
+        print("DEBUG (di_diagnostic.py): Translating 'diagnostic_params' to Chinese...")
+        # Apply the translation function to each list in the column
+        df_to_return['diagnostic_params_list_chinese'] = df_to_return['diagnostic_params'].apply(
+            lambda params_list: _translate_di(params_list) if isinstance(params_list, list) else []
+        )
+    else:
+        print("WARNING (di_diagnostic.py): 'diagnostic_params' column not found for translation.")
+        # Initialize the chinese list column anyway to avoid errors later
+        df_to_return['diagnostic_params_list_chinese'] = [[] for _ in range(len(df_to_return))]
+
+    # --- Drop the original English params column --- 
+    if 'diagnostic_params' in df_to_return.columns:
+        df_to_return.drop(columns=['diagnostic_params'], inplace=True)
+        print("DEBUG (di_diagnostic.py): Dropped 'diagnostic_params' column.")
+
+    # --- Rename column for consistency and Return all results ---
+    if 'diagnostic_params_list_chinese' in df_to_return.columns:
+        df_to_return.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
+        print("DEBUG (di_diagnostic.py): Renamed 'diagnostic_params_list_chinese' to 'diagnostic_params_list'")
+    else:
+        # Initialize the column if it wasn't created and couldn't be renamed from chinese list
+        print("DEBUG (di_diagnostic.py): Target list column not found or renamed. Initializing 'diagnostic_params_list'.")
+        df_to_return['diagnostic_params_list'] = np.empty((len(df_to_return),0)).tolist()
+
+    # --- DEBUG PRINT --- 
+    print("DEBUG (di_diagnostic.py): Columns before return:", df_to_return.columns.tolist())
+    if 'diagnostic_params_list' in df_to_return.columns:
+        print("DEBUG (di_diagnostic.py): 'diagnostic_params_list' head:")
+        # Show more rows to be sure
+        print(df_to_return['diagnostic_params_list'].head(10))
+    else:
+        print("DEBUG (di_diagnostic.py): 'diagnostic_params_list' column MISSING before return!")
+    # --- END DEBUG PRINT ---
+
+    # Return results dictionary, report string, AND the potentially diagnosed dataframe
+    return di_diagnosis_results, report_str, df_to_return
 
 # --- Root Cause Diagnosis Helper (Chapter 3 Logic) ---
 
 def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
-    """Analyzes root causes row-by-row and adds 'diagnostic_params' and 'is_sfe' columns."""
+    """Analyzes root causes row-by-row and adds 'diagnostic_params', 'is_sfe', and 'time_performance_category' columns."""
 
     if df.empty:
-        return df # Return the original empty df if input is empty
+        # Add expected columns even if input is empty
+        df['diagnostic_params'] = [[] for _ in range(len(df))]
+        df['is_sfe'] = False
+        df['time_performance_category'] = ''
+        return df
 
     # Initialize lists to store results for each row
     all_diagnostic_params = []
     all_is_sfe = []
+    all_time_performance_categories = [] # Added list for this category
 
     # Prepare max_correct_difficulty mapping for easier lookup
     # Convert multi-index max_diffs to a dict: {(type, domain): max_difficulty}
@@ -426,19 +489,17 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
 
         current_params = []
         current_is_sfe = False
+        current_time_performance_category = 'Unknown' # Default category
 
         # Determine time performance (similar to error analysis part)
-        time_performance = 'Normal Time' # Default
         is_relatively_fast = False
+        is_slow = is_overtime or is_group_overtime # Simplified slow check
         avg_time_for_type = avg_times.get(q_type, np.inf)
 
         if q_time is not None:
              if q_time < (avg_time_for_type * 0.75):
                  is_relatively_fast = True
-                 if not is_correct: time_performance = 'Fast & Wrong'
-             elif is_overtime or is_group_overtime: # Check if slow
-                 if not is_correct: time_performance = 'Slow & Wrong'
-                 # If correct but slow, it's handled by efficiency params later
+             # Removed the time_performance string calculation here, do it later based on flags
 
         # Check for Special Focus Error (SFE) - only if incorrect
         if not is_correct and q_diff is not None:
@@ -449,36 +510,30 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
 
         # Determine potential root causes based on correctness and time
         if not is_correct: # Apply error parameters
-            if time_performance == 'Fast & Wrong':
-                current_params.append('DI_CARELESSNESS_DETAIL_OMISSION') # Implicit in fast/wrong
-                current_params.append('DI_DATA_INTERPRETATION_ERROR') # Could be misinterpretation leading to speed
-            elif time_performance == 'Slow & Wrong':
-                current_params.append('DI_DATA_INTERPRETATION_ERROR')
-                current_params.append('DI_LOGICAL_REASONING_ERROR')
-                if q_domain == 'Math Related':
-                     current_params.append('DI_EFFICIENCY_BOTTLENECK_CONCEPT')
-                     current_params.append('DI_EFFICIENCY_BOTTLENECK_CALCULATION')
-                else:
-                     current_params.append('DI_EFFICIENCY_BOTTLENECK_READING')
-                     current_params.append('DI_EFFICIENCY_BOTTLENECK_LOGIC')
-                if q_type == 'GT': current_params.append('DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE')
-                if q_type == 'Multi-source reasoning': current_params.append('DI_EFFICIENCY_BOTTLENECK_INTEGRATION')
-            else: # Normal Time & Wrong
-                current_params.append('DI_DATA_INTERPRETATION_ERROR')
-                current_params.append('DI_LOGICAL_REASONING_ERROR')
-                if q_domain == 'Math Related':
-                     current_params.append('DI_CONCEPT_APPLICATION_ERROR')
-                     current_params.append('DI_CALCULATION_ERROR')
-                if q_type == 'GT': current_params.append('DI_DATA_EXTRACTION_ERROR')
-                if q_type == 'Multi-source reasoning': current_params.append('DI_MULTI_SOURCE_INTEGRATION_ERROR')
-
-        elif is_overtime or is_group_overtime: # Apply efficiency parameters if Correct & Slow
+            if is_relatively_fast:
+                current_time_performance_category = 'Fast & Wrong'
+            elif is_slow:
+                current_time_performance_category = 'Slow & Wrong'
+            else:
+                current_time_performance_category = 'Normal Time & Wrong'
+            current_params.append('DI_DATA_INTERPRETATION_ERROR')
+            current_params.append('DI_LOGICAL_REASONING_ERROR')
             if q_domain == 'Math Related':
                  current_params.append('DI_EFFICIENCY_BOTTLENECK_CONCEPT')
                  current_params.append('DI_EFFICIENCY_BOTTLENECK_CALCULATION')
             else:
                  current_params.append('DI_EFFICIENCY_BOTTLENECK_READING')
                  current_params.append('DI_EFFICIENCY_BOTTLENECK_LOGIC')
+            if q_type == 'GT': current_params.append('DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE')
+            if q_type == 'Multi-source reasoning': current_params.append('DI_EFFICIENCY_BOTTLENECK_INTEGRATION')
+
+        elif is_overtime or is_group_overtime: # Apply efficiency parameters if Correct & Slow
+            if is_slow:
+                current_time_performance_category = 'Slow & Correct'
+            else:
+                current_time_performance_category = 'Normal Time & Correct'
+            current_params.append('DI_EFFICIENCY_BOTTLENECK_CONCEPT')
+            current_params.append('DI_EFFICIENCY_BOTTLENECK_CALCULATION')
             if q_type == 'GT': current_params.append('DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE')
             if q_type == 'Multi-source reasoning': current_params.append('DI_EFFICIENCY_BOTTLENECK_INTEGRATION')
 
@@ -499,12 +554,14 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
         # Append results for this row
         all_diagnostic_params.append(unique_params)
         all_is_sfe.append(current_is_sfe)
+        all_time_performance_categories.append(current_time_performance_category) # Append category
 
     # Assign the collected lists back to the DataFrame
     # Ensure lengths match before assignment
-    if len(all_diagnostic_params) == len(df) and len(all_is_sfe) == len(df):
+    if len(all_diagnostic_params) == len(df) and len(all_is_sfe) == len(df) and len(all_time_performance_categories) == len(df):
         df['diagnostic_params'] = all_diagnostic_params
         df['is_sfe'] = all_is_sfe
+        df['time_performance_category'] = all_time_performance_categories # Assign new column
     else:
         print(f"Error: Length mismatch during root cause diagnosis. Skipping assignment.")
         # Add empty columns if they don't exist to prevent key errors downstream
@@ -512,6 +569,8 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
              df['diagnostic_params'] = [[] for _ in range(len(df))]
         if 'is_sfe' not in df.columns:
              df['is_sfe'] = False
+        if 'time_performance_category' not in df.columns:
+             df['time_performance_category'] = '' # Add default empty string
 
     return df # Return the modified DataFrame
 

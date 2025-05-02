@@ -40,10 +40,15 @@ def run_diagnosis(df):
                            'estimated_ability' (optional).
 
     Returns:
-        dict: A dictionary where keys are subject names ('Q', 'V', 'DI')
-              and values are the corresponding Markdown report strings.
-              Returns an empty dictionary or dictionary with error messages if input is invalid
-              or no valid data remains after filtering.
+        tuple: A tuple containing two elements:
+               1. A dictionary where keys are subject names ('Q', 'V', 'DI')
+                  and values are the corresponding Markdown report strings.
+                  Returns an empty dictionary or dictionary with error messages if input is invalid
+                  or no valid data remains after filtering.
+               2. The processed DataFrame with additional diagnostic fields:
+                  - time_performance_category: Classification based on time and correctness
+                  - is_sfe: Boolean indicating if question is a Special Focus Error
+                  - diagnostic_params_list: List of Chinese diagnostic labels
     """
 
     # --- 0. Initial Validation ---
@@ -51,13 +56,13 @@ def run_diagnosis(df):
     required_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'Subject']
     if not isinstance(df, pd.DataFrame):
          print("Invalid input: Input is not a pandas DataFrame.")
-         return "錯誤：輸入數據格式無效。"
+         return "錯誤：輸入數據格式無效。", pd.DataFrame()
 
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
         print(f"Invalid input DataFrame. Missing required columns: {missing_cols}")
         # Provide a more informative error message
-        return f"錯誤：輸入數據缺少必要的欄位：{', '.join(missing_cols)}。請檢查上傳的 Excel 文件。"
+        return f"錯誤：輸入數據缺少必要的欄位：{', '.join(missing_cols)}。請檢查上傳的 Excel 文件。", pd.DataFrame()
 
     # Subject column is checked above as part of required_cols
 
@@ -261,7 +266,7 @@ def run_diagnosis(df):
 
     if df_processed.empty:
         print("No valid data remaining after filtering. Cannot perform diagnosis.")
-        return "診斷終止：在時間有效性過濾後，沒有剩餘的有效數據可供分析。"
+        return "診斷終止：在時間有效性過濾後，沒有剩餘的有效數據可供分析。", pd.DataFrame()
 
     # --- Dispatch to Subject-Specific Diagnosis ---
     print("\nDispatching data to subject-specific diagnosis modules...")
@@ -282,49 +287,116 @@ def run_diagnosis(df):
         print("DEBUG: df_q is not empty but 'question_type' column is missing!")
     # === DEBUG END ===
 
-    # Prepare data/results to pass to subject modules
-    # Pass the filtered df, time pressure status, invalid count, average times per type
-    # Note: exempted_skills is passed only to Q for now
+    # List to collect processed dataframes from subject modules
+    processed_dfs_list = []
+    df_final_for_diagnosis = None # Initialize
 
     # Run Q Diagnosis if data exists
     if not df_q.empty:
-        # Pass relevant info: df_q, time pressure for Q, num_invalid for Q
         q_invalid_count = df_processed[(df_processed['Subject'] == 'Q') & (df_processed['is_invalid'])].shape[0]
-        q_report = run_q_diagnosis(df_q, subject_time_pressure_status.get('Q', False), q_invalid_count)
+        # Call updated function and capture all return values
+        q_results, q_report, df_q_processed = run_q_diagnosis(df_q, subject_time_pressure_status.get('Q', False), q_invalid_count)
         subject_report_dict['Q'] = q_report # Store Q report in the dictionary
+        if df_q_processed is not None and not df_q_processed.empty: # Check if df returned is valid
+             processed_dfs_list.append(df_q_processed) # Append processed Q df
+        else:
+             print("WARNING: run_q_diagnosis returned an empty or None DataFrame.")
+             # Optionally append original df_q as fallback? Or nothing?
+             # Let's append nothing to avoid potential column mismatches later
+             # processed_dfs_list.append(df_q)
     else:
         print("No Q data found.")
         subject_report_dict['Q'] = "量化 (Quantitative) 部分無有效數據。" # Store message in dict
 
     # Run V Diagnosis if data exists
     if not df_v.empty:
-        # Pass relevant info: df_v, time pressure for V, num_invalid for V, avg times for V
         v_invalid_count = df_processed[(df_processed['Subject'] == 'V') & (df_processed['is_invalid'])].shape[0]
         v_avg_times = subject_avg_time_per_type.get('V', {})
-        v_results, v_report = run_v_diagnosis(df_v, subject_time_pressure_status.get('V', False), v_invalid_count, v_avg_times)
+        # Call updated function and capture all return values
+        v_results, v_report, df_v_processed = run_v_diagnosis(df_v, subject_time_pressure_status.get('V', False), v_invalid_count, v_avg_times)
         subject_report_dict['V'] = v_report # Store V report in the dictionary
+        if df_v_processed is not None and not df_v_processed.empty: # Check if df returned is valid
+             processed_dfs_list.append(df_v_processed) # Append processed V df
+        else:
+             print("WARNING: run_v_diagnosis returned an empty or None DataFrame.")
+             # Append nothing for consistency
+             # processed_dfs_list.append(df_v)
     else:
         print("No V data found.")
         subject_report_dict['V'] = "語文 (Verbal) 部分無有效數據。" # Store message in dict
 
     # Run DI Diagnosis if data exists
     if not df_di.empty:
-        # 根據 di_diagnostic.py 的函數簽名傳遞參數
-        # 注意：run_di_diagnosis 只接受 df_di 一個參數，內部會自行處理時間壓力邏輯
-        # 我們確保 df_di 包含所需的所有列和信息
-        # Pass the unfiltered DI dataframe
-        di_raw_df = df_processed[df_processed['Subject'] == 'DI'].copy() # Get raw DI data before global filtering
-        if not di_raw_df.empty:
-             print("DEBUG: >>>>>> Calling run_di_diagnosis with di_raw_df >>>>>>") # DEBUG
-             di_results, di_report = run_di_diagnosis(di_raw_df)
-             print("DEBUG: <<<<<< Returned from run_di_diagnosis <<<<<<") # DEBUG
-             subject_report_dict['DI'] = di_report # Store DI report in the dictionary
+        # Pass the DI dataframe
+        # if not df_di.empty: # Outer check already done
+        print("DEBUG: >>>>>> Calling run_di_diagnosis with df_di >>>>>>") # DEBUG
+        # Capture all three return values
+        di_results, di_report, df_di_processed = run_di_diagnosis(df_di) 
+        print("DEBUG: <<<<<< Returned from run_di_diagnosis <<<<<<") # DEBUG
+        subject_report_dict['DI'] = di_report # Store DI report in the dictionary
+        if df_di_processed is not None and not df_di_processed.empty: # Check if df returned is valid
+             processed_dfs_list.append(df_di_processed) # Append the processed DI dataframe
         else:
-             print("No DI data found after initial processing.")
-             subject_report_dict['DI'] = "數據洞察 (Data Insights) 部分無數據。" # Store message in dict
+             print("WARNING: run_di_diagnosis returned an empty or None DataFrame.")
+        # else: # Inner else removed as redundant
+        #     print("No DI data found after initial processing.")
+        #     subject_report_dict['DI'] = "數據洞察 (Data Insights) 部分無數據。" # Store message in dict
     else:
         print("No DI data found.")
         subject_report_dict['DI'] = "數據洞察 (Data Insights) 部分無數據。" # Store message in dict
+
+    # --- Combine results from subject modules --- 
+    if processed_dfs_list:
+        try:
+            # Use outer join to keep all rows even if columns differ slightly initially
+            # Although ideally, all modules should return the same core columns
+            df_final_for_diagnosis = pd.concat(processed_dfs_list, ignore_index=True, sort=False, join='outer') 
+            
+            # --- Post-Concatenation Column Check and Initialization --- 
+            required_display_cols = ['Subject', 'question_position', 'is_correct', 'question_time', 'question_difficulty', 'time_performance_category', 'is_sfe', 'diagnostic_params_list']
+            missing_display_cols = [col for col in required_display_cols if col not in df_final_for_diagnosis.columns]
+            if missing_display_cols:
+                print(f"WARNING: Final combined DataFrame is missing expected display columns: {missing_display_cols}")
+                # Initialize missing columns
+                for col in missing_display_cols:
+                     if col == 'diagnostic_params_list': 
+                          # Ensure initialization creates actual list objects for each row
+                          num_rows = len(df_final_for_diagnosis)
+                          df_final_for_diagnosis[col] = pd.Series([[] for _ in range(num_rows)], index=df_final_for_diagnosis.index)
+                     elif col == 'is_sfe' or col == 'is_correct':
+                          df_final_for_diagnosis[col] = False # Default boolean
+                     elif col == 'time_performance_category':
+                          df_final_for_diagnosis[col] = 'Unknown' # Default category
+                     else:
+                          df_final_for_diagnosis[col] = pd.NA # Use pandas NA for others like time, difficulty
+                print("Initialized missing columns with default values.")
+            # --- End Column Check --- 
+
+            print(f"Combined processed data from {len(processed_dfs_list)} subject(s). Final shape: {df_final_for_diagnosis.shape}")
+            # Verify diagnostic_params_list again
+            if 'diagnostic_params_list' in df_final_for_diagnosis.columns:
+                print("Final DataFrame contains 'diagnostic_params_list' column.")
+                # Check data type - should be object containing lists
+                print(f"  'diagnostic_params_list' dtype: {df_final_for_diagnosis['diagnostic_params_list'].dtype}")
+                # Check first few non-empty lists 
+                non_empty_lists = df_final_for_diagnosis[df_final_for_diagnosis['diagnostic_params_list'].apply(lambda x: isinstance(x, list) and len(x) > 0)]
+                print(f"  First few non-empty lists:\n{non_empty_lists['diagnostic_params_list'].head()}")
+            else:
+                print("ERROR: Final DataFrame DOES NOT contain 'diagnostic_params_list' column after concatenation!")
+                # Initialize again as a safeguard
+                num_rows = len(df_final_for_diagnosis)
+                df_final_for_diagnosis['diagnostic_params_list'] = pd.Series([[] for _ in range(num_rows)], index=df_final_for_diagnosis.index)
+
+        except Exception as concat_error:
+            print(f"ERROR during pd.concat: {concat_error}")
+            print("DataFrames attempted to concatenate:")
+            for i, df_sub in enumerate(processed_dfs_list):
+                 print(f"  DataFrame {i} shape: {df_sub.shape}, columns: {df_sub.columns.tolist()}")
+            df_final_for_diagnosis = pd.DataFrame() # Assign empty df on error
+
+    else:
+        print("No processed dataframes were collected from subject modules. Cannot create final dataframe.")
+        df_final_for_diagnosis = pd.DataFrame() # Ensure it's an empty DataFrame
 
     # --- Calculate correct total invalid and valid counts AFTER all diagnoses ---
     q_invalid_count = df_processed[(df_processed['Subject'] == 'Q') & (df_processed['is_invalid'])].shape[0]
@@ -338,7 +410,14 @@ def run_diagnosis(df):
     correct_total_valid = len(df_processed) - correct_total_invalid
     print(f"\nFiltered out {correct_total_invalid} invalid questions ({q_invalid_count} Q, {v_invalid_count} V, {di_invalid_count} DI). Proceeding with {correct_total_valid} valid questions for detailed diagnosis.")
 
-    print("Diagnosis process complete. Returning report dictionary.")
-    return subject_report_dict # Return the dictionary of reports
+    # Safety Check: Initialize diagnostic_params_list if somehow missing after concat
+    if df_final_for_diagnosis is not None and 'diagnostic_params_list' not in df_final_for_diagnosis.columns:
+        print("Safety Check: Initializing 'diagnostic_params_list' as it was missing in the final DataFrame after concat.")
+        num_rows = len(df_final_for_diagnosis)
+        df_final_for_diagnosis['diagnostic_params_list'] = pd.Series([[] for _ in range(num_rows)], index=df_final_for_diagnosis.index)
+
+    print("Diagnosis process complete. Returning report dictionary and processed dataframe.")
+    # Return the combined dataframe
+    return subject_report_dict, df_final_for_diagnosis  
 
 # End of run_diagnosis function. No other code should follow.

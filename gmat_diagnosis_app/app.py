@@ -52,7 +52,7 @@ VALIDATION_RULES = {
     'Content Domain': {'allowed': ALL_CONTENT_DOMAINS, 'subject_specific': ALLOWED_CONTENT_DOMAIN, 'error': "值無效或與科目不符 (大小寫/空格敏感)。"},
     'Question Type': {'allowed': ALL_QUESTION_TYPES, 'subject_specific': ALLOWED_QUESTION_TYPE, 'error': "值無效或與科目不符 (大小寫/空格敏感)。"},
     'Fundamental Skills': {'allowed': ALL_FUNDAMENTAL_SKILLS, 'subject_specific': ALLOWED_FUNDAMENTAL_SKILLS, 'error': "值無效或與科目不符 (大小寫/空格敏感)。"},
-    # We will validate the 'Question' column after potential rename to 'question_position'
+    # We will validate the 'Question' column after potential rename
     'Question': {'type': 'positive_integer', 'error': "必須是正整數 (例如 1, 2, 3)。"},
     '\ufeffQuestion': {'type': 'positive_integer', 'error': "必須是正整數 (例如 1, 2, 3)。"}, # Handle BOM
     # Removed validation for b-values as they are not expected user inputs
@@ -866,94 +866,53 @@ if st.session_state.analysis_run and df_combined_input is not None:
             # Else: error occurred, status already set
     
     # --- Diagnosis Section --- (Now uses df_final_for_diagnosis)
-    # st.header("3. 執行診斷分析") # Combined into header 2
+    diagnosis_expander = st.expander('診斷過程', expanded=False)
+    
     if df_final_for_diagnosis is not None: # Check if data prep was successful
-        report_dict = None # Initialize report dict for this run
-        # with st.spinner("執行診斷分析中..."): # Replace with st.status
-        with st.status("執行診斷分析...", expanded=True) as status_diag:
-            try:
-                # Ensure all required columns for the *markdown logic* are present
-                # Markdown needs: 'Correct', 'question_difficulty', 'question_time', 'question_type', 
-                # 'question_fundamental_skill', 'question_position'
-                required_cols = ['is_correct', 'question_difficulty', 'question_time', 'question_type', 'question_position']
-                # Check optional cols individually and add placeholders if missing
-                if 'question_fundamental_skill' not in df_final_for_diagnosis.columns:
-                     st.warning("數據缺少 'question_fundamental_skill'，部分診斷可能受影響。正在添加占位符。")
-                     df_final_for_diagnosis['question_fundamental_skill'] = 'Unknown Skill' # Add placeholder
-                if 'content_domain' not in df_final_for_diagnosis.columns:
-                     st.warning("數據缺少 'content_domain'，部分診斷可能受影響。正在添加占位符。")
-                     df_final_for_diagnosis['content_domain'] = 'Unknown Domain' # Add placeholder
+        # Define required columns immediately after confirming df_final_for_diagnosis exists
+        required_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'Subject']
 
-                missing_cols = [col for col in required_cols if col not in df_final_for_diagnosis.columns]
-                
-                if not missing_cols:
-                    st.write("正在調用診斷模塊...")
-                    # Pass the combined data to the diagnosis module
-                    # Consider passing total_test_time if collected
-                    report_dict = run_diagnosis(df_final_for_diagnosis) # Expect a dictionary now
-                    st.session_state.report_dict = report_dict # Store dict in session state
+        with diagnosis_expander:
+            st.write("開始進行診斷分析...")
+            progress_bar = st.progress(0, text="初始化診斷過程...")
+            
+            # --- Display Subject Distribution and Difficulty Column Type Check --- 
+            subject_counts = df_final_for_diagnosis['Subject'].value_counts()
+            
+            if 'question_fundamental_skill' not in df_final_for_diagnosis.columns:
+                st.warning(f"警告: 資料中缺少 'question_fundamental_skill' 欄位，將使用預設值。")
+                df_final_for_diagnosis['question_fundamental_skill'] = 'Unknown Skill' # Add placeholder
+            if 'content_domain' not in df_final_for_diagnosis.columns:
+                st.warning(f"警告: 資料中缺少 'content_domain' 欄位，將使用預設值。")
+                df_final_for_diagnosis['content_domain'] = 'Unknown Domain' # Add placeholder
 
-                    # Check if the report dict is not None and not empty
-                    if report_dict: # Check if the dictionary is not None and not empty
-                        st.write("診斷分析完成。")
-                        status_diag.update(label="診斷分析完成！", state="complete", expanded=False)
-                    else:
-                        st.warning("診斷分析未返回有效的報告字典或字典為空。請檢查 `diagnosis_module.py` 是否返回了預期的字典格式。")
-                        status_diag.update(label="診斷分析未返回有效結果", state="warning", expanded=True)
-                        st.session_state.report_dict = {} # Ensure reset to empty dict on warning
-                else:
-                    st.error(f"準備用於診斷的資料缺少必需欄位: {missing_cols}。無法執行診斷。")
-                    status_diag.update(label=f"診斷所需欄位缺失: {missing_cols}", state="error", expanded=True)
-                    st.session_state.report_dict = {} # Ensure reset to empty dict on error
-            except Exception as e:
-                st.error(f"執行診斷時發生錯誤：{e}")
-                status_diag.update(label=f"診斷執行出錯: {e}", state="error", expanded=True)
-                st.session_state.report_dict = {} # Ensure reset to empty dict on error
+            # Define required columns inside the 'with' block, right before use
+            required_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'Subject']
 
-            # --- Generate OpenAI Summary --- (Still within button click block)
-            # Check if report_dict exists and is not empty
-            if st.session_state.report_dict: # Check session state report_dict
-                if openai_api_key:
-                    # with st.spinner("正在生成文字摘要..."): # Replace with st.status
-                    with st.status("生成 AI 文字摘要...", expanded=False) as status_ai:
-                        try:
-                            client = openai.OpenAI(api_key=openai_api_key)
-                            # Combine reports from the dictionary for the prompt
-                            report_content_for_ai = "\n\n".join(
-                                f"--- {subject} 診斷報告 ---\n{report}"
-                                for subject, report in st.session_state.report_dict.items()
-                            )
-                            # Use the combined report content in the prompt
-                            prompt = f"""請根據以下 GMAT 各科診斷報告（基於用戶實際表現數據，但使用了模擬難度估計），產生一段簡潔的總結報告（約 150-200 字），說明主要的強項、弱項或值得注意的模式。請使用繁體中文回答。
-
-診斷報告：
-{report_content_for_ai}
-
-總結報告："""
-                            st.write("正在調用 OpenAI API...")
-                            response = client.chat.completions.create(
-                                model="gpt-3.5-turbo",
-                                messages=[
-                                    {"role": "system", "content": "你是一個擅長分析 GMAT 診斷報告並產生總結的 AI 助理。"},
-                                    {"role": "user", "content": prompt}
-                                ]
-                            )
-                            summary = response.choices[0].message.content
-                            st.session_state.ai_summary = summary # Store in session state
-                            st.write("AI 摘要生成成功。")
-                            status_ai.update(label="AI 文字摘要生成成功！", state="complete", expanded=False)
-                        except Exception as e:
-                            st.error(f"生成 AI 摘要時發生錯誤：{e}")
-                            st.session_state.ai_summary = None # Reset on error
-                            status_ai.update(label=f"AI 摘要生成失敗: {e}", state="error", expanded=True)
-                else:
-                     # Info message moved to output section
-                     pass
-            # --- End OpenAI Summary ---
-        # elif not df_final_for_diagnosis_list: # Handled inside status_prep
-        #      st.warning("未能成功準備任何用於診斷的數據。")
-    # elif not simulation_success: # Condition checked before data prep
-    #     st.error("IRT 模擬過程中斷或失敗，無法進行後續分析。")
+            missing_cols = [col for col in required_cols if col not in df_final_for_diagnosis.columns]
+            if missing_cols:
+                st.error(f"缺少必須的欄位: {', '.join(missing_cols)}")
+                st.info("請確保您的資料包含所有必要欄位。")
+            else:
+                # Run diagnosis if all required columns are present
+                progress_bar.progress(25, text="正在執行診斷分析...")
+                try:
+                    # Update this line to handle the tuple return value
+                    report_dict, df_processed = run_diagnosis(df_final_for_diagnosis) # Expect a tuple now
+                    
+                    # Update df_final_for_diagnosis with processed data containing new diagnostic fields
+                    df_final_for_diagnosis = df_processed
+                    
+                    progress_bar.progress(100, text="診斷分析完成！")
+                    # Store the report_dict in session state for later use
+                    st.session_state.report_dict = report_dict
+                    st.session_state.diagnosis_complete = True
+                    st.success("診斷分析成功完成。請選擇下方選項卡查看結果或原始資料。")
+                except Exception as e:
+                    st.error(f"診斷過程中發生錯誤: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
+                    st.session_state.diagnosis_complete = False
 
 # --- Display Results Section (Uses Session State) ---
 st.divider()
@@ -1014,7 +973,48 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
                             # Display the filtered dataframe if it's valid and not empty
                             if df_to_display is not None and not df_to_display.empty:
                                 st.subheader("診斷用數據 (含模擬難度)") # Changed subheader
-                                st.dataframe(df_to_display, use_container_width=True)
+                                # Define column configurations, assuming new columns exist from backend
+                                column_config = {
+                                    "question_position": st.column_config.NumberColumn("題號", format="%d", width="small"),
+                                    "is_correct": st.column_config.CheckboxColumn("答對?", width="small"),
+                                    "question_time": st.column_config.NumberColumn("用時(分)", format="%.1f", width="small"),
+                                    "question_difficulty": st.column_config.NumberColumn("模擬難度(b)", format="%.2f", width="medium"),
+                                    "question_type": st.column_config.TextColumn("題型", width="small"),
+                                    "content_domain": st.column_config.TextColumn("內容領域", width="medium"),
+                                    "question_fundamental_skill": st.column_config.TextColumn("核心技能", width="medium"),
+                                    # --- New Columns Config --- 
+                                    "time_performance_category": st.column_config.TextColumn(
+                                        "時間表現分類", 
+                                        help="綜合答題時間與正確性的分類 (快對/慢錯等)",
+                                        width="medium"
+                                    ),
+                                    "is_sfe": st.column_config.CheckboxColumn(
+                                        "基礎不穩(SFE)?", 
+                                        help="是否為特殊關注錯誤 (Special Focus Error) - 在已掌握技能範圍內題目失誤",
+                                        width="small"
+                                    ),
+                                     "diagnostic_params_list": st.column_config.ListColumn(
+                                        "診斷標籤列表",
+                                        help="該題目觸發的具體診斷標籤",
+                                        width="large", # Adjust width as needed
+                                    ),
+                                     # Hide columns not typically needed for direct user view?
+                                     "estimated_ability": None, # Hide estimated_ability
+                                     "Subject": None, # Hide Subject column
+                                } 
+                                
+                                # Filter config for columns that actually exist in the dataframe
+                                existing_columns = df_to_display.columns
+                                filtered_column_config = {
+                                    k: v for k, v in column_config.items() if k in existing_columns or v is None # Keep explicit None config
+                                }
+
+                                st.dataframe(
+                                     df_to_display, 
+                                     use_container_width=True,
+                                     column_config=filtered_column_config, # Use the filtered config
+                                     hide_index=True # Hide the default pandas index
+                                 )
                                 st.divider() # Add separator before the text report
                             else:
                                 # Show only if analysis was run but df is missing/empty for this subject
