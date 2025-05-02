@@ -40,8 +40,10 @@ def run_diagnosis(df):
                            'estimated_ability' (optional).
 
     Returns:
-        str: A combined report string containing diagnostics for all available subjects (Q, V, DI),
-             or an error message if input is invalid or no valid data remains after filtering.
+        dict: A dictionary where keys are subject names ('Q', 'V', 'DI')
+              and values are the corresponding Markdown report strings.
+              Returns an empty dictionary or dictionary with error messages if input is invalid
+              or no valid data remains after filtering.
     """
 
     # --- 0. Initial Validation ---
@@ -263,7 +265,7 @@ def run_diagnosis(df):
 
     # --- Dispatch to Subject-Specific Diagnosis ---
     print("\nDispatching data to subject-specific diagnosis modules...")
-    subject_reports = []
+    subject_report_dict = {} # Initialize dictionary to store reports by subject
 
     # Separate dataframes by Subject
     df_q = df_processed[df_processed['Subject'] == 'Q'].copy()
@@ -289,10 +291,10 @@ def run_diagnosis(df):
         # Pass relevant info: df_q, time pressure for Q, num_invalid for Q
         q_invalid_count = df_processed[(df_processed['Subject'] == 'Q') & (df_processed['is_invalid'])].shape[0]
         q_report = run_q_diagnosis(df_q, subject_time_pressure_status.get('Q', False), q_invalid_count)
-        subject_reports.append(q_report)
+        subject_report_dict['Q'] = q_report # Store Q report in the dictionary
     else:
         print("No Q data found.")
-        subject_reports.append("量化 (Quantitative) 部分無有效數據。")
+        subject_report_dict['Q'] = "量化 (Quantitative) 部分無有效數據。" # Store message in dict
 
     # Run V Diagnosis if data exists
     if not df_v.empty:
@@ -300,10 +302,10 @@ def run_diagnosis(df):
         v_invalid_count = df_processed[(df_processed['Subject'] == 'V') & (df_processed['is_invalid'])].shape[0]
         v_avg_times = subject_avg_time_per_type.get('V', {})
         v_results, v_report = run_v_diagnosis(df_v, subject_time_pressure_status.get('V', False), v_invalid_count, v_avg_times)
-        subject_reports.append(v_report)
+        subject_report_dict['V'] = v_report # Store V report in the dictionary
     else:
         print("No V data found.")
-        subject_reports.append("語文 (Verbal) 部分無有效數據。")
+        subject_report_dict['V'] = "語文 (Verbal) 部分無有效數據。" # Store message in dict
 
     # Run DI Diagnosis if data exists
     if not df_di.empty:
@@ -316,13 +318,13 @@ def run_diagnosis(df):
              print("DEBUG: >>>>>> Calling run_di_diagnosis with di_raw_df >>>>>>") # DEBUG
              di_results, di_report = run_di_diagnosis(di_raw_df)
              print("DEBUG: <<<<<< Returned from run_di_diagnosis <<<<<<") # DEBUG
-             subject_reports.append(di_report)
+             subject_report_dict['DI'] = di_report # Store DI report in the dictionary
         else:
              print("No DI data found after initial processing.")
-             subject_reports.append("數據洞察 (Data Insights) 部分無數據。")
+             subject_report_dict['DI'] = "數據洞察 (Data Insights) 部分無數據。" # Store message in dict
     else:
         print("No DI data found.")
-        subject_reports.append("數據洞察 (Data Insights) 部分無數據。")
+        subject_report_dict['DI'] = "數據洞察 (Data Insights) 部分無數據。" # Store message in dict
 
     # --- Calculate correct total invalid and valid counts AFTER all diagnoses ---
     q_invalid_count = df_processed[(df_processed['Subject'] == 'Q') & (df_processed['is_invalid'])].shape[0]
@@ -336,11 +338,7 @@ def run_diagnosis(df):
     correct_total_valid = len(df_processed) - correct_total_invalid
     print(f"\nFiltered out {correct_total_invalid} invalid questions ({q_invalid_count} Q, {v_invalid_count} V, {di_invalid_count} DI). Proceeding with {correct_total_valid} valid questions for detailed diagnosis.")
 
-    # --- Combine Reports ---
-    print("\nCombining subject reports...")
-    final_report_str = "\n\n---\n\n".join(subject_reports) # Join reports with a separator
-
-    print("Diagnosis process complete.")
-    return final_report_str
+    print("Diagnosis process complete. Returning report dictionary.")
+    return subject_report_dict # Return the dictionary of reports
 
 # End of run_diagnosis function. No other code should follow.

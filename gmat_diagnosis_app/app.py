@@ -18,12 +18,177 @@ from gmat_diagnosis_app.diagnosis_module import run_diagnosis # Import using abs
 import os # For environment variables
 import openai # Import OpenAI library
 
+# --- Validation Rules and Messages ---
+# Based on provided testset CSVs, case and space sensitive
+
+ALLOWED_PERFORMANCE = ['Correct', 'Incorrect']
+ALLOWED_CONTENT_DOMAIN = {
+    'Q': ['Algebra', 'Arithmetic'],
+    'V': ['N/A'], # Assuming only N/A based on v.csv example
+    'DI': ['Math Related', 'Non-Math Related']
+}
+# Combine all possible domains for easier checking if needed, or use subject-specific
+ALL_CONTENT_DOMAINS = list(set(cd for subj_cds in ALLOWED_CONTENT_DOMAIN.values() for cd in subj_cds))
+
+ALLOWED_QUESTION_TYPE = {
+    'Q': ['REAL', 'PURE'],
+    'V': ['Critical Reasoning', 'Reading Comprehension'],
+    'DI': ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
+}
+ALL_QUESTION_TYPES = list(set(qt for subj_qts in ALLOWED_QUESTION_TYPE.values() for qt in subj_qts))
+
+ALLOWED_FUNDAMENTAL_SKILLS = {
+    'Q': ['Equal/Unequal/ALG', 'Rates/Ratio/Percent', 'Value/Order/Factors', 'Counting/Sets/Series/Prob/Stats'],
+    'V': ['Plan/Construct', 'Identify Stated Idea', 'Identify Inferred Idea', 'Analysis/Critique'],
+    'DI': ['N/A'] # Assuming only N/A based on di.csv example
+}
+ALL_FUNDAMENTAL_SKILLS = list(set(fs for subj_fss in ALLOWED_FUNDAMENTAL_SKILLS.values() for fs in subj_fss))
+
+
+VALIDATION_RULES = {
+    # Original Column Name (before rename) : { rules }
+    'Response Time (Minutes)': {'type': 'positive_float', 'error': "必須是正數 (例如 1.5, 2)。"},
+    'Performance': {'allowed': ALLOWED_PERFORMANCE, 'error': f"必須是 {ALLOWED_PERFORMANCE} 其中之一 (大小寫/空格敏感)。"},
+    'Content Domain': {'allowed': ALL_CONTENT_DOMAINS, 'subject_specific': ALLOWED_CONTENT_DOMAIN, 'error': "值無效或與科目不符 (大小寫/空格敏感)。"},
+    'Question Type': {'allowed': ALL_QUESTION_TYPES, 'subject_specific': ALLOWED_QUESTION_TYPE, 'error': "值無效或與科目不符 (大小寫/空格敏感)。"},
+    'Fundamental Skills': {'allowed': ALL_FUNDAMENTAL_SKILLS, 'subject_specific': ALLOWED_FUNDAMENTAL_SKILLS, 'error': "值無效或與科目不符 (大小寫/空格敏感)。"},
+    # We will validate the 'Question' column after potential rename to 'question_position'
+    'Question': {'type': 'positive_integer', 'error': "必須是正整數 (例如 1, 2, 3)。"},
+    '\ufeffQuestion': {'type': 'positive_integer', 'error': "必須是正整數 (例如 1, 2, 3)。"}, # Handle BOM
+    # Removed validation for b-values as they are not expected user inputs
+    # 'DI_b': {'type': 'number', 'error': "必須是數字。"},
+    # 'Q_b': {'type': 'number', 'error': "必須是數字。"},
+    # 'V_b': {'type': 'number', 'error': "必須是數字。"},
+}
+
+# --- End Validation Rules ---
+
+# --- Validation Helper Function ---
+def validate_dataframe(df, subject):
+    """
+    Validates the DataFrame rows based on predefined rules for the subject.
+
+    Args:
+        df (pd.DataFrame): The DataFrame to validate (potentially edited).
+        subject (str): The subject ('Q', 'V', 'DI') to apply specific rules.
+
+    Returns:
+        list: A list of error message strings. Empty list if valid.
+    """
+    errors = []
+    # Define required columns based on the *original* expected names from CSVs
+    # We check these exist in the df passed *to* validation (which is the edited_df)
+    required_original_columns = {
+        'Q': ['Question', 'Response Time (Minutes)', 'Performance', 'Content Domain', 'Question Type', 'Fundamental Skills'],
+        'V': ['Question', 'Response Time (Minutes)', 'Performance', 'Question Type', 'Fundamental Skills'], # Content Domain might be optional/N/A for V
+        'DI': ['Question', 'Response Time (Minutes)', 'Performance', 'Content Domain', 'Question Type'] # Fundamental Skills might be optional/N/A for DI
+    }
+    # Adjust required based on BOM possibility for 'Question'
+    actual_required = required_original_columns.get(subject, [])
+    question_col_to_check = 'Question' # Default
+    if '\ufeffQuestion' in df.columns and 'Question' not in df.columns:
+         question_col_to_check = '\ufeffQuestion'
+         actual_required = [col if col != 'Question' else '\ufeffQuestion' for col in actual_required]
+    elif 'Question' not in df.columns and '\ufeffQuestion' not in df.columns:
+         # If neither standard 'Question' nor BOM version exists, flag 'Question' as missing
+         pass # Let the check below handle it
+
+
+    # 1. Check for missing required columns first (using the potentially BOM-adjusted list)
+    missing_cols = [col for col in actual_required if col not in df.columns]
+    if missing_cols:
+        # If 'Question' is missing, but '\ufeffQuestion' was required and IS present, don't report 'Question' as missing.
+        if 'Question' in missing_cols and question_col_to_check == '\ufeffQuestion':
+             missing_cols.remove('Question') # Remove the standard one if BOM version is the one we check
+
+        # Re-check if missing_cols is now empty
+        if missing_cols:
+             errors.append(f"資料缺少必要欄位: {', '.join(missing_cols)}。請檢查上傳/貼上的資料或編輯結果。")
+             return errors # Stop further validation if essential columns are missing
+
+    # 2. Validate cell values row by row
+    for index, row in df.iterrows():
+        for col_name, rules in VALIDATION_RULES.items():
+            # Determine the actual column name to check in the dataframe (handling BOM)
+            current_col_name = col_name
+            if col_name == 'Question' and question_col_to_check == '\ufeffQuestion':
+                 current_col_name = question_col_to_check # Use BOM version if that's what df has
+
+            if current_col_name not in df.columns:
+                # Only skip if the original column name (non-BOM) wasn't in the required list
+                # This prevents skipping validation for a required column just because it wasn't found (e.g., 'Performance')
+                if col_name not in actual_required:
+                    continue # Skip validation if column doesn't exist AND wasn't required
+
+            # If the column IS required but wasn't found above, it would have returned errors already.
+            # If it's not required and not present, we skipped. Now, if it *is* present:
+            if current_col_name in df.columns:
+                value = row[current_col_name]
+
+                # Skip validation for truly empty/NaN cells for now
+                if pd.isna(value): # Check for NaN first
+                     continue
+                # Convert to string and check if empty *after* stripping whitespace
+                value_str_for_empty_check = str(value).strip()
+                if value_str_for_empty_check == '':
+                     continue # Also skip visibly empty cells
+
+                is_valid = True
+                error_detail = rules['error']
+
+                # Type checks (apply strip here for robustness)
+                if 'type' in rules:
+                    value_str = str(value).strip() # Use stripped value for validation
+                    if rules['type'] == 'positive_float':
+                        try:
+                            num = float(value_str)
+                            if num <= 0: is_valid = False
+                        except (ValueError, TypeError):
+                            is_valid = False
+                    elif rules['type'] == 'positive_integer':
+                        try:
+                            num = int(value_str)
+                            # Ensure it's truly an integer (no decimals) and positive
+                            if num <= 0 or str(num) != value_str: is_valid = False
+                        except (ValueError, TypeError):
+                            is_valid = False
+                    elif rules['type'] == 'number':
+                         try:
+                             float(value_str) # Just check if convertible
+                         except (ValueError, TypeError):
+                             is_valid = False
+
+
+                # Allowed list checks (case and space sensitive - use original value)
+                elif 'allowed' in rules:
+                    allowed_values = rules['allowed']
+                    # Use subject-specific list if available
+                    if 'subject_specific' in rules and subject in rules['subject_specific']:
+                        allowed_values = rules['subject_specific'][subject]
+
+                    # Perform check using the original, non-stripped value for sensitivity
+                    if value not in allowed_values:
+                        is_valid = False
+                        # Format allowed values clearly for the error message
+                        allowed_values_str = ", ".join(f"'{v}'" for v in allowed_values)
+                        error_detail += f" 允許的值: {allowed_values_str}。"
+
+
+                if not is_valid:
+                    # Add 1 to index for user-friendly row numbering (Excel/CSV style)
+                    # Use current_col_name in the error message as that's the column header the user sees
+                    errors.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 值 '{value}' 無效。{error_detail}")
+
+    return errors
+# --- End Validation Helper ---
+
+
 # --- Initialize Session State ---
 # To track if analysis has been run and store results
 if 'analysis_run' not in st.session_state:
     st.session_state.analysis_run = False
-if 'report_string' not in st.session_state:
-    st.session_state.report_string = None
+if 'report_dict' not in st.session_state:
+    st.session_state.report_dict = {}
 if 'ai_summary' not in st.session_state:
     st.session_state.ai_summary = None
 if 'final_thetas' not in st.session_state:
@@ -49,12 +214,16 @@ TOTAL_QUESTIONS_Q = 21
 TOTAL_QUESTIONS_V = 23
 TOTAL_QUESTIONS_DI = 20
 RANDOM_SEED = 1000 
+MAX_FILE_SIZE_MB = 1 # Define max file size in MB
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024 # Calculate size in bytes
 # --- End Sidebar ---
 
 st.title('GMAT 成績診斷平台')
 
 # --- Data Input Section (Using Tabs) ---
 st.header("1. 上傳或貼上各科成績單")
+
+st.info(f"提示：上傳的 CSV 檔案大小請勿超過 {MAX_FILE_SIZE_MB}MB。貼上的資料沒有此限制。") # Add info message
 
 # Initialize DataFrames
 df_q = None
@@ -66,219 +235,397 @@ tab_q, tab_v, tab_di = st.tabs(["Quantitative (Q)", "Verbal (V)", "Data Insights
 
 with tab_q:
     st.subheader("Quantitative (Q) 資料輸入")
-    uploaded_file_q = st.file_uploader("上傳 Q 科目 CSV 檔案", type="csv", key="q_uploader")
+    uploaded_file_q = st.file_uploader(
+        "上傳 Q 科目 CSV 檔案", 
+        type="csv", 
+        key="q_uploader",
+        help=f"檔案大小限制為 {MAX_FILE_SIZE_MB}MB。"
+    )
     pasted_data_q = st.text_area("或將 Q 科目 Excel 資料貼在此處：", height=150, key="q_paster")
+    
+    # --- Add Header Requirement Info ---
+    st.caption("請確保資料包含以下欄位標題 (大小寫/空格敏感): 'Question', 'Response Time (Minutes)', 'Performance', 'Content Domain', 'Question Type', 'Fundamental Skills'")
+    # --- End Header Requirement Info ---
+
     temp_df_q = None
     source_q = None
+    data_source_type_q = None # Track source type
+
     if uploaded_file_q is not None:
-        source_q = uploaded_file_q
+        if uploaded_file_q.size > MAX_FILE_SIZE_BYTES:
+            st.error(f"檔案大小 ({uploaded_file_q.size / (1024*1024):.2f} MB) 超過 {MAX_FILE_SIZE_MB}MB 限制。")
+            # source_q remains None
+        else:
+            source_q = uploaded_file_q
+            data_source_type_q = 'File Upload'
     elif pasted_data_q:
         source_q = StringIO(pasted_data_q)
-        
+        data_source_type_q = 'Pasted Data'
+
     if source_q is not None:
         try:
             temp_df_q = pd.read_csv(source_q, sep=None, engine='python')
-            # Drop rows where all columns are NaN (completely empty rows)
-            temp_df_q.dropna(how='all', inplace=True)
-
-            # --- Standardize Columns (Handle potential 'Question' variations) ---
-            rename_map_q = {
-                # '﻿Question': 'question_position', # Old logic
-                'Performance': 'Correct',
-                'Response Time (Minutes)': 'question_time',
-                'Question Type': 'question_type',
-                'Content Domain': 'content_domain',
-                'Fundamental Skills': 'question_fundamental_skill'
-            }
-            # Dynamically add the position mapping
-            if '﻿Question' in temp_df_q.columns:
-                rename_map_q['﻿Question'] = 'question_position'
-            elif 'Question' in temp_df_q.columns: # Check for plain 'Question'
-                rename_map_q['Question'] = 'question_position'
-
-            # Apply only columns that exist
-            cols_to_rename = {k: v for k, v in rename_map_q.items() if k in temp_df_q.columns}
-            temp_df_q.rename(columns=cols_to_rename, inplace=True)
             
-            # Standardize question_type AFTER renaming
-            if 'question_type' in temp_df_q.columns:
-                temp_df_q['question_type'] = temp_df_q['question_type'].astype(str).str.strip().str.upper()
-            else:
-                 st.warning("Q: 缺少 'question_type' 欄位。") # Warn but continue
+            # --- Initial Cleaning: Drop empty rows and columns --- 
+            initial_rows_q, initial_cols_q = temp_df_q.shape
+            temp_df_q.dropna(how='all', inplace=True) # Drop rows where ALL are NaN
+            temp_df_q.dropna(axis=1, how='all', inplace=True) # Drop columns where ALL are NaN
+            temp_df_q.reset_index(drop=True, inplace=True) # Reset index
+            cleaned_rows_q, cleaned_cols_q = temp_df_q.shape
+            if initial_rows_q > cleaned_rows_q or initial_cols_q > cleaned_cols_q:
+                 st.caption(f"已自動移除 {initial_rows_q - cleaned_rows_q} 個空行和 {initial_cols_q - cleaned_cols_q} 個空列。")
+            # --- End Initial Cleaning ---
 
-            if 'Correct' in temp_df_q.columns:
-                 # Convert to boolean consistently
-                 temp_df_q['Correct'] = temp_df_q['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
-                 temp_df_q.rename(columns={'Correct': 'is_correct'}, inplace=True) # Rename to is_correct
-            else:
-                st.error("Q 資料缺少 'Performance' (Correct) 欄位，無法確定錯誤題目。")
-                temp_df_q = None
+            # --- Editable Preview --- 
+            validation_errors_q = [] # Initialize error list for Q
+            if not temp_df_q.empty:
+                st.write("預覽與編輯資料 (修改後請確保欄位符合下方要求)：")
+                try:
+                    # Use data_editor for viewing all data and allowing edits
+                    edited_temp_df_q = st.data_editor(
+                        temp_df_q,
+                        key="editor_q",
+                        num_rows="dynamic", # Allow adding/deleting rows
+                        use_container_width=True
+                    )
+                    # --- START VALIDATION ---
+                    validation_errors_q = validate_dataframe(edited_temp_df_q, 'Q')
+                    if validation_errors_q:
+                        st.error("Q科目: 發現以下輸入錯誤，請修正：")
+                        for error in validation_errors_q:
+                            st.error(f"- {error}")
+                        temp_df_q = None # Mark as invalid if errors found
+                    else:
+                        temp_df_q = edited_temp_df_q # Use the validated, edited dataframe
+                    # --- END VALIDATION ---
 
+                except Exception as editor_e:
+                    st.error(f"編輯器載入或操作時發生錯誤：{editor_e}")
+                    temp_df_q = None # Stop processing this tab on editor error
+            else:
+                st.warning("讀取的資料在清理空行/空列後為空。")
+                temp_df_q = None # Set to None if empty after cleaning
+            # --- End Editable Preview --- 
+
+            # Proceed with standardization ONLY if temp_df_q is not None (i.e., no validation errors)
             if temp_df_q is not None:
-                data_sources['Q'] = 'File Upload' if uploaded_file_q else 'Pasted Data'
-                st.success(f"Q 科目資料讀取成功 ({data_sources['Q']})！")
-                # Add subject identifier and rename
-                temp_df_q['Subject'] = 'Q'
+                # --- Standardize Columns (Handle potential 'Question' variations) --- 
+                rename_map_q = {
+                    # '﻿Question': 'question_position', # Old logic
+                    'Performance': 'Correct',
+                    'Response Time (Minutes)': 'question_time',
+                    'Question Type': 'question_type',
+                    'Content Domain': 'content_domain',
+                    'Fundamental Skills': 'question_fundamental_skill'
+                }
+                # Dynamically add the position mapping based on columns found in the *edited* df
+                if '\ufeffQuestion' in temp_df_q.columns: # Check for BOM + Question first
+                    rename_map_q['\ufeffQuestion'] = 'question_position'
+                elif 'Question' in temp_df_q.columns: # Check for plain 'Question'
+                    rename_map_q['Question'] = 'question_position'
 
-                # --- Ensure independent question_position for Q ---
-                if 'question_position' not in temp_df_q.columns or pd.to_numeric(temp_df_q['question_position'], errors='coerce').isnull().any():
-                    st.warning("Q: 正在根據原始順序重新生成 question_position。")
-                    temp_df_q = temp_df_q.reset_index(drop=True)
-                    temp_df_q['question_position'] = temp_df_q.index + 1
+                # Apply only columns that exist in the edited dataframe
+                cols_to_rename = {k: v for k, v in rename_map_q.items() if k in temp_df_q.columns}
+                if cols_to_rename:
+                     temp_df_q.rename(columns=cols_to_rename, inplace=True)
+
+                # Standardize question_type AFTER renaming
+                if 'question_type' in temp_df_q.columns:
+                    temp_df_q['question_type'] = temp_df_q['question_type'].astype(str).str.strip().str.upper()
                 else:
-                    # Ensure it's integer type after validation
-                    temp_df_q['question_position'] = pd.to_numeric(temp_df_q['question_position'], errors='coerce').astype('Int64')
-                # --- End Ensure ---
-                df_q = temp_df_q # Assign to df_q here
-                with st.expander("顯示 Q 資料預覽"): # Optional Preview Expander
-                     st.dataframe(df_q.head())
+                     st.warning("Q: 編輯後的資料缺少 'question_type' (或原始對應) 欄位。", icon="⚠️")
+
+                if 'Correct' in temp_df_q.columns:
+                     # Convert to boolean consistently
+                     temp_df_q['Correct'] = temp_df_q['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
+                     temp_df_q.rename(columns={'Correct': 'is_correct'}, inplace=True) # Rename to is_correct
+                else:
+                    st.error("Q: 編輯後的資料缺少 'Performance'/'Correct' 欄位，無法確定錯誤題目。", icon="🚨")
+                    temp_df_q = None # Mark as invalid if Correct column is missing
+
+                if temp_df_q is not None:
+                    data_sources['Q'] = data_source_type_q
+                    st.success(f"Q 科目資料讀取成功 ({data_sources['Q']})！")
+                    temp_df_q['Subject'] = 'Q' # Add subject identifier
+
+                    # --- Ensure independent question_position for Q --- 
+                    # Check if position exists AND is usable after potential edits/renaming
+                    if 'question_position' not in temp_df_q.columns or pd.to_numeric(temp_df_q['question_position'], errors='coerce').isnull().any():
+                        st.warning("Q: 缺少 'Question'/'question_position' 欄位或包含無效值，正在根據當前順序重新生成題號。", icon="⚠️")
+                        # Use reset_index again to ensure consecutive numbering after edits
+                        temp_df_q = temp_df_q.reset_index(drop=True)
+                        temp_df_q['question_position'] = temp_df_q.index + 1
+                    else:
+                        # Ensure it's integer type after validation
+                        temp_df_q['question_position'] = pd.to_numeric(temp_df_q['question_position'], errors='coerce').astype('Int64')
+                    # --- End Ensure --- 
+                    df_q = temp_df_q # Assign the fully processed df to df_q
+                    # Remove old expander preview
+                    # with st.expander("顯示 Q 資料預覽"):
+                    #      st.dataframe(df_q.head())
         except Exception as e:
             st.error(f"處理 Q 科目資料時發生錯誤：{e}")
             df_q = None # Ensure df_q is None on error
 
 with tab_v:
     st.subheader("Verbal (V) 資料輸入")
-    uploaded_file_v = st.file_uploader("上傳 V 科目 CSV 檔案", type="csv", key="v_uploader")
+    uploaded_file_v = st.file_uploader(
+        "上傳 V 科目 CSV 檔案", 
+        type="csv", 
+        key="v_uploader",
+        help=f"檔案大小限制為 {MAX_FILE_SIZE_MB}MB。"
+    )
     pasted_data_v = st.text_area("或將 V 科目 Excel 資料貼在此處：", height=150, key="v_paster")
+    
+    # --- Add Header Requirement Info ---
+    st.caption("請確保資料包含以下欄位標題 (大小寫/空格敏感): 'Question', 'Response Time (Minutes)', 'Performance', 'Question Type', 'Fundamental Skills'") # Note: Content Domain is often N/A for Verbal but check if your specific source requires it.
+    # --- End Header Requirement Info ---
+
     temp_df_v = None
     source_v = None
+    data_source_type_v = None
+
     if uploaded_file_v is not None:
-        source_v = uploaded_file_v
+        if uploaded_file_v.size > MAX_FILE_SIZE_BYTES:
+            st.error(f"檔案大小 ({uploaded_file_v.size / (1024*1024):.2f} MB) 超過 {MAX_FILE_SIZE_MB}MB 限制。")
+        else:
+            source_v = uploaded_file_v
+            data_source_type_v = 'File Upload'
     elif pasted_data_v:
         source_v = StringIO(pasted_data_v)
-        
+        data_source_type_v = 'Pasted Data'
+
     if source_v is not None:
         try:
             temp_df_v = pd.read_csv(source_v, sep=None, engine='python')
-            # Drop rows where all columns are NaN (completely empty rows)
+            # --- Initial Cleaning --- 
+            initial_rows_v, initial_cols_v = temp_df_v.shape
             temp_df_v.dropna(how='all', inplace=True)
+            temp_df_v.dropna(axis=1, how='all', inplace=True)
+            temp_df_v.reset_index(drop=True, inplace=True)
+            cleaned_rows_v, cleaned_cols_v = temp_df_v.shape
+            if initial_rows_v > cleaned_rows_v or initial_cols_v > cleaned_cols_v:
+                 st.caption(f"已自動移除 {initial_rows_v - cleaned_rows_v} 個空行和 {initial_cols_v - cleaned_cols_v} 個空列。")
+            # --- End Initial Cleaning ---
 
-            rename_map_v = {
-                # '﻿Question': 'question_position',
-                'Performance': 'Correct',
-                'Response Time (Minutes)': 'question_time',
-                'Question Type': 'question_type',
-                'Fundamental Skills': 'question_fundamental_skill'
-            }
-            # Dynamically add the position mapping
-            if '﻿Question' in temp_df_v.columns:
-                rename_map_v['﻿Question'] = 'question_position'
-            elif 'Question' in temp_df_v.columns:
-                rename_map_v['Question'] = 'question_position'
-
-            cols_to_rename = {k: v for k, v in rename_map_v.items() if k in temp_df_v.columns}
-            temp_df_v.rename(columns=cols_to_rename, inplace=True)
-            
-            # Standardize question_type AFTER renaming (Remove .str.upper() for V)
-            if 'question_type' in temp_df_v.columns:
-                temp_df_v['question_type'] = temp_df_v['question_type'].astype(str).str.strip() # Keep original case for V
+            # --- Editable Preview --- 
+            validation_errors_v = [] # Initialize error list for V
+            if not temp_df_v.empty:
+                 st.write("預覽與編輯資料 (修改後請確保欄位符合下方要求)：")
+                 try:
+                    edited_temp_df_v = st.data_editor(
+                        temp_df_v, 
+                        key="editor_v", 
+                        num_rows="dynamic",
+                        use_container_width=True
+                    )
+                    # --- START VALIDATION --- 
+                    validation_errors_v = validate_dataframe(edited_temp_df_v, 'V')
+                    if validation_errors_v:
+                        st.error("V科目: 發現以下輸入錯誤，請修正：")
+                        for error in validation_errors_v:
+                            st.error(f"- {error}")
+                        temp_df_v = None # Mark as invalid
+                    else:
+                        temp_df_v = edited_temp_df_v # Use validated df
+                    # --- END VALIDATION --- 
+                 except Exception as editor_e:
+                     st.error(f"編輯器載入或操作時發生錯誤：{editor_e}")
+                     temp_df_v = None
             else:
-                 st.warning("V: 缺少 'question_type' 欄位。") # Warn but continue
-
-            if 'Correct' in temp_df_v.columns:
-                 temp_df_v['Correct'] = temp_df_v['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
-                 temp_df_v.rename(columns={'Correct': 'is_correct'}, inplace=True) # Rename to is_correct
-            else:
-                 st.error("V 資料缺少 'Performance' (Correct) 欄位，無法確定錯誤題目。")
+                 st.warning("讀取的資料在清理空行/空列後為空。")
                  temp_df_v = None
+            # --- End Editable Preview --- 
 
+            # Proceed with standardization ONLY if temp_df_v is not None
             if temp_df_v is not None:
-                data_sources['V'] = 'File Upload' if uploaded_file_v else 'Pasted Data'
-                st.success(f"V 科目資料讀取成功 ({data_sources['V']})！")
-                # Add subject identifier and rename
-                temp_df_v['Subject'] = 'V'
+                # --- Standardize Columns --- 
+                rename_map_v = {
+                    # '﻿Question': 'question_position',
+                    'Performance': 'Correct',
+                    'Response Time (Minutes)': 'question_time',
+                    'Question Type': 'question_type',
+                    'Fundamental Skills': 'question_fundamental_skill'
+                }
+                if '\ufeffQuestion' in temp_df_v.columns:
+                    rename_map_v['\ufeffQuestion'] = 'question_position'
+                elif 'Question' in temp_df_v.columns:
+                    rename_map_v['Question'] = 'question_position'
+                
+                cols_to_rename = {k: v for k, v in rename_map_v.items() if k in temp_df_v.columns}
+                if cols_to_rename:
+                    temp_df_v.rename(columns=cols_to_rename, inplace=True)
 
-                # --- Ensure independent question_position for V ---
-                if 'question_position' not in temp_df_v.columns or pd.to_numeric(temp_df_v['question_position'], errors='coerce').isnull().any():
-                    st.warning("V: 正在根據原始順序重新生成 question_position。")
-                    temp_df_v = temp_df_v.reset_index(drop=True)
-                    temp_df_v['question_position'] = temp_df_v.index + 1
+                # Standardize question_type AFTER renaming (Remove .str.upper() for V)
+                if 'question_type' in temp_df_v.columns:
+                    temp_df_v['question_type'] = temp_df_v['question_type'].astype(str).str.strip() # Keep original case for V
                 else:
-                    # Ensure it's integer type after validation
-                    temp_df_v['question_position'] = pd.to_numeric(temp_df_v['question_position'], errors='coerce').astype('Int64')
-                # --- End Ensure ---
-                df_v = temp_df_v # Assign to df_v here
-                with st.expander("顯示 V 資料預覽"):
-                     st.dataframe(df_v.head())
+                     st.warning("V: 編輯後的資料缺少 'question_type' (或原始對應) 欄位。", icon="⚠️")
+
+                if 'Correct' in temp_df_v.columns:
+                     temp_df_v['Correct'] = temp_df_v['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
+                     temp_df_v.rename(columns={'Correct': 'is_correct'}, inplace=True)
+                else:
+                     st.error("V: 編輯後的資料缺少 'Performance'/'Correct' 欄位，無法確定錯誤題目。", icon="🚨")
+                     temp_df_v = None
+
+                if temp_df_v is not None:
+                    data_sources['V'] = data_source_type_v
+                    st.success(f"V 科目資料讀取成功 ({data_sources['V']})！")
+                    temp_df_v['Subject'] = 'V'
+
+                    # --- Ensure independent question_position for V --- 
+                    if 'question_position' not in temp_df_v.columns or pd.to_numeric(temp_df_v['question_position'], errors='coerce').isnull().any():
+                        st.warning("V: 缺少 'Question'/'question_position' 欄位或包含無效值，正在根據當前順序重新生成題號。", icon="⚠️")
+                        temp_df_v = temp_df_v.reset_index(drop=True)
+                        temp_df_v['question_position'] = temp_df_v.index + 1
+                    else:
+                        temp_df_v['question_position'] = pd.to_numeric(temp_df_v['question_position'], errors='coerce').astype('Int64')
+                    # --- End Ensure --- 
+                    df_v = temp_df_v
+                    # Remove old preview
+                    # with st.expander("顯示 V 資料預覽"):
+                    #      st.dataframe(df_v.head())
         except Exception as e:
             st.error(f"處理 V 科目資料時發生錯誤：{e}")
-            df_v = None # Ensure df_v is None on error
+            df_v = None
 
 with tab_di:
     st.subheader("Data Insights (DI) 資料輸入")
-    uploaded_file_di = st.file_uploader("上傳 DI 科目 CSV 檔案", type="csv", key="di_uploader")
+    uploaded_file_di = st.file_uploader(
+        "上傳 DI 科目 CSV 檔案", 
+        type="csv", 
+        key="di_uploader",
+        help=f"檔案大小限制為 {MAX_FILE_SIZE_MB}MB。"
+    )
     pasted_data_di = st.text_area("或將 DI 科目 Excel 資料貼在此處：", height=150, key="di_paster")
+    
+    # --- Add Header Requirement Info ---
+    st.caption("請確保資料包含以下欄位標題 (大小寫/空格敏感): 'Question', 'Response Time (Minutes)', 'Performance', 'Content Domain', 'Question Type'") # Note: Fundamental Skills is often N/A for DI but check if your specific source requires it.
+    # --- End Header Requirement Info ---
+    
     temp_df_di = None
     source_di = None
+    data_source_type_di = None
+
     if uploaded_file_di is not None:
-        source_di = uploaded_file_di
+        if uploaded_file_di.size > MAX_FILE_SIZE_BYTES:
+            st.error(f"檔案大小 ({uploaded_file_di.size / (1024*1024):.2f} MB) 超過 {MAX_FILE_SIZE_MB}MB 限制。")
+        else:
+            source_di = uploaded_file_di
+            data_source_type_di = 'File Upload'
     elif pasted_data_di:
         source_di = StringIO(pasted_data_di)
+        data_source_type_di = 'Pasted Data'
 
     if source_di is not None:
         try:
             temp_df_di = pd.read_csv(source_di, sep=None, engine='python')
-            # Drop rows where all columns are NaN (completely empty rows)
+            # --- Initial Cleaning --- 
+            initial_rows_di, initial_cols_di = temp_df_di.shape
             temp_df_di.dropna(how='all', inplace=True)
+            temp_df_di.dropna(axis=1, how='all', inplace=True)
+            temp_df_di.reset_index(drop=True, inplace=True)
+            cleaned_rows_di, cleaned_cols_di = temp_df_di.shape
+            if initial_rows_di > cleaned_rows_di or initial_cols_di > cleaned_cols_di:
+                 st.caption(f"已自動移除 {initial_rows_di - cleaned_rows_di} 個空行和 {initial_cols_di - cleaned_cols_di} 個空列。")
+            # --- End Initial Cleaning ---
 
-            rename_map_di = {
-                # '﻿Question': 'question_position',
-                'Performance': 'Correct',
-                'Response Time (Minutes)': 'question_time',
-                'Question Type': 'question_type',
-                'Content Domain': 'content_domain'
-            }
-            # Dynamically add the position mapping
-            if '﻿Question' in temp_df_di.columns:
-                rename_map_di['﻿Question'] = 'question_position'
-            elif 'Question' in temp_df_di.columns:
-                rename_map_di['Question'] = 'question_position'
-
-            cols_to_rename = {k: v for k, v in rename_map_di.items() if k in temp_df_di.columns}
-            temp_df_di.rename(columns=cols_to_rename, inplace=True)
-            
-            # Standardize question_type AFTER renaming (Remove .str.upper() for DI)
-            if 'question_type' in temp_df_di.columns:
-                temp_df_di['question_type'] = temp_df_di['question_type'].astype(str).str.strip() # Keep original case for DI
+            # --- Editable Preview --- 
+            validation_errors_di = [] # Initialize error list for DI
+            if not temp_df_di.empty:
+                 st.write("預覽與編輯資料 (修改後請確保欄位符合下方要求)：")
+                 try:
+                     edited_temp_df_di = st.data_editor(
+                         temp_df_di, 
+                         key="editor_di", 
+                         num_rows="dynamic",
+                         use_container_width=True
+                     )
+                     # --- START VALIDATION --- 
+                     validation_errors_di = validate_dataframe(edited_temp_df_di, 'DI')
+                     if validation_errors_di:
+                         st.error("DI科目: 發現以下輸入錯誤，請修正：")
+                         for error in validation_errors_di:
+                             st.error(f"- {error}")
+                         temp_df_di = None # Mark as invalid
+                     else:
+                         temp_df_di = edited_temp_df_di # Use validated df
+                     # --- END VALIDATION --- 
+                 except Exception as editor_e:
+                     st.error(f"編輯器載入或操作時發生錯誤：{editor_e}")
+                     temp_df_di = None
             else:
-                st.warning("DI: 缺少 'question_type' 欄位。") # Warn but continue
-            
-            if 'Correct' in temp_df_di.columns:
-                 temp_df_di['Correct'] = temp_df_di['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
-                 temp_df_di.rename(columns={'Correct': 'is_correct'}, inplace=True) # Rename to is_correct
-            else:
-                 st.error("DI 資料缺少 'Performance' (Correct) 欄位，無法確定錯誤題目。")
+                 st.warning("讀取的資料在清理空行/空列後為空。")
                  temp_df_di = None
+            # --- End Editable Preview --- 
 
+            # Proceed with standardization ONLY if temp_df_di is not None
             if temp_df_di is not None:
-                data_sources['DI'] = 'File Upload' if uploaded_file_di else 'Pasted Data'
-                st.success(f"DI 科目資料讀取成功 ({data_sources['DI']})！")
-                # Add subject identifier and rename
-                temp_df_di['Subject'] = 'DI'
+                # --- Standardize Columns --- 
+                rename_map_di = {
+                    # '﻿Question': 'question_position',
+                    'Performance': 'Correct',
+                    'Response Time (Minutes)': 'question_time',
+                    'Question Type': 'question_type',
+                    'Content Domain': 'content_domain'
+                }
+                if '\ufeffQuestion' in temp_df_di.columns:
+                    rename_map_di['\ufeffQuestion'] = 'question_position'
+                elif 'Question' in temp_df_di.columns:
+                    rename_map_di['Question'] = 'question_position'
 
-                # --- Ensure independent question_position for DI ---
-                if 'question_position' not in temp_df_di.columns or pd.to_numeric(temp_df_di['question_position'], errors='coerce').isnull().any():
-                    st.warning("DI: 正在根據原始順序重新生成 question_position。")
-                    temp_df_di = temp_df_di.reset_index(drop=True)
-                    temp_df_di['question_position'] = temp_df_di.index + 1
+                cols_to_rename = {k: v for k, v in rename_map_di.items() if k in temp_df_di.columns}
+                if cols_to_rename:
+                    temp_df_di.rename(columns=cols_to_rename, inplace=True)
+                
+                # Standardize question_type AFTER renaming (Remove .str.upper() for DI)
+                if 'question_type' in temp_df_di.columns:
+                    temp_df_di['question_type'] = temp_df_di['question_type'].astype(str).str.strip() # Keep original case for DI
                 else:
-                    # Ensure it's integer type after validation
-                    temp_df_di['question_position'] = pd.to_numeric(temp_df_di['question_position'], errors='coerce').astype('Int64')
-                # --- End Ensure ---
-                df_di = temp_df_di # Assign to df_di here
-                with st.expander("顯示 DI 資料預覽"):
-                     st.dataframe(df_di.head())
+                    st.warning("DI: 編輯後的資料缺少 'question_type' (或原始對應) 欄位。", icon="⚠️")
+                
+                if 'Correct' in temp_df_di.columns:
+                     temp_df_di['Correct'] = temp_df_di['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
+                     temp_df_di.rename(columns={'Correct': 'is_correct'}, inplace=True) # Rename to is_correct
+                else:
+                     st.error("DI: 編輯後的資料缺少 'Performance'/'Correct' 欄位，無法確定錯誤題目。", icon="🚨")
+                     temp_df_di = None
+
+                if temp_df_di is not None:
+                    data_sources['DI'] = data_source_type_di
+                    st.success(f"DI 科目資料讀取成功 ({data_sources['DI']})！")
+                    temp_df_di['Subject'] = 'DI'
+
+                    # --- Ensure independent question_position for DI --- 
+                    if 'question_position' not in temp_df_di.columns or pd.to_numeric(temp_df_di['question_position'], errors='coerce').isnull().any():
+                        st.warning("DI: 缺少 'Question'/'question_position' 欄位或包含無效值，正在根據當前順序重新生成題號。", icon="⚠️")
+                        temp_df_di = temp_df_di.reset_index(drop=True)
+                        temp_df_di['question_position'] = temp_df_di.index + 1
+                    else:
+                        temp_df_di['question_position'] = pd.to_numeric(temp_df_di['question_position'], errors='coerce').astype('Int64')
+                    # --- End Ensure --- 
+                    df_di = temp_df_di
+                    # Remove old preview
+                    # with st.expander("顯示 DI 資料預覽"):
+                    #      st.dataframe(df_di.head())
         except Exception as e:
             st.error(f"處理 DI 科目資料時發生錯誤：{e}")
-            df_di = None # Ensure df_di is None on error
+            df_di = None
 
 # --- Combine Input Data (After Tabs) ---
+# Use the potentially edited and VALIDATED dataframes (df_q, df_v, df_di)
 input_dfs = {'Q': df_q, 'V': df_v, 'DI': df_di}
+# Filter out subjects where df is None (either initially or due to validation error)
 loaded_subjects = {subj for subj, df in input_dfs.items() if df is not None}
-df_combined_input = None
+# Create list of valid dataframes only
 df_combined_input_list = [df for df in [df_q, df_v, df_di] if df is not None]
+df_combined_input = None # Initialize
 
-if df_combined_input_list:
+# Check if *any* data was loaded initially, even if it failed validation later
+any_data_attempted = bool(data_sources) # Check if any source was identified
+
+if df_combined_input_list: # Only proceed if there's at least one *valid* df
      try:
          # Concatenate with ignore_index=True, but 'question_position' is already calculated per subject
          df_combined_input = pd.concat(df_combined_input_list, ignore_index=True)
@@ -295,19 +642,21 @@ if df_combined_input_list:
          #     df_combined_input.sort_values(by=['Subject', 'question_position'], inplace=True)
 
      except Exception as e:
-         st.error(f"合併輸入資料時發生錯誤: {e}")
+         st.error(f"合併 *有效* 輸入資料時發生錯誤: {e}")
          df_combined_input = None
-elif loaded_subjects: # Data was loaded but failed during processing within tabs
-     st.warning("部分科目數據處理失敗，請檢查上方錯誤信息。")
+elif any_data_attempted: # Data was loaded/pasted but ALL failed validation or processing
+     st.warning("所有輸入的科目數據均未能通過驗證或處理，請檢查上方各分頁的錯誤信息。分析無法進行。")
+# else: No data was ever loaded or pasted, message handled below
 
 # --- Analysis Trigger Button ---
 st.divider() # Add a visual separator
 
+# Display the button differently based on whether data is ready
 if df_combined_input is not None:
-    if st.button("🔍 開始分析", type="primary"):
+    if st.button("🔍 開始分析", type="primary", key="analyze_button"):
         st.session_state.analysis_run = True
         # Reset previous results when starting new analysis
-        st.session_state.report_string = None
+        st.session_state.report_dict = {}
         st.session_state.ai_summary = None
         st.session_state.final_thetas = {}
     else:
@@ -316,10 +665,12 @@ if df_combined_input is not None:
         # st.session_state.analysis_run = st.session_state.get('analysis_run', False) # Keep existing state if button not clicked
         pass # No need to explicitly set to false, just don't set to true
 
-elif loaded_subjects: # Data loaded but failed combining
-    st.error("無法合併輸入資料，請檢查各科數據格式。分析無法進行。")
+elif any_data_attempted: # Data attempted but failed validation/combination
+    st.error("數據驗證失敗或無法合併，請修正上方標示的錯誤後再試。")
+    st.button("🔍 開始分析", type="primary", disabled=True, key="analyze_button_disabled_invalid") # Disable button
 else:
     st.info("請在上方分頁中為至少一個科目上傳或貼上資料。")
+    st.button("🔍 開始分析", type="primary", disabled=True, key="analyze_button_disabled_no_data") # Disable button
 
 # --- Simulation, Processing, Diagnosis, and Output Tabs (Conditional Execution) ---
 if st.session_state.analysis_run and df_combined_input is not None:
@@ -483,7 +834,7 @@ if st.session_state.analysis_run and df_combined_input is not None:
     # --- Diagnosis Section --- (Now uses df_final_for_diagnosis)
     # st.header("3. 執行診斷分析") # Combined into header 2
     if df_final_for_diagnosis is not None: # Check if data prep was successful
-        report_string = None # Initialize report string for this run
+        report_dict = None # Initialize report dict for this run
         # with st.spinner("執行診斷分析中..."): # Replace with st.status
         with st.status("執行診斷分析...", expanded=True) as status_diag:
             try:
@@ -505,38 +856,44 @@ if st.session_state.analysis_run and df_combined_input is not None:
                     st.write("正在調用診斷模塊...")
                     # Pass the combined data to the diagnosis module
                     # Consider passing total_test_time if collected
-                    report_string = run_diagnosis(df_final_for_diagnosis) # Changed variable name
-                    st.session_state.report_string = report_string # Store in session state
+                    report_dict = run_diagnosis(df_final_for_diagnosis) # Expect a dictionary now
+                    st.session_state.report_dict = report_dict # Store dict in session state
 
-                    # Check if the report string is not None and not empty
-                    if report_string:
+                    # Check if the report dict is not None and not empty
+                    if report_dict: # Check if the dictionary is not None and not empty
                         st.write("診斷分析完成。")
                         status_diag.update(label="診斷分析完成！", state="complete", expanded=False)
                     else:
-                        st.warning("診斷分析未返回結果或結果為空。請檢查 `diagnosis_module.py`。") # Updated warning
-                        status_diag.update(label="診斷分析未返回結果", state="warning", expanded=True)
+                        st.warning("診斷分析未返回有效的報告字典或字典為空。請檢查 `diagnosis_module.py` 是否返回了預期的字典格式。")
+                        status_diag.update(label="診斷分析未返回有效結果", state="warning", expanded=True)
+                        st.session_state.report_dict = {} # Ensure reset to empty dict on warning
                 else:
                     st.error(f"準備用於診斷的資料缺少必需欄位: {missing_cols}。無法執行診斷。")
                     status_diag.update(label=f"診斷所需欄位缺失: {missing_cols}", state="error", expanded=True)
-                    st.session_state.report_string = None # Ensure reset on error
+                    st.session_state.report_dict = {} # Ensure reset to empty dict on error
             except Exception as e:
                 st.error(f"執行診斷時發生錯誤：{e}")
                 status_diag.update(label=f"診斷執行出錯: {e}", state="error", expanded=True)
-                st.session_state.report_string = None # Ensure reset on error
+                st.session_state.report_dict = {} # Ensure reset to empty dict on error
 
             # --- Generate OpenAI Summary --- (Still within button click block)
-            # Check if report_string exists and is not empty
-            if st.session_state.report_string: # Check session state
+            # Check if report_dict exists and is not empty
+            if st.session_state.report_dict: # Check session state report_dict
                 if openai_api_key:
                     # with st.spinner("正在生成文字摘要..."): # Replace with st.status
                     with st.status("生成 AI 文字摘要...", expanded=False) as status_ai:
                         try:
                             client = openai.OpenAI(api_key=openai_api_key)
-                            # Use the report string directly in the prompt
-                            prompt = f"""請根據以下 GMAT 診斷報告（基於用戶實際表現數據，但使用了模擬難度估計），產生一段簡潔的總結報告（約 150-200 字），說明主要的強項、弱項或值得注意的模式。請使用繁體中文回答。
+                            # Combine reports from the dictionary for the prompt
+                            report_content_for_ai = "\n\n".join(
+                                f"--- {subject} 診斷報告 ---\n{report}"
+                                for subject, report in st.session_state.report_dict.items()
+                            )
+                            # Use the combined report content in the prompt
+                            prompt = f"""請根據以下 GMAT 各科診斷報告（基於用戶實際表現數據，但使用了模擬難度估計），產生一段簡潔的總結報告（約 150-200 字），說明主要的強項、弱項或值得注意的模式。請使用繁體中文回答。
 
 診斷報告：
-{st.session_state.report_string}
+{report_content_for_ai}
 
 總結報告："""
                             st.write("正在調用 OpenAI API...")
@@ -573,22 +930,61 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
     if st.session_state.final_thetas:
          theta_items = [f"{subj}: {theta:.3f}" for subj, theta in st.session_state.final_thetas.items()]
          st.success(f"最終能力估計 (Theta): {', '.join(theta_items)}")
-    # else:
-    #      st.warning("無法獲取最終能力估計。") # Maybe don't show warning if analysis failed earlier
 
-    if st.session_state.report_string:
-        report_tab, summary_tab = st.tabs(["詳細診斷報告", "AI 文字摘要"])
-        with report_tab:
-            st.markdown(st.session_state.report_string)
-        with summary_tab:
-            if st.session_state.ai_summary:
-                st.markdown(st.session_state.ai_summary)
-            elif openai_api_key:
-                 st.info("AI 摘要尚未生成或生成失敗。請檢查上方狀態。")
+    # Check if the report dictionary exists AND is actually a dictionary
+    if isinstance(st.session_state.report_dict, dict):
+        if st.session_state.report_dict: # Check if the dictionary is not empty
+            # Dynamically create tabs based on available reports and AI summary possibility
+            report_subjects = sorted(st.session_state.report_dict.keys()) # Get subjects with reports (e.g., ['DI', 'Q', 'V'])
+            tab_names = report_subjects # Start with subject tabs
+            
+            # Check if AI summary should be a tab
+            ai_summary_available = st.session_state.ai_summary is not None
+            should_show_ai_tab = ai_summary_available or openai_api_key # Show tab if summary exists or could be generated
+
+            if should_show_ai_tab:
+                tab_names.append("AI 文字摘要")
+
+            if not tab_names:
+                st.warning("沒有可顯示的診斷報告分頁。") # Should not happen if report_dict check passed, but for safety
             else:
-                st.info("請在側邊欄輸入 OpenAI API Key 並重新運行分析以生成 AI 文字摘要。")
-    else: # Analysis ran but report is None/empty
-        st.error("分析過程未成功生成診斷報告，請檢查上方的狀態信息和錯誤提示。")
+                tabs = st.tabs(tab_names)
+                
+                # Create a dictionary to map tab names to tabs for easier access
+                tab_map = dict(zip(tab_names, tabs))
+
+                # Display subject reports in their respective tabs
+                for subject in report_subjects:
+                    if subject in tab_map: # Check if tab was created
+                        with tab_map[subject]:
+                            st.subheader(f"{subject} 科目詳細診斷報告") # Add subheader for clarity
+                            # Ensure the report content itself is a string before displaying
+                            report_content = st.session_state.report_dict.get(subject, "")
+                            if isinstance(report_content, str):
+                                st.markdown(report_content)
+                            else:
+                                st.warning(f"{subject} 科目的報告內容不是有效的文字格式，無法顯示。")
+
+                # Display AI summary tab content
+                if "AI 文字摘要" in tab_map:
+                    with tab_map["AI 文字摘要"]:
+                        st.subheader("AI 文字摘要") # Add subheader
+                        if st.session_state.ai_summary:
+                            st.markdown(st.session_state.ai_summary)
+                        elif openai_api_key: # Check if key was provided but summary failed/pending
+                             st.info("AI 摘要尚未生成或生成失敗。請檢查上方狀態。")
+                        else: # Key was not provided
+                            st.info("請在側邊欄輸入 OpenAI API Key 並重新運行分析以生成 AI 文字摘要。")
+        # else: # Dictionary is empty, analysis might have failed to produce reports for any subject
+        #     st.warning("診斷分析成功執行，但未針對任何科目產生報告內容。")
+        # The error message below handles the case where analysis ran but the dict remained empty better.
+
+    # Handle cases where analysis ran but report_dict is not a dict or is empty
+    elif st.session_state.analysis_run:
+        if not isinstance(st.session_state.report_dict, dict):
+            st.error(f"診斷分析返回的結果類型錯誤。預期為字典 (dict)，但收到了類型：{type(st.session_state.report_dict).__name__}。請檢查 `diagnosis_module.run_diagnosis` 的返回值。")
+        elif not st.session_state.report_dict: # It's a dict, but it's empty
+             st.error("分析過程未成功生成診斷報告字典，或字典為空。請檢查上方的狀態信息和錯誤提示，並確認 `diagnosis_module.run_diagnosis` 是否返回了預期的字典格式且包含內容。")
 
 # else: # Analysis was not run (button not clicked or no data)
 #     st.info("點擊 '開始分析' 按鈕以執行模擬與診斷。") # Message now shown near button
