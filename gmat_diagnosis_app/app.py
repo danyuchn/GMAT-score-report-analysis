@@ -171,13 +171,36 @@ def validate_dataframe(df, subject):
                     if 'subject_specific' in rules and subject in rules['subject_specific']:
                         allowed_values = rules['subject_specific'][subject]
 
-                    # Perform check using the original, non-stripped value for sensitivity
-                    if value not in allowed_values:
+                    # --- Start Case-Insensitive Check and Correction ---
+                    value_str_stripped = str(value).strip() # Value after stripping whitespace
+                    value_str_lower = value_str_stripped.lower() # Lowercase version for comparison
+
+                    # Create a mapping from lowercase allowed value to original allowed value
+                    allowed_values_map = {str(v).lower(): v for v in allowed_values}
+
+                    if value_str_lower in allowed_values_map:
+                        correct_value = allowed_values_map[value_str_lower]
+                        # If the stripped original value differs from the correct capitalization, update the DataFrame
+                        if value_str_stripped != correct_value:
+                            try:
+                                # Use .loc for safe assignment
+                                df.loc[index, current_col_name] = correct_value
+                                # Optionally, log the correction?
+                                # print(f"Corrected row {index}, col '{current_col_name}': '{value}' -> '{correct_value}'")
+                            except Exception as e:
+                                errors.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 嘗試自動修正大小寫時出錯 ({e})。")
+                                is_valid = False # Mark as invalid if correction fails
+
+                        # If value_str_lower was found, it's considered valid (or correction failed above)
+                        if is_valid: # Check if not marked invalid by correction error
+                             is_valid = True
+                    else:
+                        # No match found even case-insensitively
                         is_valid = False
                         # Format allowed values clearly for the error message
                         allowed_values_str = ", ".join(f"'{v}'" for v in allowed_values)
-                        error_detail += f" 允許的值: {allowed_values_str}。"
-
+                        error_detail += f" 允許的值: {allowed_values_str} (大小寫不敏感匹配失敗)。"
+                    # --- End Case-Insensitive Check and Correction ---
 
                 if not is_valid:
                     # Add 1 to index for user-friendly row numbering (Excel/CSV style)
@@ -1005,16 +1028,96 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
                                 
                                 # Filter config for columns that actually exist in the dataframe
                                 existing_columns = df_to_display.columns
-                                filtered_column_config = {
-                                    k: v for k, v in column_config.items() if k in existing_columns or v is None # Keep explicit None config
-                                }
+                                
+                                # --- Start Subject-Specific Column Filtering ---
+                                di_display_columns = ['question_position', 'question_time', 'content_domain', 'question_type', 'question_difficulty', 'time_performance_category', 'diagnostic_params_list', 'overtime']
+                                q_display_columns = ['question_position', 'question_time', 'content_domain', 'question_type', 'question_fundamental_skill', 'question_difficulty', 'time_performance_category', 'diagnostic_params_list', 'overtime']
+                                v_display_columns = ['question_position', 'question_time', 'question_type', 'question_fundamental_skill', 'question_difficulty', 'time_performance_category', 'diagnostic_params_list', 'overtime']
+                                filtered_column_config = {}
 
-                                st.dataframe(
-                                     df_to_display, 
-                                     use_container_width=True,
-                                     column_config=filtered_column_config, # Use the filtered config
-                                     hide_index=True # Hide the default pandas index
-                                 )
+                                if subject == 'DI':
+                                    for col in existing_columns:
+                                        if col in di_display_columns:
+                                            # Get the config from base, default to simple text if not defined (though it should be)
+                                            config_setting = column_config.get(col, st.column_config.TextColumn(col))
+                                            # Do not add if the base config explicitly set it to None (hidden)
+                                            if config_setting is not None:
+                                                 filtered_column_config[col] = config_setting
+                                        else:
+                                            # Explicitly hide columns not in the desired list for DI
+                                            filtered_column_config[col] = None
+                                elif subject == 'Q':
+                                     for col in existing_columns:
+                                        if col in q_display_columns:
+                                            config_setting = column_config.get(col, st.column_config.TextColumn(col))
+                                            if config_setting is not None:
+                                                 filtered_column_config[col] = config_setting
+                                        else:
+                                            filtered_column_config[col] = None
+                                elif subject == 'V':
+                                     for col in existing_columns:
+                                        if col in v_display_columns:
+                                            config_setting = column_config.get(col, st.column_config.TextColumn(col))
+                                            if config_setting is not None:
+                                                 filtered_column_config[col] = config_setting
+                                        else:
+                                            filtered_column_config[col] = None
+                                else:
+                                    # For non-DI subjects, use the original filtering logic
+                                    filtered_column_config = {
+                                        k: v for k, v in column_config.items() if k in existing_columns or v is None # Keep explicit None config
+                                    }
+                                # --- End Subject-Specific Column Filtering ---
+
+                                # --- START APPLYING STYLES ---
+                                # Define the style function inside the loop to access df_to_display columns
+                                def apply_styles(row):
+                                    # Default styles (no special styling)
+                                    styles = [''] * len(row)
+                                    # Apply red text to entire row if incorrect
+                                    if 'is_correct' in row.index and not row['is_correct']:
+                                        styles = ['color: #D32F2F'] * len(row) # Darker red text
+                                    
+                                    # Apply red background to time cell if overtime
+                                    if 'overtime' in row.index:
+                                        # 為除錯增加日誌輸出
+                                        if row['overtime'] and 'question_time' in row.index:
+                                            try:
+                                                # Attempt to get the index of the 'question_time' column
+                                                time_col_idx = row.index.get_loc('question_time')
+                                                # Apply darker red background (ensure alpha isn't too strong)
+                                                styles[time_col_idx] = 'background-color: rgba(244, 67, 54, 0.4)' # Darker red with transparency
+                                            except KeyError:
+                                                pass # Column not found, do nothing
+                                            except IndexError:
+                                                pass # Index out of bounds, do nothing
+                                    
+                                    return styles
+
+                                # Check if necessary columns exist before applying styles
+                                required_style_cols = ['is_correct', 'overtime']
+                                if all(col in df_to_display.columns for col in required_style_cols):
+                                     # Apply the styling function row-wise
+                                     styler = df_to_display.style.apply(apply_styles, axis=1)
+                                     # Display the styled DataFrame
+                                     st.dataframe(
+                                         styler, 
+                                         use_container_width=True,
+                                         column_config=filtered_column_config, # Use the filtered config
+                                         hide_index=True 
+                                     )
+                                else:
+                                     # Display the original DataFrame if styling columns are missing
+                                     missing_style_cols = [col for col in required_style_cols if col not in df_to_display.columns]
+                                     st.warning(f"部分樣式欄位缺失: {', '.join(missing_style_cols)}。無法應用樣式。")
+                                     st.dataframe(
+                                         df_to_display, 
+                                         use_container_width=True,
+                                         column_config=filtered_column_config, 
+                                         hide_index=True 
+                                     )
+                                # --- END APPLYING STYLES --- 
+
                                 st.divider() # Add separator before the text report
                             else:
                                 # Show only if analysis was run but df is missing/empty for this subject
