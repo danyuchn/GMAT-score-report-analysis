@@ -1,5 +1,6 @@
 import sys
 import os
+import re # Import regex module
 
 # Get the directory containing app.py
 app_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1129,34 +1130,35 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
                             report_content = st.session_state.report_dict.get(subject, "")
                             if report_content: # Only display markdown if there is content
                                 if isinstance(report_content, str):
-                                    st.markdown(report_content)
+                                    # --- START Replace Chapter 3 Content ---
+                                    placeholder = "（請參考診斷表單中的標記）"
+                                    # Regex pattern to find Chapter 3 title and content until Chapter 4 or end
+                                    pattern = re.compile(r"(^\*\*3\.[^\n]*\*\*)(.*?)(?=^\*\*4\.|\Z)", re.DOTALL | re.MULTILINE)
+                                    # Replacement function to keep the title (Group 1) and replace content
+                                    replacement = rf'\1\n\n{placeholder}\n\n'
+                                    modified_report_content = pattern.sub(replacement, report_content)
+                                    # --- END Replace Chapter 3 Content ---
+
+                                    # Display the modified content
+                                    st.markdown(modified_report_content)
                                 else:
                                     st.warning(f"{subject} 科目的報告內容不是有效的文字格式，無法顯示。")
-                            elif st.session_state.analysis_run: # Report is empty, but analysis ran
-                                 st.info(f"{subject} 科目沒有生成文字診斷報告。")
+                            elif st.session_state.analysis_run:
+                                st.info(f"{subject} 科目沒有生成文字診斷報告。")
 
                 # Display AI summary tab content
                 if "AI 文字摘要" in tab_map:
                     with tab_map["AI 文字摘要"]:
-                        st.subheader("AI 文字摘要") # Add subheader
+                        st.subheader("AI 文字摘要")
                         if st.session_state.ai_summary:
                             st.markdown(st.session_state.ai_summary)
-                        elif openai_api_key: # Check if key was provided but summary failed/pending
-                             st.info("AI 摘要尚未生成或生成失敗。請檢查上方狀態。")
-                        else: # Key was not provided
+                        elif openai_api_key:
+                            st.info("AI 摘要尚未生成或生成失敗。請檢查上方狀態。")
+                        else:
                             st.info("請在側邊欄輸入 OpenAI API Key 並重新運行分析以生成 AI 文字摘要。")
-        # else: # Dictionary is empty, analysis might have failed to produce reports for any subject
-        #     st.warning("診斷分析成功執行，但未針對任何科目產生報告內容。")
-        # The error message below handles the case where analysis ran but the dict remained empty better.
 
-    # Handle cases where analysis ran but report_dict is not a dict or is empty
     elif st.session_state.analysis_run:
         if not isinstance(st.session_state.report_dict, dict):
             st.error(f"診斷分析返回的結果類型錯誤。預期為字典 (dict)，但收到了類型：{type(st.session_state.report_dict).__name__}。請檢查 `diagnosis_module.run_diagnosis` 的返回值。")
-        elif not st.session_state.report_dict: # It's a dict, but it's empty
-             st.error("分析過程未成功生成診斷報告字典，或字典為空。請檢查上方的狀態信息和錯誤提示，並確認 `diagnosis_module.run_diagnosis` 是否返回了預期的字典格式且包含內容。")
-
-# else: # Analysis was not run (button not clicked or no data)
-#     st.info("點擊 '開始分析' 按鈕以執行模擬與診斷。") # Message now shown near button
-
-# Final info message handled within sections
+        elif not st.session_state.report_dict:
+            st.error("分析過程未成功生成診斷報告字典，或字典為空。請檢查上方的狀態信息和錯誤提示，並確認 `diagnosis_module.run_diagnosis` 是否返回了預期的字典格式且包含內容。")

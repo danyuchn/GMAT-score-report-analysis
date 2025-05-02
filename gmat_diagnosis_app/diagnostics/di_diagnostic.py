@@ -251,13 +251,48 @@ def run_di_diagnosis(df_di):
                 print(f"DEBUG (di_diagnostic.py): 標記DS超時 - 位置={row.get('question_position', index)}, 時間={q_time}, 閾值={overtime_threshold}")
                 
         elif q_type == 'Multi-source reasoning' or q_type == 'MSR':
-            # MSR需要特殊處理
+            # --- MSR Overtime Logic (Revised according to rules) ---
             group_time = row.get('msr_group_total_time')
-            if pd.notna(group_time) and group_time > thresholds['MSR_GROUP']:
+            is_first = row.get('is_first_msr_q', False)
+            reading_time = row.get('msr_reading_time')
+            group_threshold = thresholds.get('MSR_GROUP', 7.0) # Default if not found
+            reading_threshold = thresholds.get('MSR_READING', 1.5)
+            single_q_threshold = thresholds.get('MSR_SINGLE_Q', 1.5)
+            position = row.get('question_position', index) # Use position for logging
+
+            # 1. Check Group Overtime First
+            if pd.notna(group_time) and group_time > group_threshold:
                 df_di.loc[index, 'overtime'] = True
-                overtime_count += 1
-                print(f"DEBUG (di_diagnostic.py): 標記MSR超時 - 位置={row.get('question_position', index)}, 組時間={group_time}, 閾值={thresholds['MSR_GROUP']}")
+                overtime_count += 1 # Increment count (Note: this might overcount if multiple rows in the same OT group are processed)
+                # We need a way to mark the whole group based on one check, or adjust counting.
+                # Current loop structure will mark each row individually if group time exceeds.
+                print(f"DEBUG (di_diagnostic.py): 標記MSR超時 (組) - 位置={position}, 組時間={group_time:.2f}, 閾值={group_threshold:.1f}")
+            else:
+                # 2. If Group NOT Overtime, check Individual/Reading time
+                if is_first:
+                    # Check Reading Overtime
+                    if pd.notna(reading_time) and reading_time > reading_threshold:
+                        df_di.loc[index, 'overtime'] = True
+                        overtime_count += 1
+                        print(f"DEBUG (di_diagnostic.py): 標記MSR超時 (閱讀) - 位置={position}, 閱讀時間={reading_time:.2f}, 閾值={reading_threshold:.1f}")
+                    # Check Adjusted Single Question Overtime for First Question
+                    elif pd.notna(reading_time) and pd.notna(q_time):
+                        adjusted_time = q_time - reading_time
+                        if adjusted_time > single_q_threshold:
+                             df_di.loc[index, 'overtime'] = True
+                             overtime_count += 1
+                             print(f"DEBUG (di_diagnostic.py): 標記MSR超時 (首題調整後) - 位置={position}, 調整時間={adjusted_time:.2f}, 閾值={single_q_threshold:.1f}")
+                else:
+                    # Check Single Question Overtime for Non-First Questions
+                    if pd.notna(q_time) and q_time > single_q_threshold:
+                        df_di.loc[index, 'overtime'] = True
+                        overtime_count += 1
+                        print(f"DEBUG (di_diagnostic.py): 標記MSR超時 (非首題單題) - 位置={position}, 時間={q_time:.2f}, 閾值={single_q_threshold:.1f}")
+            # --- End MSR Overtime Logic ---
     
+    # 總結標記結果 - Recalculate sum after the loop for accuracy
+    final_overtime_sum = df_di['overtime'].sum()
+
     # 總結標記結果
     print(f"DEBUG (di_diagnostic.py): 總共標記了 {overtime_count} 個超時題目 (共 {len(df_di)} 題)")
     print(f"DEBUG (di_diagnostic.py): df_di['overtime'].sum() = {df_di['overtime'].sum()}")
@@ -683,8 +718,19 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
         # --- Finalize Params for the row ---
         unique_params = sorted(list(set(params)))
         if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in unique_params:
+            # Ensure SFE is at the front if present
             unique_params.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
             unique_params.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+
+        # --- DEBUG: Check calculated params per row ---
+        if not unique_params: # Print only if the list is empty
+            # Check index existence safely
+            row_identifier = f"Index {index}" if df.index.is_unique else f"Row position {df.index.get_loc(index)}"
+            print(f"DEBUG (_diagnose_root_causes): {row_identifier} - No diagnostic params triggered. Correct: {is_correct}, TimePerf: {current_time_performance_category}")
+        # Print first few non-empty lists (e.g., first 5 based on original index)
+        elif index < 5: # Check original index
+             print(f"DEBUG (_diagnose_root_causes): Row {index} - Triggered params: {unique_params}")
+        # --- END DEBUG ---
 
         all_diagnostic_params.append(unique_params)
         all_is_sfe.append(sfe_triggered)
@@ -1125,6 +1171,14 @@ APPENDIX_A_TRANSLATION_DI = {
     'Multi-source reasoning': 'Multi-source reasoning',
     'Graph and Table': 'Graph and Table',
     'Unknown Type': '未知類型', # Added for robustness
+    # --- Time Performance Categories ---
+    'Fast & Wrong': "快錯",
+    'Slow & Wrong': "慢錯",
+    'Normal Time & Wrong': "正常時間 & 錯",
+    'Slow & Correct': "慢對",
+    'Fast & Correct': "快對",
+    'Normal Time & Correct': "正常時間 & 對",
+    # --- End Time Performance Categories ---
 }
 
 # --- DI Tool/Prompt Recommendations Map (Example Structure) ---
@@ -1386,53 +1440,93 @@ def _generate_di_summary_report(di_results):
     # Use df_problem instead of detailed_items directly for the condition
     if not df_problem.empty: # Check if df_problem was successfully created and populated
         report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
-        # Report the breakdown by performance type (Reusing logic slightly adapted)
+        
+        # --- START NEW LOGIC: Group by time_performance_category ---
         details_added_2nd_ev = False
-        # Check if df_problem exists from detailed list generation (already done above)
-        # if 'df_problem' in locals() and not df_problem.empty:
-        performance_map_2nd = {
-            '快錯': {'types': set(), 'domains': set()},
-            '慢錯': {'types': set(), 'domains': set()},
-            '正常時間 & 錯': {'types': set(), 'domains': set()},
-            '慢對': {'types': set(), 'domains': set()}
-        }
-        for index, row in df_problem.iterrows():
-            q_type_zh = _translate_di(row.get('question_type'))
-            domain_zh = _translate_di(row.get('content_domain'))
-            is_correct = row.get('is_correct')
-            is_overtime = row.get('overtime')
-            q_time = row.get('question_time')
-            avg_time = avg_time_per_type.get(row.get('question_type'), np.inf)
+        if 'time_performance_category' in df_problem.columns:
+            # Define the desired order for performance categories
+            performance_order_en = [
+                'Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 
+                'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct',
+                'Unknown' # Include Unknown as a fallback
+            ]
+            
+            grouped_by_performance = df_problem.groupby('time_performance_category')
+            
+            # Iterate in the desired order
+            for perf_en in performance_order_en:
+                if perf_en in grouped_by_performance.groups: # Check if this group exists
+                    # --- ADD SKIP LOGIC for 'Fast & Correct' ---
+                    if perf_en == 'Fast & Correct':
+                        print(f"DEBUG (di_report): Skipping category '{perf_en}' as requested.") # DEBUG
+                        continue # Skip to the next category
+                    # --- END SKIP LOGIC ---
+                    
+                    group_df = grouped_by_performance.get_group(perf_en)
+                    if not group_df.empty:
+                        perf_zh = _translate_di(perf_en)
+                        
+                        # Extract unique types and domains from this group
+                        types_in_group = group_df['question_type'].dropna().unique()
+                        domains_in_group = group_df['content_domain'].dropna().unique()
+                        
+                        types_zh = sorted([_translate_di(t) for t in types_in_group])
+                        domains_zh = sorted([_translate_di(d) for d in domains_in_group])
 
-            is_relatively_fast_local = False
-            if pd.notna(q_time) and avg_time != np.inf and q_time < avg_time * 0.75:
-                is_relatively_fast_local = True
+                        # --- START Extract Unique Labels (Revised) ---
+                        all_labels_in_group = set()
+                        target_label_col = None
+                        # Check if the final Chinese list column exists
+                        if 'diagnostic_params_list' in group_df.columns:
+                             target_label_col = 'diagnostic_params_list'
+                             print(f"DEBUG (di_report): Using existing 'diagnostic_params_list' column.") # DEBUG
+                        # If not, check if the original English column exists
+                        elif 'diagnostic_params' in group_df.columns:
+                             target_label_col = 'diagnostic_params'
+                             print(f"DEBUG (di_report): Found 'diagnostic_params' column, will translate internally.") # DEBUG
+                        else:
+                             print(f"DEBUG (di_report): Neither 'diagnostic_params_list' nor 'diagnostic_params' found for this group!") # DEBUG
 
-            performance_zh = '未知表現'
-            if is_correct == False:
-                if is_relatively_fast_local: performance_zh = '快錯'
-                elif is_overtime: performance_zh = '慢錯'
-                else: performance_zh = '正常時間 & 錯'
-            elif is_correct == True and is_overtime:
-                performance_zh = '慢對'
+                        if target_label_col:
+                            print(f"DEBUG (di_report):   Processing labels from column: {target_label_col}") # DEBUG
+                            labels_head = group_df[target_label_col].head().tolist() # Get first 5 lists
+                            print(f"DEBUG (di_report):   Head of {target_label_col}: {labels_head}") # DEBUG
+                            
+                            for labels_list in group_df[target_label_col]:
+                                if isinstance(labels_list, list): # Check if it's a list
+                                     # If using original English codes, translate them now
+                                     if target_label_col == 'diagnostic_params':
+                                         translated_list = _translate_di(labels_list) # Translate the list
+                                         all_labels_in_group.update(translated_list)
+                                     else: # Already Chinese
+                                         all_labels_in_group.update(labels_list)
+                        
+                        # Labels in all_labels_in_group should now be Chinese
+                        sorted_labels_zh = sorted(list(all_labels_in_group))
+                        print(f"DEBUG (di_report):   Sorted unique Chinese labels found: {sorted_labels_zh}") # DEBUG
+                        # --- END Extract Unique Labels (Revised) ---
 
-            if performance_zh in performance_map_2nd:
-                performance_map_2nd[performance_zh]['types'].add(q_type_zh)
-                performance_map_2nd[performance_zh]['domains'].add(domain_zh)
+                        # --- Modify Report Line ---
+                        report_line = f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及領域：【{', '.join(domains_zh)}】。"
+                        if sorted_labels_zh:
+                             report_line += f" 注意相關問題點：【{', '.join(sorted_labels_zh)}】。"
+                        report_lines.append(report_line)
+                        # --- End Modify Report Line ---
+                        
+                        details_added_2nd_ev = True
+        else:
+            report_lines.append("  - (警告：缺少 'time_performance_category' 欄位，無法按時間表現分類。)")
+            # --- FALLBACK TO OLD LOGIC (optional, or just skip?) ---
+            # Maybe skip fallback to avoid confusion
+            pass
+        # --- END NEW LOGIC ---
 
-        for perf_zh, data in performance_map_2nd.items():
-            if data['types'] or data['domains']:
-             for perf_zh, data in performance_map_2nd.items():
-                 if data['types'] or data['domains']:
-                     type_list = sorted(list(data['types']))
-                     domain_list = sorted(list(data['domains']))
-                     report_lines.append(f"  - **{perf_zh}:** 需關注題型：【{', '.join(type_list)}】；涉及領域：【{', '.join(domain_list)}】。")
-                     details_added_2nd_ev = True
-
-        # Report core issues again
+        # Report core issues again (Keep this part)
         core_issue_texts = []
         if sfe_triggered: core_issue_texts.append(_translate_di('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'))
-        core_issue_texts.extend([_translate_di(p) for p in top_other_params_codes]) # Use codes calculated earlier
+        # Assuming top_other_params_codes is still calculated correctly earlier in the function
+        if 'top_other_params_codes' in locals() and top_other_params_codes: 
+             core_issue_texts.extend([_translate_di(p) for p in top_other_params_codes])
 
         if core_issue_texts:
              report_lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題：【{', '.join(core_issue_texts)}】。")
