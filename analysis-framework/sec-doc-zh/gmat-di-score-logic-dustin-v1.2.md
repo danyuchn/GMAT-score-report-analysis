@@ -24,6 +24,7 @@
     - `is_correct` (是否正確：`True`/`False`)
     - `content_domain` (內容領域：`Math Related`/`Non-Math Related`)
     - `question_type` (題型：`DS`, `TPA`, `MSR`, `GT`)
+    - `msr_group_id` (MSR 題組 ID，若 `question_type` 為 `MSR` 則必需)
     - `Fundamental Skills` (**確認不追蹤**)
     - `question_difficulty` (難度值)
 - **整體數據：**
@@ -31,7 +32,7 @@
     - `Max Allowed Time` (測驗上限時間)
     - `Total Number of Questions` (總題數)
 - **DI 衍生數據：**
-    - **`MSR` 閱讀時間 (`msr_reading_time`)：** 針對每個 `MSR` 題組（固定 3 題），計算 `msr_reading_time` = 該題組第一題的 `question_time` - (該題組第二題 `question_time` + 第三題 `question_time`) / 2。
+    - **`MSR` 閱讀時間 (`msr_reading_time`)：** 針對每個 `MSR` 題組，計算 `msr_reading_time` = 該題組第一題的 `question_time` - (該題組中**除第一題外**所有其他題目的平均 `question_time`)。此計算僅在題組包含至少兩題時有效，且計算結果附加在題組的第一題上。
     - **`GT` 時間分配：** 無需特別區分看圖和作答時間。
     - **各題型平均作答時間 (`average_time_per_type`)：** 基於**有效數據（過濾後）**計算各 `question_type` (`DS`, `TPA`, `MSR`, `GT`) 的平均作答時間。
     - **已掌握最高難度 (`max_correct_difficulty_per_combination`)：** 對於每個 `question_type` 和 `content_domain` 的組合，記錄該組合下所有 `is_correct` == `True` 的題目中的最高 `question_difficulty` 值。
@@ -411,72 +412,60 @@
 
 **本章目標：** 基於診斷結果，生成具體、可操作的練習建議。
 
-**主要關注：** 提供練習材料、方法、重點（難度、限時）和基礎能力訓練計劃。區分宏觀與個案建議，並應用領域側重規則。
+**主要關注：** 提供練習材料、方法、重點（難度、限時）和基礎能力訓練計劃。區分宏觀建議（針對整體表現差的題型）、聚合建議（針對特定領域下錯誤/超時的題目組），應用豁免規則（針對表現完美的題型）和領域側重規則。
 
 **為何重要：** 將診斷轉化為行動。
 
 </aside>
 
-- *(註：本章的建議生成依賴於前續章節的分析結果，包括但不限於：`question_type`, `content_domain`, `is_correct`, `overtime`, `is_sfe`, `diagnostic_params`, 難度分級 (`Y`), 難度分數 (`D`), 原始用時 (`T`), 目標用時 (`target_time_minutes`), 第五章的 `override_results`，第二章的 `domain_tags`，均遵循當前版本定義。)*
-- **練習教材與範圍建議**
-    - 核心材料: Official Guide (OG), Official Practice Exams (OPE), etc.
-    - 補充練習: GMAT Club 等平台 (可篩選特定題型、難度)。
+- *(註：本章的建議生成依賴於前續章節的分析結果...)*
 - **練習建議生成邏輯 (`_generate_di_recommendations`)**
-    - **函數定義:**
-        - `floor_to_nearest_0.5`(`value`): 將輸入數值 `value` 向下取整到最接近的 0.5 的倍數。
+    - **函數定義:** ...
     - **前置計算:**
-        - 初始化字典 `recommendations_by_type` = `{q_type: [] for q_type in all_di_types}`。
-        - 初始化集合 `processed_override_types` = `set()`。
-        - *(移除豁免規則計算: 不再計算 exempted_combinations)*
+        - 初始化字典 `recommendations_by_type` ...
+        - 初始化集合 `processed_override_types` ...
+        - **計算豁免題型 (`exempted_types`):** ...
     - **生成宏觀建議 (來自第五章的 `override_results`):**
-        - 遍歷 `override_results` 中的每個 `q_type`:\
-            - 如果該 `q_type` 觸發了 `override_triggered`:\
-                - 提取觸發時的錯誤率或超時率、建議的起始難度 `Y_agg`、建議的起始限時 `Z_agg`。\
-                - 格式化文本: `\"**宏觀建議 ({q_type}):** 由於整體表現有較大提升空間 (錯誤率 X% 或 超時率 Y%), 建議全面鞏固 **{q_type}** 題型的基礎，可從 **{Y_agg}** 難度題目開始系統性練習，掌握核心方法，建議限時 **{Z_agg} 分鐘**。\"`\
-                - 將此宏觀建議添加到 `recommendations_by_type[q_type]`。\
-                - 將 `q_type` 添加到 `processed_override_types`。
-    - **生成個案建議 (來自第三章診斷出的問題題目):**
+        - 遍歷 `override_results` 中的每個 `question_type`:\
+            - 如果該 `question_type` 觸發了 `override_triggered` 且 **未被豁免 (`exempted_types`)**:\
+                - ... (生成宏觀建議文本)
+                - 將此宏觀建議添加到 `recommendations_by_type[question_type]`。
+                - 將 `question_type` 添加到 `processed_override_types`。
+    - **生成聚合建議 (來自第三章診斷出的問題題目):**
         - 選取觸發點: `df_trigger` = `df_diagnosed` 中 `is_correct` 為 `False` 或 `overtime` 為 `True` 的題目。
-        - 遍歷 `df_trigger` 中的每一行 `row` (對應題目 `X`):\
-            - 提取: `q_type`, `domain`, 難度分數 `D`, 用時 `T`, `is_correct`, `overtime`, `is_sfe`, `diagnostic_params`。\
-            - **檢查是否被宏觀建議覆蓋:** 如果 `q_type` 在 `processed_override_types` 中，則 `continue` 跳過此題。\
-            - *(移除豁免檢查: 不再檢查 (q_type, domain) 是否在 exempted_combinations 中)*\
-            - **計算建議難度 (`Y`):** `Y` = `_grade_difficulty_di(D)` (使用第二章的難度分級函數)。\
-            - **計算建議起始限時 (`Z`, 分鐘):**\
-                - `target_time_minutes` = 根據 `q_type` 查詢預設目標時間 (e.g., DS=2.0, TPA=3.0, GT=3.0, MSR=2.0)。\
-                - `base_time_minutes` = 如果 `overtime` 為 `True` 則 `T - 0.5`，否則為 `T`。\
-                - `z_raw_minutes` = `floor_to_nearest_0.5(base_time_minutes)`。\
-                - `Z` = `max(z_raw_minutes, target_time_minutes)`。\
-                - `z_text` = 將 `Z` 格式化為 \"{:.1f} 分鐘\"。\
-                - `target_time_text` = 將 `target_time_minutes` 格式化為 \"{:.1f} 分鐘\"。\
-            - **構建建議文本:**\
-                - `translated_params` = `_translate_di(diagnostic_params)` (翻譯診斷參數列表)。\
-                - `problem_desc` = \"錯誤\" 或 \"正確但超時\"。\
-                - `sfe_prefix` = \"*基礎掌握不穩* \" (如果 `is_sfe` 為 `True`) 或 \"\" (空字符串)。\
-                - `param_text` = \"(問題點可能涉及: {翻譯後的參數列表})\" 或 \"(具體問題點需進一步分析)\"。\
-                - `rec_text` = `\"{sfe_prefix}針對 **{domain}** 領域的 **{q_type}** 題目 ({problem_desc}) {param_text}，建議練習 **{Y}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。\"`\
-            - **添加超時警告 (如果需要):** 如果 `Z - target_time_minutes > 2.0`，則在 `rec_text` 後追加 `\" **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效。**\"`。\
-            - 將包含 `type='case'`, `text=rec_text` 及其他元數據 (如 `is_sfe`, `domain`, `Y`, `Z`) 的字典添加到 `recommendations_by_type[q_type]`。
+        - **按 `question_type` 和 `content_domain` 分組:** 將 `df_trigger` 中的題目進行分組。
+        - **遍歷每個分組 (Group):** 對應一個特定的 `question_type` 和 `content_domain` 組合。
+            - **檢查是否被宏觀建議覆蓋或豁免:** 如果該組的 `question_type` 在 `processed_override_types` 或 `exempted_types` 中，則 `continue` 跳過此組。
+            - **聚合信息:** 在該分組內聚合計算以下信息：
+                - **建議難度 (`Y`):** 基於組內所有觸發題目的 **最低** `question_difficulty` 分數，使用 `_grade_difficulty_di` 轉換為難度等級。
+                - **建議起始限時 (`Z`, 分鐘):** 對組內每個觸發題目，計算其個案目標限時 (`max(floor_to_nearest_0.5(T-0.5 if overtime else T), target_time_minutes)`)，然後取這些計算結果中的 **最大值** 作為聚合建議的 `Z`。
+                - **SFE 狀態 (`group_sfe`):** 如果組內 **任何** 題目觸發了 `is_sfe`，則此聚合建議標記為 SFE。
+                - **聚合診斷參數 (`aggregated_params`):** 收集組內所有觸發題目 unique 的 `diagnostic_params` 列表。
+            - **構建聚合建議文本 (`rec_text`):**
+                - `translated_params` = `_translate_di(aggregated_params)`。
+                - `problem_desc` = "錯誤或超時"。
+                - `sfe_prefix` = "*基礎掌握不穩* " (如果 `group_sfe` 為 `True`) 或 ""。
+                - `param_text` = "(問題點可能涉及: {翻譯後的參數列表})" 或 "(具體問題點需進一步分析)"。
+                - `rec_text` = `"{sfe_prefix}針對 **{domain}** 領域的 **{question_type}** 題目 ({problem_desc}) {param_text}，建議練習 **{Y}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。"`
+            - **添加超時警告:** 如果 `Z - target_time_minutes > 2.0`，追加警告。
+            - 將包含 `type='case_aggregated'`, `text=rec_text` 及其他聚合元數據 (如 `is_sfe`, `domain`, `Y`, `Z`, `question_type`) 的字典添加到 `recommendations_by_type[question_type]`。
     - **最終組裝與領域側重規則應用:**
         - 初始化 `final_recommendations` = `[]`。
-        - *(移除添加豁免說明: 不再添加 type='exemption_note' 的建議)*
-        - 遍歷 `recommendations_by_type` 中的每個 `q_type` 和對應的 `type_recs` 列表:\
-            - 如果 `type_recs` 為空，`continue`。\
-            - **排序:** 將 `type_recs` 排序，宏觀建議 (`type='macro'`) 在前，然後是 SFE 個案 (`is_sfe=True`)，最後是普通個案。\
-            - **應用領域側重規則 (基於第二章的 `domain_tags`):**\
-                - `focus_note` = `\"\"`。\
-                - 檢查 `type_recs` 中是否存在 `Math Related` 的個案建議 (`has_math_case`) 和 `Non-Math Related` 的個案建議 (`has_non_math_case`)。\
-                - 如果 `domain_tags` 標記了 `poor_math_related` 或 `slow_math_related` 且 `has_math_case` 為 `True`，`focus_note` 追加 `\" **建議增加 {q_type} 題型下 \`Math Related\` 題目的練習比例。**\"`。\
-                - 如果 `domain_tags` 標記了 `poor_non_math_related` 或 `slow_non_math_related` 且 `has_non_math_case` 為 `True`，`focus_note` 追加 `\" **建議增加 {q_type} 題型下 \`Non-Math Related\` 題目的練習比例。**\"`。\
-            - **附加側重說明:** 如果 `focus_note` 不為空且 `type_recs` 中存在個案建議，則將 `focus_note` 追加到該 `q_type` 的**最後一個非宏觀**建議的文本末尾。如果只有宏觀建議，則追加到宏觀建議末尾。\
-            - 將處理後的 `type_recs` 列表中的所有建議添加到 `final_recommendations`。
-    - **返回:** `final_recommendations` 列表。
+        - **添加豁免說明 (若存在):**
+            - 遍歷 `exempted_types` 中的每個 `question_type`：
+                - ... (生成豁免說明文本)
+                - 將豁免說明添加到 `final_recommendations`。
+        - 遍歷 `recommendations_by_type` 中的每個 `question_type` 和對應的 `type_recs` 列表 (如果該 type 未被豁免):\
+            - ... (排序：宏觀在前，聚合建議在後)
+            - ... (應用領域側重規則，將 `focus_note` 追加到聚合建議或宏觀建議末尾)
+            - 將處理後的 `type_recs` 添加到 `final_recommendations`。
+    - **返回:** `final_recommendations` 列表 (包含豁免說明、宏觀建議、聚合建議)。
 
 <aside>
 
-**本章總結：** 我們生成了一份結構化的練習建議列表，按 `question_type`（`DS`, `TPA`, `MSR`, `GT`）聚合。根據第五章的覆蓋規則，建議分為宏觀（針對需基礎鞏固的題型）和個案（針對具體錯題或超時題）兩種。每條建議都指明了練習難度（`Y` 或 `Y_agg`）和起始限時（`Z` 或 `Z_agg`），並根據第三章的診斷結果附加了方法建議。`special_focus_error` 的題目建議被優先標註。最後應用了基於 `content_domain` 的豁免和側重規則對建議進行了微調。
+**本章總結：** 我們生成了一份結構化的練習建議列表。根據第五章的覆蓋規則，可能包含宏觀建議（針對需基礎鞏固的題型）。對於未被宏觀覆蓋且未觸發豁免規則（完美表現）的題型，我們會將錯誤或超時的題目按內容領域分組，為每個組生成一條**聚合建議**，指明該組的練習難度（基於組內最低難度）、起始限時（基於組內最高計算限時）、涉及的問題點（聚合診斷參數），並標註是否涉及基礎掌握不穩定（SFE）。對於表現完美的題型，則生成豁免說明。最後應用了基於 `content_domain` 的側重規則對建議進行了微調。
 
-**結果去向：** 這份詳細的、按題型組織的練習建議列表是最終學生診斷報告（第七章）的核心行動方案部分。
+**結果去向：** 這份詳細的練習建議列表是最終學生診斷報告（第七章）的核心行動方案部分。
 
 </aside>
 
@@ -486,85 +475,40 @@
 
 <aside>
 
-**本章目標：** 綜合前六章的分析結果，生成一份結構清晰、語言流暢、重點突出、完全使用自然語言撰寫的最終診斷報告，並提供明確的後續行動指引。**(基於內部診斷參數，通過附錄 A 對照表轉譯為中文)**
+**本章目標：** ... (整合時間壓力評估、不同領域表現對比、核心診斷發現...、特殊行為模式、以及基於這些發現生成的個性化練習建議（**區分宏觀、聚合、豁免**）和後續行動方案。)
 
-**主要關注：** 整合時間壓力評估、不同領域表現對比、核心診斷發現（以**英文參數**表示，如 `` `DI_CONCEPT_APPLICATION_ERROR` `` 或 `` `DI_BEHAVIOR_CARELESSNESS_ISSUE` ``）、特殊行為模式、以及基於這些發現生成的個性化練習建議和後續行動方案。
-
-**為何重要：** 這是交付給學生的最終成果。報告的清晰度和指導性直接影響學生理解自身問題和有效改進的能力。報告需要將複雜的數據分析轉化為易於理解和執行的建議。
+**為何重要：** ...
 
 </aside>
 
-**1. 開篇總結 (基於第一章)**
+... (1. 開篇總結, 2. 表現概覽, 3. 核心問題分析, 4. 特殊模式觀察)
 
-*   (總結整體時間使用情況：是否感受到時間壓力？總體作答時間與目標時間對比如何？末尾是否有數據無效風險 `is_invalid`？)
+**5. 詳細診斷說明 (基於第三、四章 - 輔助，供深入查看)**
 
-**2. 表現概覽 (基於第二章)**
-
-*   (總結 `Math Related` vs `Non-Math Related` 表現：在哪個領域正確率更低 (`poor_math_related`/`poor_non_math_related`) 或耗時更長 (`slow_math_related`/`slow_non_math_related`)？是否存在顯著差異？)
-
-**3. 核心問題分析 (基於第三章)**
-
-*   (基於第三章生成的**英文診斷參數**，提煉 2-3 個最主要的問題點。例如，指出在 `Math Related` 題目中頻繁出現 `` `DI_CONCEPT_APPLICATION_ERROR` ``，或在 `Non-Math Related` 的 `DS` 題中 `` `DI_LOGICAL_REASONING_ERROR` `` 是主要障礙。)
-*   (特別指出 `special_focus_error` (`` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``) 的觸發情況，強調基礎掌握不穩定問題。)
-
-**4. 特殊模式觀察 (基於第四章)**
-
-*   (報告第四章發現的行為模式參數：是否存在粗心問題 `` `DI_BEHAVIOR_CARELESSNESS_ISSUE` ``？是否存在測驗前期作答過快風險 `` `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``？)
-
-**5. 詳細診斷說明 (基於第三章 - 輔助，供深入查看)**
-
-*   (可選，提供一個簡要列表，展示不同 `question_type` 和 `content_domain` 下觸發的主要**英文診斷參數**，方便學生/顧問追溯細節，**需要附錄 A 翻譯**。)
+*   (可選，提供一個詳細列表，展示**每個**錯誤或超時題目 (`is_correct`=False 或 `overtime`=True) 的具體診斷信息，方便學生/顧問追溯細節。列表將**按題型、內容領域、題號排序**。每條記錄包含：)
+    *   **題號、題型 (中文)、領域 (中文)**
+    *   **表現標籤:** 根據時間和正確性判斷，標註為「快錯」、「慢錯」、「正常時間 & 錯」或「慢對」。
+    *   **診斷參數:** 列出該題觸發的所有英文診斷參數的**中文翻譯**，並按預定義的**類別** (如 SFE、閱讀/解讀、概念應用、邏輯推理、數據處理、MSR 特定、效率、行為) **分組**顯示。
+*   (註：此列表基於 `_generate_di_summary_report` 函數的實現，旨在提供比核心問題分析更細緻的視角。)
 
 **6. 練習建議 (基於第六章)**
 
-*   (呈現第六章生成的具體練習建議表格或列表。強調這些建議是基於識別出的**英文診斷參數**，並已應用豁免 (`exemption_triggered`) 和側重 (`override_triggered`) 規則進行了個性化調整。)
+*   (呈現第六章生成的具體練習建議。強調這些建議是基於識別出的問題點，並已應用宏觀覆蓋、**聚合**和完美表現豁免規則進行了個性化調整。)
 
 **7. 後續行動指引**
 
-*   **診斷理解確認：**
-    *   *通用提示：* 「請仔細閱讀報告，特別是核心問題分析部分。您是否認同報告指出的主要問題點（例如，對 `` `某診斷參數` `` 的描述）？這與您考試時的感受是否一致？」
-    *   *針對 `special_focus_error` (`` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``) 的提問：* 「報告顯示您在一些相對基礎的題目上出現失誤，這可能表明基礎掌握不夠穩定。您認為這主要是粗心，還是某些基礎概念確實存在模糊地帶？」
-    *   *針對效率瓶頸 (例如 `` `DI_EFFICIENCY_BOTTLENECK_...` ``) 的提問：* 「報告指出您在某些答對的題目上耗時較長，可能的原因包括...。您認為哪種情況更符合您當時的解題過程？」
-*   **質化分析建議：**
-    *   *觸發條件：* 當學生對第三章生成的某個**英文診斷參數**表示不確定，或需要進一步確認根本原因時。
-    *   *建議行動：* 提示學生提供更詳細的解題信息，例如：「如果您對報告中指出的 [`某參數中文描述`] 仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。」
-*   **二級證據參考建議：**
-    *   *觸發條件：* 當學生無法準確回憶具體障礙點（尤其涉及特定**英文參數**對應的具體知識點或障礙類型），或需要客觀數據佐證診斷時。
-    *   *建議行動：* 提示學生參考練習記錄。例如：「為了更精確地定位您在 [`某 content_domain`] [`某 question_type`] 題目中遇到的 [`某參數中文描述`] 問題，建議您查看近期的練習記錄...」 (參考第三章的具體措辭)
-*   **輔助工具與 AI 提示推薦建議：**
-    *   *推薦邏輯：* 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示，請根據您的具體診斷結果選用 (**基於以下參數觸發**):
-    *   *工具推薦：*
-        *   **若診斷顯示 `` `DI_LOGICAL_REASONING_ERROR` `` 是 Non-Math DS 題型的明顯弱項**：可以考慮使用 **`Dustin_GMAT_DI_Non-math_DS_Simulator`**。
-        *   如果您需要按知識點或題型對題目進行分類 (輔助二級證據分析或練習)：可以考慮使用 **`Dustin's GMAT Q: Question Classifier`** (主要針對 Math Related) 或手動分類。
-        *   如果診斷結果顯示 `` `DI_READING_COMPREHENSION_ERROR` `` 在 `Math Related` 題 (尤其是文字多、語境複雜的題目) 中是個問題：可以嘗試使用 **`Dustin_GMAT_Q_Real-Context_Converter`** 將純數學題目改寫後練習。
-    *   *AI 提示推薦 (按觸發參數分類)：*
-        *   **基礎理解與步驟 (`DI_READING_COMPREHENSION_ERROR`, `DI_CONCEPT_APPLICATION_ERROR` (初級), `DI_LOGICAL_REASONING_ERROR` (初級), `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`)**:
-            *   `` `Verbal-related/01_basic_explanation.md` `` (解釋 Non-Math 題)
-            *   `` `Quant-related/01_basic_explanation.md` `` (解釋 Math 題)
-        *   **解題效率與技巧 (`DI_EFFICIENCY_BOTTLENECK_...` 全系列, `DI_CALCULATION_ERROR`, `DI_MSR_READING_COMPREHENSION_BARRIER`, `DI_MSR_SINGLE_Q_BOTTLENECK`)**:
-            *   `` `Verbal-related/02_quick_cr_tpa_tricks.md` `` (用於 TPA Non-Math)
-            *   `` `Verbal-related/03_quick_rc_tricks.md` `` (用於 MSR Non-Math)
-            *   `` `Quant-related/02_quick_math_tricks.md` `` (用於 Math 計算或步驟優化)
-        *   **概念深度與模式識別 (`DI_CONCEPT_APPLICATION_ERROR` (進階), `DI_GRAPH_TABLE_INTERPRETATION_ERROR`, `DI_LOGICAL_REASONING_ERROR` (進階), `DI_MULTI_SOURCE_INTEGRATION_ERROR`)**:
-            *   `` `Verbal-related/04_mindmap_passage.md` `` (用於 MSR/GT Non-Math 理解結構)
-            *   `` `Verbal-related/07_logical_term_explained.md` `` (用於 DS/TPA/MSR Non-Math 選項分析)
-            *   `` `Quant-related/03_test_math_concepts.md` `` (分析 Math 題考點)
-            *   `` `Quant-related/04_problem_pattern.md` `` (識別 Math 題模式)
-        *   **解題方法鞏固與評估 (`DI_BEHAVIOR_CARELESSNESS_ISSUE`, 需要反思方法)**:
-            *   `` `Verbal-related/05_evaluate_explanation.md` `` (評估 Non-Math 解題思路)
-        *   **特定題型強化 (`DI_QUESTION_TYPE_SPECIFIC_ERROR` - MSR Non-Math)**:
-            *   (可參考 `Verbal-related/03_quick_rc_tricks.md`, `Verbal-related/04_mindmap_passage.md`)
-        *   **擴展練習與變體 (`DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` 或任何需要鞏固的參數)**:
-            *   `` `Quant-related/05_variant_questions.md` `` (生成 Math 變體題)
-            *   `` `Quant-related/06_similar_questions.md` `` (尋找 Math 相似題)
-            *   `` `Verbal-related/08_source_passage_rewrite.md` `` (簡化 MSR 閱讀材料)
-            *   `` `Verbal-related/09_complex_sentence_rewrite.md` `` (複雜化 MSR 閱讀材料)
+*   ... (診斷理解確認, 質化分析建議, 二級證據參考建議)
+*   **輔助工具與 AI 提示推薦建議:**
+    *   *推薦邏輯：* 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示。系統會根據您觸發的**診斷參數組合**，在預定義的映射表 (`DI_TOOL_RECOMMENDATIONS_MAP`) 中查找匹配項，並推薦相關的工具 (`名稱`) 或 AI 提示 (`*.md` 文件名)。請根據您的具體診斷結果選用。
+    *   *推薦列表：* (此處將列出基於 `DI_TOOL_RECOMMENDATIONS_MAP` 匹配結果生成的具體工具和提示列表，可能包含工具分類和提示分類)
+        *   *工具:* (例如: `Dustin_GMAT_DI_Non-math_DS_Simulator`, ...)
+        *   *AI提示:* (例如: `Quant-related/01_basic_explanation.md`, ...)
 
 <aside>
 
-**本章總結：** 本章旨在將前面各章的分析結果轉化為一份面向學生的、清晰易懂、可執行的診斷報告。報告結構包括：開篇總結、表現概覽、核心問題分析（基於**英文診斷參數**，需**附錄 A 翻譯**）、特殊模式觀察（基於**英文行為參數**）、可選的詳細診斷列表、個性化的練習建議（已應用豁免/側重規則），以及包含診斷確認、質化分析建議、二級證據建議和輔助工具/AI 提示推薦的後續行動指引。
+**本章總結：** 本章旨在將前面各章的分析結果轉化為一份面向學生的、清晰易懂、可執行的診斷報告。報告結構包括：開篇總結、表現概覽、核心問題分析、特殊模式觀察、可選的詳細診斷列表（包含性能標籤、分類診斷參數、排序）、個性化的練習建議（區分宏觀、聚合、豁免），以及包含診斷確認、質化分析建議、二級證據建議和基於 **參數組合映射** 的輔助工具/AI 提示推薦的後續行動指引。
 
-**結果去向：** 這份報告是整個 DI 診斷流程的最終產出，用於與學生溝通，解釋他們的表現、問題所在，並指導他們後續的學習、練習和反思。
+**結果去向：** ...
 
 </aside>
 

@@ -357,19 +357,19 @@
 
 - **前期過快題目:**
     - 找出 `question_position` <= `total_number_of_questions` / 3 且 `question_time` < 1.0 分鐘 的題目。
-    - 輸出風險提醒: 若存在此類題目，輸出提示：「**注意 `flag for review` 議題**」。
+    - 輸出風險提醒參數: 若存在此類題目，觸發參數 `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``。
 - **粗心率計算 (`carelessness_issue`):**
     - `num_relatively_fast_total` = 有效數據中滿足第三章 "快" 定義 (`is_relatively_fast` == `True`) 的題目總數。
     - `num_relatively_fast_incorrect` = 有效數據中 `is_relatively_fast` == `True` 且 `is_correct` = `False` 的題目總數。
     - 若 `num_relatively_fast_total` > 0，計算 `fast_wrong_rate` = `num_relatively_fast_incorrect` / `num_relatively_fast_total`。
     - 若 `fast_wrong_rate` > 0.25，則標記 `carelessness_issue` = `True`。
-- **輸出診斷標籤 (給使用者):** 若 `carelessness_issue` = `True`，提示「可能存在粗心問題」。
+- **輸出診斷標籤參數:** 若 `carelessness_issue` = `True`，觸發參數 `` `BEHAVIOR_CARELESSNESS_ISSUE` ``。
 
 <aside>
 
-**本章總結：**我們檢查了學生在測驗前段是否存在作答過快的現象，並通過計算基於相對時間標準的「快而錯」題目在所有「快」題目中的比例 (`fast_wrong_rate`)，評估了是否存在潛在的粗心問題 (`carelessness_issue`)。
+**本章總結：**我們檢查了學生在測驗前段是否存在作答過快的現象 (`BEHAVIOR_EARLY_RUSHING_FLAG_RISK`)，並通過計算基於相對時間標準的「快而錯」題目在所有「快」題目中的比例 (`fast_wrong_rate`)，評估了是否存在潛在的粗心問題 (`BEHAVIOR_CARELESSNESS_ISSUE`)。
 
-**結果去向：**本章的發現（前期過快提醒、`carelessness_issue`標記）提供了關於學生答題策略和習慣的額外信息，將作為輔助性結論納入第八章的總結報告中，並可能引導學生反思其答題節奏和仔細程度。
+**結果去向：**本章觸發的參數（`BEHAVIOR_EARLY_RUSHING_FLAG_RISK`, `BEHAVIOR_CARELESSNESS_ISSUE`）提供了關於學生答題策略和習慣的額外信息，**將通過附錄 A 對照表轉譯後**，作為輔助性結論納入第八章的總結報告中，並可能引導學生反思其答題節奏和仔細程度。
 
 </aside>
 
@@ -379,20 +379,46 @@
 
 <aside>
 
-**目標:** 檢查是否有某個核心技能存在普遍且嚴重的困難。
+**目標:** 檢查是否有某個**未被豁免的**核心技能存在普遍且嚴重的困難。
 
 </aside>
 
-- **邏輯:**
-    - 計算每個 `question_fundamental_skill` 在有效數據中的 總錯誤率 (`error_rate_skill`)。
-    - 若某技能的 `error_rate_skill` > 0.50 (即 > 50%)，則觸發 `skill_override_triggered`[`Skill`] = `True`。
-- **影響:** 若觸發，第七章的練習建議將側重該技能的基礎鞏固，而非針對個別錯題。
+**新增：基礎能力豁免規則 (Fundamental Skill Exemption Rule)**
 
 <aside>
 
-**本章總結：**本章設定了一個覆蓋規則，通過檢查每個核心技能（`question_fundamental_skill`）的整體錯誤率，判斷是否存在錯誤率過高（>50%）的情況。若存在，則觸發該技能的覆蓋標記（`skill_override_triggered`）。
+**目標:** 識別學生已完全掌握且能在時間限制內完成的技能，避免在第七章生成不必要的練習建議。
 
-**結果去向：**該標記直接影響第七章的練習建議生成邏輯。如果某技能觸發了覆蓋規則，第七章將生成針對該技能的宏觀、基礎性鞏固建議，而不是基於該技能下個別錯題的微觀建議。
+</aside>
+
+- **豁免條件計算 (在覆蓋規則判斷之前進行):**
+    - 對於某個核心技能 (`question_fundamental_skill`)：
+        - 篩選出屬於該技能的所有有效題目（排除 `is_invalid` = `True` 的題目）。
+        - **條件一 (準確性):** 所有這些有效題目的 `is_correct` 均為 `True`。
+        - **條件二 (效率):**
+            - 對於 `CR` 題目：所有有效題目的 `overtime` 標記均為 `False`。
+            - 對於 `RC` 題目：所有有效題目的 `group_overtime` 標記和 `individual_overtime` 標記均為 `False`。
+    - 若同時滿足**條件一**和**條件二**，則計算得出該核心技能的豁免狀態 `skill_exemption_status` 為 `True`。
+- **豁免規則的影響:**
+    - 計算出的豁免狀態 (`skill_exemption_status`) **僅用於**第七章練習建議生成邏輯。被標記為豁免的技能將**跳過**所有練習建議。
+    - 豁免狀態**不影響**本章後續的基礎能力覆蓋規則判斷（覆蓋規則仍基於所有非豁免技能的錯誤率）。
+    - 診斷總結（第八章）會提及這些被豁免的技能，以展示學生的強項。
+
+---
+
+**基礎能力覆蓋規則判斷 (基於所有技能，不考慮豁免狀態)**
+
+- **邏輯:**
+    - **(此處計算基於所有技能，以便全面評估，豁免狀態僅影響下游建議)**
+    - 計算每個核心技能 (`question_fundamental_skill`) 在有效數據中的 總錯誤率 (`error_rate_skill`)。
+    - 若某技能的 `error_rate_skill` > 0.50 (即 > 50%)，則觸發 `skill_override_triggered`[`Skill`] = `True`。
+- **影響:** 若觸發 `skill_override_triggered`，第七章的練習建議 (如果該技能未被豁免) 將側重該技能的基礎鞏固，而非針對個別錯題。
+
+<aside>
+
+**本章總結：**本章首先定義瞭如何計算核心技能的豁免狀態（全對且無超時）。然後，獨立於豁免狀態，設定了一個覆蓋規則，通過檢查每個核心技能的整體錯誤率，判斷是否存在錯誤率過高（>50%）的情況，並記錄在 `skill_override_triggered` 中。
+
+**結果去向：**計算出的 `skill_exemption_status` 將傳遞給第七章，用於跳過已掌握技能的建議。`skill_override_triggered` 標記也將傳遞給第七章，用於指導未被豁免的薄弱技能生成宏觀建議。
 
 </aside>
 
@@ -421,7 +447,9 @@
         - 初始化一個字典 `recommendations_by_skill` = `{}`。
         - 初始化一個集合 `processed_override_skills` = `set()`。
     - **遍歷題目:** 檢查所有在前續章節分析中被標記需要關注的有效數據題目 `X` (其核心技能為 `S`，難度為 `D`，原始用時為 `T`，題型為 `Type`)。
-        - **檢查技能覆蓋規則:**
+        - **檢查技能豁免狀態:**
+            - 若技能 `S` 的 `skill_exemption_status` == `True` (根據新增的豁免規則計算得出)，則**跳過**此題目的後續建議生成步驟，處理下一個題目。
+        - **檢查技能覆蓋規則 (僅對未豁免技能):**
             - 若技能 `S` 觸發了覆蓋規則 (`skill_override_triggered`[`S`] == `True`) 且技能 `S` **未**在 `processed_override_skills` 中：
                 - 生成宏觀建議 `G` = "針對 [`S`] 技能，由於整體錯誤率偏高 (根據第六章分析)，建議全面鞏固基礎，可從中低難度題目開始系統性練習，掌握核心方法。"
                 - 將宏觀建議 `G` 添加到 `recommendations_by_skill`[`S`]。
@@ -483,6 +511,7 @@
 **2. 表現概覽**
 
 *   (總結第二章發現：學生在不同難度區間（低/中/高）的 `CR` 和 `RC` 題目上表現如何？錯誤主要集中在哪些難度區間？哪些核心技能 (`question_fundamental_skill`) 是相對弱項？)
+*   **(提及哪些核心技能因表現完美（全對且無超時）而被豁免，展示為已掌握的強項。)**
 *   (提及第一章關於 `RC` 閱讀時間的初步評估結果，如果觸發了 `reading_comprehension_barrier_inquiry`，在此處或核心問題診斷中提示可能存在基礎閱讀障礙需要關注。)
 
 **3. 核心問題診斷**

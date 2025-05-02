@@ -42,17 +42,16 @@
 5. **輸出與總結**: 
    - 本章產生的關鍵標記：`time_pressure` (布林值), `overtime_threshold` (數值), `invalid_question_positions` (列表), 以及題目上的 `is_invalid` 標記。
 
-**全局規則應用：數據過濾與標記**
+**全局規則應用：識別無效數據與過濾**
 
-1.  **標記超時 (`overtime`):** 對於所有**未被標記為 `is_invalid`** 的題目，若其 `question_time` > `overtime_threshold`，則為該題目添加內部標記 `overtime` = `True`。
-2.  **創建過濾數據集：** 從原始題目數據中，移除 所有 `question_position` 包含在 `invalid_question_positions` 列表中的題目。
-3.  **後續分析範圍：** 第二章至第七章的所有計算、分析和建議，僅基於這個過濾後的數據集。
+1.  **創建過濾數據集：** 從原始題目數據中，移除 所有 `question_position` 包含在 `invalid_question_positions` 列表中的題目。
+2.  **後續分析範圍：** 第二章至第七章的所有計算、分析和建議，僅基於這個過濾後的數據集。**在過濾完成後，將根據 `overtime_threshold` 在剩餘的有效題目上標記 `overtime` 狀態。**
 
 <aside>
 
-**本章總結：** 我們首先計算了總時間差 (`time_diff`)，然後結合時間差和測驗末尾的作答速度判斷了學生是否處於時間壓力 (`time_pressure`) 下。基於時間壓力狀態，我們設定了統一的單題超時閾值 (`overtime_threshold`)。最後，僅在確認存在時間壓力的情況下，我們將測驗末尾作答過快的題目識別為無效數據 (`is_invalid`) 並記錄其位置 (`invalid_question_positions`)。在進行後續分析前，我們會先根據超時閾值標記超時題目 (`overtime`)，然後過濾掉無效數據。
+**本章總結：** 我們首先計算了總時間差 (`time_diff`)，然後結合時間差和測驗末尾的作答速度判斷了學生是否處於時間壓力 (`time_pressure`) 下。基於時間壓力狀態，我們設定了統一的單題超時閾值 (`overtime_threshold`)。最後，僅在確認存在時間壓力的情況下，我們將測驗末尾作答過快的題目識別為無效數據 (`is_invalid`) 並記錄其位置 (`invalid_question_positions`)。**在進行後續分析前，我們會先過濾掉這些無效數據，然後再在剩餘的有效題目上根據 `overtime_threshold` 標記超時題目 (`overtime`)。**
 
-**結果去向：** `time_pressure` 狀態和 `overtime_threshold` 將作為後續分析的重要背景信息。被標記為 `overtime` 的題目會在後續章節用於診斷慢題。被標記為 `is_invalid` 的題目將在第二章至第七章的分析中被過濾排除，以確保分析的準確性。
+**結果去向：** `time_pressure` 狀態和 `overtime_threshold` 將作為後續分析的重要背景信息。過濾後的數據集是後續所有章節分析的基礎。被標記為 `overtime` 的題目會在後續章節用於診斷慢題。被標記為 `is_invalid` 的題目已在分析開始前被排除。
 
 </aside>
 
@@ -298,152 +297,4 @@
 
 </aside>
 
-1.  **確定建議觸發點：** 找出所有帶有以下診斷標籤的題目：第三章定義的錯誤標籤 (如 `slow_wrong`, `fast_wrong`, `special_focus_error`) 或第四章定義的正確但超時 (即 `overtime` = `True` 且 `is_correct` = `True`) 的題目。以及第六章觸發 `skill_override_triggered` 的 `fundamental_skill`。
-2.  **生成與初步分類建議：**
-    - 初始化一個字典 `recommendations_by_skill` = `{}`，用於按技能臨時存儲建議列表。
-    - 初始化一個集合 `processed_override_skills` = `set()`，用於記錄已處理宏觀建議的技能。
-    - 遍歷所有建議觸發點對應的題目 `X` (其核心技能為 `S`，難度為 `D`，原始用時為 `T`)：
-        - **檢查宏觀建議 (針對技能 S):** 如果 `skill_override_triggered`[`S`] 為 `True` 且技能 `S` **未**在 `processed_override_skills` 中：
-            - 生成宏觀建議 `G` = "針對 [`S`] 技能，由於整體表現有較大提升空間 (根據第六章分析)，建議全面鞏固基礎，可從 [`Y_agg`] 難度題目開始系統性練習，掌握核心方法，建議限時 [`Z_agg`] 分鐘。" (`Y_agg` 和 `Z_agg` 來自第六章)。
-            - 將宏觀建議 `G` 添加到 `recommendations_by_skill`[`S`]。
-            - 將技能 `S` 添加到 `processed_override_skills`。
-        - **生成個案建議 (若技能 S 未觸發宏觀建議):**
-            - **練習難度 (`Y`):** 根據題目 `X` 的難度 `D` 進行映射（**統一 6 級標準**）：
-                - 若 `D` ≤ -1: `Y` = "低難度 (Low) / 505+"
-                - 若 -1 < `D` ≤ 0: `Y` = "中難度 (Mid) / 555+"
-                - 若 0 < `D` ≤ 1: `Y` = "中難度 (Mid) / 605+"
-                - 若 1 < `D` ≤ 1.5: `Y` = "中難度 (Mid) / 655+"
-                - 若 1.5 < `D` ≤ 1.95: `Y` = "高難度 (High) / 705+"
-                - 若 1.95 < `D` ≤ 2: `Y` = "高難度 (High) / 805+"
-            - **起始練習限時 (`Z`):** (**統一計算規則**)
-                - 設定目標時間: `target_time` = 2.0 分鐘。
-                - 計算 `base_time`: 若 `X` 的 `overtime` == `True` (即 `is_slow` == `True`) 則 `T` - 0.5，否則 `T`。
-                - 計算 `Z_raw` = `floor`(`base_time` * 2) / 2 (向下取整到最近的 0.5)。
-                - 確保最低值: `Z` = `max`(`Z_raw`, `target_time`)。
-
-            - 添加個案建議 `C` 到 `recommendations_by_skill`[`Skill`]。
-3.  **整理與輸出建議列表：**
-    - 初始化 `final_recommendations`。
-    - **整理聚合建議:** 遍歷 `recommendations_by_skill` 字典。
-        - 對於每個技能 `S` 及其建議列表 `skill_recs`:
-            - 如果列表非空：
-                - **應用第二章診斷調整 (側重規則):**
-                    - 檢查第二章的 `poor_real` 標籤：若 `poor_real` = `True` 且觸發該技能建議的題目中至少包含一道 `'Real'` 型題目，則在技能 `S` 的建議文本末尾追加「**Real題比例建議佔總練習題量2/3。**」
-                    - 檢查第二章的 `slow_pure` 標籤：若 `slow_pure` = `True` 且觸發該技能建議的題目中至少包含一道 `'Pure'` 型題目，則在技能 `S` 的建議文本末尾追加「**建議此考點練習題量增加。**」
-                - 將整理好的技能 `S` 的建議（可能包含一條宏觀建議和/或多條個案建議，已應用側重規則）添加到 `final_recommendations`。
-    - **最終輸出:** 輸出 `final_recommendations`，確保按技能聚合，優先顯示標註 `special_focus_error` 的建議。
-
----
-
-# **第八章：診斷總結與後續行動**
-
-<aside>
-
-**本章目標：**將前面所有的分析發現匯總成一份全面、易於理解、使用自然語言撰寫的診斷報告，供學生和老師使用。**(基於內部診斷參數，通過附錄 A 對照表轉譯為中文)**
-
-**主要關注：**整合學生的整體時間壓力狀況、關鍵分析結果（包括**英文診斷參數**）、以及量身定製的練習建議，並提供後續行動指引。
-
-**為何重要：**提供一個整體的視角，點明學生的主要優勢和待改進之處，並通過清晰的解釋和可行的步驟指導未來的學習。
-
-</aside>
-
-**1. 開篇總結**
-
-*   (此處總結第一章的發現：學生在本輪測驗中是否感受到明顯的時間壓力？總體作答時間與規定時間相比如何？測驗末尾是否存在因時間壓力導致作答過快、可能影響數據有效性的跡象 (`is_invalid` 觸發)？)
-
-**2. 表現概覽**
-
-*   (此處總結第二章的發現：比較學生在 `'Real'` 題和 `'Pure'` 題上的表現，在哪種類型上錯誤更多或耗時更長？是否存在顯著差異 (`poor_real`, `slow_pure`, `poor_pure`, `slow_real` 等參數被觸發)？錯誤主要集中在哪些難度區間？哪些核心數學技能 (`fundamental_skill`) 是相對弱項？)
-
-**3. 核心問題診斷**
-
-*   (此處使用自然語言歸納第三、四章的主要發現：**基於分析產生的診斷參數 (如 `` `Q_CONCEPT_APPLICATION_ERROR` ``, `` `Q_EFFICIENCY_BOTTLENECK_CALCULATION` `` 等)，通過附錄 A 對照表轉譯為自然語言描述**，說明學生最常見的錯誤類型和效率瓶頸。例如，是傾向於快速作答但出錯（可能涉及 `` `Q_CARELESSNESS_DETAIL_OMISSION` ``），還是花費了較長時間但仍無法解決（可能涉及 `` `Q_CONCEPT_APPLICATION_ERROR` `` 或 `` `Q_CALCULATION_ERROR` ``）？是否存在雖然做對但耗時過長的情況 (`EFFICIENCY_BOTTLENECK` 相關參數)，反映了哪些技能的應用效率有待提升？)
-*   (優先提及) (如果第三章觸發了 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``，在此處強調：『尤其需要注意的是，在一些已掌握技能範圍內的基礎或中等難度題目上出現了失誤，這表明在這些知識點的應用上可能存在穩定性問題。』)
-
-**4. 模式觀察**
-
-*   (提及第五章發現) (如果觸發了 `` `Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``，提示：『測驗開始階段的部分題目作答速度較快，建議注意保持穩定的答題節奏，避免潛在的 "`flag for review`" 風險。』)
-*   (提及第五章發現) (如果觸發了 `` `Q_BEHAVIOR_CARELESSNESS_ISSUE` ``，提示：『分析顯示，"快而錯" 的情況佔比較高，提示可能需要關注答題的仔細程度，減少粗心錯誤。』)
-
-**5. 基礎鞏固提示**
-
-*   (提及第六章發現) (如果任何 `fundamental_skill` 觸發了 `skill_override_triggered`，明確指出：『對於 [`觸發覆蓋規則的技能列表`] 這些核心技能，由於整體表現顯示出較大的提升空間，建議優先進行系統性的基礎鞏固，而非僅針對個別錯題練習。』)
-
-**6. 練習計劃呈現**
-
-*   (此處清晰、完整地列出第七章生成的所有練習建議)
-*   (包含側重說明，例如：『針對 [`技能名`] 的練習，建議增加 `Real`/`Pure` 題的比例...』(基於 `poor_real`/`slow_pure` 等參數))
-*   (確保 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 相關建議優先顯示或突出標註)
-
-**7. 後續行動指引**
-
-*   **核心約束：** 本章節最終產出的所有文字**必須完全使用自然語言**，通過**附錄 A 對照表**將內部使用的**英文診斷參數**轉譯為易於理解的中文描述，絕不直接暴露內部參數。
-*   **引導反思：** (根據診斷出的主要參數類型提出問題，問題本身使用自然語言，但基於參數觸發)
-    *   若觸發較多 `` `Q_CONCEPT_APPLICATION_ERROR` `` 或 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``：『回想一下，在做錯的 [`某類型`或`技能`] 題目時，具體是卡在哪個數學知識點或公式上？是完全沒思路，還是知道方法但用錯了？』
-    *   若觸發 `` `Q_CALCULATION_ERROR` `` 或 `` `Q_EFFICIENCY_BOTTLENECK_CALCULATION` ``：『是計算過程中容易出錯，還是計算速度偏慢？』
-    *   若觸發較多 `` `Q_READING_COMPREHENSION_ERROR` `` 或 `` `poor_real` ``：『對於做錯的文字題，是題目本身的陳述讀不懂，還是能讀懂但無法轉化成數學問題？是否存在特定主題或長句子的閱讀困難？』
-    *   若觸發 `` `Q_CARELESSNESS_DETAIL_OMISSION` `` 或 `` `Q_BEHAVIOR_CARELESSNESS_ISSUE` ``：『回想一下，是否經常因為看錯數字、漏掉條件或誤解題意而失分？』
-*   **二級證據參考建議：**
-    *   *觸發時機：* 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時。
-    *   *建議行動：* 『為了更精確地定位您在 [`某技能`/`題型`] 上的具體困難點，建議您查看近期的練習記錄（例如考前 2-4 週），整理相關錯題，歸納是哪些知識點或題型（參考**附錄 A** 中的描述）反覆出現問題。如果樣本不足，請在接下來的做題中注意收集，累積到足夠樣本後再進行分析。』
-*   **質化分析建議：**
-    *   *觸發時機：* 當您對診斷報告指出的錯誤原因感到困惑，或者上述方法仍無法幫您釐清根本問題時。
-    *   *建議行動：* 『如果您對 [`某類問題`，例如涉及 `` `Q_CONCEPT_APPLICATION_ERROR` `` 的題目] 的錯誤原因仍感困惑，可以嘗試**提供 2-3 題該類型題目的詳細解題流程跟思路範例**（可以是文字記錄或口述錄音），以便與顧問進行更深入的個案分析，共同找到癥結所在。』
-*   **輔助工具推薦建議：**
-    *   *推薦邏輯：* 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示：
-    *   *工具推薦：*
-        *   如果您在分析錯題、整理近期練習記錄（如「二級證據參考建議」中提到）時，需要按知識點或題型對題目進行分類，可以考慮使用 **`Dustin's GMAT Q: Question Classifier`**。
-        *   如果診斷結果顯示您在 `Real` 題（文字應用題）方面表現相對薄弱（例如，觸發了 `` `poor_real` `` 或 `` `slow_real` `` 參數），您可以嘗試使用 **`Dustin_GMAT_Q_Real-Context_Converter`** 將純數學題目改寫成帶有實際故事背景的應用題進行練習，以加強對文字信息的理解和轉化能力。
-    *   *AI 提示推薦 (基於觸發的診斷參數)：*
-        *   **若診斷觸發：`` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``, `` `Q_CONCEPT_APPLICATION_ERROR` `` 或 `` `skill_override_triggered` ``**:
-            *   `` `Quant-related/01_basic_explanation.md` ``: 獲取詳細解題步驟和基礎邏輯解釋。
-            *   `` `Quant-related/03_test_math_concepts.md` ``: 深入理解題目考察的數學概念和出題角度。
-        *   **若診斷觸發：`` `Q_EFFICIENCY_BOTTLENECK_READING` ``, `` `Q_EFFICIENCY_BOTTLENECK_CONCEPT` ``, `` `Q_EFFICIENCY_BOTTLENECK_CALCULATION` ``, `` `slow_real` ``, `` `slow_pure` `` 或涉及計算/思考耗時過長**:
-            *   `` `Quant-related/02_quick_math_tricks.md` ``: 學習和練習更快速的計算技巧或解題捷徑。
-        *   **若診斷觸發：`` `Q_PROBLEM_UNDERSTANDING_ERROR` ``, `` `Q_READING_COMPREHENSION_ERROR` `` (Real題)**:
-            *   `` `Quant-related/03_test_math_concepts.md` ``: 確認題目核心考察概念，輔助理解題意。
-        *   **若診斷觸發：`` `Q_CARELESSNESS_DETAIL_OMISSION` ``, `` `Q_BEHAVIOR_CARELESSNESS_ISSUE` ``**:
-            *   `` `Quant-related/01_basic_explanation.md` ``: 重新學習標準解題步驟，減少疏漏。
-        *   **通用練習與鞏固 (可用於補充第七章建議)**:
-            *   `` `Quant-related/05_variant_questions.md` ``: 生成變體題目，鞏固特定解題方法。
-            *   `` `Quant-related/06_similar_questions.md` ``: 尋找與特定學習目標或錯題相似的題目進行練習。
-
-<aside>
-
-**本章總結：**我們生成了一份完全使用自然語言撰寫的最終診斷報告 **（通過附錄A對照表將內部參數轉譯為中文）**。報告首先總結了時間使用情況和整體表現概覽，接著深入分析了**基於英文參數的**核心問題所在（特別指出了 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 的情況），納入了特殊的作答模式觀察（如 `` `Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``），並提示了需要基礎鞏固的技能領域。報告的核心部分是呈現了詳細的、按技能分類的練習計劃（已應用豁免和側重規則）。最後，報告包含了一些引導性問題和關於如何利用二級證據、質化分析來促進自我反思和針對性改進的建議，以及基於診斷參數的個性化輔助工具和 AI 提示推薦。
-
-**結果去向：**這份報告是整個診斷流程的最終產出，用於與學生溝通，並指導他們後續的學習和練習。
-
-</aside>
-
----
-
-# 附錄 A：診斷標籤參數與中文對照表
-
-| 英文參數 (Parameter)                       | 中文描述 (Chinese Description)                         |
-|--------------------------------------------|----------------------------------------------------|
-| **Quant - Reading & Understanding**        |                                                    |
-| `Q_READING_COMPREHENSION_ERROR`            | Quant 閱讀理解: Real 題文字理解錯誤/障礙           |
-| `Q_PROBLEM_UNDERSTANDING_ERROR`            | Quant 題目理解: 數學問題本身理解錯誤                 |
-| **Quant - Concept & Application**          |                                                    |
-| `Q_CONCEPT_APPLICATION_ERROR`              | Quant 概念應用: 數學觀念/公式應用錯誤/障礙           |
-| `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`   | Quant 基礎掌握: 應用不穩定 (Special Focus Error)   |
-| **Quant - Calculation**                    |                                                    |
-| `Q_CALCULATION_ERROR`                      | Quant 計算: 計算錯誤/障礙                         |
-| **Quant - Efficiency Bottlenecks**       |                                                    |
-| `Q_EFFICIENCY_BOTTLENECK_READING`          | Quant 效率瓶頸: Real 題閱讀耗時過長               |
-| `Q_EFFICIENCY_BOTTLENECK_CONCEPT`          | Quant 效率瓶頸: 概念/公式思考或導出耗時過長         |
-| `Q_EFFICIENCY_BOTTLENECK_CALCULATION`      | Quant 效率瓶頸: 計算過程耗時過長/反覆計算         |
-| **Behavioral Patterns & Carelessness**   |                                                    |
-| `Q_CARELESSNESS_DETAIL_OMISSION`           | 行為模式: 粗心 - 忽略細節/條件/陷阱                |
-| `Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK`       | 行為模式: 前期作答過快 (Flag risk)                 |
-| `Q_BEHAVIOR_CARELESSNESS_ISSUE`            | 行為模式: 整體粗心問題 (快而錯比例高)              |
-| **Comparative Performance (Real vs Pure)** |                                                    |
-| `poor_real`                                | 比較表現: Real 題錯誤率顯著偏高                    |
-| `poor_pure`                                | 比較表現: Pure 題錯誤率顯著偏高                    |
-| `slow_real`                                | 比較表現: Real 題超時率顯著偏高                    |
-| `slow_pure`                                | 比較表現: Pure 題超時率顯著偏高                    |
-| **Skill Level Override**                   |                                                    |
-| `skill_override_triggered`                 | 技能覆蓋: 某核心技能整體表現需基礎鞏固 (錯誤率或超時率>50%) |
-
-（本文件結束）
+1.  **確定建議觸發點：** 找出所有帶有以下診斷標籤的題目：第三章定義的錯誤標籤 (如 `slow_wrong`, `fast_wrong`, `special_focus_error`) 或第四章定義的正確但超時 (即 `overtime` = `True` 且 `is_correct` = `

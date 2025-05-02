@@ -2,6 +2,12 @@ import pandas as pd
 import numpy as np
 
 # --- Q-Specific Constants ---
+# Define max_allowed_time here as per MD Ch0
+MAX_ALLOWED_TIME_Q = 45.0 # minutes
+# Define fast end threshold here as per MD Ch1
+FAST_END_THRESHOLD_MINUTES = 1.0
+# Define time diff threshold for pressure as per MD Ch1
+TIME_DIFF_PRESSURE_THRESHOLD = 3.0
 
 APPENDIX_A_TRANSLATION = {
     # Quant - Reading & Understanding
@@ -18,21 +24,15 @@ APPENDIX_A_TRANSLATION = {
     'Q_EFFICIENCY_BOTTLENECK_CALCULATION': "Quant 效率瓶頸: 計算過程耗時過長/反覆計算",
     # Behavioral Patterns & Carelessness
     'Q_CARELESSNESS_DETAIL_OMISSION': "行為模式: 粗心 - 忽略細節/條件/陷阱",
-    'Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "前期作答過快 (Flag risk)",
-    'Q_BEHAVIOR_CARELESSNESS_ISSUE': "整體粗心問題 (快而錯比例高)",
+    'Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "行為模式: 前期作答過快 (Flag risk)",
+    'Q_BEHAVIOR_CARELESSNESS_ISSUE': "行為模式: 整體粗心問題 (快而錯比例高)",
     # Comparative Performance (Real vs Pure) - Flags from Ch2
-    'poor_real': "Real 題錯誤率顯著偏高",
-    'poor_pure': "Pure 題錯誤率顯著偏高",
-    'slow_real': "Real 題超時率顯著偏高",
-    'slow_pure': "Pure 題超時率顯著偏高",
+    'poor_real': "比較表現: Real 題錯誤率顯著偏高",
+    'poor_pure': "比較表現: Pure 題錯誤率顯著偏高",
+    'slow_real': "比較表現: Real 題超時率顯著偏高",
+    'slow_pure': "比較表現: Pure 題超時率顯著偏高",
     # Skill Level Override
-    # 'skill_override_triggered': "技能覆蓋: 某核心技能整體表現需基礎鞏固" # Handled separately with skill name
-
-    # Time Performance Labels (Added for report generation)
-    'Fast & Wrong': "快錯",
-    'Slow & Wrong': "慢錯",
-    'Normal Time & Wrong': "正常錯",
-    'Slow & Correct': "慢對"
+    'skill_override_triggered': "技能覆蓋: 某核心技能整體表現需基礎鞏固 (錯誤率或超時率>50%)"
 }
 
 # --- Q-Specific Helper Functions ---
@@ -183,9 +183,8 @@ def _diagnose_q_root_causes(df, avg_times, max_diffs):
 
 def _diagnose_q_internal(df_q):
      """Performs detailed Q diagnosis (Chapters 2-6).
-        Assumes df_q contains only valid Q data ('Real' or 'Pure') and necessary columns
-        ('question_type', 'is_correct', 'overtime', 'question_time',
-         'question_fundamental_skill', 'question_difficulty', 'question_position').
+        Assumes df_q contains only valid Q data ('Real' or 'Pure') with necessary columns
+        including 'overtime' and 'is_invalid' (though 'is_invalid' should be False here).
      """
      if df_q.empty:
          # Return structure indicating analysis was skipped or empty
@@ -697,32 +696,56 @@ def _generate_q_recommendations(q_diagnosis_results):
 # --- Q-Specific Summary Report Generation (Chapter 8) ---
 
 def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_time_pressure_status_q, num_invalid_questions):
-    """Generates the final summary report string based on Q diagnosis and recommendations."""
+    """Generates the final summary report string based on Q diagnosis and recommendations.
+       Aligns with Chapter 8 of gmat-q-score-logic-dustin-v1.2.md.
+    """
     print("    Generating Q - Chapter 8: Summary Report...")
     report_lines = []
 
-    # Check if diagnosis results exist
-    if not q_diagnosis_results:
-         print("      No Q diagnosis results provided. Returning empty report.")
-         return "量化 (Quantitative) 部分無有效診斷結果可供報告。"
+    # Check if diagnosis results exist at all
+    # Use chapter1_results key which is added in run_q_diagnosis
+    if not q_diagnosis_results or 'chapter1_results' not in q_diagnosis_results:
+         print("      Core diagnosis results or Chapter 1 results missing. Generating minimal report.")
+         ch1_res = q_diagnosis_results.get('chapter1_results', {})
+         time_pressure_q = ch1_res.get('time_pressure_status', False)
+         num_invalid_q = ch1_res.get('invalid_questions_excluded', 0)
+         # Generate minimal report structure matching MD sections
+         report_lines.append("## GMAT 量化 (Quantitative) 診斷報告")
+         report_lines.append("--- (基於用戶數據與模擬難度分析) ---")
+         report_lines.append("\\n**1. 開篇總結**") # MD Ch8.1 Title
+         if time_pressure_q: report_lines.append("- 根據分析，您在本輪測驗中可能感受到明顯的**時間壓力**。")
+         else: report_lines.append("- 根據分析，您在本輪測驗中未處於明顯的時間壓力下。")
+         if num_invalid_q > 0: report_lines.append(f"- 測驗末尾存在 {num_invalid_q} 道因時間壓力導致作答過快、可能影響數據有效性的跡象，已從後續詳細分析中排除。")
+         else: report_lines.append("- 未發現因時間壓力導致數據無效的跡象，所有題目均納入分析。")
+         report_lines.append("\\n**2. 表現概覽**") # MD Ch8.2 Title
+         report_lines.append("- 無充足的有效數據進行表現概覽分析。")
+         report_lines.append("\\n**3. 核心問題診斷**") # MD Ch8.3 Title
+         report_lines.append("- 無充足的有效數據進行核心問題診斷。")
+         report_lines.append("\\n**4. 模式觀察**") # MD Ch8.4 Title
+         report_lines.append("- 無充足的有效數據進行模式觀察。")
+         report_lines.append("\\n**5. 基礎鞏固提示**") # MD Ch8.5 Title
+         report_lines.append("- 無充足的有效數據進行基礎鞏固分析。")
+         report_lines.append("\\n**6. 練習計劃呈現**") # MD Ch8.6 Title
+         report_lines.append("- 無法生成練習建議。")
+         report_lines.append("\\n**7. 後續行動指引**") # MD Ch8.7 Title
+         report_lines.append("- 無法提供後續行動指引。")
+         report_lines.append("\\n--- 報告結束 ---")
+         return "\\n\\n".join(report_lines)
 
-
-    # Extract data (safer access with .get)
+    # Extract data safely using .get()
+    ch1_results = q_diagnosis_results.get('chapter1_results', {})
     ch2_summary = q_diagnosis_results.get('chapter2_summary', [])
     ch3_errors = q_diagnosis_results.get('chapter3_error_details', [])
     ch4_correct_slow = q_diagnosis_results.get('chapter4_correct_slow_details', [])
     ch5_patterns = q_diagnosis_results.get('chapter5_patterns', {})
     ch6_override = q_diagnosis_results.get('chapter6_skill_override', {})
 
-    # --- Helper to extract triggered params ---
+    # Extract triggered params for logic checks
     triggered_params = set()
     for err in ch3_errors: triggered_params.update(err.get('Possible_Params', []))
     for cs in ch4_correct_slow: triggered_params.update(cs.get('Possible_Params', []))
     if ch5_patterns.get('early_rushing_flag', False): triggered_params.add('Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
     if ch5_patterns.get('carelessness_issue_flag', False): triggered_params.add('Q_BEHAVIOR_CARELESSNESS_ISSUE')
-    # --- End Helper ---
-
-    # Get Chapter 2 Flags again for reporting
     ch2_flags = {}
     for item in ch2_summary:
          metric = item.get('Metric')
@@ -733,381 +756,305 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
                         try:
                             key, value = flag_pair.strip().split('=')
                             ch2_flags[key.strip()] = value.strip().lower() == 'true'
-                        except ValueError:
-                             pass # Ignore parsing errors
+                        except ValueError: pass
     triggered_params.update({flag for flag, status in ch2_flags.items() if status})
 
     report_lines.append("## GMAT 量化 (Quantitative) 診斷報告")
     report_lines.append("--- (基於用戶數據與模擬難度分析) ---")
     report_lines.append("")
 
-    # 1. 開篇總結 (時間)
-    report_lines.append("**1. 時間策略與有效性 (摘要)**")
-    # Add dynamic content based on passed parameters
-    time_pressure_q = subject_time_pressure_status_q
+    # 1. 開篇總結 (From Ch1 Results - Aligned with MD Ch8.1)
+    report_lines.append("**1. 開篇總結**")
+    time_pressure_q = ch1_results.get('time_pressure_status', False)
+    num_invalid_q = ch1_results.get('invalid_questions_excluded', 0)
+    # Use exact phrasing from MD Ch8.1
     if time_pressure_q:
-        report_lines.append("- 根據分析，您在量化部分可能處於**時間壓力**下 (測驗時間剩餘不多且末尾部分題目作答過快)。")
+        report_lines.append("- 根據分析，您在本輪測驗中可能感受到明顯的時間壓力。")
     else:
-        report_lines.append("- 根據分析，您在量化部分未處於明顯的時間壓力下。")
-
-    if num_invalid_questions > 0:
-        report_lines.append(f"- 已將 {num_invalid_questions} 道可能因時間壓力影響有效性的題目從詳細分析中排除，以確保診斷準確性。")
-        report_lines.append("- 請注意，這些被排除的題目將不會包含在後續的錯誤難度分佈統計和練習建議中。")
+        report_lines.append("- 根據分析，您在本輪測驗中未處於明顯的時間壓力下。")
+    if num_invalid_q > 0:
+        report_lines.append(f"- 測驗末尾存在因時間壓力導致作答過快、可能影響數據有效性的跡象 ({num_invalid_q} 題被排除)。")
     else:
-        report_lines.append("- 所有題目數據均被納入詳細分析。")
+        report_lines.append("- 未發現因時間壓力導致數據無效的跡象。")
     report_lines.append("")
 
-    # 2. 表現概覽
+    # 2. 表現概覽 (Aligned with MD Ch8.2)
     report_lines.append("**2. 表現概覽**")
     real_stats_error = next((item for item in ch2_summary if item.get('Metric') == 'Error Rate'), None)
     real_stats_ot = next((item for item in ch2_summary if item.get('Metric') == 'Overtime Rate'), None)
-
     if real_stats_error and real_stats_ot:
-        report_lines.append(f"- **Real vs. Pure 題表現:**")
-        # Use .get for safer access to values
-        real_err_rate = real_stats_error.get('Real_Value', 'N/A')
-        real_ot_rate = real_stats_ot.get('Real_Value', 'N/A')
-        # Extract Pure values directly from the same dictionaries
-        pure_err_rate = real_stats_error.get('Pure_Value', 'N/A')
-        pure_ot_rate = real_stats_ot.get('Pure_Value', 'N/A')
+        real_err_rate_str = _format_rate(real_stats_error.get('Real_Value', 'N/A'))
+        real_ot_rate_str = _format_rate(real_stats_ot.get('Real_Value', 'N/A'))
+        pure_err_rate_str = _format_rate(real_stats_error.get('Pure_Value', 'N/A'))
+        pure_ot_rate_str = _format_rate(real_stats_ot.get('Pure_Value', 'N/A'))
+        report_lines.append(f"- Real 題表現: 錯誤率 {real_err_rate_str}, 超時率 {real_ot_rate_str}")
+        report_lines.append(f"- Pure 題表現: 錯誤率 {pure_err_rate_str}, 超時率 {pure_ot_rate_str}")
 
-        # Use the helper function for formatting
-        real_err_rate_str = _format_rate(real_err_rate)
-        real_ot_rate_str = _format_rate(real_ot_rate)
-        pure_err_rate_str = _format_rate(pure_err_rate)
-        pure_ot_rate_str = _format_rate(pure_ot_rate)
-
-        report_lines.append(f"  - Real 題: 錯誤率 {real_err_rate_str}, 超時率 {real_ot_rate_str}")
-        report_lines.append(f"  - Pure 題: 錯誤率 {pure_err_rate_str}, 超時率 {pure_ot_rate_str}")
-
-        # Report triggered comparison flags
         triggered_ch2_flags_desc = []
-        for flag, status in ch2_flags.items():
-             if status and flag in APPENDIX_A_TRANSLATION:
-                  triggered_ch2_flags_desc.append(_get_translation(flag))
+        # Correctly reference the flags dictionary derived earlier
+        if ch2_flags.get('poor_real', False): triggered_ch2_flags_desc.append(_get_translation('poor_real'))
+        if ch2_flags.get('poor_pure', False): triggered_ch2_flags_desc.append(_get_translation('poor_pure'))
+        if ch2_flags.get('slow_real', False): triggered_ch2_flags_desc.append(_get_translation('slow_real'))
+        if ch2_flags.get('slow_pure', False): triggered_ch2_flags_desc.append(_get_translation('slow_pure'))
         if triggered_ch2_flags_desc:
-             report_lines.append(f"  - **提示:** {'; '.join(triggered_ch2_flags_desc)}")
-
-        # --- Add Error Difficulty Distribution Analysis ---
-        if ch3_errors:
-            error_difficulties = [err.get('Difficulty') for err in ch3_errors if err.get('Difficulty') is not None and not pd.isna(err.get('Difficulty'))]
-            if error_difficulties:
-                difficulty_labels = [_map_difficulty_to_label(d) for d in error_difficulties]
-                # Count occurrences of each difficulty label
-                label_counts = pd.Series(difficulty_labels).value_counts().sort_index() # Sort by label order implicitly
-                if not label_counts.empty:
-                    distribution_str = ", ".join([f"{label} ({count}題)" for label, count in label_counts.items()])
-                    report_lines.append(f"  - **錯誤難度分佈:** {distribution_str}")
-                else:
-                    report_lines.append("  - **錯誤難度分佈:** 無有效難度數據可供分析。")
-            else:
-                report_lines.append("  - **錯誤難度分佈:** 錯誤題目無有效難度數據。")
-        else:
-            report_lines.append("  - **錯誤難度分佈:** 無錯誤題目可供分析難度分佈。")
-        # --- End Error Difficulty Distribution Analysis ---
-
+             report_lines.append(f"- 比較提示: {'; '.join(triggered_ch2_flags_desc)}")
     else:
-        report_lines.append("- 未能進行 Real vs. Pure 題的詳細比較 (數據不足或缺失)。")
+        report_lines.append("- 未能進行 Real vs. Pure 題的詳細比較。")
 
-    # 3. 核心問題診斷
-    report_lines.append("**3. 核心問題診斷 (基於觸發的診斷標籤)**")
-    core_issues = set()
+    # Error Difficulty Distribution (Aligned with MD Ch8.2)
+    if ch3_errors:
+        error_difficulties = [err.get('Difficulty') for err in ch3_errors if err.get('Difficulty') is not None and not pd.isna(err.get('Difficulty'))]
+        if error_difficulties:
+            difficulty_labels = [_map_difficulty_to_label(d) for d in error_difficulties]
+            label_counts = pd.Series(difficulty_labels).value_counts().sort_index()
+            if not label_counts.empty:
+                distribution_str = ", ".join([f"{label} ({count}題)" for label, count in label_counts.items()])
+                report_lines.append(f"- **錯誤難度分佈:** {distribution_str}")
+            # No 'else' needed per MD structure
+        # No 'else' needed per MD structure
+    # No 'else' needed per MD structure
+    report_lines.append("")
+
+    # 3. 核心問題診斷 (Aligned with MD Ch8.3)
+    report_lines.append("**3. 核心問題診斷**")
     sfe_triggered = False
     sfe_skills_involved = set()
-
     for err in ch3_errors:
-        params = err.get('Possible_Params', [])
-        skill = err.get('Skill', 'Unknown Skill')
-        is_sfe = err.get('Is_SFE', False)
-        core_issues.update(p for p in params if p != 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-        if is_sfe:
-            sfe_triggered = True
-            if skill != 'Unknown Skill':
-                 sfe_skills_involved.add(skill)
+        if err.get('Is_SFE', False):
+             sfe_triggered = True
+             skill = err.get('Skill', 'Unknown Skill')
+             if skill != 'Unknown Skill': sfe_skills_involved.add(skill)
 
-    for cs in ch4_correct_slow:
-         core_issues.update(cs.get('Possible_Params', []))
-
-    # --- Report Core Issues Summary ---
+    # Report SFE Summary first if triggered (as per MD phrasing)
     if sfe_triggered:
-        sfe_label = _get_translation('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE') # Get the "Quant 基礎掌握: ..." label
-        sfe_note = f"{sfe_label}"
+        sfe_label = _get_translation('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+        sfe_note = f"尤其需要注意的是，在一些已掌握技能範圍內的基礎或中等難度題目上出現了失誤 ({sfe_label})"
         if sfe_skills_involved:
-             sfe_note += f" (涉及技能: {', '.join(sorted(list(sfe_skills_involved)))})"
-        # Add the short explanation note as requested
-        report_lines.append(f"- **尤其需要注意:** {sfe_note}。(註：SFE 指在已掌握技能範圍內題目失誤)")
+             sfe_note += f"，涉及技能: {', '.join(sorted(list(sfe_skills_involved)))})"
+        else:
+            sfe_note += ")"
+        report_lines.append(f"- {sfe_note}，這表明在這些知識點的應用上可能存在穩定性問題。")
 
-    # --- Keep the message if no core issues AND no SFE were found ---
-    if not core_issues and not sfe_triggered:
-        report_lines.append("- 未識別出明顯的核心問題模式 (基於錯誤及效率分析)。")
-    
-    # --- Add Detailed Error and Slow-Correct Tags per Position ---
-    detailed_items_to_report = []
-    # Add errors from chapter 3
-    for err in ch3_errors:
-        detailed_items_to_report.append({
-            'position': err.get('question_position', 'N/A'),
-            'skill': err.get('Skill', '未知技能'),
-            'performance': err.get('Time_Performance', '未知表現'), # e.g., 'Fast & Wrong'
-            'params': err.get('Possible_Params', [])
-        })
-    # Add slow & correct from chapter 4
-    for cs in ch4_correct_slow:
-        detailed_items_to_report.append({
-            'position': cs.get('question_position', 'N/A'),
-            'skill': cs.get('Skill', '未知技能'),
-            'performance': 'Slow & Correct', # Assign specific label
-            'params': cs.get('Possible_Params', [])
-        })
+    # Summarize other core issues using natural language based on triggered params
+    core_issue_summary = []
+    # Logic based on MD Ch8.3 examples
+    if 'Q_CARELESSNESS_DETAIL_OMISSION' in triggered_params:
+        core_issue_summary.append("傾向於快速作答但出錯，可能涉及{}。".format(_get_translation('Q_CARELESSNESS_DETAIL_OMISSION')))
+    if 'Q_CONCEPT_APPLICATION_ERROR' in triggered_params and not sfe_triggered: # Avoid repeating if SFE mentioned it
+        core_issue_summary.append("花費了較長時間但仍無法解決部分問題，可能涉及{}。".format(_get_translation('Q_CONCEPT_APPLICATION_ERROR')))
+    if 'Q_CALCULATION_ERROR' in triggered_params:
+        core_issue_summary.append("計算錯誤也是失分原因 ({})。".format(_get_translation('Q_CALCULATION_ERROR')))
+    if 'Q_PROBLEM_UNDERSTANDING_ERROR' in triggered_params:
+         core_issue_summary.append("對數學問題本身的理解可能存在偏差 ({})。".format(_get_translation('Q_PROBLEM_UNDERSTANDING_ERROR')))
+    if 'Q_READING_COMPREHENSION_ERROR' in triggered_params:
+        core_issue_summary.append("Real題的文字信息理解可能存在障礙 ({})。".format(_get_translation('Q_READING_COMPREHENSION_ERROR')))
 
-    if detailed_items_to_report:
-        report_lines.append("- **詳細診斷標籤 (含時間表現和技能):**")
-        # Sort items by position for readability
-        sorted_items = sorted(detailed_items_to_report, key=lambda x: x.get('position', float('inf')))
-        for item in sorted_items:
-            pos = item['position']
-            skill = item['skill']
-            performance_en = item['performance']
-            params = item['params']
-            
-            # Translate performance and params
-            performance_zh = _get_translation(performance_en)
-            translated_params = [_get_translation(p) for p in params]
-            
-            report_lines.append(f"  - 題號 {pos}: [{performance_zh}, 技能: {skill}] - 診斷: [{', '.join(translated_params)}]")
-    # --- End Detailed Tags ---
-            
-    report_lines.append("") # Add blank line after section 3
+    correct_slow_params = set()
+    for cs in ch4_correct_slow: correct_slow_params.update(cs.get('Possible_Params', []))
+    efficiency_issues = []
+    if 'Q_EFFICIENCY_BOTTLENECK_READING' in correct_slow_params: efficiency_issues.append("Real題閱讀")
+    if 'Q_EFFICIENCY_BOTTLENECK_CONCEPT' in correct_slow_params: efficiency_issues.append("概念思考")
+    if 'Q_EFFICIENCY_BOTTLENECK_CALCULATION' in correct_slow_params: efficiency_issues.append("計算過程")
+    if efficiency_issues:
+         core_issue_summary.append("部分題目雖然做對，但在{}等環節耗時過長 ({})，反映了應用效率有待提升。".format(
+             "、".join(efficiency_issues),
+             ", ".join([_get_translation(p) for p in correct_slow_params if p.startswith('Q_EFFICIENCY')]) # Translate related params
+             ))
 
-    # 4. 模式觀察
-    report_lines.append("**4. 作答模式觀察**")
+    if core_issue_summary:
+        for summary_line in core_issue_summary:
+             report_lines.append(f"- {summary_line}")
+    elif not sfe_triggered:
+         report_lines.append("- 未識別出主要的核心問題模式。") # Show only if NO SFE and NO other issues
+
+    # Remove detailed list per position as MD uses summary
+    report_lines.append("")
+
+    # 4. 模式觀察 (Aligned with MD Ch8.4)
+    report_lines.append("**4. 模式觀察**")
     pattern_found = False
     if ch5_patterns.get('early_rushing_flag', False):
-        report_lines.append(f"- **提示:** {_get_translation('Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')} - 測驗開始階段的部分題目作答速度較快 ({len(ch5_patterns.get('early_rushing_items', []))} 題)，建議注意保持穩定的答題節奏。")
+        # Use exact phrasing from MD Ch8.4
+        report_lines.append(f"- 測驗開始階段的部分題目作答速度較快，建議注意保持穩定的答題節奏，避免潛在的 \"flag for review\" 風險。 ({_get_translation('Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')})")
         pattern_found = True
     if ch5_patterns.get('carelessness_issue_flag', False):
-        report_lines.append(f"- **提示:** {_get_translation('Q_BEHAVIOR_CARELESSNESS_ISSUE')} - 分析顯示，「快而錯」的情況佔比較高 ({ch5_patterns.get('fast_wrong_rate', 0):.1%})，提示可能需關注答題仔細程度。")
+        # Use exact phrasing from MD Ch8.4
+        report_lines.append(f"- 分析顯示，「快而錯」的情況佔比較高 ({ch5_patterns.get('fast_wrong_rate', 0):.1%})，提示可能需要關注答題的仔細程度，減少粗心錯誤。 ({_get_translation('Q_BEHAVIOR_CARELESSNESS_ISSUE')})")
         pattern_found = True
     if not pattern_found:
         report_lines.append("- 未發現明顯的特殊作答模式。")
     report_lines.append("")
 
-    # 5. 基礎鞏固提示
+    # 5. 基礎鞏固提示 (Aligned with MD Ch8.5)
     report_lines.append("**5. 基礎鞏固提示**")
     override_skills_list = [skill for skill, data in ch6_override.items() if data.get('triggered', False)]
     if override_skills_list:
-        report_lines.append(f"- **以下核心技能整體表現顯示較大提升空間 (錯誤率或超時率 > 50%)，建議優先系統性鞏固:** {', '.join(sorted(override_skills_list))}")
+        # Use exact phrasing from MD Ch8.5
+        report_lines.append(f"- 對於 [{', '.join(sorted(override_skills_list))}] 這些核心技能，由於整體表現顯示出較大的提升空間，建議優先進行系統性的基礎鞏固，而非僅針對個別錯題練習。")
     else:
-        report_lines.append("- 未發現錯誤率或超時率超過 50% 的核心技能。")
+        # Use adjusted phrasing aligned with MD's intent
+        report_lines.append("- 未觸發需要優先進行基礎鞏固的技能覆蓋規則。")
     report_lines.append("")
 
-    # 6. 練習計劃呈現
-    report_lines.append("**6. 練習計劃建議**")
+    # 6. 練習計劃呈現 (Aligned with MD Ch8.6)
+    report_lines.append("**6. 練習計劃呈現**")
     if q_recommendations:
-        report_lines.extend(q_recommendations) # Embed the generated list
+        # Mention SFE prioritization as per MD Ch3 note
+        if sfe_triggered:
+             report_lines.append("- (注意：涉及「基礎掌握不穩」的建議已優先列出)")
+        report_lines.extend(q_recommendations)
     else:
-        report_lines.append("- 未生成具體的量化練習建議。")
+        report_lines.append("- 無具體練習建議生成。")
     report_lines.append("")
 
-    # 7. 後續行動指引
+    # 7. 後續行動指引 (Aligned with MD Ch8.7)
     report_lines.append("**7. 後續行動指引**")
+    # Core Constraint Reminder (Implicitly followed by using translations)
 
-    # --- Prepare mappings for detailed references ---
+    # Prepare mappings again for accurate context
     param_to_positions = {}
     skill_to_positions = {}
-    all_problem_positions = set() # Collect all positions with errors or slow-correct issues
-
     for err in ch3_errors:
-        pos = err.get('question_position')
-        skill = err.get('Skill', 'Unknown Skill')
-        params = err.get('Possible_Params', [])
-        if pos is not None:
-            all_problem_positions.add(pos)
-            if skill != 'Unknown Skill':
-                skill_to_positions.setdefault(skill, set()).add(pos)
-            for p in params:
-                param_to_positions.setdefault(p, set()).add(pos)
-                
+        pos = err.get('question_position'); skill = err.get('Skill', 'UK'); params = err.get('Possible_Params', [])
+        if skill != 'UK' and pos is not None: skill_to_positions.setdefault(skill, set()).add(pos)
+        for p in params: param_to_positions.setdefault(p, set()).add(pos)
     for cs in ch4_correct_slow:
-        pos = cs.get('question_position')
-        skill = cs.get('Skill', 'Unknown Skill')
-        params = cs.get('Possible_Params', [])
-        if pos is not None:
-            all_problem_positions.add(pos)
-            if skill != 'Unknown Skill':
-                skill_to_positions.setdefault(skill, set()).add(pos)
-            for p in params:
-                 param_to_positions.setdefault(p, set()).add(pos)
-                 
-    # Convert sets to sorted lists for consistent output
-    for param in param_to_positions:
-        param_to_positions[param] = sorted(list(param_to_positions[param]))
-    for skill in skill_to_positions:
-        skill_to_positions[skill] = sorted(list(skill_to_positions[skill]))
-    # --- End Prepare mappings --- 
+        pos = cs.get('question_position'); skill = cs.get('Skill', 'UK'); params = cs.get('Possible_Params', [])
+        if skill != 'UK' and pos is not None: skill_to_positions.setdefault(skill, set()).add(pos)
+        for p in params: param_to_positions.setdefault(p, set()).add(pos)
+    for param in param_to_positions: param_to_positions[param] = sorted(list(param_to_positions[param]))
+    for skill in skill_to_positions: skill_to_positions[skill] = sorted(list(skill_to_positions[skill]))
 
     report_lines.append("- **引導反思:**")
-    # --- Dynamic Reflection Prompts ---
     reflection_prompts = []
-    # Helper function to add position context
-    def get_pos_context(param_key):
-        positions = param_to_positions.get(param_key, [])
-        return f" (涉及題號: {positions})" if positions else ""
+    def get_pos_context_str(param_keys): # Helper to get position context string
+        positions = set().union(*(set(param_to_positions.get(key, [])) for key in param_keys))
+        return f" (涉及題號: {sorted(list(positions))})" if positions else ""
 
+    # Align reflection prompts EXACTLY with MD Ch8.7 prompts and triggers
     if 'Q_CONCEPT_APPLICATION_ERROR' in triggered_params or 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in triggered_params:
-        prompt = "  - 回想一下，在做錯的相關題目時，具體是卡在哪個數學知識點或公式上？是完全沒思路，還是知道方法但用錯了？"
-        # Combine positions for both params if needed
-        pos_context = get_pos_context('Q_CONCEPT_APPLICATION_ERROR') + get_pos_context('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-        # Basic de-duplication if context is the same
-        positions_all = sorted(list(set(param_to_positions.get('Q_CONCEPT_APPLICATION_ERROR', []) + param_to_positions.get('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE', []))))
-        reflection_prompts.append(prompt + (f" (涉及題號: {positions_all})" if positions_all else ""))
+        prompt_skills = set()
+        if 'Q_CONCEPT_APPLICATION_ERROR' in triggered_params: prompt_skills.update(skill for skill, poses in skill_to_positions.items() if any(pos in param_to_positions.get('Q_CONCEPT_APPLICATION_ERROR',[]) for pos in poses))
+        if 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in triggered_params: prompt_skills.update(sfe_skills_involved)
+        skill_context = f" [`{', '.join(sorted(list(prompt_skills)))}`] " if prompt_skills else " "
+        reflection_prompts.append(f"  - 回想一下，在做錯的{skill_context}題目時，具體是卡在哪個數學知識點或公式上？是完全沒思路，還是知道方法但用錯了？" + get_pos_context_str(['Q_CONCEPT_APPLICATION_ERROR', 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE']))
 
     if 'Q_CALCULATION_ERROR' in triggered_params or 'Q_EFFICIENCY_BOTTLENECK_CALCULATION' in triggered_params:
-        prompt = "  - 是計算過程中容易出錯，還是計算速度偏慢？"
-        positions_all = sorted(list(set(param_to_positions.get('Q_CALCULATION_ERROR', []) + param_to_positions.get('Q_EFFICIENCY_BOTTLENECK_CALCULATION', []))))
-        reflection_prompts.append(prompt + (f" (涉及題號: {positions_all})" if positions_all else ""))
-        
+        reflection_prompts.append("  - 是計算過程中容易出錯，還是計算速度偏慢？" + get_pos_context_str(['Q_CALCULATION_ERROR', 'Q_EFFICIENCY_BOTTLENECK_CALCULATION']))
+
     if 'Q_READING_COMPREHENSION_ERROR' in triggered_params or ch2_flags.get('poor_real', False):
-        prompt = "  - 對於做錯的文字題，是題目陳述讀不懂，還是無法轉化成數學問題？"
-        reflection_prompts.append(prompt + get_pos_context('Q_READING_COMPREHENSION_ERROR')) # Assuming poor_real affects same questions
+        reflection_prompts.append("  - 對於做錯的文字題，是題目本身的陳述讀不懂，還是能讀懂但無法轉化成數學問題？是否存在特定主題或長句子的閱讀困難？" + get_pos_context_str(['Q_READING_COMPREHENSION_ERROR']))
 
     if 'Q_CARELESSNESS_DETAIL_OMISSION' in triggered_params or ch5_patterns.get('carelessness_issue_flag', False):
-        prompt = "  - 回想一下，是否經常因為看錯數字、漏掉條件或誤解題意而失分？"
-        reflection_prompts.append(prompt + get_pos_context('Q_CARELESSNESS_DETAIL_OMISSION')) # Assuming carelessness issue affects same questions
+        reflection_prompts.append("  - 回想一下，是否經常因為看錯數字、漏掉條件或誤解題意而失分？" + get_pos_context_str(['Q_CARELESSNESS_DETAIL_OMISSION']))
 
-    if not reflection_prompts: # Check if any specific prompts were added
-         reflection_prompts.append("  - (本次分析未觸發典型的反思問題，建議結合練習計劃進行)")
-    report_lines.extend(reflection_prompts) # Add the generated prompts
-    # --- End Dynamic Reflection Prompts ---
+    if not reflection_prompts: reflection_prompts.append("  - (本次分析未觸發典型的反思問題，建議結合練習計劃進行)")
+    report_lines.extend(reflection_prompts)
 
     report_lines.append("- **二級證據參考建議:**")
-    # --- Dynamic Secondary Evidence Prompt --- V2: Group by Performance Type ---
-    # Re-process errors and slow-correct to group skills by performance
+    # --- Define and populate performance_to_skills before use --- #
     performance_to_skills = {
-        'Fast & Wrong': set(),
-        'Slow & Wrong': set(),
-        'Normal Time & Wrong': set(),
+        'Fast & Wrong': set(), 
+        'Slow & Wrong': set(), 
+        'Normal Time & Wrong': set(), 
         'Slow & Correct': set()
     }
     for err in ch3_errors:
-        perf = err.get('Time_Performance')
+        perf = err.get('Time_Performance') # Get performance category from Ch3 results
         skill = err.get('Skill', 'Unknown Skill')
         if perf in performance_to_skills and skill != 'Unknown Skill':
             performance_to_skills[perf].add(skill)
-            
     for cs in ch4_correct_slow:
         skill = cs.get('Skill', 'Unknown Skill')
         if skill != 'Unknown Skill':
+            # Add to Slow & Correct category based on Ch4 definition
             performance_to_skills['Slow & Correct'].add(skill)
+    # --- End definition and population --- #
 
-    review_prompt = "  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題。"
-    
-    # Add skill lists grouped by performance type
-    performance_order = ['Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 'Slow & Correct']
-    details_added = False
-    for perf_key in performance_order:
-        skills = performance_to_skills.get(perf_key)
-        if skills: # Check if the set is not empty
-            sorted_skills = sorted(list(skills))
-            perf_zh = _get_translation(perf_key) # Translate the performance key
-            # Simplified wording
-            review_prompt += f"\n  - **{perf_zh}:** 需關注技能：【{', '.join(sorted_skills)}】。"
-            details_added = True
-            
-    if not details_added:
-        review_prompt += " (本次分析未聚焦到特定的問題技能分類) " # Add fallback if no skills were categorized
-        
-    review_prompt += " 歸納是哪些知識點或題型（參考報告中的描述）導致問題。"
-    review_prompt += " 如果樣本不足，請在接下來的做題中注意收集。"
-    report_lines.append(review_prompt)
-    # --- End Dynamic Secondary Evidence Prompt ---
+    # Align Secondary Evidence text and trigger EXACTLY with MD Ch8.7
+    report_lines.append("  - *觸發時機：* 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時。")
+    secondary_evidence_skills = set().union(*performance_to_skills.values()) # Get all skills with issues
+    skill_context_for_secondary = f"在 [`{', '.join(sorted(list(secondary_evidence_skills)))}`/相關題型] " if secondary_evidence_skills else ""
+    report_lines.append(f"  - *建議行動：* 為了更精確地定位您{skill_context_for_secondary}上的具體困難點，建議您查看近期的練習記錄（例如考前 2-4 週），整理相關錯題，歸納是哪些知識點或題型（參考**附錄 A** 中的描述）反覆出現問題。如果樣本不足，請在接下來的做題中注意收集，累積到足夠樣本後再進行分析。")
 
     report_lines.append("- **質化分析建議:**")
-    # --- Restore definition of focus_areas_for_qualitative and sorted_qualitative_positions ---
-    focus_areas_for_qualitative = set()
-    concept_error_skills = {err['Skill'] for err in ch3_errors if 'Q_CONCEPT_APPLICATION_ERROR' in err.get('Possible_Params', []) and err['Skill'] != 'Unknown Skill'}
-    problem_understanding_skills = {err['Skill'] for err in ch3_errors if 'Q_PROBLEM_UNDERSTANDING_ERROR' in err.get('Possible_Params', []) and err['Skill'] != 'Unknown Skill'}
+    # Align Qualitative Analysis text and trigger EXACTLY with MD Ch8.7
+    # Trigger: Confusion (implicit) or inability to clarify via other means
+    report_lines.append("  - *觸發時機：* 當您對診斷報告指出的錯誤原因感到困惑，或者上述方法仍無法幫您釐清根本問題時。")
+    # Determine focus area based on Concept/Problem Understanding errors
+    qualitative_focus_skills = set()
+    if 'Q_CONCEPT_APPLICATION_ERROR' in triggered_params: qualitative_focus_skills.update(skill for skill, poses in skill_to_positions.items() if any(pos in param_to_positions.get('Q_CONCEPT_APPLICATION_ERROR',[]) for pos in poses))
+    if 'Q_PROBLEM_UNDERSTANDING_ERROR' in triggered_params: qualitative_focus_skills.update(skill for skill, poses in skill_to_positions.items() if any(pos in param_to_positions.get('Q_PROBLEM_UNDERSTANDING_ERROR',[]) for pos in poses))
+    qualitative_focus_area = f" [`某類問題`，例如涉及{_get_translation('Q_CONCEPT_APPLICATION_ERROR')}的題目]" if qualitative_focus_skills else " [`某類問題`]" # Default if no specific focus
+    report_lines.append(f"  - *建議行動：* 如果您對{qualitative_focus_area} 的錯誤原因仍感困惑，可以嘗試**提供 2-3 題該類型題目的詳細解題流程跟思路範例**（可以是文字記錄或口述錄音），以便與顧問進行更深入的個案分析，共同找到癥結所在。")
 
-    focus_areas_for_qualitative.update(override_skills_list) # Skills needing fundamental review are good candidates
-    focus_areas_for_qualitative.update(sfe_skills_involved)     # SFE suggests deeper issues
-    focus_areas_for_qualitative.update(concept_error_skills)
-    focus_areas_for_qualitative.update(problem_understanding_skills)
 
-    # Get all positions related to these focus skills
-    qualitative_analysis_positions = set()
-    for skill in focus_areas_for_qualitative:
-        qualitative_analysis_positions.update(skill_to_positions.get(skill, set()))
-    sorted_qualitative_positions = sorted(list(qualitative_analysis_positions))
-    # --- End Restore ---
+    report_lines.append("- **輔助工具推薦建議:**") # Changed title to match MD more closely
+    # Align Tool/Prompt Recommendations EXACTLY with MD Ch8.7 list and triggers
+    recommended_tools_list = []
+    recommended_prompts_map = {} # Use map to store prompts and their triggers
 
-    # --- Dynamic Qualitative Analysis Prompt --- (Simplified wording)
-    qualitative_prompt = "  - 如果您對診斷指出的錯誤原因仍感困惑，或者上述方法仍無法幫您釐清根本問題"
-    focus_text = ""
-    if focus_areas_for_qualitative:
-        focus_text += f"尤其針對【{', '.join(sorted(list(focus_areas_for_qualitative)))}】相關問題"
-    if sorted_qualitative_positions:
-        focus_text += f" (主要涉及題號: {sorted_qualitative_positions})"
-
-    if focus_text:
-        qualitative_prompt += f"，{focus_text}，" # Add comma before and after the focus text
-    else:
-        qualitative_prompt += "，" # Add comma if no focus areas identified
-
-    qualitative_prompt += "可提供 2-3 題該類型題目的詳細解題流程和思路，以便進行更深入的個案分析。"
-    report_lines.append(qualitative_prompt)
-    # --- End Dynamic Qualitative Analysis Prompt ---
-
-    report_lines.append("- **輔助工具與 AI 提示推薦 (基於本次診斷觸發的標籤):**")
-    tools_recommended = False
-    if 'poor_real' in triggered_params or 'slow_real' in triggered_params or 'Q_EFFICIENCY_BOTTLENECK_READING' in triggered_params:
-         report_lines.append("  - 工具: `Dustin_GMAT_Q_Real-Context_Converter` (將純數學題改寫為應用題練習)")
-         tools_recommended = True
-    # Always recommend classifier? Let's make it conditional based on having errors/slows/overrides
+    # Tool: Classifier (Trigger: errors, slow-correct, or override)
     if ch3_errors or ch4_correct_slow or override_skills_list:
-        report_lines.append("  - 工具: `Dustin's GMAT Q: Question Classifier` (輔助整理錯題/效率瓶頸題)")
-        tools_recommended = True
+         recommended_tools_list.append("`Dustin's GMAT Q: Question Classifier`")
 
-    prompts_recommended = False
-    # Simplified prompt recommendation logic
-    base_prompts = {'Quant-related/05_variant_questions.md', 'Quant-related/06_similar_questions.md'} # Always suggest these for practice
-    if 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in triggered_params or 'Q_CONCEPT_APPLICATION_ERROR' in triggered_params or override_skills_list:
-        base_prompts.add('Quant-related/01_basic_explanation.md')
-        base_prompts.add('Quant-related/03_test_math_concepts.md')
-    if any(p in triggered_params for p in ['Q_EFFICIENCY_BOTTLENECK_READING', 'Q_EFFICIENCY_BOTTLENECK_CONCEPT', 'Q_EFFICIENCY_BOTTLENECK_CALCULATION', 'slow_real', 'slow_pure']):
-        base_prompts.add('Quant-related/02_quick_math_tricks.md')
-    if any(p in triggered_params for p in ['Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_READING_COMPREHENSION_ERROR']):
-        base_prompts.add('Quant-related/03_test_math_concepts.md') # Reuse for understanding
-    if any(p in triggered_params for p in ['Q_CARELESSNESS_DETAIL_OMISSION', 'Q_BEHAVIOR_CARELESSNESS_ISSUE']):
-        base_prompts.add('Quant-related/01_basic_explanation.md') # Reuse for standard steps
+    # Tool: Real-Context Converter (Trigger: poor_real or slow_real)
+    if ch2_flags.get('poor_real', False) or ch2_flags.get('slow_real', False):
+         recommended_tools_list.append("`Dustin_GMAT_Q_Real-Context_Converter`")
 
-    if base_prompts:
-         prompts_recommended = True
-         report_lines.append("  - AI提示:")
-         for prompt in sorted(list(base_prompts)):
-             # Add context based on trigger? Maybe too complex for now.
+    # AI Prompts - Check each trigger parameter set from MD
+    def add_prompt_recommendation(prompt_name, triggering_params):
+         # Check if ANY of the triggering params were found in this run
+         if any(p in triggered_params for p in triggering_params):
+             # Store the prompt and the specific params that triggered it for potential context (though MD doesn't require showing context)
+             recommended_prompts_map[prompt_name] = recommended_prompts_map.get(prompt_name, set()).union(p for p in triggering_params if p in triggered_params)
+
+    # MD Prompt Triggers:
+    add_prompt_recommendation('Quant-related/01_basic_explanation.md', ['Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE', 'Q_CONCEPT_APPLICATION_ERROR', 'skill_override_triggered']) # Note: skill_override is not in triggered_params directly, check override_skills_list
+    if override_skills_list: recommended_prompts_map.setdefault('Quant-related/01_basic_explanation.md', set()).add('skill_override_triggered') # Manually add trigger if list is not empty
+    add_prompt_recommendation('Quant-related/03_test_math_concepts.md', ['Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE', 'Q_CONCEPT_APPLICATION_ERROR', 'skill_override_triggered'])
+    if override_skills_list: recommended_prompts_map.setdefault('Quant-related/03_test_math_concepts.md', set()).add('skill_override_triggered')
+    add_prompt_recommendation('Quant-related/02_quick_math_tricks.md', ['Q_EFFICIENCY_BOTTLENECK_READING', 'Q_EFFICIENCY_BOTTLENECK_CONCEPT', 'Q_EFFICIENCY_BOTTLENECK_CALCULATION', 'slow_real', 'slow_pure'])
+    add_prompt_recommendation('Quant-related/03_test_math_concepts.md', ['Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_READING_COMPREHENSION_ERROR']) # Already potentially added, set handles duplicates
+    add_prompt_recommendation('Quant-related/01_basic_explanation.md', ['Q_CARELESSNESS_DETAIL_OMISSION', 'Q_BEHAVIOR_CARELESSNESS_ISSUE']) # Already potentially added
+
+    # Always recommend variant and similar questions prompts? MD lists them under "通用練習與鞏固"
+    recommended_prompts_map['Quant-related/05_variant_questions.md'] = recommended_prompts_map.get('Quant-related/05_variant_questions.md', set()).union({'通用練習'})
+    recommended_prompts_map['Quant-related/06_similar_questions.md'] = recommended_prompts_map.get('Quant-related/06_similar_questions.md', set()).union({'通用練習'})
+
+    # Format Tool/Prompt output
+    if recommended_tools_list:
+         report_lines.append("  - *工具推薦:*")
+         for tool in sorted(list(set(recommended_tools_list))): # Ensure uniqueness
+             report_lines.append(f"    - {tool}")
+    if recommended_prompts_map:
+         report_lines.append("  - *AI 提示推薦:*")
+         for prompt in sorted(recommended_prompts_map.keys()):
+             # MD doesn't show trigger context, just lists prompts
              report_lines.append(f"    - `{prompt}`")
 
-
-    if not tools_recommended and not prompts_recommended:
+    if not recommended_tools_list and not recommended_prompts_map:
          report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議)")
 
-    # Use double newline to ensure paragraph breaks in Markdown
-    return "\n\n".join(report_lines)
 
+    report_lines.append("\\n--- 報告結束 ---")
+    return "\\n\\n".join(report_lines)
 
 # --- Main Q Diagnosis Entry Point ---
 
-def run_q_diagnosis(df_q, subject_time_pressure_status, num_invalid_questions):
+def run_q_diagnosis(df_raw_q):
     """
     Runs the diagnostic analysis specifically for the Quantitative section.
+    Applies Chapter 1 logic internally.
 
     Args:
-        df_q (pd.DataFrame): DataFrame containing only VALID Q response data.
-        subject_time_pressure_status (bool): Whether time pressure was detected for Q.
-        num_invalid_questions (int): Number of Q questions marked as invalid in Chapter 1.
+        df_raw_q (pd.DataFrame): Raw DataFrame with all Q responses.
+                                 Requires columns: 'question_position', 'question_time', 
+                                 'is_correct', 'question_type', 'question_difficulty', 
+                                 'question_fundamental_skill'.
 
     Returns:
-        dict: Placeholder for Q-specific results (currently empty).
+        dict: Dictionary containing Q diagnosis results by chapter.
         str: A string containing the summary report for the Q section.
         pd.DataFrame: The processed Q DataFrame with added diagnostic columns 
                       (diagnostic_params_list, is_sfe, time_performance_category).
@@ -1115,48 +1062,78 @@ def run_q_diagnosis(df_q, subject_time_pressure_status, num_invalid_questions):
     print("  Running Quantitative Diagnosis...")
     q_diagnosis_results = {}
 
-    if df_q.empty:
+    if df_raw_q.empty:
         print("    No Q data provided. Skipping Q diagnosis.")
         return {}, "Quantitative (Q) 部分無數據可供診斷。", pd.DataFrame()
 
-    # Make a copy to avoid modifying the original slice from diagnosis_module
-    df_q = df_q.copy()
+    # --- Apply Chapter 1 Rules --- 
+    # This function now handles filtering and overtime marking
+    df_q_valid, time_pressure_status_q, num_invalid_q, overtime_threshold_q = _apply_ch1_rules(df_raw_q)
+    
+    # Store Chapter 1 results for reporting
+    chapter1_results = {
+        'time_pressure_status': time_pressure_status_q,
+        'invalid_questions_excluded': num_invalid_q,
+        'overtime_threshold_used': overtime_threshold_q
+    }
+    
+    if df_q_valid.empty:
+        print("    No valid Q data remaining after Chapter 1 filtering. Skipping further Q diagnosis.")
+        # Generate a minimal report indicating no valid data
+        minimal_report = _generate_q_summary_report(
+             {"chapter1_results": chapter1_results}, # Pass Ch1 results
+             ["無有效題目可供分析。"], 
+             time_pressure_status_q, 
+             num_invalid_q
+        )
+        return {"chapter1_results": chapter1_results}, minimal_report, pd.DataFrame()
 
-    # --- Run Internal Diagnosis (Chapters 2-5 equivalent logic) ---
-    # Calculate prerequisites needed for root cause analysis
+    # Make a copy to avoid modifying the valid slice further upstream implicitly
+    # This df_q_valid is the one used for Ch2-6 logic
+    df_q_valid = df_q_valid.copy()
+
+    # --- Run Internal Diagnosis (Chapters 2-6) --- 
+    # Calculate prerequisites needed for root cause analysis (using VALID data)
     avg_time_per_type_q = {} 
-    if pd.api.types.is_numeric_dtype(df_q['question_time']):
-        avg_time_per_type_q = df_q.groupby('question_type')['question_time'].mean().to_dict()
+    if pd.api.types.is_numeric_dtype(df_q_valid['question_time']):
+        avg_time_per_type_q = df_q_valid.groupby('question_type')['question_time'].mean().to_dict()
     else:
         avg_time_per_type_q = {'REAL': 2.0, 'PURE': 2.0} # Default
 
     max_correct_difficulty_per_skill_q = {}
-    df_correct_q = df_q[df_q['is_correct'] == True]
+    df_correct_q = df_q_valid[df_q_valid['is_correct'] == True]
     if not df_correct_q.empty and 'question_fundamental_skill' in df_correct_q.columns and 'question_difficulty' in df_correct_q.columns:
         if pd.api.types.is_numeric_dtype(df_correct_q['question_difficulty']):
             max_correct_difficulty_per_skill_q = df_correct_q.groupby('question_fundamental_skill')['question_difficulty'].max().to_dict()
-        # else: print warning - handled inside function implicitly
-    # else: print warning - handled inside function implicitly
 
     # Apply root cause diagnosis (adds diagnostic_params, is_sfe, time_performance_category)
-    df_q_diagnosed = _diagnose_q_root_causes(df_q, avg_time_per_type_q, max_correct_difficulty_per_skill_q)
+    # Pass the VALID and overtime-marked dataframe here
+    df_q_diagnosed = _diagnose_q_root_causes(df_q_valid, avg_time_per_type_q, max_correct_difficulty_per_skill_q)
 
-    # --- Execute Chapters 2-6 --- 
+    # --- Execute Chapters 2-6 Logic --- 
     print("  Executing Internal Q Diagnosis (Chapters 2-6)...")
-    # Use the dataframe that has root causes diagnosed
-    q_diagnosis_results = _diagnose_q_internal(df_q_diagnosed) 
+    # Use the dataframe that has root causes diagnosed and is already filtered/marked
+    q_internal_results = _diagnose_q_internal(df_q_diagnosed) 
     print("    Finished Internal Q Diagnosis.")
+    
+    # Combine Chapter 1 results with results from Chapters 2-6
+    q_diagnosis_results = {
+        "chapter1_results": chapter1_results, 
+        **q_internal_results # Unpack results from _diagnose_q_internal
+    }
 
     # --- Translate diagnostic codes --- 
+    # Ensure the diagnosed dataframe is used for translation
     if 'diagnostic_params' in df_q_diagnosed.columns:
         print("DEBUG (q_diagnostic.py): Translating 'diagnostic_params' to Chinese...")
-        # Define a wrapper for _get_translation to handle lists
         def translate_q_list(params_list):
             return [_get_translation(p) for p in params_list] if isinstance(params_list, list) else []
         df_q_diagnosed['diagnostic_params_list_chinese'] = df_q_diagnosed['diagnostic_params'].apply(translate_q_list)
     else:
         print("WARNING (q_diagnostic.py): 'diagnostic_params' column not found for translation.")
-        df_q_diagnosed['diagnostic_params_list_chinese'] = [[] for _ in range(len(df_q_diagnosed))]
+        # Ensure column exists even if translation failed
+        if 'diagnostic_params_list_chinese' not in df_q_diagnosed.columns:
+             df_q_diagnosed['diagnostic_params_list_chinese'] = [[] for _ in range(len(df_q_diagnosed))]
 
     # --- Drop original English codes column --- 
     if 'diagnostic_params' in df_q_diagnosed.columns:
@@ -1169,35 +1146,30 @@ def run_q_diagnosis(df_q, subject_time_pressure_status, num_invalid_questions):
         print("DEBUG (q_diagnostic.py): Renamed 'diagnostic_params_list_chinese' to 'diagnostic_params_list'")
     else:
         print("DEBUG (q_diagnostic.py): Target list column not found or renamed. Initializing 'diagnostic_params_list'.")
-        df_q_diagnosed['diagnostic_params_list'] = [[] for _ in range(len(df_q_diagnosed))]
+        # Ensure column exists even if rename failed
+        if 'diagnostic_params_list' not in df_q_diagnosed.columns:
+            df_q_diagnosed['diagnostic_params_list'] = [[] for _ in range(len(df_q_diagnosed))]
 
     # --- Generate Recommendations & Summary Report --- 
     # Step 4: Generate Recommendations (Chapter 7)
     print("  Generating Q Recommendations (Chapter 7)...")
-    # Pass the core diagnosis results to the recommendation generator
+    # Pass the combined diagnosis results (Ch1-6) to the recommendation generator
     q_recommendations = _generate_q_recommendations(q_diagnosis_results) # Returns a list of strings
     print(f"    Generated {len(q_recommendations)} recommendation lines.")
 
-
     # Step 5: Generate Summary Report (Chapter 8)
     print("  Generating Q Summary Report (Chapter 8)...")
-    # Generate the report string using the internal results and recommendations
+    # Pass the combined diagnosis results (Ch1-6) and recommendations
     report_str = _generate_q_summary_report(
         q_diagnosis_results, 
         q_recommendations, 
-        subject_time_pressure_status, # Pass the time pressure status
-        num_invalid_questions        # Pass the number of invalid questions
+        time_pressure_status_q, # Pass the status from Ch1 results
+        num_invalid_q          # Pass the count from Ch1 results
     )
     print("    Finished generating Q summary report.")
 
     # --- Step 6: Final Return ---
-    # report_str = "(Q 報告生成邏輯待更新)" # Placeholder report - REMOVED
-
-    # Add translated list to the processed dataframe
-    if 'diagnostic_params' in df_q_diagnosed.columns:
-        df_q_diagnosed['diagnostic_params_list'] = df_q_diagnosed['diagnostic_params_list_chinese']
-        df_q_diagnosed.drop(columns=['diagnostic_params_list_chinese'], inplace=True)
-        print("DEBUG (q_diagnostic.py): Dropped 'diagnostic_params_list_chinese' column.")
+    # (Remove redundant translation logic here as it's done above)
 
     # --- DEBUG PRINT --- 
     print("DEBUG (q_diagnostic.py): Columns before return:", df_q_diagnosed.columns.tolist())
@@ -1209,5 +1181,102 @@ def run_q_diagnosis(df_q, subject_time_pressure_status, num_invalid_questions):
     # --- END DEBUG PRINT ---
 
     print("  Quantitative Diagnosis Complete.")
-    # Return placeholder results dict, report string, and the diagnosed dataframe
-    return q_diagnosis_results, report_str, df_q_diagnosed # Return ACTUAL results dict
+    # Return combined results dict, report string, and the final diagnosed dataframe
+    return q_diagnosis_results, report_str, df_q_diagnosed
+
+# --- Chapter 1 Logic Implementation ---
+
+def _apply_ch1_rules(df_raw_q):
+    """Applies Chapter 1 rules: calculates time pressure, identifies invalid data,
+       filters invalid data, and marks overtime on the valid data.
+
+    Args:
+        df_raw_q (pd.DataFrame): The raw DataFrame with all Q responses,
+                                 requiring columns: 'question_position', 'question_time'.
+
+    Returns:
+        tuple: containing:
+            - pd.DataFrame: Filtered DataFrame with only valid questions, 
+                            and added 'overtime' and 'is_invalid' columns.
+            - bool: time_pressure status.
+            - int: Number of invalid questions removed.
+            - float: Overtime threshold used.
+    """
+    print("    Executing Q - Chapter 1: Time Strategy & Validity...")
+    df = df_raw_q.copy()
+
+    # Ensure required columns exist
+    if not all(col in df.columns for col in ['question_position', 'question_time']):
+        print("      ERROR: Missing required columns ('question_position', 'question_time') for Chapter 1 analysis. Skipping.")
+        df['is_invalid'] = False # Assume all valid if columns missing
+        df['overtime'] = False
+        return df, False, 0, 3.0 # Return defaults
+
+    # Calculate total time and total questions from the raw data
+    total_test_time = df['question_time'].sum()
+    total_number_of_questions = df['question_position'].max() # Assumes positions are 1-based and max represents count
+    max_allowed_time = MAX_ALLOWED_TIME_Q
+
+    print(f"      Ch1 Inputs: Total Time={total_test_time:.2f} min, Total Qs={total_number_of_questions}, Max Allowed={max_allowed_time} min")
+
+    # 1. Calculate time_diff
+    time_diff = max_allowed_time - total_test_time
+    print(f"      Calculated time_diff: {time_diff:.2f} min")
+
+    # 2. Determine time_pressure
+    time_pressure = False
+    # Ensure columns are numeric before calculations
+    if pd.api.types.is_numeric_dtype(df['question_position']) and pd.api.types.is_numeric_dtype(df['question_time']):
+        last_third_start_pos = total_number_of_questions * (2/3)
+        last_third_questions = df[df['question_position'] > last_third_start_pos]
+        # Filter out NaNs in question_time before comparison
+        fast_end_questions = last_third_questions[last_third_questions['question_time'].notna() & 
+                                                  (last_third_questions['question_time'] < FAST_END_THRESHOLD_MINUTES)]
+        
+        print(f"      Checking time pressure: time_diff ({time_diff:.2f}) <= {TIME_DIFF_PRESSURE_THRESHOLD} AND {len(fast_end_questions)} fast end questions > 0")
+        if time_diff <= TIME_DIFF_PRESSURE_THRESHOLD and not fast_end_questions.empty:
+            time_pressure = True
+            print("      Time Pressure DETECTED.")
+        else:
+             print("      Time Pressure NOT detected.")
+             
+        # User Override (Not implemented here, assumes no override)
+
+    else:
+         print("      Warning: Cannot determine time pressure due to non-numeric position or time data.")
+
+    # 3. Set overtime_threshold
+    overtime_threshold = 2.5 if time_pressure else 3.0
+    print(f"      Overtime threshold set to: {overtime_threshold} min")
+
+    # 4. Identify invalid data
+    invalid_question_positions = []
+    df['is_invalid'] = False
+    if time_pressure:
+        # Use index from fast_end_questions identified earlier
+        invalid_indices = fast_end_questions.index
+        if not invalid_indices.empty:
+             # Get positions corresponding to these indices
+             invalid_positions_series = df.loc[invalid_indices, 'question_position']
+             invalid_question_positions = invalid_positions_series.tolist()
+             df.loc[invalid_indices, 'is_invalid'] = True
+             print(f"      Marked {len(invalid_question_positions)} questions as invalid due to time pressure & fast end time: {invalid_question_positions}")
+
+    num_invalid_questions = len(invalid_question_positions)
+
+    # --- Apply Global Rule: Filter invalid, then mark overtime --- 
+    # 1. Create filtered dataset
+    df_filtered = df[df['is_invalid'] == False].copy()
+    print(f"      Filtered out {num_invalid_questions} invalid questions. Remaining valid questions: {len(df_filtered)}")
+
+    # 2. Mark overtime on the filtered dataset
+    df_filtered['overtime'] = False
+    if 'question_time' in df_filtered.columns and pd.api.types.is_numeric_dtype(df_filtered['question_time']):
+         # Mark overtime where time > threshold (ignore NaNs during comparison)
+         overtime_mask = df_filtered['question_time'].notna() & (df_filtered['question_time'] > overtime_threshold)
+         df_filtered.loc[overtime_mask, 'overtime'] = True
+         print(f"      Marked {overtime_mask.sum()} valid questions as overtime.")
+    else:
+        print("      Warning: Cannot mark overtime due to missing or non-numeric 'question_time' column in filtered data.")
+
+    return df_filtered, time_pressure, num_invalid_questions, overtime_threshold
