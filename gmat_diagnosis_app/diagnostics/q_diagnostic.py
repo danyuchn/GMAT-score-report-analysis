@@ -18,15 +18,21 @@ APPENDIX_A_TRANSLATION = {
     'Q_EFFICIENCY_BOTTLENECK_CALCULATION': "Quant 效率瓶頸: 計算過程耗時過長/反覆計算",
     # Behavioral Patterns & Carelessness
     'Q_CARELESSNESS_DETAIL_OMISSION': "行為模式: 粗心 - 忽略細節/條件/陷阱",
-    'Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "行為模式: 前期作答過快 (Flag risk)",
-    'Q_BEHAVIOR_CARELESSNESS_ISSUE': "行為模式: 整體粗心問題 (快而錯比例高)",
+    'Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "前期作答過快 (Flag risk)",
+    'Q_BEHAVIOR_CARELESSNESS_ISSUE': "整體粗心問題 (快而錯比例高)",
     # Comparative Performance (Real vs Pure) - Flags from Ch2
-    'poor_real': "比較表現: Real 題錯誤率顯著偏高",
-    'poor_pure': "比較表現: Pure 題錯誤率顯著偏高",
-    'slow_real': "比較表現: Real 題超時率顯著偏高",
-    'slow_pure': "比較表現: Pure 題超時率顯著偏高",
+    'poor_real': "Real 題錯誤率顯著偏高",
+    'poor_pure': "Pure 題錯誤率顯著偏高",
+    'slow_real': "Real 題超時率顯著偏高",
+    'slow_pure': "Pure 題超時率顯著偏高",
     # Skill Level Override
     # 'skill_override_triggered': "技能覆蓋: 某核心技能整體表現需基礎鞏固" # Handled separately with skill name
+
+    # Time Performance Labels (Added for report generation)
+    'Fast & Wrong': "快錯",
+    'Slow & Wrong': "慢錯",
+    'Normal Time & Wrong': "正常錯",
+    'Slow & Correct': "慢對"
 }
 
 # --- Q-Specific Helper Functions ---
@@ -501,8 +507,9 @@ def _generate_q_recommendations(q_diagnosis_results):
                 min_diff_skill = min(trigger_difficulties) if trigger_difficulties else 0 # Default Y_agg if no difficulty data
                 y_agg = _map_difficulty_to_label(min_diff_skill)
             
-            macro_rec = f"針對【{skill}】技能：由於整體表現有較大提升空間 (錯誤率或超時率 > 50%)，建議優先**全面鞏固基礎**。可從【{y_agg}】難度題目開始系統性練習，掌握核心方法，建議限時【{z_agg}】分鐘。"
-            skill_recs_list.append({'type': 'macro', 'text': macro_rec, 'priority': 0}) # High priority
+            # Updated Macro Recommendation Text
+            macro_rec_text = f"**優先全面鞏固基礎** (整體錯誤率或超時率 > 50%): 從 {y_agg} 難度開始, 建議限時 {z_agg} 分鐘。"
+            skill_recs_list.append({'type': 'macro', 'text': macro_rec_text, 'priority': 0}) # High priority
             processed_override_skills.add(skill)
             print(f"      Generated MACRO recommendation for Skill: {skill}")
 
@@ -511,6 +518,8 @@ def _generate_q_recommendations(q_diagnosis_results):
              skill_triggers = [t for t in triggers if t['skill'] == skill]
              has_real_trigger = any(t.get('q_type') == 'Real' for t in skill_triggers)
              has_pure_trigger = any(t.get('q_type') == 'Pure' for t in skill_triggers)
+
+             adjustment_text = "" # Initialize adjustment text for this skill
 
              for trigger in skill_triggers:
                  y = "未知難度" # Default
@@ -525,50 +534,58 @@ def _generate_q_recommendations(q_diagnosis_results):
                      y = _map_difficulty_to_label(difficulty)
                      z = _calculate_practice_time_limit(time, is_overtime_trigger)
                      priority = 1 if is_sfe_trigger else 2 # Prioritize SFE related recs
-                     trigger_desc = f"(來源: Position {q_position_trigger}, {trigger_type}, SFE={is_sfe_trigger})"
-                     case_rec = f"針對【{skill}】技能下的問題 {trigger_desc}：建議練習【{y}】難度的題目，目標限時【{z}】分鐘。"
-                     skill_recs_list.append({'type': 'case', 'text': case_rec, 'priority': priority})
-                 elif trigger_type == 'correct_slow': # Handle correct_slow where difficulty might be None
-                     # Use a default difficulty or base recommendation on skill average?
-                     # For now, recommend practice at a medium level
-                     y = "中難度 (Mid) / 605+" # Default practice level for slow-correct
+
+                     # Revised case_rec construction:
+                     trigger_context = f"第 {q_position_trigger} 題相關"
+                     practice_details = f"練習 {y}, 限時 {z} 分鐘。"
+                     case_rec_text = f"{trigger_context}: {practice_details}"
+                     if is_sfe_trigger:
+                         case_rec_text = f"*基礎掌握不穩* {case_rec_text}"
+                     skill_recs_list.append({'type': 'case', 'text': case_rec_text, 'priority': priority})
+
+                 elif trigger_type == 'correct_slow':
+                     y = "中難度 (Mid) / 605+"
+                     q_position_trigger = trigger.get('q_position', 'N/A')
+                     time = trigger.get('time')
+                     is_overtime_trigger = trigger.get('is_overtime', True)
                      z = _calculate_practice_time_limit(time, is_overtime_trigger)
-                     priority = 3 # Lower priority than error-based
-                     trigger_desc = f"(來源: Position {q_position_trigger}, 正確但慢)"
-                     case_rec = f"針對【{skill}】技能下的效率問題 {trigger_desc}：建議練習【{y}】難度的題目，目標限時【{z}】分鐘，注重提升解題速度。"
-                     skill_recs_list.append({'type': 'case', 'text': case_rec, 'priority': priority})
+                     priority = 3
+
+                     # Revised case_rec construction:
+                     trigger_context = f"第 {q_position_trigger} 題相關 (正確但慢)"
+                     practice_details = f"練習 {y}, 限時 {z} 分鐘 (提升速度)。"
+                     case_rec_text = f"{trigger_context}: {practice_details}"
+                     skill_recs_list.append({'type': 'case', 'text': case_rec_text, 'priority': priority})
                  else:
                       print(f"      Skipping case recommendation for Position {q_position_trigger}: Missing difficulty for error trigger.")
 
 
-             if skill_recs_list: # Add adjustments only if case recommendations were generated
-                  # Apply Chapter 2 Adjustments
-                  adjustment_text = ""
-                  if poor_real and has_real_trigger:
-                       adjustment_text += " **Real題比例建議佔總練習題量2/3。**"
-                  if slow_pure and has_pure_trigger:
-                       adjustment_text += " **建議此考點練習題量增加。**"
-                  if adjustment_text:
-                       # Append to the first case recommendation or add as a separate note?
-                       # Let's add as a separate note for clarity
-                       skill_recs_list.append({'type': 'adjustment', 'text': f"針對【{skill}】的整體練習：{adjustment_text.strip()}", 'priority': 4})
-                  print(f"      Generated {len(skill_recs_list)} CASE recommendations/adjustments for Skill: {skill}")
+             # Apply Chapter 2 Adjustments (after processing all triggers for the skill)
+             if poor_real and has_real_trigger:
+                  adjustment_text += " **Real題比例建議佔總練習題量2/3。**"
+             if slow_pure and has_pure_trigger:
+                  adjustment_text += " **建議此考點練習題量增加。**"
+
+             # Update adjustment text format and add to list if needed
+             if adjustment_text:
+                 adj_text = f"整體練習註記: {adjustment_text.strip()}"
+                 skill_recs_list.append({'type': 'adjustment', 'text': adj_text, 'priority': 4})
+             print(f"      Generated {len([r for r in skill_recs_list if r['type'] == 'case'])} CASE recommendations and {len([r for r in skill_recs_list if r['type'] == 'adjustment'])} adjustments for Skill: {skill}")
 
         if skill_recs_list:
              # Sort recommendations within the skill: Macro (0), SFE Case (1), Other Case (2), Slow-Correct Case (3), Adjustment (4)
              recommendations_by_skill[skill] = sorted(skill_recs_list, key=lambda x: x['priority'])
 
-    # Flatten and format the final list
+    # Flatten and format the final list using concise list format
     final_recommendations = []
-    # Sort skills based on priority: Overridden skills first, then others alphabetically?
-    # For now, iterate dict order which is generally insertion order in Python 3.7+
     sorted_skills = sorted(recommendations_by_skill.keys(), key=lambda s: (0 if s in processed_override_skills else 1, s))
 
     for skill in sorted_skills:
          recs = recommendations_by_skill[skill]
          final_recommendations.append(f"--- 技能: {skill} ---")
          for rec in recs:
-              final_recommendations.append(rec['text'])
+             # Apply '* ' prefix to all lines under the skill
+             final_recommendations.append(f"* {rec['text']}")
          final_recommendations.append("") # Add blank line
 
     if not final_recommendations:
@@ -693,18 +710,6 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
     else:
         report_lines.append("- 未能進行 Real vs. Pure 題的詳細比較 (數據不足或缺失)。")
 
-    # Weakest Skills Summary
-    # Sort skills by error rate (desc), then overtime rate (desc) if triggered
-    weak_skills_triggered = {skill: data for skill, data in ch6_override.items() if data.get('triggered', False)}
-    if weak_skills_triggered:
-         sorted_weak_skills = sorted(weak_skills_triggered.keys(),
-                                     key=lambda s: (weak_skills_triggered[s].get('error_rate', 0), weak_skills_triggered[s].get('overtime_rate', 0)),
-                                     reverse=True)
-         report_lines.append(f"- **相對弱項技能 (錯誤率或超時率 > 50%):** {', '.join(sorted_weak_skills)}")
-    else:
-         report_lines.append("- 未發現錯誤率或超時率超過 50% 的核心技能。")
-    report_lines.append("") # Add blank line
-
     # 3. 核心問題診斷
     report_lines.append("**3. 核心問題診斷 (基於觸發的診斷標籤)**")
     core_issues = set()
@@ -724,25 +729,56 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
     for cs in ch4_correct_slow:
          core_issues.update(cs.get('Possible_Params', []))
 
+    # --- Report Core Issues Summary ---
     if sfe_triggered:
-        sfe_desc = _get_translation('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+        sfe_label = _get_translation('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE') # Get the "Quant 基礎掌握: ..." label
+        sfe_note = f"{sfe_label}"
         if sfe_skills_involved:
-             sfe_desc += f" (涉及技能: {', '.join(sorted(list(sfe_skills_involved)))})"
-        report_lines.append(f"- **尤其需要注意:** {sfe_desc} - 在一些已掌握技能範圍內的基礎或中等難度題目上出現了失誤，表明在這些知識點的應用上可能存在穩定性問題。")
+             sfe_note += f" (涉及技能: {', '.join(sorted(list(sfe_skills_involved)))})"
+        # Add the short explanation note as requested
+        report_lines.append(f"- **尤其需要注意:** {sfe_note}。(註：SFE 指在已掌握技能範圍內題目失誤)")
 
-    if core_issues:
-         report_lines.append("- **常見問題類型/效率瓶頸可能包括:**")
-         # Sort issues alphabetically for consistent reporting
-         for issue in sorted(list(core_issues)):
-              if issue in APPENDIX_A_TRANSLATION:
-                   report_lines.append(f"  - {_get_translation(issue)}")
-         # Add SFE again if it wasn't the only issue
-         if sfe_triggered and not core_issues: # If SFE was the *only* thing found
-              report_lines.append(f"- **主要問題:** {_get_translation('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')} (詳見上文)")
-
-    elif not sfe_triggered: # If no core issues and no SFE
+    # --- Keep the message if no core issues AND no SFE were found ---
+    if not core_issues and not sfe_triggered:
         report_lines.append("- 未識別出明顯的核心問題模式 (基於錯誤及效率分析)。")
-    report_lines.append("")
+    
+    # --- Add Detailed Error and Slow-Correct Tags per Position ---
+    detailed_items_to_report = []
+    # Add errors from chapter 3
+    for err in ch3_errors:
+        detailed_items_to_report.append({
+            'position': err.get('question_position', 'N/A'),
+            'skill': err.get('Skill', '未知技能'),
+            'performance': err.get('Time_Performance', '未知表現'), # e.g., 'Fast & Wrong'
+            'params': err.get('Possible_Params', [])
+        })
+    # Add slow & correct from chapter 4
+    for cs in ch4_correct_slow:
+        detailed_items_to_report.append({
+            'position': cs.get('question_position', 'N/A'),
+            'skill': cs.get('Skill', '未知技能'),
+            'performance': 'Slow & Correct', # Assign specific label
+            'params': cs.get('Possible_Params', [])
+        })
+
+    if detailed_items_to_report:
+        report_lines.append("- **詳細診斷標籤 (含時間表現和技能):**")
+        # Sort items by position for readability
+        sorted_items = sorted(detailed_items_to_report, key=lambda x: x.get('position', float('inf')))
+        for item in sorted_items:
+            pos = item['position']
+            skill = item['skill']
+            performance_en = item['performance']
+            params = item['params']
+            
+            # Translate performance and params
+            performance_zh = _get_translation(performance_en)
+            translated_params = [_get_translation(p) for p in params]
+            
+            report_lines.append(f"  - 題號 {pos}: [{performance_zh}, 技能: {skill}] - 診斷: [{', '.join(translated_params)}]")
+    # --- End Detailed Tags ---
+            
+    report_lines.append("") # Add blank line after section 3
 
     # 4. 模式觀察
     report_lines.append("**4. 作答模式觀察**")
@@ -763,7 +799,7 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
     if override_skills_list:
         report_lines.append(f"- **以下核心技能整體表現顯示較大提升空間 (錯誤率或超時率 > 50%)，建議優先系統性鞏固:** {', '.join(sorted(override_skills_list))}")
     else:
-        report_lines.append("- 未觸發需要優先進行基礎鞏固的技能覆蓋規則。")
+        report_lines.append("- 未發現錯誤率或超時率超過 50% 的核心技能。")
     report_lines.append("")
 
     # 6. 練習計劃呈現
@@ -776,17 +812,69 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
 
     # 7. 後續行動指引
     report_lines.append("**7. 後續行動指引**")
+
+    # --- Prepare mappings for detailed references ---
+    param_to_positions = {}
+    skill_to_positions = {}
+    all_problem_positions = set() # Collect all positions with errors or slow-correct issues
+
+    for err in ch3_errors:
+        pos = err.get('question_position')
+        skill = err.get('Skill', 'Unknown Skill')
+        params = err.get('Possible_Params', [])
+        if pos is not None:
+            all_problem_positions.add(pos)
+            if skill != 'Unknown Skill':
+                skill_to_positions.setdefault(skill, set()).add(pos)
+            for p in params:
+                param_to_positions.setdefault(p, set()).add(pos)
+                
+    for cs in ch4_correct_slow:
+        pos = cs.get('question_position')
+        skill = cs.get('Skill', 'Unknown Skill')
+        params = cs.get('Possible_Params', [])
+        if pos is not None:
+            all_problem_positions.add(pos)
+            if skill != 'Unknown Skill':
+                skill_to_positions.setdefault(skill, set()).add(pos)
+            for p in params:
+                 param_to_positions.setdefault(p, set()).add(pos)
+                 
+    # Convert sets to sorted lists for consistent output
+    for param in param_to_positions:
+        param_to_positions[param] = sorted(list(param_to_positions[param]))
+    for skill in skill_to_positions:
+        skill_to_positions[skill] = sorted(list(skill_to_positions[skill]))
+    # --- End Prepare mappings --- 
+
     report_lines.append("- **引導反思:**")
     # --- Dynamic Reflection Prompts ---
     reflection_prompts = []
+    # Helper function to add position context
+    def get_pos_context(param_key):
+        positions = param_to_positions.get(param_key, [])
+        return f" (涉及題號: {positions})" if positions else ""
+
     if 'Q_CONCEPT_APPLICATION_ERROR' in triggered_params or 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in triggered_params:
-        reflection_prompts.append("  - 回想一下，在做錯的相關題目時，具體是卡在哪個數學知識點或公式上？是完全沒思路，還是知道方法但用錯了？")
+        prompt = "  - 回想一下，在做錯的相關題目時，具體是卡在哪個數學知識點或公式上？是完全沒思路，還是知道方法但用錯了？"
+        # Combine positions for both params if needed
+        pos_context = get_pos_context('Q_CONCEPT_APPLICATION_ERROR') + get_pos_context('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+        # Basic de-duplication if context is the same
+        positions_all = sorted(list(set(param_to_positions.get('Q_CONCEPT_APPLICATION_ERROR', []) + param_to_positions.get('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE', []))))
+        reflection_prompts.append(prompt + (f" (涉及題號: {positions_all})" if positions_all else ""))
+
     if 'Q_CALCULATION_ERROR' in triggered_params or 'Q_EFFICIENCY_BOTTLENECK_CALCULATION' in triggered_params:
-        reflection_prompts.append("  - 是計算過程中容易出錯，還是計算速度偏慢？")
+        prompt = "  - 是計算過程中容易出錯，還是計算速度偏慢？"
+        positions_all = sorted(list(set(param_to_positions.get('Q_CALCULATION_ERROR', []) + param_to_positions.get('Q_EFFICIENCY_BOTTLENECK_CALCULATION', []))))
+        reflection_prompts.append(prompt + (f" (涉及題號: {positions_all})" if positions_all else ""))
+        
     if 'Q_READING_COMPREHENSION_ERROR' in triggered_params or ch2_flags.get('poor_real', False):
-        reflection_prompts.append("  - 對於做錯的文字題，是題目陳述讀不懂，還是無法轉化成數學問題？")
+        prompt = "  - 對於做錯的文字題，是題目陳述讀不懂，還是無法轉化成數學問題？"
+        reflection_prompts.append(prompt + get_pos_context('Q_READING_COMPREHENSION_ERROR')) # Assuming poor_real affects same questions
+
     if 'Q_CARELESSNESS_DETAIL_OMISSION' in triggered_params or ch5_patterns.get('carelessness_issue_flag', False):
-        reflection_prompts.append("  - 回想一下，是否經常因為看錯數字、漏掉條件或誤解題意而失分？")
+        prompt = "  - 回想一下，是否經常因為看錯數字、漏掉條件或誤解題意而失分？"
+        reflection_prompts.append(prompt + get_pos_context('Q_CARELESSNESS_DETAIL_OMISSION')) # Assuming carelessness issue affects same questions
 
     if not reflection_prompts: # Check if any specific prompts were added
          reflection_prompts.append("  - (本次分析未觸發典型的反思問題，建議結合練習計劃進行)")
@@ -794,41 +882,78 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
     # --- End Dynamic Reflection Prompts ---
 
     report_lines.append("- **二級證據參考建議:**")
-    # --- Dynamic Secondary Evidence Prompt ---
-    focus_areas_for_review = set()
-    # Use override_skills_list calculated earlier
-    sfe_skills = {err['Skill'] for err in ch3_errors if err.get('Is_SFE', False) and err['Skill'] != 'Unknown Skill'}
-    slow_wrong_skills = {err['Skill'] for err in ch3_errors if err.get('Time_Performance') == 'Slow & Wrong' and err['Skill'] != 'Unknown Skill'}
-    correct_slow_skills = {cs['Skill'] for cs in ch4_correct_slow if cs['Skill'] != 'Unknown Skill'}
-
-    focus_areas_for_review.update(override_skills_list)
-    focus_areas_for_review.update(sfe_skills)
-    focus_areas_for_review.update(slow_wrong_skills)
-    focus_areas_for_review.update(correct_slow_skills)
+    # --- Dynamic Secondary Evidence Prompt --- V2: Group by Performance Type ---
+    # Re-process errors and slow-correct to group skills by performance
+    performance_to_skills = {
+        'Fast & Wrong': set(),
+        'Slow & Wrong': set(),
+        'Normal Time & Wrong': set(),
+        'Slow & Correct': set()
+    }
+    for err in ch3_errors:
+        perf = err.get('Time_Performance')
+        skill = err.get('Skill', 'Unknown Skill')
+        if perf in performance_to_skills and skill != 'Unknown Skill':
+            performance_to_skills[perf].add(skill)
+            
+    for cs in ch4_correct_slow:
+        skill = cs.get('Skill', 'Unknown Skill')
+        if skill != 'Unknown Skill':
+            performance_to_skills['Slow & Correct'].add(skill)
 
     review_prompt = "  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題。"
-    if focus_areas_for_review:
-        review_prompt += f" 請特別關注在以下領域/問題上反覆出現的情況：【{', '.join(sorted(list(focus_areas_for_review)))}】。歸納是哪些知識點或題型（參考報告中的描述）導致問題。"
-    else:
-        review_prompt += " 歸納是哪些知識點或題型（參考報告中的描述）反覆出現問題。"
+    
+    # Add skill lists grouped by performance type
+    performance_order = ['Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 'Slow & Correct']
+    details_added = False
+    for perf_key in performance_order:
+        skills = performance_to_skills.get(perf_key)
+        if skills: # Check if the set is not empty
+            sorted_skills = sorted(list(skills))
+            perf_zh = _get_translation(perf_key) # Translate the performance key
+            # Simplified wording
+            review_prompt += f"\n  - **{perf_zh}:** 需關注技能：【{', '.join(sorted_skills)}】。"
+            details_added = True
+            
+    if not details_added:
+        review_prompt += " (本次分析未聚焦到特定的問題技能分類) " # Add fallback if no skills were categorized
+        
+    review_prompt += " 歸納是哪些知識點或題型（參考報告中的描述）導致問題。"
     review_prompt += " 如果樣本不足，請在接下來的做題中注意收集。"
     report_lines.append(review_prompt)
     # --- End Dynamic Secondary Evidence Prompt ---
 
     report_lines.append("- **質化分析建議:**")
-    # --- Dynamic Qualitative Analysis Prompt ---
+    # --- Restore definition of focus_areas_for_qualitative and sorted_qualitative_positions ---
     focus_areas_for_qualitative = set()
     concept_error_skills = {err['Skill'] for err in ch3_errors if 'Q_CONCEPT_APPLICATION_ERROR' in err.get('Possible_Params', []) and err['Skill'] != 'Unknown Skill'}
     problem_understanding_skills = {err['Skill'] for err in ch3_errors if 'Q_PROBLEM_UNDERSTANDING_ERROR' in err.get('Possible_Params', []) and err['Skill'] != 'Unknown Skill'}
 
     focus_areas_for_qualitative.update(override_skills_list) # Skills needing fundamental review are good candidates
-    focus_areas_for_qualitative.update(sfe_skills)     # SFE suggests deeper issues
+    focus_areas_for_qualitative.update(sfe_skills_involved)     # SFE suggests deeper issues
     focus_areas_for_qualitative.update(concept_error_skills)
     focus_areas_for_qualitative.update(problem_understanding_skills)
 
+    # Get all positions related to these focus skills
+    qualitative_analysis_positions = set()
+    for skill in focus_areas_for_qualitative:
+        qualitative_analysis_positions.update(skill_to_positions.get(skill, set()))
+    sorted_qualitative_positions = sorted(list(qualitative_analysis_positions))
+    # --- End Restore ---
+
+    # --- Dynamic Qualitative Analysis Prompt --- (Simplified wording)
     qualitative_prompt = "  - 如果您對診斷指出的錯誤原因仍感困惑，或者上述方法仍無法幫您釐清根本問題"
+    focus_text = ""
     if focus_areas_for_qualitative:
-         qualitative_prompt += f"，尤其是在【{', '.join(sorted(list(focus_areas_for_qualitative)))}】這些方面，"
+        focus_text += f"尤其針對【{', '.join(sorted(list(focus_areas_for_qualitative)))}】相關問題"
+    if sorted_qualitative_positions:
+        focus_text += f" (主要涉及題號: {sorted_qualitative_positions})"
+
+    if focus_text:
+        qualitative_prompt += f"，{focus_text}，" # Add comma before and after the focus text
+    else:
+        qualitative_prompt += "，" # Add comma if no focus areas identified
+
     qualitative_prompt += "可提供 2-3 題該類型題目的詳細解題流程和思路，以便進行更深入的個案分析。"
     report_lines.append(qualitative_prompt)
     # --- End Dynamic Qualitative Analysis Prompt ---
@@ -867,7 +992,8 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
     if not tools_recommended and not prompts_recommended:
          report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議)")
 
-    return "\n".join(report_lines)
+    # Use double newline to ensure paragraph breaks in Markdown
+    return "\n\n".join(report_lines)
 
 
 # --- Main Q Diagnosis Entry Point ---

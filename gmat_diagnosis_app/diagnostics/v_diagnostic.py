@@ -1120,7 +1120,8 @@ def _generate_v_summary_report(v_diagnosis_results):
 
     report_lines.append("\n--- 報告結束 ---")
     print("DEBUG: --- Exiting _generate_v_summary_report ---") # DEBUG
-    return "\n".join(report_lines)
+    # Use double newline for Markdown paragraph breaks
+    return "\n\n".join(report_lines)
 
 # --- V Recommendation Generation Helper ---
 
