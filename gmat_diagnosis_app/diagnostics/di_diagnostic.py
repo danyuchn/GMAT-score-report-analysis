@@ -975,4 +975,5 @@ def _generate_di_summary_report(di_results):
     if not tools_prompts_added:
         report_lines.append("  - 根據當前診斷，暫無特別推薦的輔助工具或 AI 提示。")
 
-    return "\n".join(report_lines) 
+    # Use double newline for Markdown paragraph breaks
+    return "\n\n".join(report_lines) 
