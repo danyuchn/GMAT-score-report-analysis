@@ -695,9 +695,20 @@ def _generate_q_recommendations(q_diagnosis_results):
 
 # --- Q-Specific Summary Report Generation (Chapter 8) ---
 
-def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_time_pressure_status_q, num_invalid_questions):
+def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_time_pressure_status_q, num_invalid_questions, df_diagnosed=None):
     """Generates the final summary report string based on Q diagnosis and recommendations.
        Aligns with Chapter 8 of gmat-q-score-logic-dustin-v1.2.md.
+       
+    Args:
+        q_diagnosis_results (dict): Dictionary containing Q diagnosis results by chapter.
+        q_recommendations (list): List of recommendation strings.
+        subject_time_pressure_status_q (bool): Whether time pressure was detected for Q.
+        num_invalid_questions (int): Number of invalid Q questions already identified.
+        df_diagnosed (pd.DataFrame, optional): The processed Q DataFrame with diagnostic columns.
+                                               Used for time_performance_category grouping.
+    
+    Returns:
+        str: A formatted summary report string.
     """
     print("    Generating Q - Chapter 8: Summary Report...")
     report_lines = []
@@ -952,30 +963,103 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
     report_lines.extend(reflection_prompts)
 
     report_lines.append("- **二級證據參考建議:**")
-    # --- Define and populate performance_to_skills before use --- #
-    performance_to_skills = {
-        'Fast & Wrong': set(), 
-        'Slow & Wrong': set(), 
-        'Normal Time & Wrong': set(), 
-        'Slow & Correct': set()
-    }
-    for err in ch3_errors:
-        perf = err.get('Time_Performance') # Get performance category from Ch3 results
-        skill = err.get('Skill', 'Unknown Skill')
-        if perf in performance_to_skills and skill != 'Unknown Skill':
-            performance_to_skills[perf].add(skill)
-    for cs in ch4_correct_slow:
-        skill = cs.get('Skill', 'Unknown Skill')
-        if skill != 'Unknown Skill':
-            # Add to Slow & Correct category based on Ch4 definition
-            performance_to_skills['Slow & Correct'].add(skill)
-    # --- End definition and population --- #
+    # Check if we have diagnosed dataframe with time_performance_category
+    if df_diagnosed is not None and not df_diagnosed.empty and 'time_performance_category' in df_diagnosed.columns:
+        # Filter for problems (incorrect or overtime)
+        df_problem = df_diagnosed[(df_diagnosed['is_correct'] == False) | (df_diagnosed.get('overtime', False) == True)].copy()
+        
+        if not df_problem.empty:
+            report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
+            
+            # --- START NEW LOGIC: Group by time_performance_category ---
+            details_added_2nd_ev = False
+            
+            # Define the desired order for performance categories
+            performance_order_en = [
+                'Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 
+                'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct',
+                'Unknown' # Include Unknown as a fallback
+            ]
+            
+            grouped_by_performance = df_problem.groupby('time_performance_category')
+            
+            # Iterate in the desired order
+            for perf_en in performance_order_en:
+                if perf_en in grouped_by_performance.groups: # Check if this group exists
+                    # --- ADD SKIP LOGIC for 'Fast & Correct' ---
+                    if perf_en == 'Fast & Correct':
+                        print(f"DEBUG (q_report): Skipping category '{perf_en}' as requested.") # DEBUG
+                        continue # Skip to the next category
+                    # --- END SKIP LOGIC ---
+                    
+                    group_df = grouped_by_performance.get_group(perf_en)
+                    if not group_df.empty:
+                        perf_zh = perf_en  # Default if translation not available
+                        # Translate performance category if needed
+                        if perf_en == 'Fast & Wrong': perf_zh = "快錯"
+                        elif perf_en == 'Slow & Wrong': perf_zh = "慢錯"
+                        elif perf_en == 'Normal Time & Wrong': perf_zh = "正常時間錯"
+                        elif perf_en == 'Slow & Correct': perf_zh = "慢對"
+                        elif perf_en == 'Fast & Correct': perf_zh = "快對"
+                        elif perf_en == 'Normal Time & Correct': perf_zh = "正常時間對"
+                        
+                        # Extract unique types and skills from this group
+                        types_in_group = group_df['question_type'].dropna().unique()
+                        skills_in_group = group_df['question_fundamental_skill'].dropna().unique()
+                        
+                        types_zh = sorted([t for t in types_in_group])  # Already in desired format
+                        skills_zh = sorted([s for s in skills_in_group])  # Already in desired format
 
-    # Align Secondary Evidence text and trigger EXACTLY with MD Ch8.7
-    report_lines.append("  - *觸發時機：* 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時。")
-    secondary_evidence_skills = set().union(*performance_to_skills.values()) # Get all skills with issues
-    skill_context_for_secondary = f"在 [`{', '.join(sorted(list(secondary_evidence_skills)))}`/相關題型] " if secondary_evidence_skills else ""
-    report_lines.append(f"  - *建議行動：* 為了更精確地定位您{skill_context_for_secondary}上的具體困難點，建議您查看近期的練習記錄（例如考前 2-4 週），整理相關錯題，歸納是哪些知識點或題型（參考**附錄 A** 中的描述）反覆出現問題。如果樣本不足，請在接下來的做題中注意收集，累積到足夠樣本後再進行分析。")
+                        # --- Extract Unique Labels ---
+                        all_labels_in_group = set()
+                        target_label_col = None
+                        
+                        # Check if the diagnostic_params_list_chinese column exists (with translated labels)
+                        if 'diagnostic_params_list_chinese' in group_df.columns:
+                            target_label_col = 'diagnostic_params_list_chinese'
+                            print(f"DEBUG (q_report): Using 'diagnostic_params_list_chinese' column.")
+                        # If not, check if the original params column exists
+                        elif 'diagnostic_params' in group_df.columns:
+                            target_label_col = 'diagnostic_params'
+                            print(f"DEBUG (q_report): Found 'diagnostic_params' column, will translate internally.")
+                        else:
+                            print(f"DEBUG (q_report): No diagnostic params column found for this group!")
+
+                        if target_label_col:
+                            print(f"DEBUG (q_report): Processing labels from column: {target_label_col}")
+                            
+                            for labels_list in group_df[target_label_col]:
+                                if isinstance(labels_list, list): # Check if it's a list
+                                    # If using original English codes, translate them now
+                                    if target_label_col == 'diagnostic_params':
+                                        translated_list = [_get_translation(p) for p in labels_list]
+                                        all_labels_in_group.update(translated_list)
+                                    else: # Already translated
+                                        all_labels_in_group.update(labels_list)
+                        
+                        sorted_labels_zh = sorted(list(all_labels_in_group))
+                        
+                        # --- Modify Report Line ---
+                        report_line = f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及技能：【{', '.join(skills_zh)}】。"
+                        if sorted_labels_zh:
+                            report_line += f" 注意相關問題點：【{', '.join(sorted_labels_zh)}】。"
+                        report_lines.append(report_line)
+                        # --- End Modify Report Line ---
+                        
+                        details_added_2nd_ev = True
+                        
+            if not details_added_2nd_ev:
+                report_lines.append("  - (本次分析未聚焦到特定的問題類型或技能)")
+                
+            report_lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
+        else:
+            report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
+    else:
+        # Fallback to old recommendations if no diagnosed dataframe or missing column
+        report_lines.append("  - *觸發時機：* 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時。")
+        secondary_evidence_skills = set().union(*performance_to_skills.values()) if 'performance_to_skills' in locals() else set()
+        skill_context_for_secondary = f"在 [`{', '.join(sorted(list(secondary_evidence_skills)))}`/相關題型] " if secondary_evidence_skills else ""
+        report_lines.append(f"  - *建議行動：* 為了更精確地定位您{skill_context_for_secondary}上的具體困難點，建議您查看近期的練習記錄（例如考前 2-4 週），整理相關錯題，歸納是哪些知識點或題型（參考**附錄 A** 中的描述）反覆出現問題。如果樣本不足，請在接下來的做題中注意收集，累積到足夠樣本後再進行分析。")
 
     report_lines.append("- **質化分析建議:**")
     # Align Qualitative Analysis text and trigger EXACTLY with MD Ch8.7
@@ -1096,7 +1180,8 @@ def run_q_diagnosis(df_raw_q, q_time_pressure_status=False, q_invalid_count=0):
              {"chapter1_results": chapter1_results}, # Pass Ch1 results
              ["無有效題目可供分析。"], 
              time_pressure_status_q, 
-             num_invalid_q
+             num_invalid_q,
+             None  # No diagnosed DataFrame available
         )
         return {"chapter1_results": chapter1_results}, minimal_report, pd.DataFrame()
 
@@ -1176,7 +1261,8 @@ def run_q_diagnosis(df_raw_q, q_time_pressure_status=False, q_invalid_count=0):
         q_diagnosis_results, 
         q_recommendations, 
         time_pressure_status_q, # Pass the status from Ch1 results
-        num_invalid_q          # Pass the count from Ch1 results
+        num_invalid_q,          # Pass the count from Ch1 results
+        df_q_diagnosed          # Pass the diagnosed DataFrame for time_performance_category grouping
     )
     print("    Finished generating Q summary report.")
 

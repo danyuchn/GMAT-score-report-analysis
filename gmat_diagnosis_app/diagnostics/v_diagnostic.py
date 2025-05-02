@@ -1414,18 +1414,91 @@ def _generate_v_summary_report(v_diagnosis_results):
     report_lines.append("- **二級證據參考建議:**")
     review_prompt = ""
     if secondary_evidence_trigger:
-        review_prompt = "  - 本次分析識別出部分問題可能需要您查看近期的練習記錄以深入了解。當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題。"
-        performance_order = ['Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 'Slow & Correct']
-        details_added = False
-        for perf_key in performance_order:
-            skills = performance_to_skills.get(perf_key)
-            if skills:
-                sorted_skills_zh = [_translate_v(s) for s in sorted(list(skills))]
-                perf_zh = _translate_v(perf_key)
-                review_prompt += f"\n  - **{perf_zh}:** 需關注技能：【{', '.join(sorted_skills_zh)}】。"
-                details_added = True
-        if not details_added:
-            review_prompt += " (本次分析未聚焦到特定的問題技能分類) "
+        review_prompt = "  - 本次分析識別出部分問題可能需要您查看近期的練習記錄以深入了解。當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。"
+        
+        # --- START NEW LOGIC: Group by time_performance_category ---
+        details_added_2nd_ev = False
+        
+        diagnosed_df = ch3.get('diagnosed_dataframe') # Re-get df
+        if diagnosed_df is not None and not diagnosed_df.empty and 'time_performance_category' in diagnosed_df.columns:
+            # Filter for problems (incorrect or overtime)
+            df_problem = diagnosed_df[(diagnosed_df['is_correct'] == False) | (diagnosed_df.get('overtime', False) == True)].copy()
+            
+            if not df_problem.empty:
+                # Define the desired order for performance categories
+                performance_order_en = [
+                    'Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 
+                    'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct',
+                    'Unknown' # Include Unknown as a fallback
+                ]
+                
+                grouped_by_performance = df_problem.groupby('time_performance_category')
+                
+                # Iterate in the desired order
+                for perf_en in performance_order_en:
+                    if perf_en in grouped_by_performance.groups: # Check if this group exists
+                        # --- ADD SKIP LOGIC for 'Fast & Correct' ---
+                        if perf_en == 'Fast & Correct':
+                            print(f"DEBUG (v_report): Skipping category '{perf_en}' as requested.") # DEBUG
+                            continue # Skip to the next category
+                        # --- END SKIP LOGIC ---
+                        
+                        group_df = grouped_by_performance.get_group(perf_en)
+                        if not group_df.empty:
+                            perf_zh = perf_en  # Default if translation not available
+                            # Translate performance category if needed
+                            if perf_en == 'Fast & Wrong': perf_zh = "快錯"
+                            elif perf_en == 'Slow & Wrong': perf_zh = "慢錯"
+                            elif perf_en == 'Normal Time & Wrong': perf_zh = "正常時間錯"
+                            elif perf_en == 'Slow & Correct': perf_zh = "慢對"
+                            elif perf_en == 'Fast & Correct': perf_zh = "快對"
+                            elif perf_en == 'Normal Time & Correct': perf_zh = "正常時間對"
+                            
+                            # Extract unique types and skills from this group
+                            types_in_group = group_df['question_type'].dropna().unique()
+                            skills_in_group = group_df['question_fundamental_skill'].dropna().unique()
+                            
+                            types_zh = sorted([t for t in types_in_group])
+                            skills_zh = sorted([s for s in skills_in_group])
+
+                            # --- Extract Unique Labels ---
+                            all_labels_in_group = set()
+                            target_label_col = None
+                            
+                            # Check if the diagnostic_params column exists
+                            if 'diagnostic_params' in group_df.columns:
+                                target_label_col = 'diagnostic_params'
+                                print(f"DEBUG (v_report): Found 'diagnostic_params' column, will translate internally.")
+                            else:
+                                print(f"DEBUG (v_report): No diagnostic params column found for this group!")
+
+                            if target_label_col:
+                                print(f"DEBUG (v_report): Processing labels from column: {target_label_col}")
+                                
+                                for labels_list in group_df[target_label_col]:
+                                    if isinstance(labels_list, list): # Check if it's a list
+                                        translated_list = [_translate_v(p) for p in labels_list]
+                                        all_labels_in_group.update(translated_list)
+                            
+                            sorted_labels_zh = sorted(list(all_labels_in_group))
+                            
+                            # --- Modify Report Line ---
+                            report_line = f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及技能：【{', '.join(skills_zh)}】。"
+                            if sorted_labels_zh:
+                                report_line += f" 注意相關問題點：【{', '.join(sorted_labels_zh)}】。"
+                            review_prompt += f"\n{report_line}"
+                            # --- End Modify Report Line ---
+                            
+                            details_added_2nd_ev = True
+                
+                if not details_added_2nd_ev:
+                    review_prompt += " (本次分析未聚焦到特定的問題類型或技能) "
+            else:
+                review_prompt += " (本次分析未發現需要分析的問題) "
+        else:
+            review_prompt += " (缺少必要診斷數據) "
+        # --- END NEW LOGIC ---
+            
         review_prompt += " 歸納是哪些知識點或題型（參考報告中的描述）導致問題。 如果樣本不足，請在接下來的做題中注意收集。"
     else:
         review_prompt = "  - (本次分析未觸發需要參考二級證據的特定問題模式)"
