@@ -192,20 +192,47 @@ with st.expander("Data Insights (DI) 資料輸入", expanded=False):
 input_dfs = {'Q': df_q, 'V': df_v, 'DI': df_di}
 loaded_subjects = {subj for subj, df in input_dfs.items() if df is not None}
 
-all_simulation_histories = []
+# Store the original combined input data for later use with simulated difficulty
+df_combined_input_list = []
+if df_q is not None: df_combined_input_list.append(df_q)
+if df_v is not None: df_combined_input_list.append(df_v)
+if df_di is not None: df_combined_input_list.append(df_di)
 
-if not loaded_subjects:
+df_combined_input = None
+if df_combined_input_list:
+     try:
+         df_combined_input = pd.concat(df_combined_input_list, ignore_index=True)
+         # Ensure question_position exists for sorting, add if missing based on index
+         if 'question_position' not in df_combined_input.columns:
+             st.warning("輸入資料缺少 'question_position' 欄位，將使用原始順序作為位置。")
+             # Assuming index corresponds to position if missing
+             df_combined_input['question_position'] = df_combined_input.index + 1 
+         else:
+              # Convert position to numeric and handle errors
+              df_combined_input['question_position'] = pd.to_numeric(df_combined_input['question_position'], errors='coerce')
+              if df_combined_input['question_position'].isnull().any():
+                    st.error("'question_position' 欄位包含非數值，無法排序。請檢查數據。")
+                    df_combined_input = None # Stop processing if position is invalid
+     except Exception as e:
+         st.error(f"合併或處理輸入資料時發生錯誤: {e}")
+         df_combined_input = None
+
+all_simulation_histories = {} # Store histories per subject
+final_thetas = {}           # Store final theta per subject
+
+if df_combined_input is None and loaded_subjects: # Check if combining failed
+     st.error("無法處理輸入資料，請檢查數據格式與 'question_position' 欄位。")
+elif not loaded_subjects:
     st.info("請展開上方區塊，為至少一個科目上傳檔案或貼上資料以開始模擬與分析。")
 else:
-    st.header("1. 執行 IRT 模擬")
+    st.header("1. 執行 IRT 模擬 (以獲取難度序列與 Theta)")
     simulation_success = True
     with st.spinner("正在執行 IRT 模擬..."):
-        # Initialize question banks first (using the same seed for consistency across runs if desired)
         st.write("初始化模擬題庫...")
         question_banks = {}
         try:
             if 'Q' in loaded_subjects: question_banks['Q'] = irt.initialize_question_bank(BANK_SIZE, seed=RANDOM_SEED)
-            if 'V' in loaded_subjects: question_banks['V'] = irt.initialize_question_bank(BANK_SIZE, seed=RANDOM_SEED + 1) # Slightly different seed
+            if 'V' in loaded_subjects: question_banks['V'] = irt.initialize_question_bank(BANK_SIZE, seed=RANDOM_SEED + 1)
             if 'DI' in loaded_subjects: question_banks['DI'] = irt.initialize_question_bank(BANK_SIZE, seed=RANDOM_SEED + 2)
             if any(bank is None for bank in question_banks.values()):
                  st.error("創建模擬題庫失敗。")
@@ -216,119 +243,136 @@ else:
             st.error(f"創建模擬題庫時出錯: {e}")
             simulation_success = False
 
-        # Run simulation for each loaded subject
         if simulation_success:
             subject_params = {
-                'Q': {'df': df_q, 'initial_theta': initial_theta_q, 'total_questions': TOTAL_QUESTIONS_Q},
-                'V': {'df': df_v, 'initial_theta': initial_theta_v, 'total_questions': TOTAL_QUESTIONS_V},
-                'DI': {'df': df_di, 'initial_theta': initial_theta_di, 'total_questions': TOTAL_QUESTIONS_DI}
+                'Q': {'initial_theta': initial_theta_q, 'total_questions': TOTAL_QUESTIONS_Q},
+                'V': {'initial_theta': initial_theta_v, 'total_questions': TOTAL_QUESTIONS_V},
+                'DI': {'initial_theta': initial_theta_di, 'total_questions': TOTAL_QUESTIONS_DI}
             }
 
-            for subject, params in subject_params.items():
-                if subject in loaded_subjects:
-                    st.write(f"執行 {subject} 科目模擬...")
-                    input_df = params['df']
-                    initial_theta = params['initial_theta']
-                    total_questions = params['total_questions']
-                    bank = question_banks[subject]
-
-                    # Extract 1-based indices of WRONG answers from the input dataframe
-                    # Assuming the input dataframe rows are in the order questions were presented
+            for subject in loaded_subjects:
+                st.write(f"執行 {subject} 科目模擬...")
+                # Get parameters for simulation
+                params = subject_params[subject]
+                initial_theta = params['initial_theta']
+                total_sim_questions = params['total_questions'] # Number of questions IN SIMULATION
+                bank = question_banks[subject]
+                
+                # Get WRONG indices from the *original* user data for this subject
+                user_df_subj = df_combined_input[df_combined_input['Subject'] == subject]
+                wrong_indices = []
+                if 'Correct' in user_df_subj.columns:
+                    # Sort by position before getting indices
+                    user_df_subj_sorted = user_df_subj.sort_values(by='question_position')
+                    wrong_indices = user_df_subj_sorted[user_df_subj_sorted['Correct'] == False].index + 1
+                    wrong_indices = wrong_indices.tolist()
+                    st.write(f"  {subject}: 從用戶數據提取 {len(wrong_indices)} 個錯誤題目位置: {wrong_indices[:10]}...")
+                else:
+                    st.warning(f"  {subject}: 用戶數據缺少 'Correct'，假設全部答對進行模擬。")
                     wrong_indices = []
-                    if 'Correct' in input_df.columns:
-                        wrong_indices = input_df[input_df['Correct'] == False].index + 1
-                        wrong_indices = wrong_indices.tolist()
-                        st.write(f"  {subject}: 偵測到 {len(wrong_indices)} 個錯誤題目，位置: {wrong_indices[:10]}...") # Show first 10
-                    else:
-                        st.warning(f"  {subject}: 輸入資料缺少 'Correct' 欄位，假設全部答對進行模擬。")
-                        wrong_indices = []
 
-                    # Run the simulation
-                    try:
-                        history_df = irt.simulate_cat_exam(
-                            question_bank=bank,
-                            wrong_question_indices=wrong_indices,
-                            initial_theta=initial_theta,
-                            total_questions=total_questions
-                        )
-                        if history_df is not None and not history_df.empty:
-                            history_df['Subject'] = subject # Add subject identifier to history
-                            all_simulation_histories.append(history_df)
-                            st.write(f"  {subject}: 模擬完成。最後 Theta 估計: {history_df['theta_est_after_answer'].iloc[-1]:.3f}")
-                        elif history_df is not None and history_df.empty:
-                            st.warning(f"  {subject}: 模擬執行了，但未產生歷史記錄 (可能是 total_questions=0)。")
-                        else:
-                             st.error(f"  {subject}: 模擬執行失敗，返回 None。")
-                             simulation_success = False
-                             break # Stop simulating other subjects if one fails
-                    except Exception as e:
-                        st.error(f"  {subject}: 執行模擬時發生錯誤: {e}")
-                        simulation_success = False
-                        break
+                # Run the simulation
+                try:
+                    history_df = irt.simulate_cat_exam(
+                        question_bank=bank,
+                        wrong_question_indices=wrong_indices,
+                        initial_theta=initial_theta,
+                        total_questions=total_sim_questions # Use the simulation total questions
+                    )
+                    if history_df is not None and not history_df.empty:
+                        all_simulation_histories[subject] = history_df
+                        final_thetas[subject] = history_df['theta_est_after_answer'].iloc[-1]
+                        st.write(f"  {subject}: 模擬完成。產生 {len(history_df)} 個模擬結果。最後 Theta 估計: {final_thetas[subject]:.3f}")
+                    elif history_df is not None and history_df.empty:
+                        st.warning(f"  {subject}: 模擬執行了，但未產生歷史記錄。")
+                        simulation_success = False # Treat empty history as failure for next steps
+                    else:
+                         st.error(f"  {subject}: 模擬執行失敗，返回 None。")
+                         simulation_success = False
+                         break
+                except Exception as e:
+                    st.error(f"  {subject}: 執行模擬時發生錯誤: {e}")
+                    simulation_success = False
+                    break
 
     if simulation_success and all_simulation_histories:
         st.success("所有科目的 IRT 模擬完成！")
-        # Combine simulation results
-        df_simulated_combined = pd.concat(all_simulation_histories, ignore_index=True)
-        st.header("模擬結果預覽")
-        st.dataframe(df_simulated_combined.head())
+        
+        # --- Combine Input Data with Simulated Difficulty --- 
+        st.header("2. 準備診斷數據 (結合用戶數據與模擬難度)")
+        df_final_for_diagnosis_list = []
+        processing_error = False
+        for subject in loaded_subjects:
+            st.write(f"處理 {subject} 科目...")
+            user_df_subj = df_combined_input[df_combined_input['Subject'] == subject].copy()
+            sim_history_df = all_simulation_histories.get(subject)
+            final_theta = final_thetas.get(subject)
 
-        # --- Prepare Data for Diagnosis ---
-        # Use the output of the simulation
-        df_for_diagnosis = df_simulated_combined.copy()
+            if sim_history_df is None or sim_history_df.empty:
+                st.error(f"找不到 {subject} 科目的有效模擬結果，無法繼續。")
+                processing_error = True
+                break
 
-        # Rename 'b' to 'difficulty' as expected by diagnosis module
-        if 'b' in df_for_diagnosis.columns:
-            df_for_diagnosis.rename(columns={'b': 'difficulty'}, inplace=True)
-        else:
-            st.error("模擬結果缺少 'b' (difficulty) 欄位！")
-            df_for_diagnosis = None # Cannot proceed
-
-        # Ensure required columns for run_diagnosis exist
-        # Required: ['Question ID', 'Correct', 'difficulty', 'question_time', 'question_type']
-        if df_for_diagnosis is not None:
-            # Rename simulated 'question_id' to 'Question ID'
-            if 'question_id' in df_for_diagnosis.columns:
-                 df_for_diagnosis.rename(columns={'question_id': 'Question ID'}, inplace=True)
-            else:
-                 st.error("模擬結果缺少 'question_id' 欄位！")
-                 df_for_diagnosis = None
-
-            # Rename 'answered_correctly' to 'Correct'
-            if 'answered_correctly' in df_for_diagnosis.columns:
-                 df_for_diagnosis.rename(columns={'answered_correctly': 'Correct'}, inplace=True)
-            elif 'Correct' not in df_for_diagnosis.columns: # Check if already named Correct
-                 st.error("模擬結果缺少 'answered_correctly' 或 'Correct' 欄位！")
-                 df_for_diagnosis = None
-
-            # Add dummy columns for 'question_time' and 'question_type' if missing
-            if 'question_time' not in df_for_diagnosis.columns:
-                df_for_diagnosis['question_time'] = 0.0 # Placeholder value
+            # Extract simulated b-values
+            sim_b_values = sim_history_df['b'].tolist()
             
-            # Add 'question_type' based on 'Subject' if missing
-            if 'question_type' not in df_for_diagnosis.columns:
-                if 'Subject' in df_for_diagnosis.columns:
-                    # Define mapping from Subject to a generic type diagnosis module might handle
-                    subject_to_type_map = {
-                        'Q': 'Quant', # Or 'Quantitative' if diagnosis module uses that
-                        'V': 'Verbal',
-                        'DI': 'DI'    # Or 'Data Insights'
-                    }
-                    df_for_diagnosis['question_type'] = df_for_diagnosis['Subject'].map(subject_to_type_map).fillna('Unknown')
-                    st.write("新增了基於 Subject 的 question_type 欄位 ('Quant', 'Verbal', 'DI')")
-                else:
-                     st.warning("模擬結果缺少 'Subject' 欄位，無法自動生成 'question_type'。將使用 'Unknown'。")
-                     df_for_diagnosis['question_type'] = 'Unknown' # Fallback placeholder
+            # Sort user data by position
+            user_df_subj_sorted = user_df_subj.sort_values(by='question_position')
+            num_user_questions = len(user_df_subj_sorted)
+            num_sim_b = len(sim_b_values)
 
-        # --- Diagnosis Section --- (Now uses df_for_diagnosis)
-        if df_for_diagnosis is not None:
-            st.header("2. 執行診斷分析 (基於模擬結果)")
+            # Check for length mismatch between user data and simulation results
+            if num_user_questions != num_sim_b:
+                 st.warning(f"{subject}: 用戶數據題目數 ({num_user_questions}) 與模擬結果數 ({num_sim_b}) 不符。" 
+                           f"將僅使用前 {min(num_user_questions, num_sim_b)} 個數據進行難度賦值。診斷可能不完整。")
+                 # Truncate to the minimum length
+                 min_len = min(num_user_questions, num_sim_b)
+                 user_df_subj_sorted = user_df_subj_sorted.iloc[:min_len]
+                 sim_b_values = sim_b_values[:min_len]
+            
+            if not sim_b_values: # Check if list became empty after truncation
+                 st.error(f"{subject}: 無可用的模擬難度值，無法繼續處理。")
+                 processing_error = True
+                 break
+
+            # Assign simulated b-values as 'question_difficulty'
+            user_df_subj_sorted['question_difficulty'] = sim_b_values
+            st.write(f"  {subject}: 已將模擬難度賦值給 {len(user_df_subj_sorted)} 道題目。")
+
+            # Add final theta as context
+            if final_theta is not None:
+                 user_df_subj_sorted['estimated_ability'] = final_theta
+
+            df_final_for_diagnosis_list.append(user_df_subj_sorted)
+        
+        if not processing_error and df_final_for_diagnosis_list:
+            df_final_for_diagnosis = pd.concat(df_final_for_diagnosis_list, ignore_index=True)
+            
+            st.subheader("診斷用數據預覽 (含模擬難度)")
+            st.dataframe(df_final_for_diagnosis.head())
+            
+            # --- Diagnosis Section --- (Now uses df_final_for_diagnosis)
+            st.header("3. 執行診斷分析")
             result_df = None
+            # Add input for total_test_time if needed by Chapter 1 logic
+            # total_test_time = st.number_input("請輸入總測驗時間（分鐘）:", value=135.0, min_value=10.0, step=0.5) 
             try:
                 with st.spinner("執行診斷分析中..."):
-                    required_diag_cols = ['Question ID', 'Correct', 'difficulty', 'question_time', 'question_type']
-                    if all(col in df_for_diagnosis.columns for col in required_diag_cols):
-                        result_df = run_diagnosis(df_for_diagnosis)
+                    # Diagnosis module now needs the combined actual data with simulated difficulty
+                    # It will need columns like: 'Question ID', 'Correct', 'question_difficulty', 'question_time', 
+                    # 'question_type', 'question_fundamental_skill', 'question_position', 'estimated_ability' (optional)
+                    
+                    # Ensure all required columns for the *markdown logic* are present
+                    # Markdown needs: 'Correct', 'question_difficulty', 'question_time', 'question_type', 
+                    # 'question_fundamental_skill', 'question_position'
+                    required_markdown_cols = ['Correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'question_position']
+                    missing_cols = [col for col in required_markdown_cols if col not in df_final_for_diagnosis.columns]
+                    
+                    if not missing_cols:
+                        # Pass the combined data to the diagnosis module
+                        # Consider passing total_test_time if collected
+                        result_df = run_diagnosis(df_final_for_diagnosis)
+                        
                         if result_df is not None and not result_df.empty:
                             st.success("診斷分析完成！")
                             st.subheader("診斷結果")
@@ -340,16 +384,16 @@ else:
                                 st.download_button(
                                     label="下載診斷結果 CSV",
                                     data=csv_data,
-                                    file_name='gmat_sim_diagnosis_result.csv',
+                                    file_name='gmat_diagnosis_result_sim_b.csv', # Indicate sim b used
                                     mime='text/csv',
-                                    key='download-sim-csv'
+                                    key='download-diag-sim-b'
                                 )
                             except Exception as e:
                                 st.error(f"準備下載檔時發生錯誤：{e}")
                         else:
                             st.warning("診斷分析未返回結果。請檢查 `diagnosis_module.py`。")
                     else:
-                        st.error(f"準備用於診斷的資料缺少必需欄位 (需要: {required_diag_cols}，實際有: {df_for_diagnosis.columns.tolist()})，無法執行診斷。")
+                        st.error(f"準備用於診斷的資料缺少 Markdown 邏輯所需欄位: {missing_cols}。無法執行診斷。")
                         result_df = None
             except Exception as e:
                 st.error(f"執行診斷時發生錯誤：{e}")
@@ -358,16 +402,16 @@ else:
             # --- Generate OpenAI Summary --- (Uses diagnosis result_df)
             if result_df is not None and not result_df.empty:
                 if openai_api_key:
-                    st.header("3. AI 文字摘要 (基於模擬診斷)")
+                    st.header("4. AI 文字摘要 (基於詳細診斷)")
                     try:
                         client = openai.OpenAI(api_key=openai_api_key)
                         prompt_data = result_df.to_string()
-                        prompt = f"""請根據以下 GMAT 模擬診斷結果摘要，產生一段簡潔的總結報告（約 100-150 字），說明主要的強項、弱項或值得注意的模式。請使用繁體中文回答。\n\n診斷摘要：\n{prompt_data}\n\n總結報告："""
+                        prompt = f"""請根據以下 GMAT 診斷結果摘要（基於用戶實際表現數據，但使用了模擬難度估計），產生一段簡潔的總結報告（約 150-200 字），說明主要的強項、弱項或值得注意的模式。請使用繁體中文回答。\n\n診斷摘要：\n{prompt_data}\n\n總結報告："""
                         with st.spinner("正在生成文字摘要..."):
                             response = client.chat.completions.create(
                                 model="gpt-3.5-turbo",
                                 messages=[
-                                    {"role": "system", "content": "你是一個擅長分析 GMAT 模擬診斷報告並產生總結的 AI 助理。"},
+                                    {"role": "system", "content": "你是一個擅長分析 GMAT 診斷報告並產生總結的 AI 助理。"},
                                     {"role": "user", "content": prompt}
                                 ]
                             )
@@ -379,12 +423,9 @@ else:
                 else:
                     st.info("在側邊欄輸入您的 OpenAI API Key 以生成 AI 文字摘要。")
             # --- End OpenAI Summary ---
-        else:
-             st.warning("準備用於診斷的資料失敗，無法執行診斷分析。")
+        elif not df_final_for_diagnosis_list:
+             st.warning("未能成功準備任何用於診斷的數據。")
     elif not simulation_success:
         st.error("IRT 模擬過程中斷或失敗，無法進行後續分析。")
-    # If no simulation histories were generated (e.g., initial error)
-    # elif not all_simulation_histories:
-    #    st.warning("未能生成任何模擬結果，無法進行分析。")
 
-# Final info message is handled within the sections now.
+# Final info message handled within sections

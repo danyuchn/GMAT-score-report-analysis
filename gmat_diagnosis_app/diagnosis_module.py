@@ -1,395 +1,214 @@
 import pandas as pd
 import numpy as np
 
-# --- Placeholder Helper Functions for Diagnosis ---
-# These functions currently only calculate basic stats.
-# Detailed logic based on markdown documents needs to be implemented here.
+# Import subject-specific diagnosis runners
+from .diagnostics.q_diagnostic import run_q_diagnosis
+from .diagnostics.v_diagnostic import run_v_diagnosis
+from .diagnostics.di_diagnostic import run_di_diagnosis
 
-def _diagnose_ds(df_ds):
-    """Placeholder diagnosis for Data Sufficiency (DS)."""
-    if df_ds.empty:
-        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
-    
-    total = len(df_ds)
-    errors = df_ds['Correct'].eq(False).sum()
-    error_rate = errors / total if total > 0 else 0
-    overtime = df_ds['overtime'].eq(True).sum() if 'overtime' in df_ds.columns else 0
-    overtime_rate = overtime / total if total > 0 else 0
-    
-    # TODO: Implement detailed DS diagnosis based on markdown logic
-    #       - Check special_focus_error (DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE)
-    #       - Classify errors (Fast/Slow/Normal & Wrong)
-    #       - Associate DI_... diagnostic parameters
-    
-    diagnosis = f"DS: Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
-    
-    return pd.DataFrame([{
-        'Question Type': 'DS', 
-        'Total': total, 
-        'Errors': errors, 
-        'Error Rate': error_rate, 
-        'Overtime': overtime, 
-        'Overtime Rate': overtime_rate,
-        'Diagnosis': diagnosis
-    }])
-
-def _diagnose_tpa(df_tpa):
-    """Placeholder diagnosis for Two-Part Analysis (TPA)."""
-    if df_tpa.empty:
-        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
-        
-    total = len(df_tpa)
-    errors = df_tpa['Correct'].eq(False).sum()
-    error_rate = errors / total if total > 0 else 0
-    overtime = df_tpa['overtime'].eq(True).sum() if 'overtime' in df_tpa.columns else 0
-    overtime_rate = overtime / total if total > 0 else 0
-
-    # TODO: Implement detailed TPA diagnosis based on markdown logic
-    diagnosis = f"TPA: Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
-
-    return pd.DataFrame([{
-        'Question Type': 'TPA', 
-        'Total': total, 
-        'Errors': errors, 
-        'Error Rate': error_rate, 
-        'Overtime': overtime, 
-        'Overtime Rate': overtime_rate,
-        'Diagnosis': diagnosis
-    }])
-    
-def _diagnose_msr(df_msr):
-    """Placeholder diagnosis for Multi-Source Reasoning (MSR)."""
-    if df_msr.empty:
-        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
-
-    total = len(df_msr)
-    errors = df_msr['Correct'].eq(False).sum()
-    error_rate = errors / total if total > 0 else 0
-    # Note: Overtime for MSR is group-based in the markdown
-    overtime = df_msr['overtime'].eq(True).sum() if 'overtime' in df_msr.columns else 0 
-    overtime_rate = overtime / total if total > 0 else 0
-    
-    # TODO: Implement detailed MSR diagnosis (group analysis, reading time, etc.)
-    diagnosis = f"MSR: Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
-
-    return pd.DataFrame([{
-        'Question Type': 'MSR', 
-        'Total': total, 
-        'Errors': errors, 
-        'Error Rate': error_rate, 
-        'Overtime': overtime, 
-        'Overtime Rate': overtime_rate,
-        'Diagnosis': diagnosis
-    }])
-
-def _diagnose_gt(df_gt):
-    """Placeholder diagnosis for Graph & Table (GT)."""
-    if df_gt.empty:
-        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
-
-    total = len(df_gt)
-    errors = df_gt['Correct'].eq(False).sum()
-    error_rate = errors / total if total > 0 else 0
-    overtime = df_gt['overtime'].eq(True).sum() if 'overtime' in df_gt.columns else 0
-    overtime_rate = overtime / total if total > 0 else 0
-    
-    # TODO: Implement detailed GT diagnosis based on markdown logic
-    diagnosis = f"GT: Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
-
-    return pd.DataFrame([{
-        'Question Type': 'GT', 
-        'Total': total, 
-        'Errors': errors, 
-        'Error Rate': error_rate, 
-        'Overtime': overtime, 
-        'Overtime Rate': overtime_rate,
-        'Diagnosis': diagnosis
-    }])
-    
-def _diagnose_cr(df_cr):
-    """Placeholder diagnosis for Critical Reasoning (CR)."""
-    if df_cr.empty:
-        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
-        
-    total = len(df_cr)
-    errors = df_cr['Correct'].eq(False).sum()
-    error_rate = errors / total if total > 0 else 0
-    overtime = df_cr['overtime'].eq(True).sum() if 'overtime' in df_cr.columns else 0
-    overtime_rate = overtime / total if total > 0 else 0
-
-    # TODO: Implement detailed CR diagnosis based on markdown logic
-    #       - Check special_focus_error (FOUNDATIONAL_MASTERY_INSTABILITY_SFE)
-    #       - Classify errors (Fast/Slow/Normal & Wrong)
-    #       - Associate CR_... diagnostic parameters
-    #       - Requires 'question_fundamental_skill' column
-    
-    diagnosis = f"CR: Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
-
-    return pd.DataFrame([{
-        'Question Type': 'CR', 
-        'Total': total, 
-        'Errors': errors, 
-        'Error Rate': error_rate, 
-        'Overtime': overtime, 
-        'Overtime Rate': overtime_rate,
-        'Diagnosis': diagnosis
-    }])
-
-def _diagnose_rc(df_rc):
-    """Placeholder diagnosis for Reading Comprehension (RC)."""
-    if df_rc.empty:
-        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
-
-    total = len(df_rc)
-    errors = df_rc['Correct'].eq(False).sum()
-    error_rate = errors / total if total > 0 else 0
-    # Note: Overtime for RC has group and individual components
-    overtime = df_rc['overtime'].eq(True).sum() if 'overtime' in df_rc.columns else 0 
-    overtime_rate = overtime / total if total > 0 else 0
-    
-    # TODO: Implement detailed RC diagnosis (group analysis, reading time, etc.)
-    #       - Requires 'question_fundamental_skill' column
-    diagnosis = f"RC: Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
-
-    return pd.DataFrame([{
-        'Question Type': 'RC', 
-        'Total': total, 
-        'Errors': errors, 
-        'Error Rate': error_rate, 
-        'Overtime': overtime, 
-        'Overtime Rate': overtime_rate,
-        'Diagnosis': diagnosis
-    }])
-
-def _diagnose_q(df_q):
-     """Placeholder diagnosis for Quantitative (Q) - Real/Pure analysis."""
-     if df_q.empty:
-        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
-
-     # Assuming 'question_type' column exists with 'Real'/'Pure'
-     if 'question_type' not in df_q.columns:
-         # Handle case where Q section doesn't distinguish Real/Pure
-         total = len(df_q)
-         errors = df_q['Correct'].eq(False).sum()
-         error_rate = errors / total if total > 0 else 0
-         overtime = df_q['overtime'].eq(True).sum() if 'overtime' in df_q.columns else 0
-         overtime_rate = overtime / total if total > 0 else 0
-         diagnosis = f"Q (Overall): Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
-         return pd.DataFrame([{'Question Type': 'Q (Overall)', 'Total': total, 'Errors': errors, 'Error Rate': error_rate, 'Overtime': overtime, 'Overtime Rate': overtime_rate, 'Diagnosis': diagnosis}])
-
-     results = []
-     for q_type in ['Real', 'Pure']:
-         df_subtype = df_q[df_q['question_type'] == q_type]
-         if not df_subtype.empty:
-             total = len(df_subtype)
-             errors = df_subtype['Correct'].eq(False).sum()
-             error_rate = errors / total if total > 0 else 0
-             overtime = df_subtype['overtime'].eq(True).sum() if 'overtime' in df_subtype.columns else 0
-             overtime_rate = overtime / total if total > 0 else 0
-             
-             # TODO: Implement detailed Q diagnosis (Real/Pure comparison, skills, SFE, parameters)
-             #       Requires 'question_fundamental_skill' column
-             diagnosis = f"Q ({q_type}): Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
-             results.append({
-                 'Question Type': f'Q ({q_type})', 
-                 'Total': total, 
-                 'Errors': errors, 
-                 'Error Rate': error_rate, 
-                 'Overtime': overtime, 
-                 'Overtime Rate': overtime_rate,
-                 'Diagnosis': diagnosis
-             })
-             
-     return pd.DataFrame(results)
-
-# Added placeholder functions for overall Verbal and DI diagnosis
-def _diagnose_verbal_overall(df_v):
-    """Placeholder overall diagnosis for Verbal based on simulation."""
-    if df_v.empty:
-        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
-
-    total = len(df_v)
-    errors = df_v['Correct'].eq(False).sum()
-    error_rate = errors / total if total > 0 else 0
-    overtime = df_v['overtime'].eq(True).sum() if 'overtime' in df_v.columns else 0
-    overtime_rate = overtime / total if total > 0 else 0
-
-    diagnosis = f"Verbal (Overall): Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
-
-    return pd.DataFrame([{
-        'Question Type': 'Verbal (Overall)',
-        'Total': total,
-        'Errors': errors,
-        'Error Rate': error_rate,
-        'Overtime': overtime,
-        'Overtime Rate': overtime_rate,
-        'Diagnosis': diagnosis
-    }])
-
-def _diagnose_di_overall(df_di):
-    """Placeholder overall diagnosis for Data Insights based on simulation."""
-    if df_di.empty:
-        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
-
-    total = len(df_di)
-    errors = df_di['Correct'].eq(False).sum()
-    error_rate = errors / total if total > 0 else 0
-    overtime = df_di['overtime'].eq(True).sum() if 'overtime' in df_di.columns else 0
-    overtime_rate = overtime / total if total > 0 else 0
-
-    diagnosis = f"DI (Overall): Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
-
-    return pd.DataFrame([{
-        'Question Type': 'DI (Overall)',
-        'Total': total,
-        'Errors': errors,
-        'Error Rate': error_rate,
-        'Overtime': overtime,
-        'Overtime Rate': overtime_rate,
-        'Diagnosis': diagnosis
-    }])
-
-# --- Main Diagnosis Function ---
+# --- Main Diagnosis Orchestration Function ---
 
 def run_diagnosis(df):
     """
-    Runs the diagnostic analysis based on the input DataFrame.
+    Runs the complete diagnostic analysis by orchestrating subject-specific modules.
+    Performs initial data validation and Chapter 1 analysis (Time Strategy & Validity)
+    before dispatching data to Q, V, and DI diagnostic runners.
 
     Args:
-        df (pd.DataFrame): DataFrame containing response data. 
-                           Expected columns: 'Question ID', 'Correct', 'question_difficulty', 
-                           'question_time', 'question_type' (e.g., 'DS', 'CR', 'Real', 'Pure').
-                           'difficulty' (calculated by estimate_difficulty). 
-                           Optional but needed for full diagnosis: 'question_fundamental_skill', 
-                           'content_domain', 'question_position', 'total_test_time'.
+        df (pd.DataFrame): DataFrame containing response data.
+                           Expected columns: 'Question ID', 'Correct', 'question_difficulty' (simulated),
+                           'question_time', 'question_type', 'question_fundamental_skill',
+                           'question_position', 'Subject' ('Q', 'V', or 'DI'),
+                           'estimated_ability' (optional).
 
     Returns:
-        pd.DataFrame: A DataFrame containing the diagnosis results, typically summarized by 
-                      question type or skill category. Returns an empty DataFrame if input is invalid.
+        str: A combined report string containing diagnostics for all available subjects (Q, V, DI),
+             or an error message if input is invalid or no valid data remains after filtering.
     """
-    
-    # --- 1. Input Validation ---
-    required_cols = ['Question ID', 'Correct', 'difficulty', 'question_time', 'question_type']
-    if not isinstance(df, pd.DataFrame) or not all(col in df.columns for col in required_cols):
-        print(f"Invalid input DataFrame. Missing one or more required columns: {required_cols}")
-        # In Streamlit app, use st.error()
-        return pd.DataFrame() # Return empty DataFrame for invalid input
+
+    # --- 0. Initial Validation ---
+    # Define the required columns, including 'Subject'
+    required_cols = ['Question ID', 'Correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'question_position', 'Subject']
+    if not isinstance(df, pd.DataFrame):
+         print("Invalid input: Input is not a pandas DataFrame.")
+         return "錯誤：輸入數據格式無效。"
+
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        print(f"Invalid input DataFrame. Missing required columns: {missing_cols}")
+        # Provide a more informative error message
+        return f"錯誤：輸入數據缺少必要的欄位：{', '.join(missing_cols)}。請檢查上傳的 Excel 文件。"
+
+    # Subject column is checked above as part of required_cols
 
     df_processed = df.copy()
 
-    # --- 2. Data Preprocessing (Simulated/Placeholder) ---
-    # TODO: Implement full logic from Chapter 1 of markdown files
-    #       - Calculate time_pressure (requires total_test_time or assume based on df)
-    #       - Define overtime thresholds based on time_pressure and question_type
-    #       - Mark 'is_invalid' based on time_pressure and ending speed (requires question_position)
-    #       - Mark 'overtime' based on thresholds
-    
-    # Placeholder for 'overtime' marking (using arbitrary thresholds for now)
-    # This needs actual implementation using markdown logic
-    def mark_overtime(row):
-        q_type = row['question_type']
-        time = row['question_time']
-        # Example thresholds (replace with actual logic)
-        # Added Quant, Verbal, DI placeholders
-        thresholds = {
-            'DS': 2.5, 'TPA': 3.5, 'MSR': 2.3, 'GT': 3.5, 
-            'CR': 2.5, 'RC': 2.5, 
-            'Real': 3.0, 'Pure': 3.0,
-            'Quant': 3.0, 'Verbal': 2.5, 'DI': 3.0 # Generic thresholds for overall types
-        }
-        return time > thresholds.get(q_type, 3.0) # Default 3.0 mins
+    # --- Data Type Conversion and Cleaning ---
+    # Convert time and position to numeric, coercing errors
+    df_processed['question_time'] = pd.to_numeric(df_processed['question_time'], errors='coerce')
+    df_processed['question_position'] = pd.to_numeric(df_processed['question_position'], errors='coerce')
+    df_processed['question_difficulty'] = pd.to_numeric(df_processed['question_difficulty'], errors='coerce')
+    # Convert Correct to boolean, handling potential string values ('True', 'False')
+    if df_processed['Correct'].dtype == 'object':
+        df_processed['Correct'] = df_processed['Correct'].astype(str).str.lower().map({'true': True, 'false': False, '1': True, '0': False})
+    df_processed['Correct'] = df_processed['Correct'].astype(bool)
 
-    if 'question_time' in df_processed.columns:
-        df_processed['overtime'] = df_processed.apply(mark_overtime, axis=1)
-    else:
-        df_processed['overtime'] = False # Assume not overtime if time is missing
+    # --- Initialize internal columns ---
+    df_processed['is_invalid'] = False # Initialize is_invalid column
+    df_processed['overtime'] = False # Initialize overtime column
+    df_processed['overtime_threshold'] = 3.0 # Default threshold
 
-    # Placeholder for 'is_invalid' filtering (assuming no invalid data for now)
-    # This needs actual implementation
-    df_filtered = df_processed # .loc[df_processed['is_invalid'] == False] if 'is_invalid' in df_processed else df_processed
-    
-    if df_filtered.empty:
-        print("No valid data remaining after filtering.")
-        return pd.DataFrame()
+    # --- 1. Overall Time Strategy & Data Validity (Chapter 1 Logic - Applied Per Subject) ---
+    print("Starting Chapter 1: Time Strategy & Validity Analysis...")
+    subjects_present = df_processed['Subject'].unique()
+    all_invalid_indices = []
+    subject_time_pressure_status = {} # Dictionary to store time pressure status per subject
 
-    # --- 3. Group by Question Type and Diagnose ---
-    all_diagnostics = []
-    grouped = df_filtered.groupby('question_type')
+    # Define subject-specific parameters (Adjust these as needed)
+    subject_time_limits = {'Q': 45.0, 'V': 45.0, 'DI': 45.0}
 
-    # Define mapping from question type to diagnosis function
-    diagnosis_map = {
-        # DI Types
-        'DS': _diagnose_ds,
-        'TPA': _diagnose_tpa,
-        'MSR': _diagnose_msr,
-        'GT': _diagnose_gt,
-        # Verbal Types
-        'CR': _diagnose_cr,
-        'RC': _diagnose_rc,
-        # Quant Types (Real/Pure handled within _diagnose_q)
-        'Real': _diagnose_q,
-        'Pure': _diagnose_q,
-        # Overall Simulation Types (Added)
-        'Quant': _diagnose_q, # Use the same function, it handles overall Q case
-        'Verbal': _diagnose_verbal_overall, # New placeholder for overall Verbal
-        'DI': _diagnose_di_overall # New placeholder for overall DI
-    }
+    for subject in subjects_present:
+        print(f"  Processing Subject: {subject}")
+        # Check if subject is recognized before proceeding
+        if subject not in subject_time_limits:
+            print(f"    Warning: Unrecognized subject '{subject}'. Skipping time analysis for this subject.")
+            subject_time_pressure_status[subject] = '未知' # Mark status as unknown
+            continue
 
-    for name, group in grouped:
-        q_type = name # question_type from groupby
-        
-        # Handle potential multiple types mapping to the same function (like Real/Pure -> _diagnose_q)
-        # Find the appropriate function from the map
-        diag_func = diagnosis_map.get(q_type)
+        df_subj = df_processed[df_processed['Subject'] == subject].copy()
+        if df_subj.empty:
+            print(f"    Subject {subject}: No data found.")
+            subject_time_pressure_status[subject] = False # No pressure if no data
+            continue
 
-        if diag_func:
-            # Special handling for _diagnose_q which handles both Real and Pure
-            if diag_func == _diagnose_q:
-                 # Check if this group name ('Real' or 'Pure' or 'Quant') has already been processed by _diagnose_q
-                 # We only want to call _diagnose_q once for all relevant Q types.
-                 # Collect all Q-related data first.
-                 q_subtypes_present = [qt for qt in ['Real', 'Pure', 'Quant'] if qt in grouped.groups]
-                 if q_type == q_subtypes_present[0]: # Only process on the *first* Q subtype encountered
-                      q_data = pd.concat([grouped.get_group(qt) for qt in q_subtypes_present])
-                      result = _diagnose_q(q_data)
-                      if result is not None and not result.empty: all_diagnostics.append(result)
-            elif diag_func == _diagnose_verbal_overall:
-                 # Similar logic if CR/RC also exist and we want one combined Verbal report
-                 # For now, just call the overall function if 'Verbal' is the type
-                 if q_type == 'Verbal': 
-                     result = _diagnose_verbal_overall(group)
-                     if result is not None and not result.empty: all_diagnostics.append(result)
-                 # If CR/RC exist, they will be handled by their specific entries below
-                 # We might want to prevent double-counting later.
-            elif diag_func == _diagnose_di_overall:
-                 # Similar logic if DS/TPA etc also exist
-                 if q_type == 'DI':
-                      result = _diagnose_di_overall(group)
-                      if result is not None and not result.empty: all_diagnostics.append(result)
-                 # Specific DI types handled below.
-            else: # Handle specific types like DS, CR, RC etc.
-                 # Avoid reprocessing if handled by an overall function (optional refinement)
-                 # For now, call specific functions if they exist
-                 if q_type not in ['Real', 'Pure', 'Quant', 'Verbal', 'DI']: # Avoid calling _diagnose_q, _diagnose_verbal etc. again
-                      result = diag_func(group)
-                      if result is not None and not result.empty: all_diagnostics.append(result)
-        elif q_type == 'Unknown':
-             print(f"Info: Skipping diagnosis for question type '{q_type}'.")
+        # Check for NaN/NaT in critical columns after conversion
+        if df_subj['question_time'].isnull().any() or df_subj['question_position'].isnull().any():
+             print(f"    Warning: Subject {subject} has missing/non-numeric time or position data after conversion. Skipping detailed time analysis.")
+             subject_time_pressure_status[subject] = '未知' # Status unknown if data is bad
+             continue
+
+        total_number_of_questions = len(df_subj)
+        max_allowed_time = subject_time_limits.get(subject, 45.0) # Default to 45 if subject not defined
+        total_test_time = df_subj['question_time'].sum()
+        time_diff = max_allowed_time - total_test_time
+        print(f"    Subject {subject}: Total Time = {total_test_time:.2f} min, Allowed = {max_allowed_time:.1f} min, Diff = {time_diff:.2f} min")
+
+        # Find last third questions
+        last_third_start_position = np.ceil(total_number_of_questions * 2 / 3)
+        last_third_questions = df_subj[df_subj['question_position'] >= last_third_start_position]
+
+        # Find fast questions at the end (ensure time is not NaN before comparing)
+        fast_end_questions = last_third_questions[last_third_questions['question_time'].notna() & (last_third_questions['question_time'] < 1.0)]
+        print(f"    Subject {subject}: Found {len(fast_end_questions)} questions < 1.0 min in last third.")
+
+        # Determine time pressure
+        time_pressure = False
+        if time_diff <= 3.0 and not fast_end_questions.empty:
+            time_pressure = True
+            print(f"    Subject {subject}: Time Pressure Detected (Diff <= 3 min AND fast end questions exist).")
+            # TODO: Implement user override logic if needed
         else:
-            # This is where the original warning was likely printed
-            print(f"Warning: No diagnosis function explicitly defined or mapped for question type '{q_type}'. Skipping.")
+             print(f"    Subject {subject}: No Time Pressure Detected.")
 
-    # --- 4. Consolidate Results ---
-    if not all_diagnostics:
-        print("No diagnostic results generated.")
-        return pd.DataFrame()
-        
-    try:
-        final_results = pd.concat(all_diagnostics, ignore_index=True)
-    except Exception as e:
-        print(f"Error consolidating diagnostic results: {e}")
-        return pd.DataFrame() # Return empty on error
+        subject_time_pressure_status[subject] = time_pressure # Store status
 
-    # TODO: Add further analysis/summarization if needed
+        # Set overtime threshold based on pressure
+        overtime_threshold = 2.5 if time_pressure else 3.0
+        print(f"    Subject {subject}: Overtime Threshold set to {overtime_threshold:.1f} min.")
+        df_processed.loc[df_subj.index, 'overtime_threshold'] = overtime_threshold
 
-    return final_results
+        # Identify invalid indices (only if time pressure is true)
+        if time_pressure:
+            invalid_indices = fast_end_questions.index.tolist()
+            all_invalid_indices.extend(invalid_indices)
+            print(f"    Subject {subject}: Marked {len(invalid_indices)} question(s) as invalid due to time pressure.")
+
+    # --- Global Rule Application: Mark Invalid and Overtime ---
+    if all_invalid_indices:
+        df_processed.loc[all_invalid_indices, 'is_invalid'] = True
+        print(f"Marked a total of {len(all_invalid_indices)} questions as invalid across all subjects.")
+
+    # Mark overtime for non-invalid rows based on their subject's threshold
+    # Ensure time is not NaN before comparing with threshold
+    df_processed['overtime'] = (
+        df_processed['question_time'].notna() &
+        (df_processed['question_time'] > df_processed['overtime_threshold']) &
+        (~df_processed['is_invalid'])
+    )
+    num_overtime = df_processed['overtime'].sum()
+    print(f"Marked {num_overtime} questions as overtime.")
+
+    num_invalid_questions = len(all_invalid_indices) # Total invalid count
+
+    # --- Filter out invalid data ---
+    df_filtered = df_processed[df_processed['is_invalid'] == False].copy()
+    num_filtered = len(df_processed) - len(df_filtered)
+    print(f"Filtered out {num_filtered} invalid questions. Proceeding with {len(df_filtered)} valid questions for detailed diagnosis.")
+
+    if df_filtered.empty:
+        print("No valid data remaining after filtering. Cannot perform diagnosis.")
+        return "診斷終止：在時間有效性過濾後，沒有剩餘的有效數據可供分析。"
+
+    # --- Calculate Exempted Skills (for Q Chapter 7) ---
+    print("Calculating exempted skills for Q Chapter 7...")
+    exempted_skills = set()
+    # Check if the skill column exists and has content before grouping
+    if 'question_fundamental_skill' in df_filtered.columns and df_filtered['question_fundamental_skill'].notna().any():
+        try:
+            # Group by skill, handling potential NaN skills gracefully
+            grouped_by_skill_valid = df_filtered.dropna(subset=['question_fundamental_skill']).groupby('question_fundamental_skill')
+            for skill, group in grouped_by_skill_valid:
+                # Ensure Correct and overtime columns are boolean before calculation
+                if pd.api.types.is_bool_dtype(group['Correct']) and pd.api.types.is_bool_dtype(group['overtime']):
+                    num_correct_not_overtime = group[(group['Correct'] == True) & (group['overtime'] == False)].shape[0]
+                    if num_correct_not_overtime > 2:
+                        exempted_skills.add(skill)
+                        print(f"  Skill '{skill}' exempted for Q (Correct & Not Overtime: {num_correct_not_overtime} > 2)")
+                else:
+                     print(f"  Skipping exemption calculation for skill '{skill}': 'Correct' or 'overtime' column is not boolean.")
+        except Exception as e:
+            print(f"  Error during exemption calculation: {e}")
+    else:
+        print("  Skipping Q exemption calculation (missing 'question_fundamental_skill' column or column is empty).")
+
+    # --- Dispatch to Subject-Specific Diagnosis ---
+    print("\nDispatching data to subject-specific diagnosis modules...")
+    subject_reports = []
+
+    # Separate dataframes by Subject
+    df_q = df_filtered[df_filtered['Subject'] == 'Q'].copy()
+    df_v = df_filtered[df_filtered['Subject'] == 'V'].copy()
+    df_di = df_filtered[df_filtered['Subject'] == 'DI'].copy()
+
+    # Run Q Diagnosis if data exists
+    if not df_q.empty:
+        q_report = run_q_diagnosis(df_q, exempted_skills, subject_time_pressure_status, num_invalid_questions)
+        subject_reports.append(q_report)
+    else:
+        print("No Q data found.")
+        subject_reports.append("量化 (Quantitative) 部分無有效數據。")
+
+    # Run V Diagnosis if data exists
+    if not df_v.empty:
+        v_report = run_v_diagnosis(df_v, subject_time_pressure_status, num_invalid_questions)
+        subject_reports.append(v_report)
+    else:
+        print("No V data found.")
+        subject_reports.append("語文 (Verbal) 部分無有效數據。")
+
+    # Run DI Diagnosis if data exists
+    if not df_di.empty:
+        di_report = run_di_diagnosis(df_di, subject_time_pressure_status, num_invalid_questions)
+        subject_reports.append(di_report)
+    else:
+        print("No DI data found.")
+        subject_reports.append("數據洞察 (Data Insights) 部分無有效數據。")
+
+    # --- Combine Reports ---
+    print("\nCombining subject reports...")
+    final_report_str = "\n\n---\n\n".join(subject_reports) # Join reports with a separator
+
+    print("Diagnosis process complete.")
+    return final_report_str
+
+# End of run_diagnosis function. No other code should follow.
