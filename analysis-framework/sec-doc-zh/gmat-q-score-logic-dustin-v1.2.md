@@ -1,6 +1,6 @@
 # **第零章：核心輸入數據與設定**
 
-- 每題數據： `question_id` (題目 ID), `question_time` (作答時間/分鐘), `is_correct` (是否正確/布林值), `question_type` ('Real' / 'Pure'), `question_difficulty` (難度值), `question_fundamental_skill` (核心技能), `question_position` (題目順序)。
+- 每題數據： `question_position` (題目位置，必需，作為唯一識別符), `question_time` (作答時間/分鐘), `is_correct` (是否正確/布林值), `question_type` ('Real' / 'Pure'), `question_difficulty` (難度值), `question_fundamental_skill` (核心技能)。
     - **核心技能 (`question_fundamental_skill`) 分類列表:**
         - `Rates/Ratio/Percent`
         - `Value/Order/Factor`
@@ -35,22 +35,22 @@
    - *說明：此閾值用於後續分析中標識單題作答時間 (`question_time`) 是否超時 (`overtime` = `True`)。*
 
 4. **識別無效數據 (`is_invalid`)**: 
-   - 初始化 `invalid_question_ids` = `[]`。
-   - 標記邏輯：如果 `time_pressure` == `True` （根據第 2 步判斷得出），則將 `fast_end_questions` （即最後 1/3 中 `question_time` < 1.0 分鐘的題目）的 `question_id` 加入 `invalid_question_ids` 列表，並為這些題目內部標記 `is_invalid` = `True`。
+   - 初始化 `invalid_question_positions` = `[]`。
+   - 標記邏輯：如果 `time_pressure` == `True` （根據第 2 步判斷得出），則將 `fast_end_questions` （即最後 1/3 中 `question_time` < 1.0 分鐘的題目）的 `question_position` 加入 `invalid_question_positions` 列表，並為這些題目內部標記 `is_invalid` = `True`。
    - *說明：只有在確定存在時間壓力時，末尾的快速作答才被視為無效數據。*
 
 5. **輸出與總結**: 
-   - 本章產生的關鍵標記：`time_pressure` (布林值), `overtime_threshold` (數值), `invalid_question_ids` (列表), 以及題目上的 `is_invalid` 標記。
+   - 本章產生的關鍵標記：`time_pressure` (布林值), `overtime_threshold` (數值), `invalid_question_positions` (列表), 以及題目上的 `is_invalid` 標記。
 
 **全局規則應用：數據過濾與標記**
 
 1.  **標記超時 (`overtime`):** 對於所有**未被標記為 `is_invalid`** 的題目，若其 `question_time` > `overtime_threshold`，則為該題目添加內部標記 `overtime` = `True`。
-2.  **創建過濾數據集：** 從原始題目數據中，移除 所有 `question_id` 包含在 `invalid_question_ids` 列表中的題目。
+2.  **創建過濾數據集：** 從原始題目數據中，移除 所有 `question_position` 包含在 `invalid_question_positions` 列表中的題目。
 3.  **後續分析範圍：** 第二章至第七章的所有計算、分析和建議，僅基於這個過濾後的數據集。
 
 <aside>
 
-**本章總結：** 我們首先計算了總時間差 (`time_diff`)，然後結合時間差和測驗末尾的作答速度判斷了學生是否處於時間壓力 (`time_pressure`) 下。基於時間壓力狀態，我們設定了統一的單題超時閾值 (`overtime_threshold`)。最後，僅在確認存在時間壓力的情況下，我們將測驗末尾作答過快的題目識別為無效數據 (`is_invalid`) 並記錄其 ID (`invalid_question_ids`)。在進行後續分析前，我們會先根據超時閾值標記超時題目 (`overtime`)，然後過濾掉無效數據。
+**本章總結：** 我們首先計算了總時間差 (`time_diff`)，然後結合時間差和測驗末尾的作答速度判斷了學生是否處於時間壓力 (`time_pressure`) 下。基於時間壓力狀態，我們設定了統一的單題超時閾值 (`overtime_threshold`)。最後，僅在確認存在時間壓力的情況下，我們將測驗末尾作答過快的題目識別為無效數據 (`is_invalid`) 並記錄其位置 (`invalid_question_positions`)。在進行後續分析前，我們會先根據超時閾值標記超時題目 (`overtime`)，然後過濾掉無效數據。
 
 **結果去向：** `time_pressure` 狀態和 `overtime_threshold` 將作為後續分析的重要背景信息。被標記為 `overtime` 的題目會在後續章節用於診斷慢題。被標記為 `is_invalid` 的題目將在第二章至第七章的分析中被過濾排除，以確保分析的準確性。
 
@@ -60,7 +60,7 @@
 
 **全局規則應用：數據過濾**
 
-1. 創建過濾數據集： 從原始題目數據中，移除 所有 `question_id` 包含在 `invalid_question_ids` 列表中的題目。
+1. 創建過濾數據集： 從原始題目數據中，移除 所有 `question_position` 包含在 `invalid_question_positions` 列表中的題目。
 2. 後續分析範圍： 第二章至第七章的所有計算、分析和建議，僅基於這個過濾後的數據集。（註：標識題目是否 `overtime` 的步驟應在此數據過濾後，根據第一章確定的 `overtime_threshold` 進行。）
 
 <aside>
@@ -207,7 +207,7 @@
 
 1. **篩選題目：** 找出過濾數據中 `is_correct` = `True` 且 `overtime` = `True` 的題目 (即作答正確但用時超過 `overtime_threshold` 的題目)。
 2. **記錄與推測 (關聯診斷參數)：**
-    - 記錄這些題目的 `question_id`, `question_type`, `question_fundamental_skill`, `question_time`。
+    - 記錄這些題目的 `question_position`, `question_type`, `question_fundamental_skill`, `question_time`。
     - 可能原因 (診斷參數):
         - `` `Q_EFFICIENCY_BOTTLENECK_READING` `` (若 `question_type` == 'Real')
         - `` `Q_EFFICIENCY_BOTTLENECK_CONCEPT` ``
@@ -235,7 +235,7 @@
 
 1. **前期過快題目：**
    找出 `question_position` <= `total_number_of_questions` / 3 且 `question_time` < 1.0 分鐘的題目 (絕對標準)。
-   記錄這些題目的 `question_id`, `question_type`, `question_fundamental_skill`，並關聯診斷參數 `` `Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``。輸出風險提醒：「**注意 `flag for review` 議題**」。
+   記錄這些題目的 `question_position`, `question_type`, `question_fundamental_skill`，並關聯診斷參數 `` `Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``。輸出風險提醒：「**注意 `flag for review` 議題**」。
 1. **粗心率計算 (`carelessness_issue`)：**
     `num_relatively_fast_total` = 過濾數據中滿足第三章「快」定義 (`is_relatively_fast` == `True`) 的總數。
     `num_relatively_fast_incorrect` = 過濾數據中 `is_relatively_fast` == `True` 且 `is_correct` == `False` 的總數。

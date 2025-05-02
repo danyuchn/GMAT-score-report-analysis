@@ -1,8 +1,20 @@
+import sys
+import os
+
+# Get the directory containing app.py
+app_dir = os.path.dirname(os.path.abspath(__file__))
+# Get the parent directory (project root)
+project_root = os.path.dirname(app_dir)
+
+# Add the project root to the beginning of sys.path
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import streamlit as st
 import pandas as pd
 from io import StringIO # Use io.StringIO directly
-import irt_module as irt # Import the updated module
-from diagnosis_module import run_diagnosis # Import the diagnosis function
+from gmat_diagnosis_app import irt_module as irt # Import using absolute path
+from gmat_diagnosis_app.diagnosis_module import run_diagnosis # Import using absolute path
 import os # For environment variables
 import openai # Import OpenAI library
 
@@ -57,17 +69,24 @@ with st.expander("Quantitative (Q) 資料輸入", expanded=False):
     if source_q is not None:
         try:
             temp_df_q = pd.read_csv(source_q, sep=None, engine='python')
-            # --- Standardize Columns (Keep original metadata, map Correct) ---
-            # Use a consistent base mapping, Q_b/V_b/DI_b are no longer primary source of difficulty
+            # Drop rows where all columns are NaN (completely empty rows)
+            temp_df_q.dropna(how='all', inplace=True)
+
+            # --- Standardize Columns (Handle potential 'Question' variations) ---
             rename_map_q = {
-                '\ufeffQuestion': 'Question ID', # Handle BOM
+                # '﻿Question': 'question_position', # Old logic
                 'Performance': 'Correct',
-                'Response Time (Minutes)': 'question_time', # Keep for potential future use
-                'Question Type': 'question_type', # Keep for potential future use
-                'Content Domain': 'content_domain', # Keep for potential future use
-                'Fundamental Skills': 'question_fundamental_skill' # Keep
-                # Removed mapping for Q_b
+                'Response Time (Minutes)': 'question_time',
+                'Question Type': 'question_type',
+                'Content Domain': 'content_domain',
+                'Fundamental Skills': 'question_fundamental_skill'
             }
+            # Dynamically add the position mapping
+            if '﻿Question' in temp_df_q.columns:
+                rename_map_q['﻿Question'] = 'question_position'
+            elif 'Question' in temp_df_q.columns: # Check for plain 'Question'
+                rename_map_q['Question'] = 'question_position'
+
             # Apply only columns that exist
             cols_to_rename = {k: v for k, v in rename_map_q.items() if k in temp_df_q.columns}
             temp_df_q.rename(columns=cols_to_rename, inplace=True)
@@ -75,6 +94,7 @@ with st.expander("Quantitative (Q) 資料輸入", expanded=False):
             if 'Correct' in temp_df_q.columns:
                  # Convert to boolean consistently
                  temp_df_q['Correct'] = temp_df_q['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
+                 temp_df_q.rename(columns={'Correct': 'is_correct'}, inplace=True) # Rename to is_correct
             else:
                 st.error("Q 資料缺少 'Performance' (Correct) 欄位，無法確定錯誤題目。")
                 temp_df_q = None
@@ -82,8 +102,18 @@ with st.expander("Quantitative (Q) 資料輸入", expanded=False):
             if temp_df_q is not None:
                 data_sources['Q'] = 'File Upload' if uploaded_file_q else 'Pasted Data'
                 st.success(f"Q 科目資料讀取成功 ({data_sources['Q']})！")
-                # Add section identifier
+                # Add subject identifier and rename
                 temp_df_q['Subject'] = 'Q'
+
+                # --- Ensure independent question_position for Q ---
+                if 'question_position' not in temp_df_q.columns or pd.to_numeric(temp_df_q['question_position'], errors='coerce').isnull().any():
+                    st.warning("Q: 正在根據原始順序重新生成 question_position。")
+                    temp_df_q = temp_df_q.reset_index(drop=True)
+                    temp_df_q['question_position'] = temp_df_q.index + 1
+                else:
+                    # Ensure it's integer type after validation
+                    temp_df_q['question_position'] = pd.to_numeric(temp_df_q['question_position'], errors='coerce').astype('Int64')
+                # --- End Ensure ---
 
         except Exception as e:
             st.error(f"處理 Q 科目資料時發生錯誤：{e}")
@@ -108,19 +138,28 @@ with st.expander("Verbal (V) 資料輸入", expanded=False):
     if source_v is not None:
         try:
             temp_df_v = pd.read_csv(source_v, sep=None, engine='python')
+            # Drop rows where all columns are NaN (completely empty rows)
+            temp_df_v.dropna(how='all', inplace=True)
+
             rename_map_v = {
-                '\ufeffQuestion': 'Question ID',
+                # '﻿Question': 'question_position',
                 'Performance': 'Correct',
                 'Response Time (Minutes)': 'question_time',
                 'Question Type': 'question_type',
                 'Fundamental Skills': 'question_fundamental_skill'
-                # Removed mapping for V_b
             }
+            # Dynamically add the position mapping
+            if '﻿Question' in temp_df_v.columns:
+                rename_map_v['﻿Question'] = 'question_position'
+            elif 'Question' in temp_df_v.columns:
+                rename_map_v['Question'] = 'question_position'
+
             cols_to_rename = {k: v for k, v in rename_map_v.items() if k in temp_df_v.columns}
             temp_df_v.rename(columns=cols_to_rename, inplace=True)
             
             if 'Correct' in temp_df_v.columns:
                  temp_df_v['Correct'] = temp_df_v['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
+                 temp_df_v.rename(columns={'Correct': 'is_correct'}, inplace=True) # Rename to is_correct
             else:
                  st.error("V 資料缺少 'Performance' (Correct) 欄位，無法確定錯誤題目。")
                  temp_df_v = None
@@ -128,8 +167,18 @@ with st.expander("Verbal (V) 資料輸入", expanded=False):
             if temp_df_v is not None:
                 data_sources['V'] = 'File Upload' if uploaded_file_v else 'Pasted Data'
                 st.success(f"V 科目資料讀取成功 ({data_sources['V']})！")
-                # Add section identifier
+                # Add subject identifier and rename
                 temp_df_v['Subject'] = 'V'
+
+                # --- Ensure independent question_position for V ---
+                if 'question_position' not in temp_df_v.columns or pd.to_numeric(temp_df_v['question_position'], errors='coerce').isnull().any():
+                    st.warning("V: 正在根據原始順序重新生成 question_position。")
+                    temp_df_v = temp_df_v.reset_index(drop=True)
+                    temp_df_v['question_position'] = temp_df_v.index + 1
+                else:
+                    # Ensure it's integer type after validation
+                    temp_df_v['question_position'] = pd.to_numeric(temp_df_v['question_position'], errors='coerce').astype('Int64')
+                # --- End Ensure ---
 
         except Exception as e:
             st.error(f"處理 V 科目資料時發生錯誤：{e}")
@@ -154,19 +203,28 @@ with st.expander("Data Insights (DI) 資料輸入", expanded=False):
     if source_di is not None:
         try:
             temp_df_di = pd.read_csv(source_di, sep=None, engine='python')
+            # Drop rows where all columns are NaN (completely empty rows)
+            temp_df_di.dropna(how='all', inplace=True)
+
             rename_map_di = {
-                '\ufeffQuestion': 'Question ID',
+                # '﻿Question': 'question_position',
                 'Performance': 'Correct',
                 'Response Time (Minutes)': 'question_time',
                 'Question Type': 'question_type',
                 'Content Domain': 'content_domain'
-                 # Removed mapping for DI_b
             }
+            # Dynamically add the position mapping
+            if '﻿Question' in temp_df_di.columns:
+                rename_map_di['﻿Question'] = 'question_position'
+            elif 'Question' in temp_df_di.columns:
+                rename_map_di['Question'] = 'question_position'
+
             cols_to_rename = {k: v for k, v in rename_map_di.items() if k in temp_df_di.columns}
             temp_df_di.rename(columns=cols_to_rename, inplace=True)
             
             if 'Correct' in temp_df_di.columns:
                  temp_df_di['Correct'] = temp_df_di['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
+                 temp_df_di.rename(columns={'Correct': 'is_correct'}, inplace=True) # Rename to is_correct
             else:
                  st.error("DI 資料缺少 'Performance' (Correct) 欄位，無法確定錯誤題目。")
                  temp_df_di = None
@@ -174,8 +232,18 @@ with st.expander("Data Insights (DI) 資料輸入", expanded=False):
             if temp_df_di is not None:
                 data_sources['DI'] = 'File Upload' if uploaded_file_di else 'Pasted Data'
                 st.success(f"DI 科目資料讀取成功 ({data_sources['DI']})！")
-                # Add section identifier
+                # Add subject identifier and rename
                 temp_df_di['Subject'] = 'DI'
+
+                # --- Ensure independent question_position for DI ---
+                if 'question_position' not in temp_df_di.columns or pd.to_numeric(temp_df_di['question_position'], errors='coerce').isnull().any():
+                    st.warning("DI: 正在根據原始順序重新生成 question_position。")
+                    temp_df_di = temp_df_di.reset_index(drop=True)
+                    temp_df_di['question_position'] = temp_df_di.index + 1
+                else:
+                    # Ensure it's integer type after validation
+                    temp_df_di['question_position'] = pd.to_numeric(temp_df_di['question_position'], errors='coerce').astype('Int64')
+                # --- End Ensure ---
 
         except Exception as e:
             st.error(f"處理 DI 科目資料時發生錯誤：{e}")
@@ -201,18 +269,20 @@ if df_di is not None: df_combined_input_list.append(df_di)
 df_combined_input = None
 if df_combined_input_list:
      try:
+         # Concatenate with ignore_index=True, but 'question_position' is already calculated per subject
          df_combined_input = pd.concat(df_combined_input_list, ignore_index=True)
-         # Ensure question_position exists for sorting, add if missing based on index
+
+         # Ensure 'question_position' column exists after concat (it should, unless all inputs failed processing)
          if 'question_position' not in df_combined_input.columns:
-             st.warning("輸入資料缺少 'question_position' 欄位，將使用原始順序作為位置。")
-             # Assuming index corresponds to position if missing
-             df_combined_input['question_position'] = df_combined_input.index + 1 
+             st.error("合併後資料缺少 'question_position' 欄位，無法繼續。檢查各科數據處理。")
+             df_combined_input = None
+         elif df_combined_input['question_position'].isnull().any():
+              st.error("合併後 'question_position' 欄位包含空值，無法繼續。檢查各科數據處理。")
+              df_combined_input = None
          else:
-              # Convert position to numeric and handle errors
-              df_combined_input['question_position'] = pd.to_numeric(df_combined_input['question_position'], errors='coerce')
-              if df_combined_input['question_position'].isnull().any():
-                    st.error("'question_position' 欄位包含非數值，無法排序。請檢查數據。")
-                    df_combined_input = None # Stop processing if position is invalid
+             # Optional: Sort for better viewing/debugging, though later logic sorts per subject
+             df_combined_input.sort_values(by=['Subject', 'question_position'], inplace=True)
+
      except Exception as e:
          st.error(f"合併或處理輸入資料時發生錯誤: {e}")
          df_combined_input = None
@@ -260,22 +330,28 @@ else:
                 
                 # Get WRONG indices from the *original* user data for this subject
                 user_df_subj = df_combined_input[df_combined_input['Subject'] == subject]
-                wrong_indices = []
-                if 'Correct' in user_df_subj.columns:
+                wrong_indices = [] # Keep variable name for now, but it holds positions
+                # Check for the final column name 'is_correct'
+                if 'is_correct' in user_df_subj.columns:
                     # Sort by position before getting indices
                     user_df_subj_sorted = user_df_subj.sort_values(by='question_position')
-                    wrong_indices = user_df_subj_sorted[user_df_subj_sorted['Correct'] == False].index + 1
-                    wrong_indices = wrong_indices.tolist()
+                    # Filter using the final column name 'is_correct'
+                    # --- CORRECTED LOGIC HERE ---
+                    # Directly get the 'question_position' values of incorrect answers
+                    wrong_positions = user_df_subj_sorted[user_df_subj_sorted['is_correct'] == False]['question_position'].tolist()
+                    wrong_indices = wrong_positions # Assign to the variable expected by the simulation function
+                    # --- END CORRECTION ---
                     st.write(f"  {subject}: 從用戶數據提取 {len(wrong_indices)} 個錯誤題目位置: {wrong_indices[:10]}...")
                 else:
-                    st.warning(f"  {subject}: 用戶數據缺少 'Correct'，假設全部答對進行模擬。")
+                    # This warning should now only appear if 'Performance' was truly missing initially
+                    st.warning(f"  {subject}: 用戶數據缺少 'is_correct' 欄位 (源自 'Performance')，假設全部答對進行模擬。")
                     wrong_indices = []
 
                 # Run the simulation
                 try:
                     history_df = irt.simulate_cat_exam(
                         question_bank=bank,
-                        wrong_question_indices=wrong_indices,
+                        wrong_question_indices=wrong_indices, # Pass the list of actual wrong positions
                         initial_theta=initial_theta,
                         total_questions=total_sim_questions # Use the simulation total questions
                     )
@@ -365,48 +441,63 @@ else:
                     # Ensure all required columns for the *markdown logic* are present
                     # Markdown needs: 'Correct', 'question_difficulty', 'question_time', 'question_type', 
                     # 'question_fundamental_skill', 'question_position'
-                    required_markdown_cols = ['Correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'question_position']
+                    required_markdown_cols = ['is_correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'question_position']
                     missing_cols = [col for col in required_markdown_cols if col not in df_final_for_diagnosis.columns]
                     
                     if not missing_cols:
                         # Pass the combined data to the diagnosis module
                         # Consider passing total_test_time if collected
-                        result_df = run_diagnosis(df_final_for_diagnosis)
-                        
-                        if result_df is not None and not result_df.empty:
+                        report_string = run_diagnosis(df_final_for_diagnosis) # Changed variable name
+
+                        # Check if the report string is not None and not empty
+                        if report_string:
                             st.success("診斷分析完成！")
                             st.subheader("診斷結果")
-                            st.dataframe(result_df)
+                            # Use st.markdown to display the report string
+                            st.markdown(report_string)
 
-                            # Download Button
-                            try:
-                                csv_data = result_df.to_csv(index=False).encode('utf-8')
-                                st.download_button(
-                                    label="下載診斷結果 CSV",
-                                    data=csv_data,
-                                    file_name='gmat_diagnosis_result_sim_b.csv', # Indicate sim b used
-                                    mime='text/csv',
-                                    key='download-diag-sim-b'
-                                )
-                            except Exception as e:
-                                st.error(f"準備下載檔時發生錯誤：{e}")
+                            # --- Download Button (Commented out as report is now a string) ---
+                            # try:
+                            #     # If we want to download the string report:
+                            #     # report_bytes = report_string.encode('utf-8')
+                            #     # st.download_button(
+                            #     #     label="下載診斷報告 (.txt)",
+                            #     #     data=report_bytes,
+                            #     #     file_name='gmat_diagnosis_report.txt',
+                            #     #     mime='text/plain',
+                            #     #     key='download-diag-report-txt'
+                            #     # )
+                            #     # Original CSV download based on DataFrame:
+                            #     # csv_data = result_df.to_csv(index=False).encode('utf-8')
+                            #     # st.download_button(
+                            #     #     label="下載診斷結果 CSV",
+                            #     #     data=csv_data,
+                            #     #     file_name='gmat_diagnosis_result_sim_b.csv', # Indicate sim b used
+                            #     #     mime='text/csv',
+                            #     #     key='download-diag-sim-b'
+                            #     # )
+                            #     pass # Keep commented out for now
+                            # except Exception as e:
+                            #     st.error(f"準備下載檔時發生錯誤：{e}")
+                            # --- End Download Button ---
                         else:
-                            st.warning("診斷分析未返回結果。請檢查 `diagnosis_module.py`。")
+                            st.warning("診斷分析未返回結果或結果為空。請檢查 `diagnosis_module.py`。") # Updated warning
                     else:
                         st.error(f"準備用於診斷的資料缺少 Markdown 邏輯所需欄位: {missing_cols}。無法執行診斷。")
-                        result_df = None
+                        report_string = None # Ensure variable exists even if error occurs
             except Exception as e:
                 st.error(f"執行診斷時發生錯誤：{e}")
-                result_df = None
+                report_string = None # Ensure variable exists after exception
 
-            # --- Generate OpenAI Summary --- (Uses diagnosis result_df)
-            if result_df is not None and not result_df.empty:
+            # --- Generate OpenAI Summary --- (Uses diagnosis report_string)
+            # Check if report_string exists and is not empty
+            if report_string:
                 if openai_api_key:
                     st.header("4. AI 文字摘要 (基於詳細診斷)")
                     try:
                         client = openai.OpenAI(api_key=openai_api_key)
-                        prompt_data = result_df.to_string()
-                        prompt = f"""請根據以下 GMAT 診斷結果摘要（基於用戶實際表現數據，但使用了模擬難度估計），產生一段簡潔的總結報告（約 150-200 字），說明主要的強項、弱項或值得注意的模式。請使用繁體中文回答。\n\n診斷摘要：\n{prompt_data}\n\n總結報告："""
+                        # Use the report string directly in the prompt
+                        prompt = f"""請根據以下 GMAT 診斷報告（基於用戶實際表現數據，但使用了模擬難度估計），產生一段簡潔的總結報告（約 150-200 字），說明主要的強項、弱項或值得注意的模式。請使用繁體中文回答。\n\n診斷報告：\n{report_string}\n\n總結報告："""
                         with st.spinner("正在生成文字摘要..."):
                             response = client.chat.completions.create(
                                 model="gpt-3.5-turbo",
