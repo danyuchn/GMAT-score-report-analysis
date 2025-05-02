@@ -313,7 +313,7 @@ def run_diagnosis(df):
         v_invalid_count = df_processed[(df_processed['Subject'] == 'V') & (df_processed['is_invalid'])].shape[0]
         v_avg_times = subject_avg_time_per_type.get('V', {})
         # Call updated function and capture all return values
-        v_results, v_report, df_v_processed = run_v_diagnosis(df_v, subject_time_pressure_status.get('V', False), v_invalid_count, v_avg_times)
+        v_results, v_report, df_v_processed = run_v_diagnosis(df_v, subject_time_pressure_status.get('V', False), v_avg_times, v_invalid_count)
         subject_report_dict['V'] = v_report # Store V report in the dictionary
         if df_v_processed is not None and not df_v_processed.empty: # Check if df returned is valid
              processed_dfs_list.append(df_v_processed) # Append processed V df

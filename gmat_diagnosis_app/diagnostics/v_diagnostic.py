@@ -459,7 +459,7 @@ def _calculate_first_third_averages(df):
 
 # --- Main V Diagnosis Runner ---
 
-def run_v_diagnosis(df_v, v_time_pressure_status, v_avg_time_per_type): # Removed num_invalid_v_questions
+def run_v_diagnosis(df_v, v_time_pressure_status, v_avg_time_per_type, v_invalid_count=0): # Added v_invalid_count parameter
     """
     Runs the diagnostic analysis specifically for the Verbal section.
 
@@ -467,6 +467,7 @@ def run_v_diagnosis(df_v, v_time_pressure_status, v_avg_time_per_type): # Remove
         df_v (pd.DataFrame): DataFrame containing V response data (can include invalid).
         v_time_pressure_status (bool): Whether time pressure was detected for V.
         v_avg_time_per_type (dict): Dictionary mapping V question types to average times (overall).
+        v_invalid_count (int): Number of invalid V questions already identified.
 
     Returns:
         dict: A dictionary containing the results of the V diagnosis.
@@ -553,9 +554,11 @@ def run_v_diagnosis(df_v, v_time_pressure_status, v_avg_time_per_type): # Remove
         hasty_cr_mask = pd.Series(False, index=df_v.index) # Initialize with False
         first_third_cr_avg = first_third_avg_time_per_type.get('CR', None)
         if first_third_cr_avg is not None and first_third_cr_avg > 0:
-            hasty_cr_mask = (df_v['question_type'] == 'CR') & \\
-                            (df_v['question_time'] < first_third_cr_avg * 0.5) & \\
-                            last_third_mask
+            hasty_cr_mask = (
+                (df_v['question_type'] == 'CR') & \
+                (df_v['question_time'] < first_third_cr_avg * 0.5) & \
+                last_third_mask
+            )
         else:
             print("DEBUG: First third CR average time not available or zero, skipping hasty CR check.")
 
@@ -563,14 +566,25 @@ def run_v_diagnosis(df_v, v_time_pressure_status, v_avg_time_per_type): # Remove
         # Hasty condition 3 (RC): group_time < 0.5 * (first_third_avg * group_size)
         hasty_rc_mask = pd.Series(False, index=df_v.index) # Initialize with False
         first_third_rc_avg = first_third_avg_time_per_type.get('RC', None)
-        if first_third_rc_avg is not None and first_third_rc_avg > 0 and \\
-           'rc_group_total_time' in df_v.columns and 'rc_group_size' in df_v.columns:
+        if (first_third_rc_avg is not None and 
+            first_third_rc_avg > 0 and 
+            'rc_group_total_time' in df_v.columns and 
+            'rc_group_size' in df_v.columns):
             # Apply only where rc_group_total_time and rc_group_size are valid
-            valid_rc_check_mask = df_v['rc_group_total_time'].notna() & df_v['rc_group_size'].notna() & (df_v['rc_group_size'] > 0)
-            hasty_rc_mask = (df_v['question_type'] == 'RC') & \\
-                            (df_v['rc_group_total_time'] < (first_third_rc_avg * df_v['rc_group_size'] * 0.5)) & \\
-                            valid_rc_check_mask & \\
-                            last_third_mask
+            # Create mask for valid RC group data
+            valid_rc_check_mask = (
+                df_v['rc_group_total_time'].notna() & 
+                df_v['rc_group_size'].notna() & 
+                (df_v['rc_group_size'] > 0)
+            )
+            
+            # Create mask for hasty RC questions
+            hasty_rc_mask = (
+                (df_v['question_type'] == 'RC') & \
+                (df_v['rc_group_total_time'] < (first_third_rc_avg * df_v['rc_group_size'] * 0.5)) & \
+                valid_rc_check_mask & \
+                last_third_mask
+            )
         else:
             print("DEBUG: First third RC average time, group time, or group size not available/valid, skipping hasty RC check.")
 
@@ -750,21 +764,37 @@ def run_v_diagnosis(df_v, v_time_pressure_status, v_avg_time_per_type): # Remove
     else:
         print("WARNING (v_diagnostic.py): 'diagnostic_params' column not found for translation.")
         # Initialize with empty lists if column doesn't exist
-        df_v['diagnostic_params_list_chinese'] = [[] for _ in range(len(df_v))]
+        # Ensure correct initialization syntax and apply it to the dataframe
+        num_rows = len(df_v)
+        df_v['diagnostic_params_list_chinese'] = pd.Series([[] for _ in range(num_rows)], index=df_v.index)
 
 
-    # --- Drop original English codes column ---
+    # --- Drop original English codes column --- 
     if 'diagnostic_params' in df_v.columns:
-        df_v.drop(columns=['diagnostic_params'], inplace=True)
-        print("DEBUG (v_diagnostic.py): Dropped 'diagnostic_params' column.")
+        try:
+             df_v.drop(columns=['diagnostic_params'], inplace=True)
+             print("DEBUG (v_diagnostic.py): Dropped 'diagnostic_params' column.")
+        except KeyError: # Handle case where column might have already been dropped or renamed
+             print("DEBUG (v_diagnostic.py): 'diagnostic_params' column not found during drop (might be already handled).")
 
-    # --- Rename translated column ---
+    # --- Rename translated column --- 
     if 'diagnostic_params_list_chinese' in df_v.columns:
-        df_v.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
-        print("DEBUG (v_diagnostic.py): Renamed 'diagnostic_params_list_chinese' to 'diagnostic_params_list'")
+        try:
+            df_v.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
+            print("DEBUG (v_diagnostic.py): Renamed 'diagnostic_params_list_chinese' to 'diagnostic_params_list'")
+        except Exception as e: # Catch potential errors during rename
+             print(f"ERROR renaming column: {e}")
+             # If rename fails, ensure the target column still exists or is created
+             if 'diagnostic_params_list' not in df_v.columns:
+                 print("Initializing 'diagnostic_params_list' after rename failed.")
+                 num_rows = len(df_v)
+                 df_v['diagnostic_params_list'] = pd.Series([[] for _ in range(num_rows)], index=df_v.index)
     else:
-        print("DEBUG (v_diagnostic.py): Target list column not found or renamed. Initializing 'diagnostic_params_list'.")
-        df_v['diagnostic_params_list'] = [[] for _ in range(len(df_v))]
+        # If rename source doesn't exist, still ensure target 'diagnostic_params_list' exists
+        print("DEBUG (v_diagnostic.py): Source column ('diagnostic_params_list_chinese') not found for rename. Ensuring 'diagnostic_params_list' exists.")
+        if 'diagnostic_params_list' not in df_v.columns:
+            num_rows = len(df_v)
+            df_v['diagnostic_params_list'] = pd.Series([[] for _ in range(num_rows)], index=df_v.index)
 
     # --- Initialize results dictionary --- 
     v_diagnosis_results = {}
@@ -775,6 +805,12 @@ def run_v_diagnosis(df_v, v_time_pressure_status, v_avg_time_per_type): # Remove
         'invalid_questions_excluded': num_invalid_v_questions
         # Add other relevant Ch1 metrics if calculated (e.g., total time, avg time)
     }
+    
+    # Use provided v_invalid_count if it's greater than the calculated value
+    if v_invalid_count > num_invalid_v_questions:
+        print(f"    Using provided invalid question count ({v_invalid_count}) for reporting instead of calculated value ({num_invalid_v_questions}).")
+        v_diagnosis_results['chapter_1']['invalid_questions_excluded'] = v_invalid_count
+        
     print("  Populated Chapter 1 V results.")
 
     # --- Populate Chapter 2 Results (Basic Metrics) --- 
