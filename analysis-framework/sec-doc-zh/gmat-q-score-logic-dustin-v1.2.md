@@ -302,18 +302,12 @@
 2.  **生成與初步分類建議：**
     - 初始化一個字典 `recommendations_by_skill` = `{}`，用於按技能臨時存儲建議列表。
     - 初始化一個集合 `processed_override_skills` = `set()`，用於記錄已處理宏觀建議的技能。
-    - **計算豁免技能:**
-        - 初始化一個集合 `exempted_skills` = `set()`。
-        - 對於每個 `fundamental_skill` (`S`):
-            - 計算該技能下正確 (`is_correct`==`True`) 且未超時 (`overtime`==`False`) 的題目數量 `num_correct_not_overtime`。
-            - 若 `num_correct_not_overtime` > 2，則將 `S` 添加到 `exempted_skills`。
     - 遍歷所有建議觸發點對應的題目 `X` (其核心技能為 `S`，難度為 `D`，原始用時為 `T`)：
-        - **檢查豁免:** 如果技能 `S` 在 `exempted_skills` 中，則跳過此題目的個案建議生成。
         - **檢查宏觀建議 (針對技能 S):** 如果 `skill_override_triggered`[`S`] 為 `True` 且技能 `S` **未**在 `processed_override_skills` 中：
             - 生成宏觀建議 `G` = "針對 [`S`] 技能，由於整體表現有較大提升空間 (根據第六章分析)，建議全面鞏固基礎，可從 [`Y_agg`] 難度題目開始系統性練習，掌握核心方法，建議限時 [`Z_agg`] 分鐘。" (`Y_agg` 和 `Z_agg` 來自第六章)。
             - 將宏觀建議 `G` 添加到 `recommendations_by_skill`[`S`]。
             - 將技能 `S` 添加到 `processed_override_skills`。
-        - **生成個案建議 (若技能 S 未觸發宏觀建議且未被豁免):**
+        - **生成個案建議 (若技能 S 未觸發宏觀建議):**
             - **練習難度 (`Y`):** 根據題目 `X` 的難度 `D` 進行映射（**統一 6 級標準**）：
                 - 若 `D` ≤ -1: `Y` = "低難度 (Low) / 505+"
                 - 若 -1 < `D` ≤ 0: `Y` = "中難度 (Mid) / 555+"
@@ -330,7 +324,6 @@
             - 添加個案建議 `C` 到 `recommendations_by_skill`[`Skill`]。
 3.  **整理與輸出建議列表：**
     - 初始化 `final_recommendations`。
-    - **處理豁免技能:** 對於在 `exempted_skills` 中的每個技能 `S`，如果它**未**觸發宏觀建議，則添加一條豁免說明到 `final_recommendations`：「技能 [`S`] 表現穩定，可暫緩練習。」
     - **整理聚合建議:** 遍歷 `recommendations_by_skill` 字典。
         - 對於每個技能 `S` 及其建議列表 `skill_recs`:
             - 如果列表非空：
@@ -338,7 +331,7 @@
                     - 檢查第二章的 `poor_real` 標籤：若 `poor_real` = `True` 且觸發該技能建議的題目中至少包含一道 `'Real'` 型題目，則在技能 `S` 的建議文本末尾追加「**Real題比例建議佔總練習題量2/3。**」
                     - 檢查第二章的 `slow_pure` 標籤：若 `slow_pure` = `True` 且觸發該技能建議的題目中至少包含一道 `'Pure'` 型題目，則在技能 `S` 的建議文本末尾追加「**建議此考點練習題量增加。**」
                 - 將整理好的技能 `S` 的建議（可能包含一條宏觀建議和/或多條個案建議，已應用側重規則）添加到 `final_recommendations`。
-    - **最終輸出:** 輸出 `final_recommendations`，確保按技能聚合，優先顯示標註 `special_focus_error` 的建議，並包含豁免說明。
+    - **最終輸出:** 輸出 `final_recommendations`，確保按技能聚合，優先顯示標註 `special_focus_error` 的建議。
 
 ---
 
@@ -379,7 +372,6 @@
 **6. 練習計劃呈現**
 
 *   (此處清晰、完整地列出第七章生成的所有練習建議)
-*   (包含豁免說明，例如：『技能 [`被豁免的技能名`] 表現穩定，可暫緩練習。』)
 *   (包含側重說明，例如：『針對 [`技能名`] 的練習，建議增加 `Real`/`Pure` 題的比例...』(基於 `poor_real`/`slow_pure` 等參數))
 *   (確保 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 相關建議優先顯示或突出標註)
 

@@ -409,54 +409,68 @@
 
 <aside>
 
-**本章目標：** 基於前面所有章節的分析結果（特別是第三章的診斷和第五章的覆蓋規則），生成具體、可操作的練習建議。
+**本章目標：** 基於診斷結果，生成具體、可操作的練習建議。
 
-**主要關注：** 整合錯誤分析 (`is_correct`==`False`)、正確但超時 (`is_correct`==`True` 且 `overtime`==`True`) 分析、特殊關注錯誤 (`special_focus_error`) 以及題型覆蓋規則 (`override_triggered`) 的結果，為相關的 `question_type` 創建具體（指定難度 `Y`、限時 `Z`）或宏觀（指定難度 `Y_agg`、限時 `Z_agg`）的練習任務。同時，根據第三章診斷附加練習方法建議，並應用第二章的 `content_domain` 表現調整規則（豁免/側重）。
+**主要關注：** 提供練習材料、方法、重點（難度、限時）和基礎能力訓練計劃。區分宏觀與個案建議，並應用領域側重規則。
 
-**為何重要：** 這是將診斷結果轉化為實際改進方案的關鍵一步，旨在為學生提供一個個性化、層次分明（區分基礎鞏固和個案突破）、包含練習內容（What）、難度（Y/Y_agg）、限時（Z/Z_agg）和方法（How）的完整練習計劃。
+**為何重要：** 將診斷轉化為行動。
 
 </aside>
 
-- **建議觸發點：** 第三章診斷出的錯誤題目 (`is_correct` == `False`) 和正確但超時的題目 (`is_correct` == `True` 且 `overtime` == `True`)，以及第五章觸發 `override_triggered` 的 `question_type`。
-- **建議生成邏輯：**
-    - **前置計算/準備：**
-        - 初始化字典 `recommendations_by_type` = `{}`。
+- *(註：本章的建議生成依賴於前續章節的分析結果，包括但不限於：`question_type`, `content_domain`, `is_correct`, `overtime`, `is_sfe`, `diagnostic_params`, 難度分級 (`Y`), 難度分數 (`D`), 原始用時 (`T`), 目標用時 (`target_time_minutes`), 第五章的 `override_results`，第二章的 `domain_tags`，均遵循當前版本定義。)*
+- **練習教材與範圍建議**
+    - 核心材料: Official Guide (OG), Official Practice Exams (OPE), etc.
+    - 補充練習: GMAT Club 等平台 (可篩選特定題型、難度)。
+- **練習建議生成邏輯 (`_generate_di_recommendations`)**
+    - **函數定義:**
+        - `floor_to_nearest_0.5`(`value`): 將輸入數值 `value` 向下取整到最接近的 0.5 的倍數。
+    - **前置計算:**
+        - 初始化字典 `recommendations_by_type` = `{q_type: [] for q_type in all_di_types}`。
         - 初始化集合 `processed_override_types` = `set()`。
-        - **計算豁免組合:**
-            - 初始化集合 `exempted_combinations` = `set()`。
-            - 對於每個 `question_type` (`Qt`) 和 `content_domain` (`Dm`) 的組合：
-                - 計算該組合下正確 (`is_correct`==`True`) 且未超時 (`overtime`==`False`) 的題目數量 `num_correct_not_overtime`。
-                - 若 `num_correct_not_overtime` > 2，則將 `(Qt, Dm)` 添加到 `exempted_combinations`。
-    - **遍歷觸發點 (題目 `X` 或 題型 `Qt`):**
-        - **處理宏觀建議:** 若觸發點是題型 `Qt` 且 `override_triggered`[`Qt`] == `True` 且 `Qt` 不在 `processed_override_types`:
-            - 生成宏觀建議 `G`: "針對 [`Qt`] 題型，由於整體表現有較大提升空間，建議全面鞏固基礎，可從 [`Y_agg`] 難度題目開始系統性練習，掌握核心方法，建議限時 [`Z_agg`] 分鐘。" (`Y_agg` 和 `Z_agg` 來自第五章)。
-            - 添加 `G` 到 `recommendations_by_type`[`Qt`]。
-            - 添加 `Qt` 到 `processed_override_types`。
-        - **處理個案建議 (針對題目 `X`，其題型為 `Qt`, 內容域 `Dm`, 難度 `D`, 用時 `T`):**
-            - **檢查豁免和宏觀:** 如果 `(Qt, Dm)` 在 `exempted_combinations` 中，或 `Qt` 在 `processed_override_types` 中，跳過。
-            - **練習難度 (Y):** 根據 `D` 映射 (6級標準，同 Q/V 文件)。
-            - **起始練習限時 (Z):** (**統一計算規則**)
-                - 確定題型目標時間 (`target_time`) (參考第五章 `Z_agg` 的設定)：
-                    - `DS`: 2.0, `TPA`: 3.0, `GT`: 3.0, `MSR`: 2.0 (單題目標)。
-                - 計算 `base_time`: 若題目 `X` 超時 (`overtime` == `True`)，則 `T` - 0.5，否則 `T`。
-                - 計算 `Z_raw` = `floor`(`base_time` * 2) / 2 (向下取整到最近的 0.5)。
-                - 確保最低值: `Z` = `max`(`Z_raw`, `target_time`)。
-            - **構建建議文本:**
-                - 基本模板：「針對 [`Dm`] 領域的 [`Qt`] 題型 (根據第三/四章診斷確定具體問題點)，建議練習 [`Y`] 難度題目，起始練習限時建議為 [`Z`] 分鐘。(最終目標時間：DS 2分鐘; TPA/GT 3分鐘; MSR 單題 2分鐘左右)。"
-                - **優先級標註:** 如果該題觸發了 `special_focus_error` = `True`，則在此建議前標註「*基礎掌握不穩*」。
-                - **超長提醒:** 若 `Z` - `target_time` > 2.0 分鐘，加註提醒「**需加大練習量以確保逐步限時有效**」。
-            - 添加個案建議 `C` 到 `recommendations_by_type`[`Qt`]。
-    - **整理與輸出建議列表：**
-        - 初始化 `final_recommendations`。
-        - **處理豁免組合:** 對於在 `exempted_combinations` 中的每個 `(Qt, Dm)` 組合，如果 `Qt` **未**觸發宏觀建議，則添加豁免說明到 `final_recommendations`：「[`Dm`] 的 [`Qt`] 題目表現穩定，可暫緩練習。」
-        - **整理聚合建議:** 遍歷 `recommendations_by_type`。
-            - 對於每個題型 `Qt` 及其建議列表 `type_recs`:
-                - 如果列表非空：
-                    - **應用 `content_domain` 側重規則 (基於第二章顯著差異標籤):**
-                        - 檢查第二章的 `poor_math_related`/`slow_math_related` 標籤：若觸發，且建議列表中包含 `Math Related` 的個案建議，則追加「**建議增加 [`Qt`] 題型下 `Math Related` 題目的練習比例。**」
-                        - 檢查第二章的 `poor_non_math_related`/`slow_non_math_related` 標籤：若觸發，且建議列表中包含 `Non-Math Related` 的個案建議，則追加「**建議增加 [`Qt`] 題型下 `Non-Math Related` 題目的練習比例。**」
-                    - 將整理好的題型 `Qt` 的建議添加到 `final_recommendations`。
-        - **最終輸出:** 輸出 `final_recommendations`，確保按題型聚合，優先顯示 `special_focus_error` 建議，包含豁免說明和側重說明。
+        - *(移除豁免規則計算: 不再計算 exempted_combinations)*
+    - **生成宏觀建議 (來自第五章的 `override_results`):**
+        - 遍歷 `override_results` 中的每個 `q_type`:\
+            - 如果該 `q_type` 觸發了 `override_triggered`:\
+                - 提取觸發時的錯誤率或超時率、建議的起始難度 `Y_agg`、建議的起始限時 `Z_agg`。\
+                - 格式化文本: `\"**宏觀建議 ({q_type}):** 由於整體表現有較大提升空間 (錯誤率 X% 或 超時率 Y%), 建議全面鞏固 **{q_type}** 題型的基礎，可從 **{Y_agg}** 難度題目開始系統性練習，掌握核心方法，建議限時 **{Z_agg} 分鐘**。\"`\
+                - 將此宏觀建議添加到 `recommendations_by_type[q_type]`。\
+                - 將 `q_type` 添加到 `processed_override_types`。
+    - **生成個案建議 (來自第三章診斷出的問題題目):**
+        - 選取觸發點: `df_trigger` = `df_diagnosed` 中 `is_correct` 為 `False` 或 `overtime` 為 `True` 的題目。
+        - 遍歷 `df_trigger` 中的每一行 `row` (對應題目 `X`):\
+            - 提取: `q_type`, `domain`, 難度分數 `D`, 用時 `T`, `is_correct`, `overtime`, `is_sfe`, `diagnostic_params`。\
+            - **檢查是否被宏觀建議覆蓋:** 如果 `q_type` 在 `processed_override_types` 中，則 `continue` 跳過此題。\
+            - *(移除豁免檢查: 不再檢查 (q_type, domain) 是否在 exempted_combinations 中)*\
+            - **計算建議難度 (`Y`):** `Y` = `_grade_difficulty_di(D)` (使用第二章的難度分級函數)。\
+            - **計算建議起始限時 (`Z`, 分鐘):**\
+                - `target_time_minutes` = 根據 `q_type` 查詢預設目標時間 (e.g., DS=2.0, TPA=3.0, GT=3.0, MSR=2.0)。\
+                - `base_time_minutes` = 如果 `overtime` 為 `True` 則 `T - 0.5`，否則為 `T`。\
+                - `z_raw_minutes` = `floor_to_nearest_0.5(base_time_minutes)`。\
+                - `Z` = `max(z_raw_minutes, target_time_minutes)`。\
+                - `z_text` = 將 `Z` 格式化為 \"{:.1f} 分鐘\"。\
+                - `target_time_text` = 將 `target_time_minutes` 格式化為 \"{:.1f} 分鐘\"。\
+            - **構建建議文本:**\
+                - `translated_params` = `_translate_di(diagnostic_params)` (翻譯診斷參數列表)。\
+                - `problem_desc` = \"錯誤\" 或 \"正確但超時\"。\
+                - `sfe_prefix` = \"*基礎掌握不穩* \" (如果 `is_sfe` 為 `True`) 或 \"\" (空字符串)。\
+                - `param_text` = \"(問題點可能涉及: {翻譯後的參數列表})\" 或 \"(具體問題點需進一步分析)\"。\
+                - `rec_text` = `\"{sfe_prefix}針對 **{domain}** 領域的 **{q_type}** 題目 ({problem_desc}) {param_text}，建議練習 **{Y}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。\"`\
+            - **添加超時警告 (如果需要):** 如果 `Z - target_time_minutes > 2.0`，則在 `rec_text` 後追加 `\" **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效。**\"`。\
+            - 將包含 `type='case'`, `text=rec_text` 及其他元數據 (如 `is_sfe`, `domain`, `Y`, `Z`) 的字典添加到 `recommendations_by_type[q_type]`。
+    - **最終組裝與領域側重規則應用:**
+        - 初始化 `final_recommendations` = `[]`。
+        - *(移除添加豁免說明: 不再添加 type='exemption_note' 的建議)*
+        - 遍歷 `recommendations_by_type` 中的每個 `q_type` 和對應的 `type_recs` 列表:\
+            - 如果 `type_recs` 為空，`continue`。\
+            - **排序:** 將 `type_recs` 排序，宏觀建議 (`type='macro'`) 在前，然後是 SFE 個案 (`is_sfe=True`)，最後是普通個案。\
+            - **應用領域側重規則 (基於第二章的 `domain_tags`):**\
+                - `focus_note` = `\"\"`。\
+                - 檢查 `type_recs` 中是否存在 `Math Related` 的個案建議 (`has_math_case`) 和 `Non-Math Related` 的個案建議 (`has_non_math_case`)。\
+                - 如果 `domain_tags` 標記了 `poor_math_related` 或 `slow_math_related` 且 `has_math_case` 為 `True`，`focus_note` 追加 `\" **建議增加 {q_type} 題型下 \`Math Related\` 題目的練習比例。**\"`。\
+                - 如果 `domain_tags` 標記了 `poor_non_math_related` 或 `slow_non_math_related` 且 `has_non_math_case` 為 `True`，`focus_note` 追加 `\" **建議增加 {q_type} 題型下 \`Non-Math Related\` 題目的練習比例。**\"`。\
+            - **附加側重說明:** 如果 `focus_note` 不為空且 `type_recs` 中存在個案建議，則將 `focus_note` 追加到該 `q_type` 的**最後一個非宏觀**建議的文本末尾。如果只有宏觀建議，則追加到宏觀建議末尾。\
+            - 將處理後的 `type_recs` 列表中的所有建議添加到 `final_recommendations`。
+    - **返回:** `final_recommendations` 列表。
 
 <aside>
 
