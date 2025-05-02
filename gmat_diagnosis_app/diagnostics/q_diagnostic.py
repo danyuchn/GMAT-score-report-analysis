@@ -1042,7 +1042,7 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
 
 # --- Main Q Diagnosis Entry Point ---
 
-def run_q_diagnosis(df_raw_q):
+def run_q_diagnosis(df_raw_q, q_time_pressure_status=False, q_invalid_count=0):
     """
     Runs the diagnostic analysis specifically for the Quantitative section.
     Applies Chapter 1 logic internally.
@@ -1052,6 +1052,8 @@ def run_q_diagnosis(df_raw_q):
                                  Requires columns: 'question_position', 'question_time', 
                                  'is_correct', 'question_type', 'question_difficulty', 
                                  'question_fundamental_skill'.
+        q_time_pressure_status (bool): Whether time pressure was detected for Q.
+        q_invalid_count (int): Number of invalid Q questions already identified.
 
     Returns:
         dict: Dictionary containing Q diagnosis results by chapter.
@@ -1069,6 +1071,16 @@ def run_q_diagnosis(df_raw_q):
     # --- Apply Chapter 1 Rules --- 
     # This function now handles filtering and overtime marking
     df_q_valid, time_pressure_status_q, num_invalid_q, overtime_threshold_q = _apply_ch1_rules(df_raw_q)
+    
+    # If q_time_pressure_status is provided, use it instead of calculated value
+    if q_time_pressure_status is not None:
+        print(f"    Overriding calculated time pressure status ({time_pressure_status_q}) with provided value ({q_time_pressure_status}).")
+        time_pressure_status_q = q_time_pressure_status
+    
+    # If q_invalid_count is provided, use it for reporting
+    if q_invalid_count > 0:
+        print(f"    Using provided invalid question count ({q_invalid_count}) for reporting.")
+        num_invalid_q = q_invalid_count
     
     # Store Chapter 1 results for reporting
     chapter1_results = {
