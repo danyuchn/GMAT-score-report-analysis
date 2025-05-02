@@ -202,6 +202,52 @@ def _diagnose_q(df_q):
              
      return pd.DataFrame(results)
 
+# Added placeholder functions for overall Verbal and DI diagnosis
+def _diagnose_verbal_overall(df_v):
+    """Placeholder overall diagnosis for Verbal based on simulation."""
+    if df_v.empty:
+        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
+
+    total = len(df_v)
+    errors = df_v['Correct'].eq(False).sum()
+    error_rate = errors / total if total > 0 else 0
+    overtime = df_v['overtime'].eq(True).sum() if 'overtime' in df_v.columns else 0
+    overtime_rate = overtime / total if total > 0 else 0
+
+    diagnosis = f"Verbal (Overall): Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
+
+    return pd.DataFrame([{
+        'Question Type': 'Verbal (Overall)',
+        'Total': total,
+        'Errors': errors,
+        'Error Rate': error_rate,
+        'Overtime': overtime,
+        'Overtime Rate': overtime_rate,
+        'Diagnosis': diagnosis
+    }])
+
+def _diagnose_di_overall(df_di):
+    """Placeholder overall diagnosis for Data Insights based on simulation."""
+    if df_di.empty:
+        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis'])
+
+    total = len(df_di)
+    errors = df_di['Correct'].eq(False).sum()
+    error_rate = errors / total if total > 0 else 0
+    overtime = df_di['overtime'].eq(True).sum() if 'overtime' in df_di.columns else 0
+    overtime_rate = overtime / total if total > 0 else 0
+
+    diagnosis = f"DI (Overall): Error Rate {error_rate:.1%}, Overtime Rate {overtime_rate:.1%}. (Detailed diagnosis pending)"
+
+    return pd.DataFrame([{
+        'Question Type': 'DI (Overall)',
+        'Total': total,
+        'Errors': errors,
+        'Error Rate': error_rate,
+        'Overtime': overtime,
+        'Overtime Rate': overtime_rate,
+        'Diagnosis': diagnosis
+    }])
 
 # --- Main Diagnosis Function ---
 
@@ -244,16 +290,19 @@ def run_diagnosis(df):
         q_type = row['question_type']
         time = row['question_time']
         # Example thresholds (replace with actual logic)
-        thresholds = {'DS': 2.5, 'TPA': 3.5, 'MSR': 2.3, 'GT': 3.5, 'CR': 2.5, 'RC': 2.5, 'Real': 3.0, 'Pure': 3.0}
+        # Added Quant, Verbal, DI placeholders
+        thresholds = {
+            'DS': 2.5, 'TPA': 3.5, 'MSR': 2.3, 'GT': 3.5, 
+            'CR': 2.5, 'RC': 2.5, 
+            'Real': 3.0, 'Pure': 3.0,
+            'Quant': 3.0, 'Verbal': 2.5, 'DI': 3.0 # Generic thresholds for overall types
+        }
         return time > thresholds.get(q_type, 3.0) # Default 3.0 mins
 
     if 'question_time' in df_processed.columns:
-         df_processed['overtime'] = df_processed.apply(mark_overtime, axis=1)
+        df_processed['overtime'] = df_processed.apply(mark_overtime, axis=1)
     else:
-         # If no time data, cannot mark overtime
-         df_processed['overtime'] = False 
-         print("Warning: 'question_time' column not found. Overtime analysis skipped.")
-
+        df_processed['overtime'] = False # Assume not overtime if time is missing
 
     # Placeholder for 'is_invalid' filtering (assuming no invalid data for now)
     # This needs actual implementation
@@ -263,51 +312,84 @@ def run_diagnosis(df):
         print("No valid data remaining after filtering.")
         return pd.DataFrame()
 
-    # --- 3. Diagnose by Section/Type ---
-    all_results = []
-    
-    # Infer sections/types present in the data
-    q_types_present = df_filtered['question_type'].unique()
-    
-    # Map question types to diagnostic functions
-    diagnosis_functions = {
+    # --- 3. Group by Question Type and Diagnose ---
+    all_diagnostics = []
+    grouped = df_filtered.groupby('question_type')
+
+    # Define mapping from question type to diagnosis function
+    diagnosis_map = {
+        # DI Types
         'DS': _diagnose_ds,
         'TPA': _diagnose_tpa,
         'MSR': _diagnose_msr,
         'GT': _diagnose_gt,
+        # Verbal Types
         'CR': _diagnose_cr,
         'RC': _diagnose_rc,
-        'Real': _diagnose_q, # Use _diagnose_q for both Real and Pure
-        'Pure': _diagnose_q, # _diagnose_q handles sub-types
+        # Quant Types (Real/Pure handled within _diagnose_q)
+        'Real': _diagnose_q,
+        'Pure': _diagnose_q,
+        # Overall Simulation Types (Added)
+        'Quant': _diagnose_q, # Use the same function, it handles overall Q case
+        'Verbal': _diagnose_verbal_overall, # New placeholder for overall Verbal
+        'DI': _diagnose_di_overall # New placeholder for overall DI
     }
 
-    # Group Quantitative ('Real', 'Pure') separately if present
-    is_q_present = any(qt in ['Real', 'Pure'] for qt in q_types_present)
-    
-    processed_q = False
-    for q_type in q_types_present:
-        if q_type in ['Real', 'Pure']:
-            if not processed_q: # Process Q section only once
-                 df_section = df_filtered[df_filtered['question_type'].isin(['Real', 'Pure'])]
-                 if not df_section.empty:
-                     result = _diagnose_q(df_section)
-                     if result is not None and not result.empty:
-                         all_results.append(result)
-                 processed_q = True
-        elif q_type in diagnosis_functions:
-            df_section = df_filtered[df_filtered['question_type'] == q_type]
-            if not df_section.empty:
-                 func = diagnosis_functions[q_type]
-                 result = func(df_section)
-                 if result is not None and not result.empty:
-                     all_results.append(result)
-        else:
-             print(f"Warning: No diagnosis function defined for question type '{q_type}'. Skipping.")
-
-    # --- 4. Combine and Return Results ---
-    if not all_results:
-        return pd.DataFrame(columns=['Question Type', 'Total', 'Errors', 'Error Rate', 'Overtime', 'Overtime Rate', 'Diagnosis']) # Return structure if no results
+    for name, group in grouped:
+        q_type = name # question_type from groupby
         
-    result_df = pd.concat(all_results, ignore_index=True)
-    
-    return result_df
+        # Handle potential multiple types mapping to the same function (like Real/Pure -> _diagnose_q)
+        # Find the appropriate function from the map
+        diag_func = diagnosis_map.get(q_type)
+
+        if diag_func:
+            # Special handling for _diagnose_q which handles both Real and Pure
+            if diag_func == _diagnose_q:
+                 # Check if this group name ('Real' or 'Pure' or 'Quant') has already been processed by _diagnose_q
+                 # We only want to call _diagnose_q once for all relevant Q types.
+                 # Collect all Q-related data first.
+                 q_subtypes_present = [qt for qt in ['Real', 'Pure', 'Quant'] if qt in grouped.groups]
+                 if q_type == q_subtypes_present[0]: # Only process on the *first* Q subtype encountered
+                      q_data = pd.concat([grouped.get_group(qt) for qt in q_subtypes_present])
+                      result = _diagnose_q(q_data)
+                      if result is not None and not result.empty: all_diagnostics.append(result)
+            elif diag_func == _diagnose_verbal_overall:
+                 # Similar logic if CR/RC also exist and we want one combined Verbal report
+                 # For now, just call the overall function if 'Verbal' is the type
+                 if q_type == 'Verbal': 
+                     result = _diagnose_verbal_overall(group)
+                     if result is not None and not result.empty: all_diagnostics.append(result)
+                 # If CR/RC exist, they will be handled by their specific entries below
+                 # We might want to prevent double-counting later.
+            elif diag_func == _diagnose_di_overall:
+                 # Similar logic if DS/TPA etc also exist
+                 if q_type == 'DI':
+                      result = _diagnose_di_overall(group)
+                      if result is not None and not result.empty: all_diagnostics.append(result)
+                 # Specific DI types handled below.
+            else: # Handle specific types like DS, CR, RC etc.
+                 # Avoid reprocessing if handled by an overall function (optional refinement)
+                 # For now, call specific functions if they exist
+                 if q_type not in ['Real', 'Pure', 'Quant', 'Verbal', 'DI']: # Avoid calling _diagnose_q, _diagnose_verbal etc. again
+                      result = diag_func(group)
+                      if result is not None and not result.empty: all_diagnostics.append(result)
+        elif q_type == 'Unknown':
+             print(f"Info: Skipping diagnosis for question type '{q_type}'.")
+        else:
+            # This is where the original warning was likely printed
+            print(f"Warning: No diagnosis function explicitly defined or mapped for question type '{q_type}'. Skipping.")
+
+    # --- 4. Consolidate Results ---
+    if not all_diagnostics:
+        print("No diagnostic results generated.")
+        return pd.DataFrame()
+        
+    try:
+        final_results = pd.concat(all_diagnostics, ignore_index=True)
+    except Exception as e:
+        print(f"Error consolidating diagnostic results: {e}")
+        return pd.DataFrame() # Return empty on error
+
+    # TODO: Add further analysis/summarization if needed
+
+    return final_results
