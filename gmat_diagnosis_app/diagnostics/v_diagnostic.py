@@ -1414,16 +1414,23 @@ def _generate_v_summary_report(v_diagnosis_results):
             if trigger_reasons_translated:
                 # Extract tool names and prompt names using precise patterns
                 import re
-                # Match `Dustin...` or other potential tool names NOT ending in .md
-                tools = re.findall(r'`([^`]+?)(?<!\.md)`', tool_desc)
-                # Match patterns like `Verbal-related/... .md`
-                prompts = re.findall(r'`((?:Verbal-related/|\w+/)[^`]+\.md)`', tool_desc) # Allow other potential paths ending in .md
+                # Step 1: Find all items within backticks
+                all_backticked_items = re.findall(r'`([^`]+?)`', tool_desc)
+                
+                # Step 2: Filter into tools (not ending in .md) and prompts (ending in .md)
+                current_tools = {item for item in all_backticked_items if not item.endswith('.md') and item.strip()}
+                current_prompts = {item for item in all_backticked_items if item.endswith('.md')}
+                
+                # # Match `Dustin...` or other potential tool names NOT ending in .md (OLD LOGIC)
+                # tools = re.findall(r'`([^`]+?)(?<!\\.md)`', tool_desc)
+                # # Match patterns like `Verbal-related/... .md` (OLD LOGIC)
+                # prompts = re.findall(r'`((?:Verbal-related/|\\w+/)[^`]+\\.md)`', tool_desc) # Allow other potential paths ending in .md
 
-                if tools:
-                    recommended_tools.update(tools) # Add to set
+                if current_tools:
+                    recommended_tools.update(current_tools) # Add to set
                     recommendations_made = True
-                if prompts:
-                    for prompt in prompts:
+                if current_prompts:
+                    for prompt in current_prompts:
                         # Store reasons for each prompt
                         if prompt not in recommended_prompts_map:
                             recommended_prompts_map[prompt] = set()

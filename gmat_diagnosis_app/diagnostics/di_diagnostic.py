@@ -666,59 +666,76 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
 
     df_trigger = df_diagnosed[((df_diagnosed['is_correct'] == False) | (df_diagnosed['overtime'] == True))]
 
-    for index, row in df_trigger.iterrows():
-        q_type = row['question_type'] # This should have the full name from the data
-        # Check if q_type is valid before proceeding
-        if q_type not in question_types_full:
-            print(f"Warning: Encountered unexpected question type '{q_type}' in recommendation generation. Skipping row {index}.")
-            continue
-        domain = row['content_domain']
-        difficulty_score = row['question_difficulty']
-        q_time_minutes = row['question_time']
-        is_correct = row['is_correct']
-        is_overtime = row['overtime']
-        is_sfe = row['is_sfe']
-        diag_params = row['diagnostic_params'] # List of english params
+    # --- NEW: Group by type and domain to generate aggregated recommendations ---
+    if not df_trigger.empty:
+        grouped_triggers = df_trigger.groupby(['question_type', 'content_domain'])
 
-        # Skip if covered by macro
-        if q_type in processed_override_types:
-            continue
+        for name, group_df in grouped_triggers:
+            q_type, domain = name
+            # Check if q_type is valid before proceeding
+            if q_type not in question_types_full:
+                print(f"Warning: Encountered unexpected question type '{q_type}' in aggregated recommendation generation. Skipping group.")
+                continue
+            
+            # Skip if covered by macro override for this type
+            if q_type in processed_override_types:
+                continue
 
-        # Calculate Y (Difficulty Grade)
-        y_grade = _grade_difficulty_di(difficulty_score)
+            # --- Aggregate information within the group ---
+            # Y: Lowest difficulty grade
+            min_difficulty_score = group_df['question_difficulty'].min()
+            y_grade = _grade_difficulty_di(min_difficulty_score)
 
-        # Calculate Z (Starting Time Limit in minutes)
-        target_time_minutes = target_times_minutes.get(q_type, 120) # Default 2 mins
-        base_time_minutes = q_time_minutes - (0.5) if is_overtime else q_time_minutes
-        z_raw_minutes = math.floor((base_time_minutes) * 2) / 2.0
-        z_minutes = max(z_raw_minutes, target_time_minutes)
-        z_text = f"{z_minutes:.1f} 分鐘"
-        target_time_text = f"{target_time_minutes:.1f} 分鐘"
+            # Z: Highest starting time limit
+            z_minutes_list = []
+            target_time_minutes = target_times_minutes.get(q_type, 2.0)
+            for _, row in group_df.iterrows():
+                q_time_minutes = row['question_time']
+                is_overtime = row['overtime']
+                # Calculate base time correctly, handle potential None
+                base_time_minutes = q_time_minutes
+                if pd.notna(q_time_minutes):
+                     if is_overtime:
+                         base_time_minutes = q_time_minutes - 0.5 
+                     z_raw_minutes = math.floor(base_time_minutes * 2) / 2.0
+                     z = max(z_raw_minutes, target_time_minutes)
+                     z_minutes_list.append(z)
+                 # else: handle missing time? Append target? For now, only valid times contribute.
+                     
+            max_z_minutes = max(z_minutes_list) if z_minutes_list else target_time_minutes
+            z_text = f"{max_z_minutes:.1f} 分鐘"
+            target_time_text = f"{target_time_minutes:.1f} 分鐘"
 
-        # Build recommendation text
-        # Translate diag_params before including
-        translated_params = _translate_di(diag_params) # Translate the list
-        problem_desc = "錯誤" if not is_correct else "正確但超時"
-        sfe_prefix = "*基礎掌握不穩* " if is_sfe else ""
-        # Use translated parameters in the text
-        param_text = f"(問題點可能涉及: {', '.join(translated_params)})" if translated_params else "(具體問題點需進一步分析)"
+            # SFE: Check if any question in the group triggered SFE
+            group_sfe = group_df['is_sfe'].any()
 
-        rec_text = f"{sfe_prefix}針對 **{domain}** 領域的 **{q_type}** 題目 ({problem_desc}) {param_text}，"
-        rec_text += f"建議練習 **{y_grade}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。"
+            # Params: Aggregate all unique diagnostic parameters
+            diag_params_codes = set(p for params_list in group_df['diagnostic_params'] for p in params_list)
+            translated_params = _translate_di(list(diag_params_codes))
 
-        # Add overtime warning if Z is much higher than target
-        if z_minutes - target_time_minutes > 2.0:
-            rec_text += " **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效。**"
+            # --- Build the aggregated recommendation text ---
+            problem_desc = "錯誤或超時" # Aggregated description
+            sfe_prefix = "*基礎掌握不穩* " if group_sfe else ""
+            translated_domain = _translate_di(domain) # Translate domain name
+            
+            # Construct text without the detailed parameter list
+            rec_text = f"{sfe_prefix}針對 **{translated_domain}** 領域的 **{q_type}** 題目 ({problem_desc})，"
+            rec_text += f"建議練習 **{y_grade}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。"
 
-        recommendations_by_type[q_type].append({
-            'type': 'case',
-            'is_sfe': is_sfe,
-            'domain': domain,
-            'difficulty_grade': y_grade,
-            'time_limit_z': z_minutes,
-            'text': rec_text,
-            'related_question_index': index # Optional: store index for traceability
-        })
+            # Add overtime warning based on max Z
+            if max_z_minutes - target_time_minutes > 2.0:
+                rec_text += " **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效。**"
+
+            # Append the aggregated recommendation
+            recommendations_by_type[q_type].append({
+                'type': 'case_aggregated', # Mark as aggregated
+                'is_sfe': group_sfe, # Store if SFE was present in the group
+                'domain': domain, # Store original domain for focus rule check
+                'difficulty_grade': y_grade,
+                'time_limit_z': max_z_minutes,
+                'text': rec_text,
+            })
+    # --- END NEW Aggregation Logic ---
 
     # 4. Final Assembly and Domain Focus Rules
     final_recommendations = []
@@ -727,31 +744,39 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
     for q_type, type_recs in recommendations_by_type.items():
         if not type_recs: continue # Skip if no recommendations for this type
 
-        # Sort recommendations: Macro first, then SFE cases, then other cases
+        # Sort recommendations: Macro first, then Aggregated cases
         def sort_key(rec):
             if rec['type'] == 'macro': return 0
-            if rec.get('is_sfe'): return 1
-            return 2
+            # SFE flag is part of the aggregated rec, not for sorting individual cases
+            # All aggregated cases have the same priority level for now
+            # Could sort aggregated cases by domain (Math -> Non-Math) if needed
+            return 1 
         type_recs.sort(key=sort_key)
 
         # Apply domain focus rules
         focus_note = ""
-        has_math_case = any(r.get('domain') == 'Math Related' for r in type_recs if r['type'] == 'case')
-        has_non_math_case = any(r.get('domain') == 'Non-Math Related' for r in type_recs if r['type'] == 'case')
+        # Check domain from aggregated recs
+        has_math_case_agg = any(r.get('domain') == 'Math Related' for r in type_recs if r['type'] == 'case_aggregated')
+        has_non_math_case_agg = any(r.get('domain') == 'Non-Math Related' for r in type_recs if r['type'] == 'case_aggregated')
 
         if domain_tags.get('poor_math_related') or domain_tags.get('slow_math_related'):
-            if has_math_case: focus_note += f" **建議增加 {q_type} 題型下 `Math Related` 題目的練習比例。**"
+            if has_math_case_agg: focus_note += f" **建議增加 {q_type} 題型下 `{_translate_di('Math Related')}` 題目的練習比例。**"
         if domain_tags.get('poor_non_math_related') or domain_tags.get('slow_non_math_related'):
-            if has_non_math_case: focus_note += f" **建議增加 {q_type} 題型下 `Non-Math Related` 題目的練習比例。**"
+            if has_non_math_case_agg: focus_note += f" **建議增加 {q_type} 題型下 `{_translate_di('Non-Math Related')}` 題目的練習比例。**"
 
-        # Add focus note to the last recommendation text of this type (if any case recs exist)
-        if focus_note and any(r['type'] == 'case' for r in type_recs):
+        # Add focus note to the last non-macro recommendation text of this type 
+        if focus_note and any(r['type'] == 'case_aggregated' for r in type_recs):
+            # Find the last aggregated recommendation to append the note
+            last_agg_rec_index = -1
             for i in range(len(type_recs) - 1, -1, -1):
-                if type_recs[i]['type'] != 'macro': # Add to first non-macro rec from end
-                    type_recs[i]['text'] += focus_note
+                if type_recs[i]['type'] == 'case_aggregated':
+                    last_agg_rec_index = i
                     break
-            else: # If only macro rec exists, append there? Or add as separate item?
-                 type_recs[-1]['text'] += focus_note # Append to macro if only macro exists
+            
+            if last_agg_rec_index != -1:
+                 type_recs[last_agg_rec_index]['text'] += focus_note
+            elif type_recs: # If only macro rec exists, append there?
+                 type_recs[-1]['text'] += focus_note 
 
         # Add the processed recommendations for this type to final list
         final_recommendations.extend(type_recs)
@@ -763,6 +788,7 @@ APPENDIX_A_TRANSLATION_DI = {
     # DI - Reading & Understanding
     'DI_READING_COMPREHENSION_ERROR': "DI 閱讀理解: 文字/題意理解錯誤/障礙 (Math/Non-Math)",
     'DI_GRAPH_TABLE_INTERPRETATION_ERROR': "DI 圖表解讀: 圖形/表格信息解讀錯誤/障礙",
+    'DI_DATA_INTERPRETATION_ERROR': "DI 數據解讀: 數據/信息解讀錯誤",
     # DI - Concept & Application (Math)
     'DI_CONCEPT_APPLICATION_ERROR': "DI 概念應用 (Math): 數學觀念/公式應用錯誤/障礙",
     # DI - Logical Reasoning (Non-Math)
@@ -797,6 +823,78 @@ APPENDIX_A_TRANSLATION_DI = {
     'Moderate': "中等",
     'Low': "低",
     'Unknown': "未知",
+}
+
+# --- DI Tool/Prompt Recommendations Map (Example Structure) ---
+# Maps sets of diagnostic parameters to strings containing tool/prompt recommendations
+DI_TOOL_RECOMMENDATIONS_MAP = {
+    # Example: Non-Math DS Logic Issues
+    frozenset(['DI_LOGICAL_REASONING_ERROR']): # Trigger based on parameter only
+        "針對非數學 DS 邏輯問題，考慮使用工具 `Dustin_GMAT_DI_Non-math_DS_Simulator`。相關 AI 提示可能包括 `DI-related/ds_logic_patterns.md`。", # Tool and Prompt
+    # Example: Calculation Errors or Efficiency Bottleneck
+    frozenset(['DI_CALCULATION_ERROR', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION']):
+        "計算錯誤或效率低下，可使用 AI 提示 `Quant-related/calculation_shortcuts.md` 或 `Quant-related/error_analysis_calculation.md`。", # Only Prompts
+    # Example: Data Interpretation Errors (General)
+    frozenset(['DI_DATA_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR']):
+        "數據或文本解讀錯誤，嘗試 AI 提示 `DI-related/interpret_complex_text.md` 或 `DI-related/common_interpretation_pitfalls.md`。", # Only Prompts
+    # Example: MSR Integration Issues
+    frozenset(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_EFFICIENCY_BOTTLENECK_INTEGRATION']):
+        "MSR 信息整合困難或耗時，可考慮使用工具 `Dustin_GMAT_DI_MSR_Integrator`。AI 提示可嘗試 `DI-related/msr_integration_strategy.md`。", # Tool and Prompt
+    # Example: Carelessness
+    frozenset(['DI_BEHAVIOR_CARELESSNESS_ISSUE', 'DI_CARELESSNESS_DETAIL_OMISSION']):
+        "粗心問題導致失誤，建議使用 AI 提示 `General/attention_to_detail_checklist.md` 或 `General/self_reflection_careless_errors.md`。", # Only Prompts
+    # Example: Foundational Mastery (SFE)
+    frozenset(['DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE']):
+        "基礎掌握不穩定 (SFE)，建議優先使用 AI 提示 `Quant-related/01_basic_explanation.md` 或 `DI-related/basic_concept_review.md` 鞏固基礎。", # Only Prompts
+    # Add more mappings as needed based on DI parameters and available tools/prompts
+}
+
+
+# --- Parameter Categories for Report Grouping (DI) ---
+DI_PARAM_CATEGORY_ORDER = [
+    'SFE',
+    'Reading/Interpretation',
+    'Concept/Application (Math)',
+    'Logical Reasoning (Non-Math)',
+    'Data Handling',
+    'MSR Specific',
+    'Efficiency',
+    'Behavioral',
+    'Unknown' # Catch-all for unmapped params
+]
+
+DI_PARAM_TO_CATEGORY = {
+    # SFE
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': 'SFE',
+    # Reading/Interpretation
+    'DI_READING_COMPREHENSION_ERROR': 'Reading/Interpretation',
+    'DI_GRAPH_TABLE_INTERPRETATION_ERROR': 'Reading/Interpretation',
+    'DI_DATA_INTERPRETATION_ERROR': 'Reading/Interpretation',
+    # Concept/Application (Math)
+    'DI_CONCEPT_APPLICATION_ERROR': 'Concept/Application (Math)',
+    # Logical Reasoning (Non-Math)
+    'DI_LOGICAL_REASONING_ERROR': 'Logical Reasoning (Non-Math)',
+    # Data Handling
+    'DI_DATA_EXTRACTION_ERROR': 'Data Handling',
+    'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR': 'Data Handling',
+    'DI_CALCULATION_ERROR': 'Data Handling', # Calculation is a form of data handling here
+    # MSR Specific
+    'DI_MULTI_SOURCE_INTEGRATION_ERROR': 'MSR Specific',
+    'DI_MSR_READING_COMPREHENSION_BARRIER': 'MSR Specific', # Or Efficiency/Reading? Grouping under MSR
+    'DI_MSR_SINGLE_Q_BOTTLENECK': 'MSR Specific', # Or Efficiency? Grouping under MSR
+    # Question Type Specific (Consider mapping to primary issue type if possible)
+    'DI_QUESTION_TYPE_SPECIFIC_ERROR': 'Unknown', # Needs context to categorize better
+    # Efficiency
+    'DI_EFFICIENCY_BOTTLENECK_READING': 'Efficiency',
+    'DI_EFFICIENCY_BOTTLENECK_CONCEPT': 'Efficiency',
+    'DI_EFFICIENCY_BOTTLENECK_CALCULATION': 'Efficiency',
+    'DI_EFFICIENCY_BOTTLENECK_LOGIC': 'Efficiency',
+    'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE': 'Efficiency',
+    'DI_EFFICIENCY_BOTTLENECK_INTEGRATION': 'Efficiency',
+    # Behavioral
+    'DI_CARELESSNESS_DETAIL_OMISSION': 'Behavioral',
+    'DI_BEHAVIOR_CARELESSNESS_ISSUE': 'Behavioral',
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': 'Behavioral',
 }
 
 def _translate_di(param):
@@ -860,19 +958,123 @@ def _generate_di_summary_report(di_results):
     # 3. 核心問題分析 (基於第三章參數)
     report_lines.append("**3. 核心問題分析**")
     core_issues = []
-    # Prioritize SFE
-    if sfe_triggered:
-        core_issues.append(f"**{_translate_di('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')}**: 在一些基礎或已掌握難度範圍內的題目上出現失誤，顯示基礎掌握不夠穩定。")
-    # Add top 2-3 other frequent parameters (excluding SFE if already added)
+    sfe_domains_involved = set()
+    sfe_types_involved = set()
+
+    # --- SFE Summary Logic (Similar to V/Q) ---
+    if sfe_triggered and diagnosed_df is not None:
+        sfe_rows = diagnosed_df[diagnosed_df['is_sfe'] == True]
+        if not sfe_rows.empty:
+            sfe_domains_involved = set(sfe_rows['content_domain'])
+            sfe_types_involved = set(sfe_rows['question_type'])
+            sfe_label = _translate_di('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+            # Translate domains and types before joining
+            sfe_domains_zh = ", ".join(sorted([_translate_di(d) for d in sfe_domains_involved]))
+            sfe_types_zh = ", ".join(sorted([t for t in sfe_types_involved])) # Use type names directly
+            sfe_note = f"**尤其需要注意: {sfe_label}**" 
+            if sfe_domains_involved: sfe_note += f" (涉及領域: {sfe_domains_zh})"
+            if sfe_types_involved: sfe_note += f" (涉及題型: {sfe_types_zh})"
+            sfe_note += ". (註：SFE 指在已掌握難度範圍內題目失誤)"
+            report_lines.append(f"- {sfe_note}")
+
+    # --- Core Issue Summary (Keep existing logic) ---
+    # Add top 2-3 other frequent parameters (excluding SFE)
     param_counts_ch3 = pd.Series([p for params_list in diagnosed_df['diagnostic_params'] for p in params_list if p != 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE']).value_counts()
     top_other_params = param_counts_ch3.head(2).index.tolist()
-    for param in top_other_params:
-        core_issues.append(f"**{_translate_di(param)}**: 這是導致錯誤或低效的另一個主要原因。")
+    if top_other_params:
+        report_lines.append("- **其他主要問題點:**")
+        for param in top_other_params:
+            report_lines.append(f"  - {_translate_di(param)}")
+    elif not sfe_triggered:
+        # Only show this if no SFE and no other core issues found
+        report_lines.append("- 未識別出明顯的核心問題模式。")
 
-    if not core_issues:
-        report_lines.append("- 未識別出特別突出的核心問題參數。")
+    # --- Detailed Diagnostic List (Similar to V/Q) ---
+    report_lines.append("- **詳細診斷標籤 (錯誤或超時題目):**")
+    detailed_items = []
+    avg_time_per_type = ch3.get('avg_time_per_type_minutes', {}) # Get avg times needed for perf label
+
+    if diagnosed_df is not None and not diagnosed_df.empty:
+        # Filter for error or overtime questions
+        df_problem = diagnosed_df[ (diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True) ].copy()
+        # df_problem.sort_values('question_position', inplace=True) # Old sorting
+
+        # --- NEW Sorting Logic ---
+        # Define desired sort order for types and domains
+        type_order = ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table', 'Unknown Type']
+        domain_order = ['Math Related', 'Non-Math Related', 'Unknown Domain']
+
+        # Convert columns to categorical with the defined order
+        df_problem['question_type_cat'] = pd.Categorical(df_problem['question_type'], categories=type_order, ordered=True)
+        df_problem['content_domain_cat'] = pd.Categorical(df_problem['content_domain'], categories=domain_order, ordered=True)
+
+        # Sort by the categorical columns, then by position
+        df_problem.sort_values(by=['question_type_cat', 'content_domain_cat', 'question_position'], inplace=True)
+        # --- END NEW Sorting Logic ---
+
+        for index, row in df_problem.iterrows():
+            pos = row.get('question_position', 'N/A')
+            q_type = row.get('question_type', '未知類型')
+            # Use original domain column for display, translate it
+            domain_orig = row.get('content_domain', '未知領域')
+            domain = _translate_di(domain_orig)
+            params_codes = row.get('diagnostic_params', [])
+            is_correct = row.get('is_correct')
+            is_overtime = row.get('overtime')
+            q_time = row.get('question_time')
+            avg_time = avg_time_per_type.get(q_type, np.inf)
+
+            # Determine performance label
+            performance_en = 'Unknown Performance'
+            if is_correct == False:
+                if q_time is not None and q_time < avg_time * 0.75:
+                    performance_en = 'Fast & Wrong'
+                elif is_overtime:
+                    performance_en = 'Slow & Wrong'
+                else:
+                    performance_en = 'Normal Time & Wrong'
+            elif is_correct == True and is_overtime:
+                performance_en = 'Slow & Correct'
+            
+            # Translate performance label
+            performance_zh_map = {
+                'Fast & Wrong': "快錯",
+                'Slow & Wrong': "慢錯",
+                'Normal Time & Wrong': "正常時間 & 錯",
+                'Slow & Correct': "慢對",
+            }
+            performance_zh = performance_zh_map.get(performance_en, performance_en)
+
+            # Translate parameters and group by category
+            params_by_category = {}
+            if params_codes:
+                 translated_params = _translate_di(params_codes)
+                 for p_code, p_zh in zip(params_codes, translated_params):
+                     category = DI_PARAM_TO_CATEGORY.get(p_code, 'Unknown')
+                     params_by_category.setdefault(category, []).append(p_zh)
+
+            # Format line parts
+            # Example: 題號 3: [慢錯, 類型: DS, 領域: 數學相關] - 診斷:
+            line_parts = [f"  - 題號 {pos}: [{performance_zh}, 類型: {q_type}, 領域: {domain}] - 診斷:"]
+            for category in DI_PARAM_CATEGORY_ORDER:
+                if category in params_by_category:
+                    sorted_category_params = sorted(params_by_category[category])
+                    line_parts.append(f"    - [{', '.join(sorted_category_params)}]")
+            
+            # If no params were found/categorized, add a placeholder? 
+            if not params_by_category and params_codes:
+                 line_parts.append(f"    - [未分類診斷: {', '.join(_translate_di(params_codes))}]") # Show raw translated if categorization failed
+            elif not params_codes:
+                 line_parts.append("    - [無特定診斷標籤]") # Indicate if no params triggered
+
+            detailed_items.append("\n".join(line_parts))
+
+    if not detailed_items:
+        report_lines.append("  - 無錯誤或超時題目可供詳細分析。")
     else:
-        report_lines.extend([f"- {issue}" for issue in core_issues])
+        report_lines.extend(detailed_items)
+    # --- End Detailed Diagnostic List ---
+
     report_lines.append("")
 
     # 4. 特殊模式觀察 (基於第四章)
@@ -933,47 +1135,173 @@ def _generate_di_summary_report(di_results):
         report_lines.append("  **質化分析建議:**")
         report_lines.append("  - 如果您對報告中指出的某些問題（尤其是非數學相關的邏輯或閱讀理解錯誤）仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。")
 
-    # 7.3 Second Evidence Suggestion
-    # Trigger if core issues identified
-    if core_issues:
-        report_lines.append("  **二級證據參考建議:**")
-        report_lines.append("  - 為了更精確地定位您遇到的問題，建議您查看近期的練習記錄，尋找與報告中核心問題參數相關的類似錯誤或超時題目。如果能找到 5-10 題以上，嘗試歸納常見錯誤模式或涉及的具體考點/障礙類型。")
+    # 7.3 Second Evidence Suggestion (Adapted from V/Q logic)
+    report_lines.append("  **二級證據參考建議:**")
+    # Check if there were any problems diagnosed
+    if diagnosed_df is not None and not diagnosed_df.empty and not df_problem.empty: # Use df_problem filtered earlier in Ch3 generation
+        report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
+
+        # Map performance types to involved Q-Types and Domains
+        performance_map = {
+            'Fast & Wrong': {'types': set(), 'domains': set()},
+            'Slow & Wrong': {'types': set(), 'domains': set()},
+            'Normal Time & Wrong': {'types': set(), 'domains': set()},
+            'Slow & Correct': {'types': set(), 'domains': set()}
+        }
+        avg_time_per_type = ch3.get('avg_time_per_type_minutes', {}) # Reuse avg times
+
+        # Re-iterate through df_problem used in Ch3 detailed list generation
+        for index, row in df_problem.iterrows():
+            q_type = row.get('question_type')
+            domain = row.get('content_domain')
+            is_correct = row.get('is_correct')
+            is_overtime = row.get('overtime')
+            q_time = row.get('question_time')
+            avg_time = avg_time_per_type.get(q_type, np.inf)
+
+            # Determine performance label (reuse logic from Ch3 list generation)
+            performance_en = 'Unknown Performance'
+            if is_correct == False:
+                if q_time is not None and q_time < avg_time * 0.75:
+                    performance_en = 'Fast & Wrong'
+                elif is_overtime:
+                    performance_en = 'Slow & Wrong'
+                else:
+                    performance_en = 'Normal Time & Wrong'
+            elif is_correct == True and is_overtime:
+                performance_en = 'Slow & Correct'
+            
+            if performance_en in performance_map:
+                 if q_type: performance_map[performance_en]['types'].add(q_type)
+                 if domain: performance_map[performance_en]['domains'].add(_translate_di(domain))
+
+        # Report the breakdown by performance type
+        details_added = False
+        performance_order_zh = {
+             'Fast & Wrong': "快錯",
+             'Slow & Wrong': "慢錯",
+             'Normal Time & Wrong': "正常時間 & 錯",
+             'Slow & Correct': "慢對",
+         }
+        for perf_key, perf_zh in performance_order_zh.items():
+            if performance_map[perf_key]['types'] or performance_map[perf_key]['domains']:
+                type_list = sorted(list(performance_map[perf_key]['types']))
+                domain_list = sorted(list(performance_map[perf_key]['domains'])) # Domains are already translated
+                report_lines.append(f"  - **{perf_zh}:** 需關注題型：【{', '.join(type_list)}】；涉及領域：【{', '.join(domain_list)}】。")
+                details_added = True
+        
+        # Add reference to core issues from Ch3
+        core_issue_params = [p for p in all_triggered_params if p != 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'] # Get top params identified earlier
+        core_issue_texts = []
+        if sfe_triggered:
+             core_issue_texts.append(_translate_di('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'))
+        core_issue_texts.extend([_translate_di(p) for p in top_other_params]) # Use top_other_params calculated for Ch3 summary
+        
+        if core_issue_texts:
+             report_lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題：【{', '.join(core_issue_texts)}】。")
+             details_added = True
+
+        if not details_added:
+            report_lines.append("  - (本次分析未聚焦到特定的問題類型或領域)")
+        
+        report_lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
+    else:
+        # Case where no problems were diagnosed
+        report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
 
     # 7.4 Tools and Prompts Recommendation
     report_lines.append("  **輔助工具與 AI 提示推薦建議:**")
-    tools_prompts_added = False
-    # Tool recommendations
-    if 'DI_LOGICAL_REASONING_ERROR' in all_triggered_params and diagnosed_df is not None and not diagnosed_df.empty and any(diagnosed_df[(diagnosed_df['diagnostic_params'].apply(lambda x: 'DI_LOGICAL_REASONING_ERROR' in x)) & (diagnosed_df['question_type'] == 'Data Sufficiency') & (diagnosed_df['content_domain'] == 'Non-Math Related')].any()):
-        report_lines.append("  - *工具:* 考慮使用 `Dustin_GMAT_DI_Non-math_DS_Simulator` 針對性練習非數學 DS 邏輯。")
-        tools_prompts_added = True
-    # Add other tool triggers if applicable...
+    
+    # --- NEW Logic using DI_TOOL_RECOMMENDATIONS_MAP ---
+    recommended_di_tools = set()
+    recommended_di_prompts = set()
+    processed_for_tools_di = set() # To avoid duplicating recommendations from overlapping param sets
+    recommendations_made_di = False
 
-    # Prompt recommendations (simplified logic based on presence of param types)
-    prompt_map = {
-        'basic': ['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_LOGICAL_REASONING_ERROR', 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'],
-        'efficiency': ['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION', 'DI_EFFICIENCY_BOTTLENECK_LOGIC', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_MSR_READING_COMPREHENSION_BARRIER', 'DI_MSR_SINGLE_Q_BOTTLENECK', 'DI_CALCULATION_ERROR'],
-        'deep': ['DI_CONCEPT_APPLICATION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_LOGICAL_REASONING_ERROR', 'DI_MULTI_SOURCE_INTEGRATION_ERROR'],
-        'behavior': ['DI_BEHAVIOR_CARELESSNESS_ISSUE'],
-        'msr_specific': ['DI_QUESTION_TYPE_SPECIFIC_ERROR'],
-        'consolidation': ['DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'] # Also for general consolidation
-    }
-    triggered_prompt_types = set()
-    for p_type, params in prompt_map.items():
-        if any(tp in all_triggered_params for tp in params):
-            triggered_prompt_types.add(p_type)
+    # Get all unique triggered params (calculated earlier for Ch3)
+    # Ensure all_triggered_params is available here
+    # If not, recalculate: 
+    if 'all_triggered_params' not in locals() and diagnosed_df is not None:
+         all_triggered_params = list(set(p for params_list in diagnosed_df['diagnostic_params'] for p in params_list))
+    elif diagnosed_df is None:
+        all_triggered_params = [] # Ensure it exists even if df is None
+        
+    # Also consider behavioral flags from Ch4 if they should trigger tools/prompts
+    if ch4.get('carelessness_issue_triggered'):
+         all_triggered_params.append('DI_BEHAVIOR_CARELESSNESS_ISSUE') 
+    if ch4.get('early_rushing_risk_triggered'):
+         all_triggered_params.append('DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
+    # Remove duplicates again after adding behavioral flags
+    all_triggered_params = list(set(all_triggered_params))
 
-    if triggered_prompt_types:
-        report_lines.append("  - *AI提示 (可根據問題選用):*")
-        if 'basic' in triggered_prompt_types: report_lines.append("    - 解釋基礎概念/步驟: `Verbal-related/01...` 或 `Quant-related/01...`")
-        if 'efficiency' in triggered_prompt_types: report_lines.append("    - 提升解題效率/技巧: `Verbal-related/02...`, `Verbal-related/03...`, `Quant-related/02...`")
-        if 'deep' in triggered_prompt_types: report_lines.append("    - 深化概念理解/模式識別: `Verbal-related/04...`, `Verbal-related/07...`, `Quant-related/03...`, `Quant-related/04...`")
-        if 'behavior' in triggered_prompt_types: report_lines.append("    - 評估解題方法/思路: `Verbal-related/05...`")
-        if 'consolidation' in triggered_prompt_types: report_lines.append("    - 生成變體題/相似題鞏固: `Quant-related/05...`, `Quant-related/06...`")
-        if 'msr_specific' in triggered_prompt_types: report_lines.append("    - MSR 文本簡化/複雜化: `Verbal-related/08...`, `Verbal-related/09...`")
-        tools_prompts_added = True
+    for params_set, tool_desc in DI_TOOL_RECOMMENDATIONS_MAP.items():
+        # Check if any of the required params were triggered
+        trigger_match = any(p in all_triggered_params for p in params_set)
+        
+        if trigger_match and not params_set.issubset(processed_for_tools_di):
+            import re
+            # Extract all backticked items
+            all_backticked = re.findall(r'`([^`]+?)`', tool_desc)
+            # Filter into tools and prompts
+            current_tools = {item for item in all_backticked if not item.endswith('.md') and item.strip()}
+            current_prompts = {item for item in all_backticked if item.endswith('.md')}
+            
+            if current_tools:
+                recommended_di_tools.update(current_tools)
+                recommendations_made_di = True
+            if current_prompts:
+                recommended_di_prompts.update(current_prompts)
+                recommendations_made_di = True
+                
+            processed_for_tools_di.update(params_set) # Mark params as processed
 
-    if not tools_prompts_added:
+    # --- Output the collected tools and prompts --- 
+    tools_were_recommended_di = bool(recommended_di_tools)
+    prompts_were_recommended_di = bool(recommended_di_prompts)
+
+    if tools_were_recommended_di:
+        report_lines.append("  - *工具:*")
+        for tool in sorted(list(recommended_di_tools)):
+            report_lines.append(f"    - `{tool}`")
+            
+    if prompts_were_recommended_di:
+        if tools_were_recommended_di:
+             report_lines.append("") # Add spacer if both lists have content
+        report_lines.append("  - *AI提示:*")
+        for prompt in sorted(list(recommended_di_prompts)):
+            report_lines.append(f"    - `{prompt}`")
+
+    # Fallback message if nothing was recommended
+    if not recommendations_made_di:
         report_lines.append("  - 根據當前診斷，暫無特別推薦的輔助工具或 AI 提示。")
+    # --- END NEW Logic ---
+
+    # --- REMOVE Old Hardcoded/Categorized Logic --- 
+    # tools_prompts_added = False
+    # # Tool recommendations
+    # if 'DI_LOGICAL_REASONING_ERROR' in all_triggered_params ... :
+    #     report_lines.append("  - *工具:* ...")
+    #     tools_prompts_added = True
+    # # ... 
+    # 
+    # tools_were_recommended = tools_prompts_added
+    # 
+    # # Prompt recommendations (simplified logic based on presence of param types)
+    # prompt_map = { ... }
+    # triggered_prompt_types = set()
+    # # ... 
+    # 
+    # if triggered_prompt_types:
+    #     if tools_were_recommended:
+    #          report_lines.append("") 
+    #     report_lines.append("  - *AI提示 (可根據問題選用):*")
+    #     if 'basic' in triggered_prompt_types: report_lines.append("    - ...")
+    #     # ... 
+    #     tools_prompts_added = True
+    # 
+    # if not tools_prompts_added:
+    #     report_lines.append("  - 根據當前診斷，暫無特別推薦的輔助工具或 AI 提示。")
+    # --- END REMOVE Old Logic --- 
 
     # Use double newline for Markdown paragraph breaks
     return "\n\n".join(report_lines) 
