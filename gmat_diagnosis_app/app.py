@@ -80,8 +80,8 @@ def validate_dataframe(df, subject):
     # We check these exist in the df passed *to* validation (which is the edited_df)
     required_original_columns = {
         'Q': ['Question', 'Response Time (Minutes)', 'Performance', 'Content Domain', 'Question Type', 'Fundamental Skills'],
-        'V': ['Question', 'Response Time (Minutes)', 'Performance', 'Question Type', 'Fundamental Skills'], # Content Domain might be optional/N/A for V
-        'DI': ['Question', 'Response Time (Minutes)', 'Performance', 'Content Domain', 'Question Type'] # Fundamental Skills might be optional/N/A for DI
+        'V': ['Question', 'Response Time (Minutes)', 'Performance', 'Question Type', 'Fundamental Skills'], # REMOVE Content Domain for V
+        'DI': ['Question', 'Response Time (Minutes)', 'Performance', 'Content Domain', 'Question Type'] # REMOVE Fundamental Skills for DI
     }
     # Adjust required based on BOM possibility for 'Question'
     actual_required = required_original_columns.get(subject, [])
@@ -147,10 +147,15 @@ def validate_dataframe(df, subject):
                             is_valid = False
                     elif rules['type'] == 'positive_integer':
                         try:
-                            num = int(value_str)
-                            # Ensure it's truly an integer (no decimals) and positive
-                            if num <= 0 or str(num) != value_str: is_valid = False
+                            # Convert to float first to handle inputs like '1.0'
+                            num_float = float(value_str)
+                            # Check if positive, is an integer (no fractional part), and matches int conversion
+                            if num_float > 0 and num_float == int(num_float):
+                                is_valid = True
+                            else:
+                                is_valid = False # Not positive or has fractional part
                         except (ValueError, TypeError):
+                             # If conversion to float fails, it's not a valid representation of an integer
                             is_valid = False
                     elif rules['type'] == 'number':
                          try:
@@ -193,7 +198,13 @@ if 'ai_summary' not in st.session_state:
     st.session_state.ai_summary = None
 if 'final_thetas' not in st.session_state:
      st.session_state.final_thetas = {}
-
+# Remove state for validated dataframes
+# if 'validated_df_q' not in st.session_state:
+#     st.session_state.validated_df_q = None
+# if 'validated_df_v' not in st.session_state:
+#     st.session_state.validated_df_v = None
+# if 'validated_df_di' not in st.session_state:
+#     st.session_state.validated_df_di = None
 
 # --- Sidebar Settings (Keep as is) ---
 st.sidebar.subheader("OpenAI 設定 (選用)")
@@ -266,6 +277,13 @@ with tab_q:
         try:
             temp_df_q = pd.read_csv(source_q, sep=None, engine='python')
             
+            # --- Explicitly Remove *_b columns --- 
+            cols_to_drop_q = [col for col in temp_df_q.columns if str(col).endswith('_b')]
+            if cols_to_drop_q:
+                temp_df_q.drop(columns=cols_to_drop_q, inplace=True)
+                st.caption(f"已自動忽略以下欄位: {', '.join(cols_to_drop_q)}")
+            # --- End Remove --- 
+            
             # --- Initial Cleaning: Drop empty rows and columns --- 
             initial_rows_q, initial_cols_q = temp_df_q.shape
             temp_df_q.dropna(how='all', inplace=True) # Drop rows where ALL are NaN
@@ -305,7 +323,6 @@ with tab_q:
             else:
                 st.warning("讀取的資料在清理空行/空列後為空。")
                 temp_df_q = None # Set to None if empty after cleaning
-            # --- End Editable Preview --- 
 
             # Proceed with standardization ONLY if temp_df_q is not None (i.e., no validation errors)
             if temp_df_q is not None:
@@ -341,7 +358,7 @@ with tab_q:
                      temp_df_q.rename(columns={'Correct': 'is_correct'}, inplace=True) # Rename to is_correct
                 else:
                     st.error("Q: 編輯後的資料缺少 'Performance'/'Correct' 欄位，無法確定錯誤題目。", icon="🚨")
-                    temp_df_q = None # Mark as invalid if Correct column is missing
+                    temp_df_q = None # Mark as invalid
 
                 if temp_df_q is not None:
                     data_sources['Q'] = data_source_type_q
@@ -360,9 +377,10 @@ with tab_q:
                         temp_df_q['question_position'] = pd.to_numeric(temp_df_q['question_position'], errors='coerce').astype('Int64')
                     # --- End Ensure --- 
                     df_q = temp_df_q # Assign the fully processed df to df_q
-                    # Remove old expander preview
-                    # with st.expander("顯示 Q 資料預覽"):
-                    #      st.dataframe(df_q.head())
+
+            # Reset df_q if temp_df_q ended up being None after standardization/validation
+            if temp_df_q is None:
+                df_q = None
         except Exception as e:
             st.error(f"處理 Q 科目資料時發生錯誤：{e}")
             df_q = None # Ensure df_q is None on error
@@ -398,6 +416,14 @@ with tab_v:
     if source_v is not None:
         try:
             temp_df_v = pd.read_csv(source_v, sep=None, engine='python')
+            
+            # --- Explicitly Remove *_b columns --- 
+            cols_to_drop_v = [col for col in temp_df_v.columns if str(col).endswith('_b')]
+            if cols_to_drop_v:
+                temp_df_v.drop(columns=cols_to_drop_v, inplace=True)
+                st.caption(f"已自動忽略以下欄位: {', '.join(cols_to_drop_v)}")
+            # --- End Remove --- 
+            
             # --- Initial Cleaning --- 
             initial_rows_v, initial_cols_v = temp_df_v.shape
             temp_df_v.dropna(how='all', inplace=True)
@@ -435,7 +461,6 @@ with tab_v:
             else:
                  st.warning("讀取的資料在清理空行/空列後為空。")
                  temp_df_v = None
-            # --- End Editable Preview --- 
 
             # Proceed with standardization ONLY if temp_df_v is not None
             if temp_df_v is not None:
@@ -483,9 +508,10 @@ with tab_v:
                         temp_df_v['question_position'] = pd.to_numeric(temp_df_v['question_position'], errors='coerce').astype('Int64')
                     # --- End Ensure --- 
                     df_v = temp_df_v
-                    # Remove old preview
-                    # with st.expander("顯示 V 資料預覽"):
-                    #      st.dataframe(df_v.head())
+
+            # Reset df_v if temp_df_v ended up being None after standardization/validation
+            if temp_df_v is None:
+                df_v = None
         except Exception as e:
             st.error(f"處理 V 科目資料時發生錯誤：{e}")
             df_v = None
@@ -521,6 +547,14 @@ with tab_di:
     if source_di is not None:
         try:
             temp_df_di = pd.read_csv(source_di, sep=None, engine='python')
+            
+            # --- Explicitly Remove *_b columns --- 
+            cols_to_drop_di = [col for col in temp_df_di.columns if str(col).endswith('_b')]
+            if cols_to_drop_di:
+                temp_df_di.drop(columns=cols_to_drop_di, inplace=True)
+                st.caption(f"已自動忽略以下欄位: {', '.join(cols_to_drop_di)}")
+            # --- End Remove --- 
+            
             # --- Initial Cleaning --- 
             initial_rows_di, initial_cols_di = temp_df_di.shape
             temp_df_di.dropna(how='all', inplace=True)
@@ -558,7 +592,6 @@ with tab_di:
             else:
                  st.warning("讀取的資料在清理空行/空列後為空。")
                  temp_df_di = None
-            # --- End Editable Preview --- 
 
             # Proceed with standardization ONLY if temp_df_di is not None
             if temp_df_di is not None:
@@ -606,9 +639,10 @@ with tab_di:
                         temp_df_di['question_position'] = pd.to_numeric(temp_df_di['question_position'], errors='coerce').astype('Int64')
                     # --- End Ensure --- 
                     df_di = temp_df_di
-                    # Remove old preview
-                    # with st.expander("顯示 DI 資料預覽"):
-                    #      st.dataframe(df_di.head())
+
+            # Reset df_di if temp_df_di ended up being None after standardization/validation
+            if temp_df_di is None:
+                 df_di = None
         except Exception as e:
             st.error(f"處理 DI 科目資料時發生錯誤：{e}")
             df_di = None
@@ -933,7 +967,7 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
 
     # Check if the report dictionary exists AND is actually a dictionary
     if isinstance(st.session_state.report_dict, dict):
-        if st.session_state.report_dict: # Check if the dictionary is not empty
+        if st.session_state.report_dict: # Check if the dictionary is not None and not empty
             # Dynamically create tabs based on available reports and AI summary possibility
             report_subjects = sorted(st.session_state.report_dict.keys()) # Get subjects with reports (e.g., ['DI', 'Q', 'V'])
             tab_names = report_subjects # Start with subject tabs
@@ -958,12 +992,45 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
                     if subject in tab_map: # Check if tab was created
                         with tab_map[subject]:
                             st.subheader(f"{subject} 科目詳細診斷報告") # Add subheader for clarity
+
+                            # --- Display Input Data Table (using df_final_for_diagnosis) ---
+                            df_to_display = None
+                            # Check if the main diagnosis dataframe exists
+                            if 'df_final_for_diagnosis' in locals() and df_final_for_diagnosis is not None:
+                                try:
+                                     # Filter the final diagnosis df for the current subject
+                                     df_to_display = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == subject].copy()
+                                     # Optional: Select or reorder columns for display if needed
+                                     # display_cols = ['question_position', 'is_correct', 'question_time', 'question_difficulty', 'question_type', 'content_domain', 'question_fundamental_skill']
+                                     # existing_display_cols = [col for col in display_cols if col in df_to_display.columns]
+                                     # df_to_display = df_to_display[existing_display_cols]
+                                except KeyError:
+                                      st.warning(f"無法在最終數據中找到 {subject} 科目的 'Subject' 欄位進行過濾。")
+                                      df_to_display = None # Reset if filtering fails
+                                except Exception as filter_e:
+                                      st.warning(f"過濾 {subject} 科目數據以供顯示時出錯: {filter_e}")
+                                      df_to_display = None
+
+                            # Display the filtered dataframe if it's valid and not empty
+                            if df_to_display is not None and not df_to_display.empty:
+                                st.subheader("診斷用數據 (含模擬難度)") # Changed subheader
+                                st.dataframe(df_to_display, use_container_width=True)
+                                st.divider() # Add separator before the text report
+                            else:
+                                # Show only if analysis was run but df is missing/empty for this subject
+                                if st.session_state.analysis_run: 
+                                    st.caption(f"未能加載用於顯示的 {subject} 科目診斷數據表格。") # Fallback message
+                            # --- End Display Input Data Table ---
+
                             # Ensure the report content itself is a string before displaying
                             report_content = st.session_state.report_dict.get(subject, "")
-                            if isinstance(report_content, str):
-                                st.markdown(report_content)
-                            else:
-                                st.warning(f"{subject} 科目的報告內容不是有效的文字格式，無法顯示。")
+                            if report_content: # Only display markdown if there is content
+                                if isinstance(report_content, str):
+                                    st.markdown(report_content)
+                                else:
+                                    st.warning(f"{subject} 科目的報告內容不是有效的文字格式，無法顯示。")
+                            elif st.session_state.analysis_run: # Report is empty, but analysis ran
+                                 st.info(f"{subject} 科目沒有生成文字診斷報告。")
 
                 # Display AI summary tab content
                 if "AI 文字摘要" in tab_map:
