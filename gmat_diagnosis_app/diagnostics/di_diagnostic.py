@@ -636,20 +636,6 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
     question_types_full = ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
     recommendations_by_type = {q_type: [] for q_type in question_types_full}
     processed_override_types = set()
-    exempted_combinations = set()
-
-    # 1. Calculate Exempted Combinations
-    if not df_diagnosed.empty and 'content_domain' in df_diagnosed.columns and 'question_type' in df_diagnosed.columns:
-        # 針對每個 question_type 和 content_domain 的組合
-        # 計算該組合下正確 (is_correct==True) 且未超時 (overtime==False) 的題目數量
-        # 若數量 > 2，將該組合加入豁免清單
-        combo_groups = df_diagnosed.groupby(['question_type', 'content_domain'])
-        exempted_combinations = set()
-        for (qt, dm), group in combo_groups:
-            num_correct_not_overtime = group[(group['is_correct'] == True) & (group['overtime'] == False)].shape[0]
-            if num_correct_not_overtime > 2:
-                exempted_combinations.add((qt, dm))
-        print(f"        Exempted Combinations (Qt, Dm): {exempted_combinations}")
 
     # 2. Generate Macro Recommendations (from Chapter 5 override)
     for q_type, override_info in override_results.items():
@@ -694,8 +680,8 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
         is_sfe = row['is_sfe']
         diag_params = row['diagnostic_params'] # List of english params
 
-        # Skip if exempted or covered by macro
-        if (q_type, domain) in exempted_combinations or q_type in processed_override_types:
+        # Skip if covered by macro
+        if q_type in processed_override_types:
             continue
 
         # Calculate Y (Difficulty Grade)
@@ -736,15 +722,6 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
 
     # 4. Final Assembly and Domain Focus Rules
     final_recommendations = []
-
-    # Add exemption notes first if type not overridden
-    for qt, dm in exempted_combinations:
-        if qt not in processed_override_types:
-             final_recommendations.append({
-                 'type': 'exemption_note',
-                 'question_type': qt,
-                 'text': f"**豁免說明 ({qt}):** {dm} 領域的 {qt} 題目表現穩定，可暫緩練習。"
-             })
 
     # Process recommendations by type, applying focus rules
     for q_type, type_recs in recommendations_by_type.items():

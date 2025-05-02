@@ -257,71 +257,28 @@ def run_diagnosis(df):
              if num_fast > 0: print(f"  Marked {num_fast} {subject}/{q_type} questions as suspiciously fast (< {avg_time * V_SUSPICIOUS_FAST_MULTIPLIER:.2f} min).")
 
 
-    num_invalid_questions = len(all_invalid_indices) # Total invalid count
-
-    # --- Filter out invalid data ---
-    df_filtered = df_processed[df_processed['is_invalid'] == False].copy()
-    num_filtered = len(df_processed) - len(df_filtered)
-    print(f"Filtered out {num_filtered} invalid questions. Proceeding with {len(df_filtered)} valid questions for detailed diagnosis.")
-
-    if df_filtered.empty:
+    if df_processed.empty:
         print("No valid data remaining after filtering. Cannot perform diagnosis.")
         return "診斷終止：在時間有效性過濾後，沒有剩餘的有效數據可供分析。"
-
-    # --- Calculate Exempted Skills (for Q Chapter 7) ---
-    print("Calculating exempted skills for Q Chapter 7...")
-    exempted_skills = set()
-    if 'question_fundamental_skill' in df_filtered.columns and df_filtered['question_fundamental_skill'].notna().any():
-        try:
-            df_q_filtered = df_filtered[df_filtered['Subject'] == 'Q']
-            grouped_by_skill_valid = df_q_filtered.dropna(subset=['question_fundamental_skill']).groupby('question_fundamental_skill')
-            for skill, group in grouped_by_skill_valid:
-                # Ensure Correct and overtime columns are boolean before calculation
-                # Use the generic 'overtime' flag for Q exemption for now
-                if pd.api.types.is_bool_dtype(group['is_correct']) and pd.api.types.is_bool_dtype(group['overtime']):
-                    num_correct_not_overtime = group[(group['is_correct'] == True) & (group['overtime'] == False)].shape[0]
-                    if num_correct_not_overtime > 2:
-                        exempted_skills.add(skill)
-                        print(f"  Skill '{skill}' exempted for Q (Correct & Not Overtime: {num_correct_not_overtime} > 2)")
-                else:
-                     print(f"  Skipping exemption calculation for skill '{skill}': 'Correct' or 'overtime' column is not boolean.")
-        except Exception as e:
-            print(f"  Error during exemption calculation: {e}")
-    else:
-        print("  Skipping Q exemption calculation (missing 'question_fundamental_skill' column or column is empty).")
-
-    # --- Calculate Exempted Skills (for V Chapter 6/7) ---
-    print("Calculating exempted skills for V Chapter 6/7...")
-    exempted_v_skills = set()
-    if 'question_fundamental_skill' in df_filtered.columns and df_filtered['question_fundamental_skill'].notna().any():
-        try:
-            df_v_filtered = df_filtered[df_filtered['Subject'] == 'V']
-            grouped_by_skill_valid_v = df_v_filtered.dropna(subset=['question_fundamental_skill']).groupby('question_fundamental_skill')
-            for skill, group in grouped_by_skill_valid_v:
-                # V exemption rule: correct and not overtime > 2
-                # 'overtime' for V is complex (CR uses flag, RC uses group/individual)
-                # Use the final 'overtime' flag assigned in v_diagnosis Ch1
-                if pd.api.types.is_bool_dtype(group['is_correct']) and 'overtime' in group.columns and pd.api.types.is_bool_dtype(group['overtime']):
-                    num_correct_not_overtime = group[(group['is_correct'] == True) & (group['overtime'] == False)].shape[0]
-                    # V-Doc Ch7 exemption rule uses > 2
-                    if num_correct_not_overtime > 2:
-                        exempted_v_skills.add(skill)
-                        print(f"  Skill '{skill}' exempted for V (Correct & Not Overtime: {num_correct_not_overtime} > 2)")
-                else:
-                     print(f"  Skipping V exemption calculation for skill '{skill}': 'Correct' or 'overtime' column type issue or missing.")
-        except Exception as e:
-            print(f"  Error during V exemption calculation: {e}")
-    else:
-        print("  Skipping Q exemption calculation (missing 'question_fundamental_skill' column or column is empty).")
 
     # --- Dispatch to Subject-Specific Diagnosis ---
     print("\nDispatching data to subject-specific diagnosis modules...")
     subject_reports = []
 
     # Separate dataframes by Subject
-    df_q = df_filtered[df_filtered['Subject'] == 'Q'].copy()
-    df_v = df_filtered[df_filtered['Subject'] == 'V'].copy()
-    df_di = df_filtered[df_filtered['Subject'] == 'DI'].copy()
+    df_q = df_processed[df_processed['Subject'] == 'Q'].copy()
+    df_v = df_processed[df_processed['Subject'] == 'V'].copy()
+    df_di = df_processed[df_processed['Subject'] == 'DI'].copy()
+
+    # === DEBUG START: Check df_q right after creation ===
+    print(f"DEBUG: df_q shape after filtering by Subject: {df_q.shape}")
+    if not df_q.empty and 'question_type' in df_q.columns:
+        print(f"DEBUG: df_q['question_type'] value counts BEFORE run_q_diagnosis:\n{df_q['question_type'].value_counts(dropna=False)}")
+    elif df_q.empty:
+        print("DEBUG: df_q is EMPTY after filtering by Subject!")
+    else:
+        print("DEBUG: df_q is not empty but 'question_type' column is missing!")
+    # === DEBUG END ===
 
     # Prepare data/results to pass to subject modules
     # Pass the filtered df, time pressure status, invalid count, average times per type
@@ -329,9 +286,9 @@ def run_diagnosis(df):
 
     # Run Q Diagnosis if data exists
     if not df_q.empty:
-        # Pass relevant info: df_q, exempted_skills, time pressure for Q, num_invalid for Q
+        # Pass relevant info: df_q, time pressure for Q, num_invalid for Q
         q_invalid_count = df_processed[(df_processed['Subject'] == 'Q') & (df_processed['is_invalid'])].shape[0]
-        q_report = run_q_diagnosis(df_q, exempted_skills, subject_time_pressure_status.get('Q', False), q_invalid_count) # Assuming status is Bool
+        q_report = run_q_diagnosis(df_q, subject_time_pressure_status.get('Q', False), q_invalid_count)
         subject_reports.append(q_report)
     else:
         print("No Q data found.")
@@ -342,7 +299,7 @@ def run_diagnosis(df):
         # Pass relevant info: df_v, time pressure for V, num_invalid for V, avg times for V
         v_invalid_count = df_processed[(df_processed['Subject'] == 'V') & (df_processed['is_invalid'])].shape[0]
         v_avg_times = subject_avg_time_per_type.get('V', {})
-        v_results, v_report = run_v_diagnosis(df_v, subject_time_pressure_status.get('V', False), v_invalid_count, v_avg_times, exempted_v_skills) # run_v_diagnosis returns results dict and report string
+        v_results, v_report = run_v_diagnosis(df_v, subject_time_pressure_status.get('V', False), v_invalid_count, v_avg_times)
         subject_reports.append(v_report)
     else:
         print("No V data found.")
@@ -366,6 +323,18 @@ def run_diagnosis(df):
     else:
         print("No DI data found.")
         subject_reports.append("數據洞察 (Data Insights) 部分無數據。")
+
+    # --- Calculate correct total invalid and valid counts AFTER all diagnoses ---
+    q_invalid_count = df_processed[(df_processed['Subject'] == 'Q') & (df_processed['is_invalid'])].shape[0]
+    v_invalid_count = df_processed[(df_processed['Subject'] == 'V') & (df_processed['is_invalid'])].shape[0]
+    # Extract DI invalid count from results (handle potential absence)
+    di_invalid_count = 0
+    if 'di_results' in locals() and isinstance(di_results, dict):
+        di_invalid_count = di_results.get('chapter_1', {}).get('invalid_questions_excluded', 0)
+    
+    correct_total_invalid = q_invalid_count + v_invalid_count + di_invalid_count
+    correct_total_valid = len(df_processed) - correct_total_invalid
+    print(f"\nFiltered out {correct_total_invalid} invalid questions ({q_invalid_count} Q, {v_invalid_count} V, {di_invalid_count} DI). Proceeding with {correct_total_valid} valid questions for detailed diagnosis.")
 
     # --- Combine Reports ---
     print("\nCombining subject reports...")

@@ -91,6 +91,12 @@ with st.expander("Quantitative (Q) 資料輸入", expanded=False):
             cols_to_rename = {k: v for k, v in rename_map_q.items() if k in temp_df_q.columns}
             temp_df_q.rename(columns=cols_to_rename, inplace=True)
             
+            # Standardize question_type AFTER renaming
+            if 'question_type' in temp_df_q.columns:
+                temp_df_q['question_type'] = temp_df_q['question_type'].astype(str).str.strip().str.upper()
+            else:
+                 st.warning("Q: 缺少 'question_type' 欄位。") # Warn but continue
+
             if 'Correct' in temp_df_q.columns:
                  # Convert to boolean consistently
                  temp_df_q['Correct'] = temp_df_q['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
@@ -157,6 +163,12 @@ with st.expander("Verbal (V) 資料輸入", expanded=False):
             cols_to_rename = {k: v for k, v in rename_map_v.items() if k in temp_df_v.columns}
             temp_df_v.rename(columns=cols_to_rename, inplace=True)
             
+            # Standardize question_type AFTER renaming (Remove .str.upper() for V)
+            if 'question_type' in temp_df_v.columns:
+                temp_df_v['question_type'] = temp_df_v['question_type'].astype(str).str.strip() # Keep original case for V
+            else:
+                 st.warning("V: 缺少 'question_type' 欄位。") # Warn but continue
+
             if 'Correct' in temp_df_v.columns:
                  temp_df_v['Correct'] = temp_df_v['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
                  temp_df_v.rename(columns={'Correct': 'is_correct'}, inplace=True) # Rename to is_correct
@@ -221,6 +233,12 @@ with st.expander("Data Insights (DI) 資料輸入", expanded=False):
 
             cols_to_rename = {k: v for k, v in rename_map_di.items() if k in temp_df_di.columns}
             temp_df_di.rename(columns=cols_to_rename, inplace=True)
+            
+            # Standardize question_type AFTER renaming (Remove .str.upper() for DI)
+            if 'question_type' in temp_df_di.columns:
+                temp_df_di['question_type'] = temp_df_di['question_type'].astype(str).str.strip() # Keep original case for DI
+            else:
+                st.warning("DI: 缺少 'question_type' 欄位。") # Warn but continue
             
             if 'Correct' in temp_df_di.columns:
                  temp_df_di['Correct'] = temp_df_di['Correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
@@ -341,7 +359,7 @@ else:
                     wrong_positions = user_df_subj_sorted[user_df_subj_sorted['is_correct'] == False]['question_position'].tolist()
                     wrong_indices = wrong_positions # Assign to the variable expected by the simulation function
                     # --- END CORRECTION ---
-                    st.write(f"  {subject}: 從用戶數據提取 {len(wrong_indices)} 個錯誤題目位置: {wrong_indices[:10]}...")
+                    st.write(f"  {subject}: 從用戶數據提取 {len(wrong_indices)} 個錯誤題目位置: {wrong_indices}")
                 else:
                     # This warning should now only appear if 'Performance' was truly missing initially
                     st.warning(f"  {subject}: 用戶數據缺少 'is_correct' 欄位 (源自 'Performance')，假設全部答對進行模擬。")

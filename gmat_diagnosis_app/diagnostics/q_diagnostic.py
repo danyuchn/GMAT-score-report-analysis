@@ -89,8 +89,15 @@ def _diagnose_q_internal(df_q):
 
      # --- Chapter 2: Real vs Pure Analysis ---
      print("    Executing Q - Chapter 2: Real vs Pure Analysis...")
-     df_real = df_q[df_q['question_type'] == 'Real'].copy()
-     df_pure = df_q[df_q['question_type'] == 'Pure'].copy()
+     # Use uppercase to match standardized data from app.py
+     df_real = df_q[df_q['question_type'] == 'REAL'].copy()
+     df_pure = df_q[df_q['question_type'] == 'PURE'].copy()
+
+     # DEBUG: Print value counts for the relevant columns
+     print(f"      DEBUG: df_real['is_correct'] counts:\n{df_real['is_correct'].value_counts(dropna=False)}")
+     print(f"      DEBUG: df_real['overtime'] counts:\n{df_real['overtime'].value_counts(dropna=False)}")
+     print(f"      DEBUG: df_pure['is_correct'] counts:\n{df_pure['is_correct'].value_counts(dropna=False)}")
+     print(f"      DEBUG: df_pure['overtime'] counts:\n{df_pure['overtime'].value_counts(dropna=False)}")
 
      # Counts
      num_total_real = len(df_real)
@@ -405,7 +412,7 @@ def _diagnose_q_internal(df_q):
 
 # --- Q-Specific Recommendation Generation (Chapter 7) ---
 
-def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
+def _generate_q_recommendations(q_diagnosis_results):
     """Generates practice recommendations based on Q diagnosis results (Ch 2-6)."""
     print("    Generating Q - Chapter 7: Practice Recommendations...")
     recommendations_by_skill = {}
@@ -479,8 +486,7 @@ def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
 
         skill_recs_list = []
         is_overridden = ch6_override.get(skill, {}).get('triggered', False)
-        is_exempted = skill in exempted_skills # Check against passed-in set
-        print(f"      Processing Skill: {skill}, Overridden: {is_overridden}, Exempted: {is_exempted}")
+        print(f"      Processing Skill: {skill}, Overridden: {is_overridden}")
 
         if is_overridden and skill not in processed_override_skills:
             # Generate Macro Recommendation
@@ -500,7 +506,7 @@ def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
             processed_override_skills.add(skill)
             print(f"      Generated MACRO recommendation for Skill: {skill}")
 
-        elif not is_exempted and not is_overridden:
+        elif not is_overridden:
              # Generate Case Recommendations
              skill_triggers = [t for t in triggers if t['skill'] == skill]
              has_real_trigger = any(t.get('q_type') == 'Real' for t in skill_triggers)
@@ -548,17 +554,8 @@ def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
                        skill_recs_list.append({'type': 'adjustment', 'text': f"針對【{skill}】的整體練習：{adjustment_text.strip()}", 'priority': 4})
                   print(f"      Generated {len(skill_recs_list)} CASE recommendations/adjustments for Skill: {skill}")
 
-        elif is_exempted:
-            # Generate exemption note only if not overridden (macro rec takes precedence)
-            if not is_overridden:
-                 exemption_note = f"技能【{skill}】表現穩定 (正確且未超時 > 2)，可暫緩針對個別錯題/慢題的練習。"
-                 skill_recs_list.append({'type': 'exemption', 'text': exemption_note, 'priority': 5})
-                 print(f"      Generated EXEMPTION note for Skill: {skill}")
-            else:
-                 print(f"      Skill {skill} is Exempted but also Overridden, Macro Recommendation takes precedence.")
-
         if skill_recs_list:
-             # Sort recommendations within the skill: Macro (0), SFE Case (1), Other Case (2), Slow-Correct Case (3), Adjustment (4), Exemption (5)
+             # Sort recommendations within the skill: Macro (0), SFE Case (1), Other Case (2), Slow-Correct Case (3), Adjustment (4)
              recommendations_by_skill[skill] = sorted(skill_recs_list, key=lambda x: x['priority'])
 
     # Flatten and format the final list
@@ -639,6 +636,7 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
 
     if num_invalid_questions > 0:
         report_lines.append(f"- 已將 {num_invalid_questions} 道可能因時間壓力影響有效性的題目從詳細分析中排除，以確保診斷準確性。")
+        report_lines.append("- 請注意，這些被排除的題目將不會包含在後續的錯誤難度分佈統計和練習建議中。")
     else:
         report_lines.append("- 所有題目數據均被納入詳細分析。")
     report_lines.append("")
@@ -646,17 +644,16 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
     # 2. 表現概覽
     report_lines.append("**2. 表現概覽**")
     real_stats_error = next((item for item in ch2_summary if item.get('Metric') == 'Error Rate'), None)
-    pure_stats_error = real_stats_error # In the current structure, they are in the same dict item
     real_stats_ot = next((item for item in ch2_summary if item.get('Metric') == 'Overtime Rate'), None)
-    pure_stats_ot = real_stats_ot
 
     if real_stats_error and real_stats_ot:
         report_lines.append(f"- **Real vs. Pure 題表現:**")
         # Use .get for safer access to values
         real_err_rate = real_stats_error.get('Real_Value', 'N/A')
         real_ot_rate = real_stats_ot.get('Real_Value', 'N/A')
-        pure_err_rate = pure_stats_error.get('Pure_Value', 'N/A')
-        pure_ot_rate = pure_stats_ot.get('Pure_Value', 'N/A')
+        # Extract Pure values directly from the same dictionaries
+        pure_err_rate = real_stats_error.get('Pure_Value', 'N/A')
+        pure_ot_rate = real_stats_ot.get('Pure_Value', 'N/A')
 
         # Use the helper function for formatting
         real_err_rate_str = _format_rate(real_err_rate)
@@ -875,35 +872,29 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
 
 # --- Main Q Diagnosis Entry Point ---
 
-def run_q_diagnosis(df_q, exempted_skills, subject_time_pressure_status, num_invalid_questions):
+def run_q_diagnosis(df_q, subject_time_pressure_status, num_invalid_questions):
     """
-    Runs the full diagnostic process for the Quantitative (Q) section.
+    Runs the full Quant diagnosis process based on pre-processed data.
 
     Args:
-        df_q (pd.DataFrame): DataFrame containing *filtered* Q data.
-        exempted_skills (set): Set of skills exempted from case recommendations.
-        subject_time_pressure_status (dict): Dictionary mapping subject to time pressure boolean.
-        num_invalid_questions (int): Total number of invalid questions filtered out earlier.
+        df_q (pd.DataFrame): Pre-processed DataFrame for Q (filtered, with difficulty etc.).
+        subject_time_pressure_status (bool): Whether time pressure was detected for Q.
+        num_invalid_questions (int): Number of invalid questions excluded for Q.
 
     Returns:
-        str: The generated Q summary report string, or a message indicating no report could be generated.
+        str: A string containing the formatted summary report for the Q section.
     """
-    print("--- Running Quantitative Diagnosis --- ")
-    if df_q.empty:
-        print("  No valid Q data provided. Skipping Q diagnosis.")
-        return "量化 (Quantitative) 部分無有效數據可供診斷。"
+    print("--- Entering run_q_diagnosis ---")
+    # Placeholder for exempted skills calculation if moved here later
+    # For now, assumes exempted_skills are determined globally if needed, or not used
 
-    # Perform core diagnosis (Chapters 2-6)
+    # Execute internal diagnosis steps (Chapters 2-6)
     q_diagnosis_results = _diagnose_q_internal(df_q)
 
-    if not q_diagnosis_results: # Check if internal diagnosis returned empty results
-        print("  Q internal diagnosis yielded no results. Skipping recommendations and report.")
-        return "量化 (Quantitative) 部分診斷未產生有效結果。"
+    # Generate Recommendations (Chapter 7) - Removed exempted_skills argument
+    q_recommendations = _generate_q_recommendations(q_diagnosis_results)
 
-    # Generate recommendations (Chapter 7)
-    q_recommendations = _generate_q_recommendations(q_diagnosis_results, exempted_skills)
-
-    # Generate summary report (Chapter 8)
+    # Generate Summary Report (Chapter 8)
     q_report = _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_time_pressure_status, num_invalid_questions)
 
     print("--- Finished Quantitative Diagnosis --- ")
