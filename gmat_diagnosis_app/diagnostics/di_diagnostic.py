@@ -3,50 +3,57 @@ import numpy as np
 import math # For floor function
 
 # --- DI-Specific Constants (from Markdown Chapter 0 & 1) ---
-MAX_ALLOWED_TIME_DI = 45.0
+MAX_ALLOWED_TIME_DI = 45.0  # minutes
 TOTAL_QUESTIONS_DI = 20
-TIME_PRESSURE_THRESHOLD_DI = 3.0 # minutes difference
-INVALID_TIME_THRESHOLD_SECONDS = 60.0 # 1.0 minute
+TIME_PRESSURE_THRESHOLD_DI = 3.0  # minutes difference
+INVALID_TIME_THRESHOLD_MINUTES = 1.0  # 1.0 minute
 LAST_THIRD_FRACTION = 2/3
 
-# Overtime thresholds (seconds) based on time pressure
-OVERTIME_THRESHOLDS_SECONDS = {
-    True: { # High Pressure
-        'TPA': 3.0 * 60,
-        'GT': 3.0 * 60,
-        'DS': 2.0 * 60,
-        'MSR_GROUP': 6.0 * 60,
-        'MSR_READING': 1.5 * 60,
-        'MSR_SINGLE_Q': 1.5 * 60
+# Overtime thresholds (minutes) based on time pressure
+OVERTIME_THRESHOLDS = {
+    True: {  # High Pressure
+        'TPA': 3.0,
+        'GT': 3.0,
+        'DS': 2.0,
+        'MSR_GROUP': 6.0,
+        'MSR_READING': 1.5,
+        'MSR_SINGLE_Q': 1.5
     },
-    False: { # Low Pressure
-        'TPA': 3.5 * 60,
-        'GT': 3.5 * 60,
-        'DS': 2.5 * 60,
-        'MSR_GROUP': 7.0 * 60,
-        'MSR_READING': 1.5 * 60, # Reading threshold often kept constant
-        'MSR_SINGLE_Q': 1.5 * 60 # Single question threshold often kept constant
+    False: {  # Low Pressure
+        'TPA': 3.5,
+        'GT': 3.5,
+        'DS': 2.5,
+        'MSR_GROUP': 7.0,
+        'MSR_READING': 1.5,  # Reading threshold often kept constant
+        'MSR_SINGLE_Q': 1.5  # Single question threshold often kept constant
     }
 }
 
 # --- DI-Specific Helper Functions ---
 
+def _format_rate(rate_value):
+    """Formats a value as percentage if numeric, otherwise returns as string."""
+    if isinstance(rate_value, (int, float)):
+        return f"{rate_value:.1%}"
+    else:
+        return str(rate_value) # Ensure it's a string
+
 def _grade_difficulty_di(difficulty):
-    """Maps DI difficulty score to a 6-level grade string."""
+    """Maps DI difficulty score to a 6-level grade string based on documentation."""
     if pd.isna(difficulty):
         return "Unknown Difficulty"
     if difficulty <= -1:
-        return "Low / 505+"
+        return "低難度 (Low) / 505+"
     elif difficulty <= 0:
-        return "Mid / 555+"
+        return "中難度 (Mid) / 555+"
     elif difficulty <= 1:
-        return "Mid / 605+"
+        return "中難度 (Mid) / 605+"
     elif difficulty <= 1.5:
-        return "Mid / 655+"
+        return "中難度 (Mid) / 655+"
     elif difficulty <= 1.95:
-        return "High / 705+"
+        return "高難度 (High) / 705+"
     else: # difficulty > 1.95
-        return "High / 805+"
+        return "高難度 (High) / 805+"
 
 def _analyze_dimension(df_filtered, dimension_col):
     """Analyzes performance metrics grouped by a specific dimension column."""
@@ -58,7 +65,7 @@ def _analyze_dimension(df_filtered, dimension_col):
 
     for name, group in grouped:
         total = len(group)
-        errors = group['Correct'].eq(False).sum()
+        errors = group['is_correct'].eq(False).sum()
         overtime = group['overtime'].eq(True).sum()
         error_rate = errors / total if total > 0 else 0.0
         overtime_rate = overtime / total if total > 0 else 0.0
@@ -84,7 +91,8 @@ def _calculate_msr_metrics(df):
         df['msr_reading_time'] = np.nan
         return df
 
-    df_msr = df[df['question_type'] == 'MSR'].copy()
+    # Use full type name
+    df_msr = df[df['question_type'] == 'Multi-source reasoning'].copy()
     if df_msr.empty:
         df['msr_group_total_time'] = np.nan
         df['msr_reading_time'] = np.nan
@@ -100,6 +108,7 @@ def _calculate_msr_metrics(df):
         group_df_sorted = group_df.sort_values('question_position')
         if len(group_df_sorted) >= 2:
             first_q_time = group_df_sorted['question_time'].iloc[0]
+            # 針對每個 MSR 題組（固定 3 題），計算 msr_reading_time = 該題組第一題的 question_time - (該題組第二題 question_time + 第三題 question_time) / 2。
             other_q_times_avg = group_df_sorted['question_time'].iloc[1:].mean()
             reading_time = first_q_time - other_q_times_avg
             # Store reading time associated with the first question's index
@@ -149,13 +158,14 @@ def run_di_diagnosis(df_di):
     Args:
         df_di (pd.DataFrame): DataFrame containing only DI response data.
                               Needs columns like 'question_time', 'Correct', 'question_type',
-                              'question_position', 'msr_group_id' (if MSR exists), etc.
+                              'question_position' (acts as identifier), 'msr_group_id' (if MSR exists), etc.
                               'question_difficulty' (simulated) is expected.
 
     Returns:
         dict: A dictionary containing the results of the DI diagnosis, structured by chapter.
         str: A string containing the summary report for the DI section.
     """
+    print("DEBUG: >>>>>> Entering run_di_diagnosis >>>>>>") # DEBUG
     print("  Running Data Insights Diagnosis...")
     di_diagnosis_results = {}
 
@@ -165,19 +175,19 @@ def run_di_diagnosis(df_di):
 
     # --- Chapter 0: Derivative Data Calculation ---
     print("    Chapter 0: Calculating Derivative Metrics (MSR Times)...")
-    # Ensure 'question_time' is numeric (seconds assumed based on thresholds)
+    # Ensure 'question_time' is numeric (minutes)
     df_di['question_time'] = pd.to_numeric(df_di['question_time'], errors='coerce')
     df_di = _calculate_msr_metrics(df_di)
 
     # --- Chapter 1: Time Strategy & Validity ---
     print("    Chapter 1: Time Strategy & Validity Analysis (DI Specific)")
-    total_test_time_di = df_di['question_time'].sum() / 60.0 # Convert sum of seconds to minutes
+    total_test_time_di = df_di['question_time'].sum() # Already in minutes
     time_diff = MAX_ALLOWED_TIME_DI - total_test_time_di
     time_pressure = time_diff <= TIME_PRESSURE_THRESHOLD_DI
     print(f"      DI Total Time: {total_test_time_di:.2f} min, Allowed: {MAX_ALLOWED_TIME_DI:.1f} min, Diff: {time_diff:.2f} min, Pressure: {time_pressure}")
 
     # Set thresholds based on pressure
-    thresholds = OVERTIME_THRESHOLDS_SECONDS[time_pressure]
+    thresholds = OVERTIME_THRESHOLDS[time_pressure]
 
     # Identify invalid questions (only if time_pressure is True)
     df_di['is_invalid'] = False
@@ -186,7 +196,7 @@ def run_di_diagnosis(df_di):
         last_third_pos_start = TOTAL_QUESTIONS_DI * LAST_THIRD_FRACTION
         invalid_mask = (
             (df_di['question_position'] > last_third_pos_start) &
-            (df_di['question_time'] < INVALID_TIME_THRESHOLD_SECONDS)
+            (df_di['question_time'] < INVALID_TIME_THRESHOLD_MINUTES)
         )
         df_di.loc[invalid_mask, 'is_invalid'] = True
         num_invalid_questions = invalid_mask.sum()
@@ -206,7 +216,7 @@ def run_di_diagnosis(df_di):
             df_di.loc[index, 'overtime'] = True
         elif q_type == 'DS' and q_time > thresholds['DS']:
             df_di.loc[index, 'overtime'] = True
-        elif q_type == 'MSR':
+        elif q_type == 'Multi-source reasoning':
             group_time = row['msr_group_total_time']
             if pd.notna(group_time) and group_time > thresholds['MSR_GROUP']:
                 df_di.loc[index, 'overtime'] = True # Mark individual MSR Q as overtime if group is overtime
@@ -228,7 +238,7 @@ def run_di_diagnosis(df_di):
         'time_difference_minutes': time_diff,
         'time_pressure': time_pressure,
         'invalid_questions_excluded': num_invalid_questions,
-        'overtime_thresholds_seconds': thresholds
+        'overtime_thresholds_minutes': thresholds
     }
 
     # --- Chapter 2: Multidimensional Performance Analysis (Using df_di_filtered) ---
@@ -299,9 +309,10 @@ def run_di_diagnosis(df_di):
     if not df_di_filtered.empty:
         # Calculate prerequisites for Chapter 3
         avg_time_per_type = df_di_filtered.groupby('question_type')['question_time'].mean().to_dict()
-        print(f"      Avg Time Per Type (seconds): {avg_time_per_type}")
+        print(f"      Avg Time Per Type (minutes): {avg_time_per_type}")
 
-        max_correct_difficulty_per_combination = df_di_filtered[df_di_filtered['Correct'] == True].groupby(
+        # Use 'is_correct' here
+        max_correct_difficulty_per_combination = df_di_filtered[df_di_filtered['is_correct'] == True].groupby(
             ['question_type', 'content_domain']
         )['question_difficulty'].max().unstack(fill_value=-np.inf) # Use -inf for missing combos
         print(f"      Max Correct Difficulty Per Combination:\n{max_correct_difficulty_per_combination}")
@@ -313,7 +324,7 @@ def run_di_diagnosis(df_di):
         # Storing the whole DF might be easier for subsequent chapters
         di_diagnosis_results['chapter_3'] = {
             'diagnosed_dataframe': df_di_filtered, # Contains 'diagnostic_params' and 'is_sfe' columns
-            'avg_time_per_type_seconds': avg_time_per_type,
+            'avg_time_per_type_minutes': avg_time_per_type,
             'max_correct_difficulty': max_correct_difficulty_per_combination.to_dict()
         }
         # Optional: Print summary of triggered params
@@ -325,14 +336,14 @@ def run_di_diagnosis(df_di):
         print("      Skipping Chapter 3 due to empty filtered data.")
         di_diagnosis_results['chapter_3'] = {
              'diagnosed_dataframe': pd.DataFrame(),
-             'avg_time_per_type_seconds': {},
+             'avg_time_per_type_minutes': {},
              'max_correct_difficulty': {}
          }
 
     # --- Chapter 4: Special Pattern Observation (Using df_di_filtered) ---
     print("    Chapter 4: Special Pattern Observation")
     # Need avg_time_per_type from Chapter 3 results
-    avg_times_ch3 = di_diagnosis_results.get('chapter_3', {}).get('avg_time_per_type_seconds', {})
+    avg_times_ch3 = di_diagnosis_results.get('chapter_3', {}).get('avg_time_per_type_minutes', {})
     pattern_analysis = _observe_di_patterns(df_di_filtered, avg_times_ch3)
     di_diagnosis_results['chapter_4'] = pattern_analysis
     # Optional: Print pattern results
@@ -382,120 +393,127 @@ def run_di_diagnosis(df_di):
 # --- Root Cause Diagnosis Helper (Chapter 3 Logic) ---
 
 def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
-    """Applies Chapter 3 root cause diagnosis logic row-by-row.
-       Adds 'diagnostic_params' (list) and 'is_sfe' (bool) columns.
-    """
-    df['diagnostic_params'] = [[] for _ in range(len(df))]
-    df['is_sfe'] = False
+    """Analyzes root causes row-by-row and adds 'diagnostic_params' and 'is_sfe' columns."""
 
+    if df.empty:
+        return df # Return the original empty df if input is empty
+
+    # Initialize lists to store results for each row
+    all_diagnostic_params = []
+    all_is_sfe = []
+
+    # Prepare max_correct_difficulty mapping for easier lookup
+    # Convert multi-index max_diffs to a dict: {(type, domain): max_difficulty}
+    max_diff_dict = {}
+    if isinstance(max_diffs, pd.DataFrame): # Check if it's the DataFrame format
+        for q_type in max_diffs.columns:
+            for domain in max_diffs.index:
+                max_val = max_diffs.loc[domain, q_type]
+                if pd.notna(max_val) and max_val != -np.inf:
+                     max_diff_dict[(q_type, domain)] = max_val
+
+    # Iterate through each row of the input DataFrame
     for index, row in df.iterrows():
-        params = []
+        # Extract basic information
         q_type = row['question_type']
-        domain = row['content_domain']
-        q_time = row['question_time']
-        is_correct = row['Correct']
-        difficulty = row['question_difficulty']
-        is_overtime = row['overtime'] # From Chapter 1
+        q_domain = row.get('content_domain', 'Unknown Domain')
+        q_diff = row.get('question_difficulty', None)
+        q_time = row.get('question_time', None)
+        # Ensure is_correct exists and is bool
+        is_correct = bool(row.get('is_correct', True))
+        is_overtime = bool(row.get('overtime', False))
+        is_group_overtime = bool(row.get('msr_group_overtime', False))
 
-        # Determine Time Performance
-        avg_time = avg_times.get(q_type, np.inf) # Default to infinity if type unknown
-        is_relatively_fast = q_time < avg_time * 0.75
-        is_slow = is_overtime # Slow is defined by the overtime flag from Ch1
-        is_normal_time = not is_relatively_fast and not is_slow
+        current_params = []
+        current_is_sfe = False
 
-        # Determine Special Focus Error (SFE)
-        max_correct_diff = max_diffs.get(domain, {}).get(q_type, -np.inf) # Get max correct diff for this combo
-        is_sfe = (not is_correct) and (difficulty < max_correct_diff)
-        df.loc[index, 'is_sfe'] = is_sfe
-        if is_sfe:
-            params.append('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+        # Determine time performance (similar to error analysis part)
+        time_performance = 'Normal Time' # Default
+        is_relatively_fast = False
+        avg_time_for_type = avg_times.get(q_type, np.inf)
 
-        # Apply MSR Specific Time Checks (Independent)
-        if q_type == 'MSR':
-            # Reading time check (only applies to first question, check if reading_time exists and is high)
-            msr_reading_time = row.get('msr_reading_time') # Get calculated reading time
-            msr_reading_threshold = ch1_thresholds.get('MSR_READING')
-            if pd.notna(msr_reading_time) and msr_reading_threshold is not None and msr_reading_time > msr_reading_threshold:
-                 params.append('DI_MSR_READING_COMPREHENSION_BARRIER')
+        if q_time is not None:
+             if q_time < (avg_time_for_type * 0.75):
+                 is_relatively_fast = True
+                 if not is_correct: time_performance = 'Fast & Wrong'
+             elif is_overtime or is_group_overtime: # Check if slow
+                 if not is_correct: time_performance = 'Slow & Wrong'
+                 # If correct but slow, it's handled by efficiency params later
 
-            # Single Q time check (if not first question? Doc is a bit vague, let's apply to all MSR for simplicity if time > threshold)
-            msr_single_q_threshold = ch1_thresholds.get('MSR_SINGLE_Q')
-            if msr_single_q_threshold is not None and q_time > msr_single_q_threshold:
-                # Avoid double-counting if group is already overtime? No, doc says independent.
-                params.append('DI_MSR_SINGLE_Q_BOTTLENECK')
+        # Check for Special Focus Error (SFE) - only if incorrect
+        if not is_correct and q_diff is not None:
+            max_correct_diff = max_diff_dict.get((q_type, q_domain), -np.inf) # Lookup max correct diff
+            if q_diff < max_correct_diff:
+                current_is_sfe = True
+                current_params.append('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
 
-        # Apply Rules based on Type, Domain, Time, Correctness
-        if q_type == 'DS':
-            if domain == 'Math Related':
-                if is_slow and not is_correct:
-                    params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                elif is_slow and is_correct:
-                    params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
-                elif (is_normal_time or is_relatively_fast) and not is_correct:
-                    params.extend(['DI_CONCEPT_APPLICATION_ERROR'])
-                    if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-            elif domain == 'Non-Math Related':
-                if is_slow and not is_correct:
-                     params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                elif is_slow and is_correct:
-                     params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
-                elif (is_normal_time or is_relatively_fast) and not is_correct:
-                     params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+        # Determine potential root causes based on correctness and time
+        if not is_correct: # Apply error parameters
+            if time_performance == 'Fast & Wrong':
+                current_params.append('DI_CARELESSNESS_DETAIL_OMISSION') # Implicit in fast/wrong
+                current_params.append('DI_DATA_INTERPRETATION_ERROR') # Could be misinterpretation leading to speed
+            elif time_performance == 'Slow & Wrong':
+                current_params.append('DI_DATA_INTERPRETATION_ERROR')
+                current_params.append('DI_LOGICAL_REASONING_ERROR')
+                if q_domain == 'Math Related':
+                     current_params.append('DI_EFFICIENCY_BOTTLENECK_CONCEPT')
+                     current_params.append('DI_EFFICIENCY_BOTTLENECK_CALCULATION')
+                else:
+                     current_params.append('DI_EFFICIENCY_BOTTLENECK_READING')
+                     current_params.append('DI_EFFICIENCY_BOTTLENECK_LOGIC')
+                if q_type == 'GT': current_params.append('DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE')
+                if q_type == 'Multi-source reasoning': current_params.append('DI_EFFICIENCY_BOTTLENECK_INTEGRATION')
+            else: # Normal Time & Wrong
+                current_params.append('DI_DATA_INTERPRETATION_ERROR')
+                current_params.append('DI_LOGICAL_REASONING_ERROR')
+                if q_domain == 'Math Related':
+                     current_params.append('DI_CONCEPT_APPLICATION_ERROR')
+                     current_params.append('DI_CALCULATION_ERROR')
+                if q_type == 'GT': current_params.append('DI_DATA_EXTRACTION_ERROR')
+                if q_type == 'Multi-source reasoning': current_params.append('DI_MULTI_SOURCE_INTEGRATION_ERROR')
 
-        elif q_type == 'TPA': # Similar logic to DS
-             if domain == 'Math Related':
-                 if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                 elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
-                 elif (is_normal_time or is_relatively_fast) and not is_correct:
-                     params.extend(['DI_CONCEPT_APPLICATION_ERROR'])
-                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-             elif domain == 'Non-Math Related':
-                 if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                 elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
-                 elif (is_normal_time or is_relatively_fast) and not is_correct:
-                     params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+        elif is_overtime or is_group_overtime: # Apply efficiency parameters if Correct & Slow
+            if q_domain == 'Math Related':
+                 current_params.append('DI_EFFICIENCY_BOTTLENECK_CONCEPT')
+                 current_params.append('DI_EFFICIENCY_BOTTLENECK_CALCULATION')
+            else:
+                 current_params.append('DI_EFFICIENCY_BOTTLENECK_READING')
+                 current_params.append('DI_EFFICIENCY_BOTTLENECK_LOGIC')
+            if q_type == 'GT': current_params.append('DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE')
+            if q_type == 'Multi-source reasoning': current_params.append('DI_EFFICIENCY_BOTTLENECK_INTEGRATION')
 
-        elif q_type == 'GT':
-             if domain == 'Math Related':
-                 if is_slow and not is_correct: params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_DATA_EXTRACTION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                 elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
-                 elif (is_normal_time or is_relatively_fast) and not is_correct:
-                     params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_DATA_EXTRACTION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR'])
-                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-             elif domain == 'Non-Math Related':
-                 if is_slow and not is_correct: params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                 elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
-                 elif (is_normal_time or is_relatively_fast) and not is_correct:
-                     params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+        # Special MSR-specific parameters
+        if q_type == 'Multi-source reasoning':
+            reading_time = row.get('msr_reading_time', None)
+            if pd.notna(reading_time) and reading_time > ch1_thresholds.get('MSR_READING', 1.5):
+                current_params.append('DI_MSR_READING_BOTTLENECK')
+            if is_group_overtime:
+                 current_params.append('DI_MSR_GROUP_INEFFICIENCY')
 
-        elif q_type == 'MSR':
-            # Note: is_slow here refers to individual question overtime based on group time
-            if domain == 'Math Related':
-                 if is_slow and not is_correct: params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                 elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
-                 elif (is_normal_time or is_relatively_fast) and not is_correct:
-                     params.extend(['DI_CONCEPT_APPLICATION_ERROR']) # Simplified, could be integration/reading too
-                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-            elif domain == 'Non-Math Related':
-                 if is_slow and not is_correct: params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_LOGICAL_REASONING_ERROR', 'DI_QUESTION_TYPE_SPECIFIC_ERROR'])
-                 elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
-                 elif (is_normal_time or is_relatively_fast) and not is_correct:
-                     params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR','DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-
-        # Remove duplicates and store
-        unique_params = list(set(params))
-        # Ensure SFE is always first if present, for easier identification later
+        # Remove duplicates and ensure SFE is first if present
+        unique_params = list(set(current_params))
         if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in unique_params:
-            unique_params.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-            unique_params.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+             unique_params.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+             unique_params.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
 
-        df.loc[index, 'diagnostic_params'] = unique_params
+        # Append results for this row
+        all_diagnostic_params.append(unique_params)
+        all_is_sfe.append(current_is_sfe)
 
-    return df 
+    # Assign the collected lists back to the DataFrame
+    # Ensure lengths match before assignment
+    if len(all_diagnostic_params) == len(df) and len(all_is_sfe) == len(df):
+        df['diagnostic_params'] = all_diagnostic_params
+        df['is_sfe'] = all_is_sfe
+    else:
+        print(f"Error: Length mismatch during root cause diagnosis. Skipping assignment.")
+        # Add empty columns if they don't exist to prevent key errors downstream
+        if 'diagnostic_params' not in df.columns:
+             df['diagnostic_params'] = [[] for _ in range(len(df))]
+        if 'is_sfe' not in df.columns:
+             df['is_sfe'] = False
+
+    return df # Return the modified DataFrame
 
 # --- Special Pattern Observation Helper (Chapter 4 Logic) ---
 
@@ -521,7 +539,7 @@ def _observe_di_patterns(df, avg_times):
             df.loc[index, 'is_relatively_fast'] = True
 
     fast_mask = df['is_relatively_fast'] == True
-    fast_wrong_mask = fast_mask & (df['Correct'] == False)
+    fast_wrong_mask = fast_mask & (df['is_correct'] == False)
 
     num_relatively_fast_total = fast_mask.sum()
     num_relatively_fast_incorrect = fast_wrong_mask.sum()
@@ -537,7 +555,7 @@ def _observe_di_patterns(df, avg_times):
     early_pos_limit = TOTAL_QUESTIONS_DI / 3
     early_rush_mask = (
         (df['question_position'] <= early_pos_limit) &
-        (df['question_time'] < INVALID_TIME_THRESHOLD_SECONDS) # Use 1.0 min threshold
+        (df['question_time'] < INVALID_TIME_THRESHOLD_MINUTES) # Use 1.0 min threshold
     )
 
     early_rushing_df = df[early_rush_mask]
@@ -563,7 +581,8 @@ def _observe_di_patterns(df, avg_times):
 def _check_foundation_override(df, type_metrics):
     """Checks for foundation override rule for each question type."""
     override_results = {}
-    question_types = ['DS', 'TPA', 'MSR', 'GT'] # All possible DI types
+    # Use full type names
+    question_types = ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
 
     for q_type in question_types:
         metrics = type_metrics.get(q_type, {})
@@ -581,7 +600,7 @@ def _check_foundation_override(df, type_metrics):
             # Find relevant questions if triggered
             triggering_mask = (
                 (df['question_type'] == q_type) &
-                ((df['Correct'] == False) | (df['overtime'] == True))
+                ((df['is_correct'] == False) | (df['overtime'] == True))
             )
             triggering_df = df[triggering_mask]
 
@@ -591,8 +610,7 @@ def _check_foundation_override(df, type_metrics):
                 y_agg = _grade_difficulty_di(min_difficulty)
 
                 # Calculate Z_agg (max time among triggering questions, floored to 0.5 min)
-                max_time_seconds = triggering_df['question_time'].max()
-                max_time_minutes = max_time_seconds / 60.0
+                max_time_minutes = triggering_df['question_time'].max()
                 # Floor to nearest 0.5 minute: floor(time * 2) / 2
                 z_agg = math.floor(max_time_minutes * 2) / 2.0
             else:
@@ -614,25 +632,36 @@ def _check_foundation_override(df, type_metrics):
 
 def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
     """Generates practice recommendations based on Chapters 3, 5, and 2 results."""
-    recommendations_by_type = {q_type: [] for q_type in ['DS', 'TPA', 'MSR', 'GT']}
+    # Use full type names for initialization
+    question_types_full = ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
+    recommendations_by_type = {q_type: [] for q_type in question_types_full}
     processed_override_types = set()
     exempted_combinations = set()
 
     # 1. Calculate Exempted Combinations
     if not df_diagnosed.empty and 'content_domain' in df_diagnosed.columns and 'question_type' in df_diagnosed.columns:
-        correct_not_overtime = df_diagnosed[(df_diagnosed['Correct'] == True) & (df_diagnosed['overtime'] == False)]
-        combo_counts = correct_not_overtime.groupby(['question_type', 'content_domain']).size()
-        exempted_combos_series = combo_counts[combo_counts > 2]
-        exempted_combinations = set(exempted_combos_series.index)
+        # 針對每個 question_type 和 content_domain 的組合
+        # 計算該組合下正確 (is_correct==True) 且未超時 (overtime==False) 的題目數量
+        # 若數量 > 2，將該組合加入豁免清單
+        combo_groups = df_diagnosed.groupby(['question_type', 'content_domain'])
+        exempted_combinations = set()
+        for (qt, dm), group in combo_groups:
+            num_correct_not_overtime = group[(group['is_correct'] == True) & (group['overtime'] == False)].shape[0]
+            if num_correct_not_overtime > 2:
+                exempted_combinations.add((qt, dm))
         print(f"        Exempted Combinations (Qt, Dm): {exempted_combinations}")
 
     # 2. Generate Macro Recommendations (from Chapter 5 override)
     for q_type, override_info in override_results.items():
-        if override_info.get('override_triggered'):
+        # Ensure using full name if present in override_results keys
+        if q_type in recommendations_by_type and override_info.get('override_triggered'):
             y_agg = override_info.get('Y_agg', '未知難度')
             z_agg = override_info.get('Z_agg')
             z_agg_text = f"{z_agg:.1f} 分鐘" if z_agg is not None else "未知限時"
-            rec_text = f"**宏觀建議 ({q_type}):** 由於整體表現有較大提升空間 (錯誤率 {override_info.get('triggering_error_rate', 0.0):.1%} 或 超時率 {override_info.get('triggering_overtime_rate', 0.0):.1%}), "
+            # Format rates before f-string
+            error_rate_str = _format_rate(override_info.get('triggering_error_rate', 0.0))
+            overtime_rate_str = _format_rate(override_info.get('triggering_overtime_rate', 0.0))
+            rec_text = f"**宏觀建議 ({q_type}):** 由於整體表現有較大提升空間 (錯誤率 {error_rate_str} 或 超時率 {overtime_rate_str}), "
             rec_text += f"建議全面鞏固 **{q_type}** 題型的基礎，可從 **{y_agg}** 難度題目開始系統性練習，掌握核心方法，建議限時 **{z_agg_text}**。"
             recommendations_by_type[q_type].append({
                 'type': 'macro',
@@ -641,17 +670,26 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
             processed_override_types.add(q_type)
 
     # 3. Generate Case Recommendations (from Chapter 3 diagnosed data)
-    # Define target times (seconds) for Z calculation
-    target_times_seconds = {'DS': 2.0*60, 'TPA': 3.0*60, 'GT': 3.0*60, 'MSR': 2.0*60}
+    # Use full type names for target times
+    target_times_minutes = {
+        'Data Sufficiency': 2.0,
+        'Two-part analysis': 3.0,
+        'Graph and Table': 3.0,
+        'Multi-source reasoning': 2.0 # Target time per question for MSR
+    }
 
-    df_trigger = df_diagnosed[((df_diagnosed['Correct'] == False) | (df_diagnosed['overtime'] == True))]
+    df_trigger = df_diagnosed[((df_diagnosed['is_correct'] == False) | (df_diagnosed['overtime'] == True))]
 
     for index, row in df_trigger.iterrows():
-        q_type = row['question_type']
+        q_type = row['question_type'] # This should have the full name from the data
+        # Check if q_type is valid before proceeding
+        if q_type not in question_types_full:
+            print(f"Warning: Encountered unexpected question type '{q_type}' in recommendation generation. Skipping row {index}.")
+            continue
         domain = row['content_domain']
         difficulty_score = row['question_difficulty']
-        q_time_seconds = row['question_time']
-        is_correct = row['Correct']
+        q_time_minutes = row['question_time']
+        is_correct = row['is_correct']
         is_overtime = row['overtime']
         is_sfe = row['is_sfe']
         diag_params = row['diagnostic_params'] # List of english params
@@ -664,24 +702,26 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
         y_grade = _grade_difficulty_di(difficulty_score)
 
         # Calculate Z (Starting Time Limit in minutes)
-        target_time_sec = target_times_seconds.get(q_type, 120) # Default 2 mins
-        base_time_sec = q_time_seconds - (0.5 * 60) if is_overtime else q_time_seconds
-        z_raw_minutes = math.floor((base_time_sec / 60.0) * 2) / 2.0
-        z_minutes = max(z_raw_minutes, target_time_sec / 60.0)
+        target_time_minutes = target_times_minutes.get(q_type, 120) # Default 2 mins
+        base_time_minutes = q_time_minutes - (0.5) if is_overtime else q_time_minutes
+        z_raw_minutes = math.floor((base_time_minutes) * 2) / 2.0
+        z_minutes = max(z_raw_minutes, target_time_minutes)
         z_text = f"{z_minutes:.1f} 分鐘"
-        target_time_text = f"{target_time_sec / 60.0:.1f} 分鐘"
+        target_time_text = f"{target_time_minutes:.1f} 分鐘"
 
         # Build recommendation text
-        # TODO: Translate diag_params before including?
+        # Translate diag_params before including
+        translated_params = _translate_di(diag_params) # Translate the list
         problem_desc = "錯誤" if not is_correct else "正確但超時"
         sfe_prefix = "*基礎掌握不穩* " if is_sfe else ""
-        param_text = f"(問題點可能涉及: {', '.join(diag_params)})" if diag_params else "(具體問題點需進一步分析)"
+        # Use translated parameters in the text
+        param_text = f"(問題點可能涉及: {', '.join(translated_params)})" if translated_params else "(具體問題點需進一步分析)"
 
         rec_text = f"{sfe_prefix}針對 **{domain}** 領域的 **{q_type}** 題目 ({problem_desc}) {param_text}，"
         rec_text += f"建議練習 **{y_grade}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。"
 
         # Add overtime warning if Z is much higher than target
-        if z_minutes - (target_time_sec / 60.0) > 2.0:
+        if z_minutes - target_time_minutes > 2.0:
             rec_text += " **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效。**"
 
         recommendations_by_type[q_type].append({
@@ -864,7 +904,8 @@ def _generate_di_summary_report(di_results):
     rushing_triggered = ch4.get('early_rushing_risk_triggered')
     patterns_found = False
     if careless_triggered:
-        report_lines.append(f"- **{_translate_di('DI_BEHAVIOR_CARELESSNESS_ISSUE')}**: 相對快速作答的題目中，錯誤比例偏高 ({ch4.get('fast_wrong_rate', 0.0):.1%})，提示可能存在粗心問題。")
+        fast_wrong_rate_str = _format_rate(ch4.get('fast_wrong_rate', 0.0)) # Format rate
+        report_lines.append(f"- **{_translate_di('DI_BEHAVIOR_CARELESSNESS_ISSUE')}**: 相對快速作答的題目中，錯誤比例偏高 ({fast_wrong_rate_str})，提示可能存在粗心問題。")
         patterns_found = True
     if rushing_triggered:
         num_rush = len(ch4.get('early_rushing_questions', []))
@@ -925,7 +966,7 @@ def _generate_di_summary_report(di_results):
     report_lines.append("  **輔助工具與 AI 提示推薦建議:**")
     tools_prompts_added = False
     # Tool recommendations
-    if 'DI_LOGICAL_REASONING_ERROR' in all_triggered_params and diagnosed_df is not None and not diagnosed_df.empty and any(diagnosed_df[(diagnosed_df['diagnostic_params'].apply(lambda x: 'DI_LOGICAL_REASONING_ERROR' in x)) & (diagnosed_df['question_type'] == 'DS') & (diagnosed_df['content_domain'] == 'Non-Math Related')].any()):
+    if 'DI_LOGICAL_REASONING_ERROR' in all_triggered_params and diagnosed_df is not None and not diagnosed_df.empty and any(diagnosed_df[(diagnosed_df['diagnostic_params'].apply(lambda x: 'DI_LOGICAL_REASONING_ERROR' in x)) & (diagnosed_df['question_type'] == 'Data Sufficiency') & (diagnosed_df['content_domain'] == 'Non-Math Related')].any()):
         report_lines.append("  - *工具:* 考慮使用 `Dustin_GMAT_DI_Non-math_DS_Simulator` 針對性練習非數學 DS 邏輯。")
         tools_prompts_added = True
     # Add other tool triggers if applicable...

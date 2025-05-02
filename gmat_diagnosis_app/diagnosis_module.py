@@ -2,9 +2,26 @@ import pandas as pd
 import numpy as np
 
 # Import subject-specific diagnosis runners
-from .diagnostics.q_diagnostic import run_q_diagnosis
-from .diagnostics.v_diagnostic import run_v_diagnosis
-from .diagnostics.di_diagnostic import run_di_diagnosis
+from gmat_diagnosis_app.diagnostics.q_diagnostic import run_q_diagnosis
+from gmat_diagnosis_app.diagnostics.v_diagnostic import run_v_diagnosis
+from gmat_diagnosis_app.diagnostics.di_diagnostic import run_di_diagnosis
+
+# --- Constants from V-Doc Chapter 1 ---
+V_MAX_ALLOWED_TIME = 45.0 # minutes
+V_TIME_PRESSURE_THRESHOLD_DIFF = 1.0 # minutes difference
+V_INVALID_TIME_ABANDONED = 0.5 # minutes
+V_INVALID_TIME_HASTY_MIN = 1.0 # minutes
+V_CR_OVERTIME_THRESHOLD_PRESSURE_TRUE = 2.0 # minutes
+V_CR_OVERTIME_THRESHOLD_PRESSURE_FALSE = 2.5 # minutes
+V_SUSPICIOUS_FAST_MULTIPLIER = 0.5
+
+# --- Constants from DI-Doc Chapter 0 & 1 --- - Removed
+# DI_MAX_ALLOWED_TIME = 45.0 # minutes
+# DI_TIME_PRESSURE_THRESHOLD = 3.0 # minutes difference
+# DI_INVALID_TIME_THRESHOLD = 1.0 # minutes
+# DI_LAST_THIRD_FRACTION = 2/3
+
+# Note: Q and DI constants should be defined or imported if needed
 
 # --- Main Diagnosis Orchestration Function ---
 
@@ -16,9 +33,10 @@ def run_diagnosis(df):
 
     Args:
         df (pd.DataFrame): DataFrame containing response data.
-                           Expected columns: 'Question ID', 'Correct', 'question_difficulty' (simulated),
+                           Expected columns: 'question_position' (acts as identifier),
+                           'is_correct', 'question_difficulty' (simulated),
                            'question_time', 'question_type', 'question_fundamental_skill',
-                           'question_position', 'Subject' ('Q', 'V', or 'DI'),
+                           'Subject' ('Q', 'V', or 'DI'),
                            'estimated_ability' (optional).
 
     Returns:
@@ -28,7 +46,7 @@ def run_diagnosis(df):
 
     # --- 0. Initial Validation ---
     # Define the required columns, including 'Subject'
-    required_cols = ['Question ID', 'Correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'question_position', 'Subject']
+    required_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'Subject']
     if not isinstance(df, pd.DataFrame):
          print("Invalid input: Input is not a pandas DataFrame.")
          return "錯誤：輸入數據格式無效。"
@@ -45,34 +63,37 @@ def run_diagnosis(df):
 
     # --- Data Type Conversion and Cleaning ---
     # Convert time and position to numeric, coercing errors
+    # V-Doc uses minutes, assuming input is already in minutes. If input is seconds, convert here.
+    # Let's assume input 'question_time' is MINUTES for now, aligning with V-doc Chapter 1 examples.
     df_processed['question_time'] = pd.to_numeric(df_processed['question_time'], errors='coerce')
     df_processed['question_position'] = pd.to_numeric(df_processed['question_position'], errors='coerce')
     df_processed['question_difficulty'] = pd.to_numeric(df_processed['question_difficulty'], errors='coerce')
     # Convert Correct to boolean, handling potential string values ('True', 'False')
-    if df_processed['Correct'].dtype == 'object':
-        df_processed['Correct'] = df_processed['Correct'].astype(str).str.lower().map({'true': True, 'false': False, '1': True, '0': False})
-    df_processed['Correct'] = df_processed['Correct'].astype(bool)
+    if df_processed['is_correct'].dtype == 'object':
+        df_processed['is_correct'] = df_processed['is_correct'].astype(str).str.lower().map({'true': True, 'false': False, '1': True, '0': False})
+    df_processed['is_correct'] = df_processed['is_correct'].astype(bool)
 
     # --- Initialize internal columns ---
     df_processed['is_invalid'] = False # Initialize is_invalid column
-    df_processed['overtime'] = False # Initialize overtime column
-    df_processed['overtime_threshold'] = 3.0 # Default threshold
+    df_processed['overtime'] = False # Initialize overtime column (generic flag, specific logic in V/DI)
+    df_processed['suspiciously_fast'] = False # Initialize suspiciously_fast column
 
     # --- 1. Overall Time Strategy & Data Validity (Chapter 1 Logic - Applied Per Subject) ---
     print("Starting Chapter 1: Time Strategy & Validity Analysis...")
     subjects_present = df_processed['Subject'].unique()
     all_invalid_indices = []
     subject_time_pressure_status = {} # Dictionary to store time pressure status per subject
+    subject_avg_time_per_type = {} # Store avg times for suspiciously_fast calc
 
-    # Define subject-specific parameters (Adjust these as needed)
-    subject_time_limits = {'Q': 45.0, 'V': 45.0, 'DI': 45.0}
+    # Define subject-specific parameters (Use V constants for V)
+    subject_time_limits = {'Q': 45.0, 'V': V_MAX_ALLOWED_TIME, 'DI': 45.0} # Define DI max time here or fetch from di_diagnostic
 
     for subject in subjects_present:
         print(f"  Processing Subject: {subject}")
         # Check if subject is recognized before proceeding
-        if subject not in subject_time_limits:
+        if subject not in subject_time_limits: # DI will be skipped here initially if not in limits
             print(f"    Warning: Unrecognized subject '{subject}'. Skipping time analysis for this subject.")
-            subject_time_pressure_status[subject] = '未知' # Mark status as unknown
+            subject_time_pressure_status[subject] = 'Unknown' # Mark status as unknown
             continue
 
         df_subj = df_processed[df_processed['Subject'] == subject].copy()
@@ -84,59 +105,157 @@ def run_diagnosis(df):
         # Check for NaN/NaT in critical columns after conversion
         if df_subj['question_time'].isnull().any() or df_subj['question_position'].isnull().any():
              print(f"    Warning: Subject {subject} has missing/non-numeric time or position data after conversion. Skipping detailed time analysis.")
-             subject_time_pressure_status[subject] = '未知' # Status unknown if data is bad
+             subject_time_pressure_status[subject] = 'Unknown' # Status unknown if data is bad
              continue
 
         total_number_of_questions = len(df_subj)
-        max_allowed_time = subject_time_limits.get(subject, 45.0) # Default to 45 if subject not defined
+        max_allowed_time = subject_time_limits.get(subject, 45.0)
         total_test_time = df_subj['question_time'].sum()
         time_diff = max_allowed_time - total_test_time
         print(f"    Subject {subject}: Total Time = {total_test_time:.2f} min, Allowed = {max_allowed_time:.1f} min, Diff = {time_diff:.2f} min")
 
-        # Find last third questions
-        last_third_start_position = np.ceil(total_number_of_questions * 2 / 3)
-        last_third_questions = df_subj[df_subj['question_position'] >= last_third_start_position]
-
-        # Find fast questions at the end (ensure time is not NaN before comparing)
-        fast_end_questions = last_third_questions[last_third_questions['question_time'].notna() & (last_third_questions['question_time'] < 1.0)]
-        print(f"    Subject {subject}: Found {len(fast_end_questions)} questions < 1.0 min in last third.")
-
-        # Determine time pressure
+        # Determine time pressure (using V-doc logic for V subject)
         time_pressure = False
-        if time_diff <= 3.0 and not fast_end_questions.empty:
-            time_pressure = True
-            print(f"    Subject {subject}: Time Pressure Detected (Diff <= 3 min AND fast end questions exist).")
-            # TODO: Implement user override logic if needed
-        else:
-             print(f"    Subject {subject}: No Time Pressure Detected.")
+        if subject == 'V':
+            if time_diff < V_TIME_PRESSURE_THRESHOLD_DIFF:
+                time_pressure = True
+                print(f"    Subject {subject}: Time Pressure Detected (V Logic: Diff < {V_TIME_PRESSURE_THRESHOLD_DIFF} min).")
+            else:
+                print(f"    Subject {subject}: No Time Pressure Detected (V Logic).")
+            # --- User Override Logic Placeholder ---
+            # if user_override_flags.get(subject, {}).get('no_pressure', False):
+            #     time_pressure = False
+            #     print(f"    Subject {subject}: User OVERRIDE - Time Pressure set to False.")
+        elif subject == 'DI':
+            # DI time pressure and invalid logic is handled within di_diagnostic.py
+            # We still need to calculate avg times for suspicious check later if needed
+            print(f"    Subject {subject}: Time pressure and validity handled within DI module.")
+            # Store a default status or skip? Let's store False, as the DI module calculates the real one.
+            time_pressure = False # Default placeholder, DI module calculates the true value
+            # If suspicious fast logic is needed globally for DI, calculate avg times here.
+            if 'question_type' in df_subj.columns:
+                subject_avg_time_per_type[subject] = df_subj.groupby('question_type')['question_time'].mean().to_dict()
+                print(f"      Avg time per type (min) for DI (for potential suspicious check): {subject_avg_time_per_type[subject]}")
+            else:
+                subject_avg_time_per_type[subject] = {}
+                print("      Warning: 'question_type' column missing for DI, cannot calculate average times.")
+
+        else: # Apply original logic for Q for now (needs review based on their docs)
+             last_third_start_position = np.ceil(total_number_of_questions * 2 / 3)
+             last_third_questions = df_subj[df_subj['question_position'] >= last_third_start_position]
+             fast_end_questions = last_third_questions[last_third_questions['question_time'].notna() & (last_third_questions['question_time'] < 1.0)] # Assuming 1.0 min threshold still applies for Q's original logic check
+             if time_diff <= 3.0 and not fast_end_questions.empty:
+                 time_pressure = True
+                 print(f"    Subject {subject}: Time Pressure Detected (Original Logic: Diff <= 3 min AND fast end questions exist).")
+             else:
+                  print(f"    Subject {subject}: No Time Pressure Detected (Original Logic).")
 
         subject_time_pressure_status[subject] = time_pressure # Store status
 
-        # Set overtime threshold based on pressure
-        overtime_threshold = 2.5 if time_pressure else 3.0
-        print(f"    Subject {subject}: Overtime Threshold set to {overtime_threshold:.1f} min.")
-        df_processed.loc[df_subj.index, 'overtime_threshold'] = overtime_threshold
+        # Calculate average time per type for this subject (needed for invalid & suspicious checks)
+        # TODO: Add calculation for first_third_average_time_per_type if needed by invalid logic
+        if 'question_type' in df_subj.columns:
+             subject_avg_time_per_type[subject] = df_subj.groupby('question_type')['question_time'].mean().to_dict()
+             print(f"      Avg time per type (min): {subject_avg_time_per_type[subject]}")
+        else:
+             subject_avg_time_per_type[subject] = {}
+             print("      Warning: 'question_type' column missing, cannot calculate average times.")
+
 
         # Identify invalid indices (only if time pressure is true)
         if time_pressure:
-            invalid_indices = fast_end_questions.index.tolist()
-            all_invalid_indices.extend(invalid_indices)
-            print(f"    Subject {subject}: Marked {len(invalid_indices)} question(s) as invalid due to time pressure.")
+            invalid_indices_subj = []
+            
+            if subject == 'V':
+                last_third_start_position = np.ceil(total_number_of_questions * 2 / 3)
+                last_third_df = df_subj[df_subj['question_position'] >= last_third_start_position]
+                
+                avg_times = subject_avg_time_per_type.get(subject, {})
+                
+                for index, row in last_third_df.iterrows():
+                    q_time = row['question_time']
+                    q_type = row['question_type']
+                    
+                    # Check for Abandoned
+                    is_abandoned = q_time < V_INVALID_TIME_ABANDONED
+                    
+                    # Check for Hasty (V-doc logic needs avg times and RC group logic)
+                    is_hasty = q_time < V_INVALID_TIME_HASTY_MIN
+                    # Placeholder for more complex hasty check from V-doc (requires avg time and RC group handling)
+                    # avg_time_for_type = avg_times.get(q_type)
+                    # if avg_time_for_type is not None:
+                    #     # Need first_third_average_time for comparison
+                    #     # Need RC group logic here too
+                    #     # Example placeholder for CR hasty check:
+                    #     # if q_type == 'CR' and q_time < first_third_avg_time_cr * 0.5: is_hasty = True
+                    #     pass # Implement full hasty logic when avg times and RC groups are handled
+                    
+                    if is_abandoned or is_hasty:
+                        invalid_indices_subj.append(index)
+            elif subject == 'DI':
+                # DI invalid logic handled within di_diagnostic.py
+                pass # Do nothing here for DI invalid marking
+            else:  # 預設邏輯 (目前用於 Q)
+                last_third_start_position = np.ceil(total_number_of_questions * 2 / 3)
+                last_third_df = df_subj[df_subj['question_position'] >= last_third_start_position]
+                invalid_mask = last_third_df['question_time'] < 1.0
+                invalid_indices_subj = last_third_df[invalid_mask].index.tolist()
 
-    # --- Global Rule Application: Mark Invalid and Overtime ---
+            if invalid_indices_subj:
+                all_invalid_indices.extend(invalid_indices_subj)
+                print(f"    Subject {subject}: Marked {len(invalid_indices_subj)} question(s) in last third as invalid due to time pressure and being hasty/abandoned.")
+
+    # --- Global Rule Application: Mark Invalid, Overtime (CR only here), Suspiciously Fast ---
     if all_invalid_indices:
         df_processed.loc[all_invalid_indices, 'is_invalid'] = True
         print(f"Marked a total of {len(all_invalid_indices)} questions as invalid across all subjects.")
 
-    # Mark overtime for non-invalid rows based on their subject's threshold
-    # Ensure time is not NaN before comparing with threshold
-    df_processed['overtime'] = (
-        df_processed['question_time'].notna() &
-        (df_processed['question_time'] > df_processed['overtime_threshold']) &
-        (~df_processed['is_invalid'])
-    )
-    num_overtime = df_processed['overtime'].sum()
-    print(f"Marked {num_overtime} questions as overtime.")
+    # Mark overtime for Q rows based on Q subject's pressure
+    if 'Q' in subject_time_pressure_status:
+        q_pressure = subject_time_pressure_status['Q']
+        q_overtime_threshold = 2.5 if q_pressure else 3.0  # Set threshold based on pressure
+        q_overtime_mask = (
+            (df_processed['Subject'] == 'Q') &
+            (df_processed['question_time'].notna()) &
+            (df_processed['question_time'] > q_overtime_threshold) &
+            (~df_processed['is_invalid'])
+        )
+        df_processed.loc[q_overtime_mask, 'overtime'] = True
+        print(f"Marked {q_overtime_mask.sum()} Q questions as overtime (threshold: {q_overtime_threshold:.1f} min).")
+
+    # Mark overtime for non-invalid CR rows based on V subject's pressure
+    # Overtime for RC and other subjects needs subject-specific logic
+    if 'V' in subject_time_pressure_status:
+        v_pressure = subject_time_pressure_status['V']
+        v_cr_threshold = V_CR_OVERTIME_THRESHOLD_PRESSURE_TRUE if v_pressure else V_CR_OVERTIME_THRESHOLD_PRESSURE_FALSE
+        cr_overtime_mask = (
+            (df_processed['Subject'] == 'V') &
+            (df_processed['question_type'] == 'CR') &
+            (df_processed['question_time'].notna()) &
+            (df_processed['question_time'] > v_cr_threshold) &
+            (~df_processed['is_invalid'])
+        )
+        df_processed.loc[cr_overtime_mask, 'overtime'] = True
+        print(f"Marked {cr_overtime_mask.sum()} CR questions as overtime (threshold: {v_cr_threshold:.1f} min).")
+    # Note: Other subjects' overtime marking needs their specific logic/thresholds here or in their modules
+
+    # Mark suspiciously fast for non-invalid rows
+    for subject, avg_times in subject_avg_time_per_type.items():
+         if not avg_times: continue # Skip if no avg times calculated
+         subj_mask = df_processed['Subject'] == subject
+         for q_type, avg_time in avg_times.items():
+             if avg_time is None or pd.isna(avg_time): continue
+             type_mask = df_processed['question_type'] == q_type
+             fast_mask = (
+                 subj_mask & type_mask &
+                 df_processed['question_time'].notna() &
+                 (df_processed['question_time'] < avg_time * V_SUSPICIOUS_FAST_MULTIPLIER) &
+                 (~df_processed['is_invalid'])
+             )
+             df_processed.loc[fast_mask, 'suspiciously_fast'] = True
+             num_fast = fast_mask.sum()
+             if num_fast > 0: print(f"  Marked {num_fast} {subject}/{q_type} questions as suspiciously fast (< {avg_time * V_SUSPICIOUS_FAST_MULTIPLIER:.2f} min).")
+
 
     num_invalid_questions = len(all_invalid_indices) # Total invalid count
 
@@ -152,15 +271,15 @@ def run_diagnosis(df):
     # --- Calculate Exempted Skills (for Q Chapter 7) ---
     print("Calculating exempted skills for Q Chapter 7...")
     exempted_skills = set()
-    # Check if the skill column exists and has content before grouping
     if 'question_fundamental_skill' in df_filtered.columns and df_filtered['question_fundamental_skill'].notna().any():
         try:
-            # Group by skill, handling potential NaN skills gracefully
-            grouped_by_skill_valid = df_filtered.dropna(subset=['question_fundamental_skill']).groupby('question_fundamental_skill')
+            df_q_filtered = df_filtered[df_filtered['Subject'] == 'Q']
+            grouped_by_skill_valid = df_q_filtered.dropna(subset=['question_fundamental_skill']).groupby('question_fundamental_skill')
             for skill, group in grouped_by_skill_valid:
                 # Ensure Correct and overtime columns are boolean before calculation
-                if pd.api.types.is_bool_dtype(group['Correct']) and pd.api.types.is_bool_dtype(group['overtime']):
-                    num_correct_not_overtime = group[(group['Correct'] == True) & (group['overtime'] == False)].shape[0]
+                # Use the generic 'overtime' flag for Q exemption for now
+                if pd.api.types.is_bool_dtype(group['is_correct']) and pd.api.types.is_bool_dtype(group['overtime']):
+                    num_correct_not_overtime = group[(group['is_correct'] == True) & (group['overtime'] == False)].shape[0]
                     if num_correct_not_overtime > 2:
                         exempted_skills.add(skill)
                         print(f"  Skill '{skill}' exempted for Q (Correct & Not Overtime: {num_correct_not_overtime} > 2)")
@@ -168,6 +287,30 @@ def run_diagnosis(df):
                      print(f"  Skipping exemption calculation for skill '{skill}': 'Correct' or 'overtime' column is not boolean.")
         except Exception as e:
             print(f"  Error during exemption calculation: {e}")
+    else:
+        print("  Skipping Q exemption calculation (missing 'question_fundamental_skill' column or column is empty).")
+
+    # --- Calculate Exempted Skills (for V Chapter 6/7) ---
+    print("Calculating exempted skills for V Chapter 6/7...")
+    exempted_v_skills = set()
+    if 'question_fundamental_skill' in df_filtered.columns and df_filtered['question_fundamental_skill'].notna().any():
+        try:
+            df_v_filtered = df_filtered[df_filtered['Subject'] == 'V']
+            grouped_by_skill_valid_v = df_v_filtered.dropna(subset=['question_fundamental_skill']).groupby('question_fundamental_skill')
+            for skill, group in grouped_by_skill_valid_v:
+                # V exemption rule: correct and not overtime > 2
+                # 'overtime' for V is complex (CR uses flag, RC uses group/individual)
+                # Use the final 'overtime' flag assigned in v_diagnosis Ch1
+                if pd.api.types.is_bool_dtype(group['is_correct']) and 'overtime' in group.columns and pd.api.types.is_bool_dtype(group['overtime']):
+                    num_correct_not_overtime = group[(group['is_correct'] == True) & (group['overtime'] == False)].shape[0]
+                    # V-Doc Ch7 exemption rule uses > 2
+                    if num_correct_not_overtime > 2:
+                        exempted_v_skills.add(skill)
+                        print(f"  Skill '{skill}' exempted for V (Correct & Not Overtime: {num_correct_not_overtime} > 2)")
+                else:
+                     print(f"  Skipping V exemption calculation for skill '{skill}': 'Correct' or 'overtime' column type issue or missing.")
+        except Exception as e:
+            print(f"  Error during V exemption calculation: {e}")
     else:
         print("  Skipping Q exemption calculation (missing 'question_fundamental_skill' column or column is empty).")
 
@@ -180,9 +323,15 @@ def run_diagnosis(df):
     df_v = df_filtered[df_filtered['Subject'] == 'V'].copy()
     df_di = df_filtered[df_filtered['Subject'] == 'DI'].copy()
 
+    # Prepare data/results to pass to subject modules
+    # Pass the filtered df, time pressure status, invalid count, average times per type
+    # Note: exempted_skills is passed only to Q for now
+
     # Run Q Diagnosis if data exists
     if not df_q.empty:
-        q_report = run_q_diagnosis(df_q, exempted_skills, subject_time_pressure_status, num_invalid_questions)
+        # Pass relevant info: df_q, exempted_skills, time pressure for Q, num_invalid for Q
+        q_invalid_count = df_processed[(df_processed['Subject'] == 'Q') & (df_processed['is_invalid'])].shape[0]
+        q_report = run_q_diagnosis(df_q, exempted_skills, subject_time_pressure_status.get('Q', False), q_invalid_count) # Assuming status is Bool
         subject_reports.append(q_report)
     else:
         print("No Q data found.")
@@ -190,7 +339,10 @@ def run_diagnosis(df):
 
     # Run V Diagnosis if data exists
     if not df_v.empty:
-        v_report = run_v_diagnosis(df_v, subject_time_pressure_status, num_invalid_questions)
+        # Pass relevant info: df_v, time pressure for V, num_invalid for V, avg times for V
+        v_invalid_count = df_processed[(df_processed['Subject'] == 'V') & (df_processed['is_invalid'])].shape[0]
+        v_avg_times = subject_avg_time_per_type.get('V', {})
+        v_results, v_report = run_v_diagnosis(df_v, subject_time_pressure_status.get('V', False), v_invalid_count, v_avg_times, exempted_v_skills) # run_v_diagnosis returns results dict and report string
         subject_reports.append(v_report)
     else:
         print("No V data found.")
@@ -198,11 +350,22 @@ def run_diagnosis(df):
 
     # Run DI Diagnosis if data exists
     if not df_di.empty:
-        di_report = run_di_diagnosis(df_di, subject_time_pressure_status, num_invalid_questions)
-        subject_reports.append(di_report)
+        # 根據 di_diagnostic.py 的函數簽名傳遞參數
+        # 注意：run_di_diagnosis 只接受 df_di 一個參數，內部會自行處理時間壓力邏輯
+        # 我們確保 df_di 包含所需的所有列和信息
+        # Pass the unfiltered DI dataframe
+        di_raw_df = df_processed[df_processed['Subject'] == 'DI'].copy() # Get raw DI data before global filtering
+        if not di_raw_df.empty:
+             print("DEBUG: >>>>>> Calling run_di_diagnosis with di_raw_df >>>>>>") # DEBUG
+             di_results, di_report = run_di_diagnosis(di_raw_df)
+             print("DEBUG: <<<<<< Returned from run_di_diagnosis <<<<<<") # DEBUG
+             subject_reports.append(di_report)
+        else:
+             print("No DI data found after initial processing.")
+             subject_reports.append("數據洞察 (Data Insights) 部分無數據。")
     else:
         print("No DI data found.")
-        subject_reports.append("數據洞察 (Data Insights) 部分無有效數據。")
+        subject_reports.append("數據洞察 (Data Insights) 部分無數據。")
 
     # --- Combine Reports ---
     print("\nCombining subject reports...")

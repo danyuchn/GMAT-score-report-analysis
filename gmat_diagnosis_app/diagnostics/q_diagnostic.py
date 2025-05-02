@@ -35,6 +35,13 @@ def _get_translation(param):
     """Helper to get Chinese description, returns param name if not found."""
     return APPENDIX_A_TRANSLATION.get(param, param)
 
+def _format_rate(rate_value):
+    """Formats a value as percentage if numeric, otherwise returns as string."""
+    if isinstance(rate_value, (int, float)):
+        return f"{rate_value:.1%}"
+    else:
+        return str(rate_value) # Ensure it's a string
+
 def _map_difficulty_to_label(difficulty):
     """Maps numeric difficulty (b-value) to descriptive label based on Ch7 rules."""
     if difficulty is None or pd.isna(difficulty): # Handle None or NaN difficulty
@@ -72,8 +79,8 @@ def _calculate_practice_time_limit(item_time, is_overtime):
 def _diagnose_q_internal(df_q):
      """Performs detailed Q diagnosis (Chapters 2-6).
         Assumes df_q contains only valid Q data ('Real' or 'Pure') and necessary columns
-        ('question_type', 'Correct', 'overtime', 'question_time',
-         'question_fundamental_skill', 'question_difficulty', 'Question ID', 'question_position').
+        ('question_type', 'is_correct', 'overtime', 'question_time',
+         'question_fundamental_skill', 'question_difficulty', 'question_position').
      """
      if df_q.empty:
          # Return structure indicating analysis was skipped or empty
@@ -88,8 +95,8 @@ def _diagnose_q_internal(df_q):
      # Counts
      num_total_real = len(df_real)
      num_total_pure = len(df_pure)
-     num_real_errors = df_real['Correct'].eq(False).sum()
-     num_pure_errors = df_pure['Correct'].eq(False).sum()
+     num_real_errors = df_real['is_correct'].eq(False).sum()
+     num_pure_errors = df_pure['is_correct'].eq(False).sum()
      # Ensure 'overtime' column exists and is boolean
      num_real_overtime = df_real['overtime'].eq(True).sum() if 'overtime' in df_real.columns else 0
      num_pure_overtime = df_pure['overtime'].eq(True).sum() if 'overtime' in df_pure.columns else 0
@@ -143,7 +150,7 @@ def _diagnose_q_internal(df_q):
      # --- Chapter 3: Error Cause Analysis ---
      print("    Executing Q - Chapter 3: Error Cause Analysis...")
      error_analysis_list = []
-     df_errors = df_q[df_q['Correct'] == False].copy()
+     df_errors = df_q[df_q['is_correct'] == False].copy()
      average_time_per_type = {} # Initialize
 
      if not df_errors.empty:
@@ -158,7 +165,7 @@ def _diagnose_q_internal(df_q):
              average_time_per_type = {'Real': 2.0, 'Pure': 2.0}
 
 
-         df_correct = df_q[df_q['Correct'] == True]
+         df_correct = df_q[df_q['is_correct'] == True]
          max_correct_difficulty_per_skill = {} # Initialize
          if not df_correct.empty and 'question_fundamental_skill' in df_correct.columns and 'question_difficulty' in df_correct.columns:
               # Ensure difficulty is numeric before grouping
@@ -172,7 +179,7 @@ def _diagnose_q_internal(df_q):
 
          # Analyze each error
          for index, row in df_errors.iterrows():
-             q_id = row['Question ID']
+             q_position = row['question_position']
              q_type = row['question_type']
              q_skill = row.get('question_fundamental_skill', 'Unknown Skill') # Handle missing skill
              q_difficulty = row.get('question_difficulty', None) # Handle potentially missing difficulty
@@ -180,7 +187,7 @@ def _diagnose_q_internal(df_q):
              is_overtime = row.get('overtime', False) # Default to False if missing
 
              analysis_result = {
-                 'Question ID': q_id,
+                 'question_position': q_position,
                  'Skill': q_skill,
                  'Type': q_type,
                  'Difficulty': q_difficulty,
@@ -196,9 +203,9 @@ def _diagnose_q_internal(df_q):
                  if q_difficulty < max_correct_diff:
                      analysis_result['Is_SFE'] = True
                      analysis_result['Possible_Params'].append('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-                     print(f"        SFE Detected: QID {q_id}, Skill '{q_skill}', Difficulty {q_difficulty:.2f} < Max Correct {max_correct_diff:.2f}")
+                     print(f"        SFE Detected: Position {q_position}, Skill '{q_skill}', Difficulty {q_difficulty:.2f} < Max Correct {max_correct_diff:.2f}")
              else:
-                  print(f"        Skipping SFE check for QID {q_id}: Missing difficulty.")
+                  print(f"        Skipping SFE check for Position {q_position}: Missing difficulty.")
 
              # 2. Classify Time Performance & Assign Params
              is_relatively_fast = False
@@ -211,7 +218,7 @@ def _diagnose_q_internal(df_q):
                  is_normal_time = not is_relatively_fast and not is_slow
              else:
                  is_slow = False # Cannot determine fast/slow/normal without time
-                 print(f"        Skipping time performance classification for QID {q_id}: Missing time.")
+                 print(f"        Skipping time performance classification for Position {q_position}: Missing time.")
 
 
              possible_params = []
@@ -237,7 +244,7 @@ def _diagnose_q_internal(df_q):
                   if p not in existing_params:
                       analysis_result['Possible_Params'].append(p)
 
-             print(f"        Analyzed Error: QID {q_id}, Time Perf: {analysis_result['Time_Performance']}, SFE: {analysis_result['Is_SFE']}, Params: {analysis_result['Possible_Params']}")
+             print(f"        Analyzed Error: Position {q_position}, Time Perf: {analysis_result['Time_Performance']}, SFE: {analysis_result['Is_SFE']}, Params: {analysis_result['Possible_Params']}")
              error_analysis_list.append(analysis_result)
      else:
           print("    No errors found in Q section for Chapter 3 analysis.")
@@ -247,18 +254,18 @@ def _diagnose_q_internal(df_q):
      correct_slow_analysis_list = []
      # Ensure 'overtime' column exists before filtering
      if 'overtime' in df_q.columns:
-         df_correct_slow = df_q[(df_q['Correct'] == True) & (df_q['overtime'] == True)].copy()
+         df_correct_slow = df_q[(df_q['is_correct'] == True) & (df_q['overtime'] == True)].copy()
 
          if not df_correct_slow.empty:
              print(f"      Found {len(df_correct_slow)} correct but slow questions.")
              for index, row in df_correct_slow.iterrows():
-                 q_id = row['Question ID']
+                 q_position = row['question_position']
                  q_type = row['question_type']
                  q_skill = row.get('question_fundamental_skill', 'Unknown Skill')
                  q_time = row.get('question_time', None)
 
                  analysis_result = {
-                     'Question ID': q_id,
+                     'question_position': q_position,
                      'Skill': q_skill,
                      'Type': q_type,
                      'Time': q_time,
@@ -272,7 +279,7 @@ def _diagnose_q_internal(df_q):
 
                  analysis_result['Possible_Params'] = possible_params
                  time_str = f"{q_time:.2f}" if q_time is not None else "N/A"
-                 print(f"        Correct but Slow: QID {q_id}, Skill '{q_skill}', Type '{q_type}', Time {time_str}, Params: {possible_params}")
+                 print(f"        Correct but Slow: Position {q_position}, Skill '{q_skill}', Type '{q_type}', Time {time_str}, Params: {possible_params}")
                  correct_slow_analysis_list.append(analysis_result)
          else:
              print("    No correct but slow questions found in Q section for Chapter 4 analysis.")
@@ -299,8 +306,7 @@ def _diagnose_q_internal(df_q):
              print(f"      Flag Triggered: Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK ({len(df_early)} items < 1.0 min in first third)")
              for index, row in df_early.iterrows():
                  early_rushing_items.append({
-                      'Question ID': row['Question ID'],
-                      'Position': row['question_position'],
+                      'question_position': row['question_position'],
                       'Time': row['question_time'],
                       'Type': row['question_type'],
                       'Skill': row.get('question_fundamental_skill', 'Unknown Skill'),
@@ -321,7 +327,7 @@ def _diagnose_q_internal(df_q):
              axis=1
          )
          num_relatively_fast_total = temp_df_q['is_relatively_fast'].sum()
-         num_relatively_fast_incorrect = temp_df_q[(temp_df_q['is_relatively_fast'] == True) & (temp_df_q['Correct'] == False)].shape[0]
+         num_relatively_fast_incorrect = temp_df_q[(temp_df_q['is_relatively_fast'] == True) & (temp_df_q['is_correct'] == False)].shape[0]
 
          if num_relatively_fast_total > 0:
              fast_wrong_rate = num_relatively_fast_incorrect / num_relatively_fast_total
@@ -345,22 +351,37 @@ def _diagnose_q_internal(df_q):
              num_total_skill = len(group)
              if num_total_skill == 0: continue
 
-             num_errors_skill = group['Correct'].eq(False).sum()
+             num_errors_skill = group['is_correct'].eq(False).sum()
              num_overtime_skill = group['overtime'].eq(True).sum()
 
              error_rate_skill = num_errors_skill / num_total_skill
              overtime_rate_skill = num_overtime_skill / num_total_skill
 
              triggered = False
+             min_diff_skill = None
+             y_agg = None
+             z_agg = 2.5  # 文檔指定的固定值
+             
              if error_rate_skill > 0.5 or overtime_rate_skill > 0.5:
                  triggered = True
-                 print(f"      Skill Override Triggered: Skill='{skill}', ErrRate={error_rate_skill:.1%}, OTRate={overtime_rate_skill:.1%}")
+                 # 找出該技能中錯誤或超時題目的最低難度
+                 problem_items = group[(group['is_correct'] == False) | (group['overtime'] == True)]
+                 if not problem_items.empty and 'question_difficulty' in problem_items.columns:
+                     difficulties = problem_items['question_difficulty'].dropna()
+                     if not difficulties.empty:
+                         min_diff_skill = difficulties.min()
+                         y_agg = _map_difficulty_to_label(min_diff_skill)
+                 
+                 print(f"      Skill Override Triggered: Skill='{skill}', ErrRate={error_rate_skill:.1%}, OTRate={overtime_rate_skill:.1%}, Y_agg={y_agg}")
 
              skill_override_flags[skill] = {
                  'triggered': triggered,
                  'error_rate': error_rate_skill,
                  'overtime_rate': overtime_rate_skill,
-                 'total_questions': num_total_skill
+                 'total_questions': num_total_skill,
+                 'min_diff_skill': min_diff_skill,  # 新增儲存最低難度
+                 'y_agg': y_agg,  # 新增儲存映射難度標籤
+                 'z_agg': z_agg if triggered else None  # 新增儲存限時
              }
      else:
          print("      Skipping skill override check (missing 'question_fundamental_skill' or 'overtime' column).")
@@ -427,13 +448,13 @@ def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
                  'time': error.get('Time'),
                  'is_overtime': error.get('Time_Performance') == 'Slow & Wrong',
                  'is_sfe': error.get('Is_SFE', False),
-                 'q_id': error.get('Question ID'),
+                 'q_position': error.get('question_position'),
                  'q_type': error.get('Type'),
                  'trigger_type': 'error'
              })
              all_skills_found.add(skill)
         else:
-            print(f"      Skipping trigger for error QID {error.get('Question ID')}: Unknown Skill")
+            print(f"      Skipping trigger for error Position {error.get('question_position')}: Unknown Skill")
 
     for slow in ch4_correct_slow:
         skill = slow.get('Skill', 'Unknown Skill')
@@ -444,13 +465,13 @@ def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
                  'time': slow.get('Time'),
                  'is_overtime': True, # By definition of Ch4
                  'is_sfe': False,
-                 'q_id': slow.get('Question ID'),
+                 'q_position': slow.get('question_position'),
                  'q_type': slow.get('Type'),
                  'trigger_type': 'correct_slow'
              })
              all_skills_found.add(skill)
         else:
-            print(f"      Skipping trigger for correct-slow QID {slow.get('Question ID')}: Unknown Skill")
+            print(f"      Skipping trigger for correct-slow Position {slow.get('question_position')}: Unknown Skill")
 
     # --- Generate Recommendations per Skill ---
     for skill in all_skills_found:
@@ -463,10 +484,17 @@ def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
 
         if is_overridden and skill not in processed_override_skills:
             # Generate Macro Recommendation
-            trigger_difficulties = [t['difficulty'] for t in triggers if t['skill'] == skill and t['difficulty'] is not None and not pd.isna(t['difficulty'])]
-            min_diff_skill = min(trigger_difficulties) if trigger_difficulties else 0 # Default Y_agg if no difficulty data
-            y_agg = _map_difficulty_to_label(min_diff_skill)
-            z_agg = 2.5 # Fixed Z_agg from markdown
+            # 從第六章的結果取得y_agg和z_agg，而不是重新計算
+            override_info = ch6_override.get(skill, {})
+            y_agg = override_info.get('y_agg')
+            z_agg = override_info.get('z_agg', 2.5)  # 如果沒有存儲，使用文檔默認值
+            
+            # 如果第六章沒有計算出y_agg（可能因為難度數據缺失），則使用觸發點難度
+            if y_agg is None:
+                trigger_difficulties = [t['difficulty'] for t in triggers if t['skill'] == skill and t['difficulty'] is not None and not pd.isna(t['difficulty'])]
+                min_diff_skill = min(trigger_difficulties) if trigger_difficulties else 0 # Default Y_agg if no difficulty data
+                y_agg = _map_difficulty_to_label(min_diff_skill)
+            
             macro_rec = f"針對【{skill}】技能：由於整體表現有較大提升空間 (錯誤率或超時率 > 50%)，建議優先**全面鞏固基礎**。可從【{y_agg}】難度題目開始系統性練習，掌握核心方法，建議限時【{z_agg}】分鐘。"
             skill_recs_list.append({'type': 'macro', 'text': macro_rec, 'priority': 0}) # High priority
             processed_override_skills.add(skill)
@@ -483,7 +511,7 @@ def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
                  difficulty = trigger.get('difficulty')
                  time = trigger.get('time')
                  is_overtime_trigger = trigger.get('is_overtime', False)
-                 q_id_trigger = trigger.get('q_id', 'N/A')
+                 q_position_trigger = trigger.get('q_position', 'N/A')
                  trigger_type = trigger.get('trigger_type')
                  is_sfe_trigger = trigger.get('is_sfe', False)
 
@@ -491,7 +519,7 @@ def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
                      y = _map_difficulty_to_label(difficulty)
                      z = _calculate_practice_time_limit(time, is_overtime_trigger)
                      priority = 1 if is_sfe_trigger else 2 # Prioritize SFE related recs
-                     trigger_desc = f"(來源: QID {q_id_trigger}, {trigger_type}, SFE={is_sfe_trigger})"
+                     trigger_desc = f"(來源: Position {q_position_trigger}, {trigger_type}, SFE={is_sfe_trigger})"
                      case_rec = f"針對【{skill}】技能下的問題 {trigger_desc}：建議練習【{y}】難度的題目，目標限時【{z}】分鐘。"
                      skill_recs_list.append({'type': 'case', 'text': case_rec, 'priority': priority})
                  elif trigger_type == 'correct_slow': # Handle correct_slow where difficulty might be None
@@ -500,11 +528,11 @@ def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
                      y = "中難度 (Mid) / 605+" # Default practice level for slow-correct
                      z = _calculate_practice_time_limit(time, is_overtime_trigger)
                      priority = 3 # Lower priority than error-based
-                     trigger_desc = f"(來源: QID {q_id_trigger}, 正確但慢)"
+                     trigger_desc = f"(來源: Position {q_position_trigger}, 正確但慢)"
                      case_rec = f"針對【{skill}】技能下的效率問題 {trigger_desc}：建議練習【{y}】難度的題目，目標限時【{z}】分鐘，注重提升解題速度。"
                      skill_recs_list.append({'type': 'case', 'text': case_rec, 'priority': priority})
                  else:
-                      print(f"      Skipping case recommendation for QID {q_id_trigger}: Missing difficulty for error trigger.")
+                      print(f"      Skipping case recommendation for Position {q_position_trigger}: Missing difficulty for error trigger.")
 
 
              if skill_recs_list: # Add adjustments only if case recommendations were generated
@@ -555,7 +583,7 @@ def _generate_q_recommendations(q_diagnosis_results, exempted_skills):
 
 # --- Q-Specific Summary Report Generation (Chapter 8) ---
 
-def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_time_pressure_status, num_invalid_questions):
+def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_time_pressure_status_q, num_invalid_questions):
     """Generates the final summary report string based on Q diagnosis and recommendations."""
     print("    Generating Q - Chapter 8: Summary Report...")
     report_lines = []
@@ -603,13 +631,11 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
     # 1. 開篇總結 (時間)
     report_lines.append("**1. 時間策略與有效性 (摘要)**")
     # Add dynamic content based on passed parameters
-    q_time_pressure = subject_time_pressure_status.get('Q', '未知') # Get Q status, default to unknown
-    if q_time_pressure is True:
+    time_pressure_q = subject_time_pressure_status_q
+    if time_pressure_q:
         report_lines.append("- 根據分析，您在量化部分可能處於**時間壓力**下 (測驗時間剩餘不多且末尾部分題目作答過快)。")
-    elif q_time_pressure is False:
-        report_lines.append("- 根據分析，您在量化部分未處於明顯的時間壓力下。")
     else:
-        report_lines.append("- 未能明確判斷量化部分的時間壓力狀態。")
+        report_lines.append("- 根據分析，您在量化部分未處於明顯的時間壓力下。")
 
     if num_invalid_questions > 0:
         report_lines.append(f"- 已將 {num_invalid_questions} 道可能因時間壓力影響有效性的題目從詳細分析中排除，以確保診斷準確性。")
@@ -632,8 +658,14 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
         pure_err_rate = pure_stats_error.get('Pure_Value', 'N/A')
         pure_ot_rate = pure_stats_ot.get('Pure_Value', 'N/A')
 
-        report_lines.append(f"  - Real 題: 錯誤率 {real_err_rate:.1% if isinstance(real_err_rate, (int, float)) else real_err_rate}, 超時率 {real_ot_rate:.1% if isinstance(real_ot_rate, (int, float)) else real_ot_rate}")
-        report_lines.append(f"  - Pure 題: 錯誤率 {pure_err_rate:.1% if isinstance(pure_err_rate, (int, float)) else pure_err_rate}, 超時率 {pure_ot_rate:.1% if isinstance(pure_ot_rate, (int, float)) else pure_ot_rate}")
+        # Use the helper function for formatting
+        real_err_rate_str = _format_rate(real_err_rate)
+        real_ot_rate_str = _format_rate(real_ot_rate)
+        pure_err_rate_str = _format_rate(pure_err_rate)
+        pure_ot_rate_str = _format_rate(pure_ot_rate)
+
+        report_lines.append(f"  - Real 題: 錯誤率 {real_err_rate_str}, 超時率 {real_ot_rate_str}")
+        report_lines.append(f"  - Pure 題: 錯誤率 {pure_err_rate_str}, 超時率 {pure_ot_rate_str}")
 
         # Report triggered comparison flags
         triggered_ch2_flags_desc = []
@@ -642,6 +674,25 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
                   triggered_ch2_flags_desc.append(_get_translation(flag))
         if triggered_ch2_flags_desc:
              report_lines.append(f"  - **提示:** {'; '.join(triggered_ch2_flags_desc)}")
+
+        # --- Add Error Difficulty Distribution Analysis ---
+        if ch3_errors:
+            error_difficulties = [err.get('Difficulty') for err in ch3_errors if err.get('Difficulty') is not None and not pd.isna(err.get('Difficulty'))]
+            if error_difficulties:
+                difficulty_labels = [_map_difficulty_to_label(d) for d in error_difficulties]
+                # Count occurrences of each difficulty label
+                label_counts = pd.Series(difficulty_labels).value_counts().sort_index() # Sort by label order implicitly
+                if not label_counts.empty:
+                    distribution_str = ", ".join([f"{label} ({count}題)" for label, count in label_counts.items()])
+                    report_lines.append(f"  - **錯誤難度分佈:** {distribution_str}")
+                else:
+                    report_lines.append("  - **錯誤難度分佈:** 無有效難度數據可供分析。")
+            else:
+                report_lines.append("  - **錯誤難度分佈:** 錯誤題目無有效難度數據。")
+        else:
+            report_lines.append("  - **錯誤難度分佈:** 無錯誤題目可供分析難度分佈。")
+        # --- End Error Difficulty Distribution Analysis ---
+
     else:
         report_lines.append("- 未能進行 Real vs. Pure 題的詳細比較 (數據不足或缺失)。")
 

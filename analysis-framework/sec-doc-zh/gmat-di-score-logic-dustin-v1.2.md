@@ -4,7 +4,7 @@
 
 **本章目標：** 定義 DI 科目診斷分析所需的所有核心輸入數據結構。
 
-**主要關注：** 確立基礎設定（如考試時間、題數）、題型定義、每題需記錄的詳細數據點（`question_id`、`question_time`、`is_correct`、`content_domain`、`question_type`、`question_difficulty`、`question_position`）、整體測驗數據以及需要預處理或計算的衍生數據（如 MSR 閱讀時間、各題型平均時間、已掌握最高難度）。
+**主要關注：** 確立基礎設定（如考試時間、題數）、題型定義、每題需記錄的詳細數據點（`question_position`、`question_time`、`is_correct`、`content_domain`、`question_type`、`question_difficulty`）、整體測驗數據以及需要預處理或計算的衍生數據（如 MSR 閱讀時間、各題型平均時間、已掌握最高難度）。
 
 **為何重要：** 本章定義的數據是後續所有分析、計算和診斷的基石。數據的完整性、準確性和一致性直接關係到診斷結果的有效性和可靠性。
 
@@ -19,14 +19,13 @@
     - `MSR`: Multi-Source Reasoning
     - `GT`: Graph & Table
 - **每題數據：**
-    - `question_id` (題目 ID)
+    - `question_position` (題目順序，必需，作為唯一識別符)
     - `question_time` (作答時間/分鐘)
     - `is_correct` (是否正確：`True`/`False`)
     - `content_domain` (內容領域：`Math Related`/`Non-Math Related`)
     - `question_type` (題型：`DS`, `TPA`, `MSR`, `GT`)
     - `Fundamental Skills` (**確認不追蹤**)
     - `question_difficulty` (難度值)
-    - `question_position` (題目順序)
 - **整體數據：**
     - `Total Test Time` (總作答時間/分鐘)
     - `Max Allowed Time` (測驗上限時間)
@@ -363,7 +362,7 @@
 
 2. **前期過快題目 (`early_rushing_flag_risk`)：**
     - 找出 `question_position` <= `total_number_of_questions` / 3 且 `question_time` < 1.0 分鐘的題目 (絕對標準)。
-    - 記錄這些題目的 `question_id`, `question_type`, `content_domain`。
+    - 記錄這些題目的 `question_position`, `question_type`, `content_domain`。
     - 若找到任何此類題目，則設置診斷參數 `` `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` 為 `True`，並記錄診斷行動：「提醒學生測驗前期存在作答過快情況，可能影響準確率或遺漏關鍵信息，建議調整開局節奏。」
 
 <aside>

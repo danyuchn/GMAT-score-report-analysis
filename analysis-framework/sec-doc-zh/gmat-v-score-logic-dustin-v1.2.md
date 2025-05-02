@@ -1,13 +1,12 @@
 # **第零章：核心輸入數據與設定**
 
 - **每題數據:**
-    - `question_id` (題目 ID)
+    - `question_position` (題目順序，必需，作為唯一識別符)
     - `question_time` (作答時間/分鐘)
     - `is_correct` (是否正確/布林值)
     - `question_type` ( `Critical Reasoning` 映射轉換至 `CR` ；`Reading Comprehension` 映射轉換至 `RC`)
     - `question_difficulty` (難度值 `V_b` )
     - `question_fundamental_skill` (核心技能 - 例如: `Plan/Construct`, `Identify Stated Idea`, `Identify Inferred Idea`, `Analysis/Critique`)
-    - `question_position` (題目順序)
 - **整體數據:**
     - `total_test_time` (總作答時間/分鐘)
     - `max_allowed_time` (測驗上限時間，固定為 45 分鐘)
