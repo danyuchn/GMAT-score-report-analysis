@@ -712,25 +712,25 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
          # Generate minimal report structure matching MD sections
          report_lines.append("## GMAT 量化 (Quantitative) 診斷報告")
          report_lines.append("--- (基於用戶數據與模擬難度分析) ---")
-         report_lines.append("\\n**1. 開篇總結**") # MD Ch8.1 Title
+         report_lines.append("\n**1. 開篇總結**") # MD Ch8.1 Title
          if time_pressure_q: report_lines.append("- 根據分析，您在本輪測驗中可能感受到明顯的**時間壓力**。")
          else: report_lines.append("- 根據分析，您在本輪測驗中未處於明顯的時間壓力下。")
          if num_invalid_q > 0: report_lines.append(f"- 測驗末尾存在 {num_invalid_q} 道因時間壓力導致作答過快、可能影響數據有效性的跡象，已從後續詳細分析中排除。")
          else: report_lines.append("- 未發現因時間壓力導致數據無效的跡象，所有題目均納入分析。")
-         report_lines.append("\\n**2. 表現概覽**") # MD Ch8.2 Title
+         report_lines.append("\n**2. 表現概覽**") # MD Ch8.2 Title
          report_lines.append("- 無充足的有效數據進行表現概覽分析。")
-         report_lines.append("\\n**3. 核心問題診斷**") # MD Ch8.3 Title
+         report_lines.append("\n**3. 核心問題診斷**") # MD Ch8.3 Title
          report_lines.append("- 無充足的有效數據進行核心問題診斷。")
-         report_lines.append("\\n**4. 模式觀察**") # MD Ch8.4 Title
+         report_lines.append("\n**4. 模式觀察**") # MD Ch8.4 Title
          report_lines.append("- 無充足的有效數據進行模式觀察。")
-         report_lines.append("\\n**5. 基礎鞏固提示**") # MD Ch8.5 Title
+         report_lines.append("\n**5. 基礎鞏固提示**") # MD Ch8.5 Title
          report_lines.append("- 無充足的有效數據進行基礎鞏固分析。")
-         report_lines.append("\\n**6. 練習計劃呈現**") # MD Ch8.6 Title
+         report_lines.append("\n**6. 練習計劃呈現**") # MD Ch8.6 Title
          report_lines.append("- 無法生成練習建議。")
-         report_lines.append("\\n**7. 後續行動指引**") # MD Ch8.7 Title
+         report_lines.append("\n**7. 後續行動指引**") # MD Ch8.7 Title
          report_lines.append("- 無法提供後續行動指引。")
-         report_lines.append("\\n--- 報告結束 ---")
-         return "\\n\\n".join(report_lines)
+         report_lines.append("\n--- 報告結束 ---")
+         return "\n\n".join(report_lines)
 
     # Extract data safely using .get()
     ch1_results = q_diagnosis_results.get('chapter1_results', {})
@@ -1037,8 +1037,8 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
          report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議)")
 
 
-    report_lines.append("\\n--- 報告結束 ---")
-    return "\\n\\n".join(report_lines)
+    report_lines.append("\n--- 報告結束 ---")
+    return "\n\n".join(report_lines)
 
 # --- Main Q Diagnosis Entry Point ---
 
@@ -1191,6 +1191,14 @@ def run_q_diagnosis(df_raw_q, q_time_pressure_status=False, q_invalid_count=0):
     else:
         print("DEBUG (q_diagnostic.py): 'diagnostic_params_list' column MISSING before return!")
     # --- END DEBUG PRINT ---
+
+    # --- 確保 Subject 欄位存在 ---
+    if 'Subject' not in df_q_diagnosed.columns:
+        print("警告: 'Subject' 欄位在 Q 返回前缺失，正在重新添加...")
+        df_q_diagnosed['Subject'] = 'Q'
+    elif df_q_diagnosed['Subject'].isnull().any() or (df_q_diagnosed['Subject'] != 'Q').any():
+        print("警告: 'Subject' 欄位存在但包含空值或錯誤值，正在修正...")
+        df_q_diagnosed['Subject'] = 'Q' # 強制修正
 
     print("  Quantitative Diagnosis Complete.")
     # Return combined results dict, report string, and the final diagnosed dataframe

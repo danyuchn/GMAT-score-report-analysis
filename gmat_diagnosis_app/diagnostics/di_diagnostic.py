@@ -213,21 +213,59 @@ def run_di_diagnosis(df_di):
     df_di['overtime'] = False
     # df_di['msr_group_overtime'] = False # Removed this flag as 'overtime' now handles MSR group OT
 
+    print("DEBUG (di_diagnostic.py): 開始標記超時 - DI數據包含以下題型:")
+    print(df_di['question_type'].value_counts())
+    print(f"DEBUG (di_diagnostic.py): 使用閾值: {thresholds}")
+    
+    overtime_count = 0
+
     for index, row in df_di[df_di['is_invalid'] == False].iterrows():
         q_type = row['question_type']
         q_time = row['question_time']
+        
+        # 調試單個行的處理
+        if index % 5 == 0:  # 僅打印每5行，避免過多輸出
+            print(f"DEBUG (di_diagnostic.py): 檢查行 {index}, 題型='{q_type}', 時間={q_time}")
 
-        if q_type == 'TPA' and pd.notna(q_time) and q_time > thresholds['TPA']: # Added notna check
-            df_di.loc[index, 'overtime'] = True
-        elif q_type == 'GT' and pd.notna(q_time) and q_time > thresholds['GT']: # Added notna check
-            df_di.loc[index, 'overtime'] = True
-        elif q_type == 'DS' and pd.notna(q_time) and q_time > thresholds['DS']: # Added notna check
-            df_di.loc[index, 'overtime'] = True
-        elif q_type == 'Multi-source reasoning':
-            group_time = row['msr_group_total_time']
+        # 兼容可能的題型名稱差異
+        overtime_threshold = None
+        if q_type == 'Two-part analysis' or q_type == 'TPA':
+            overtime_threshold = thresholds['TPA']
+            if pd.notna(q_time) and q_time > overtime_threshold:
+                df_di.loc[index, 'overtime'] = True
+                overtime_count += 1
+                print(f"DEBUG (di_diagnostic.py): 標記TPA超時 - 位置={row.get('question_position', index)}, 時間={q_time}, 閾值={overtime_threshold}")
+                
+        elif q_type == 'Graph and Table' or q_type == 'GT':
+            overtime_threshold = thresholds['GT']
+            if pd.notna(q_time) and q_time > overtime_threshold:
+                df_di.loc[index, 'overtime'] = True
+                overtime_count += 1
+                print(f"DEBUG (di_diagnostic.py): 標記GT超時 - 位置={row.get('question_position', index)}, 時間={q_time}, 閾值={overtime_threshold}")
+                
+        elif q_type == 'Data Sufficiency' or q_type == 'DS':
+            overtime_threshold = thresholds['DS']
+            if pd.notna(q_time) and q_time > overtime_threshold:
+                df_di.loc[index, 'overtime'] = True
+                overtime_count += 1
+                print(f"DEBUG (di_diagnostic.py): 標記DS超時 - 位置={row.get('question_position', index)}, 時間={q_time}, 閾值={overtime_threshold}")
+                
+        elif q_type == 'Multi-source reasoning' or q_type == 'MSR':
+            # MSR需要特殊處理
+            group_time = row.get('msr_group_total_time')
             if pd.notna(group_time) and group_time > thresholds['MSR_GROUP']:
-                df_di.loc[index, 'overtime'] = True # Mark individual MSR Q as overtime if group is overtime
-                # Removed setting msr_group_overtime flag
+                df_di.loc[index, 'overtime'] = True
+                overtime_count += 1
+                print(f"DEBUG (di_diagnostic.py): 標記MSR超時 - 位置={row.get('question_position', index)}, 組時間={group_time}, 閾值={thresholds['MSR_GROUP']}")
+    
+    # 總結標記結果
+    print(f"DEBUG (di_diagnostic.py): 總共標記了 {overtime_count} 個超時題目 (共 {len(df_di)} 題)")
+    print(f"DEBUG (di_diagnostic.py): df_di['overtime'].sum() = {df_di['overtime'].sum()}")
+    if overtime_count > 0:
+        print("DEBUG (di_diagnostic.py): 超時題目分布:")
+        if 'question_type' in df_di.columns and 'overtime' in df_di.columns:
+            overtime_by_type = df_di[df_di['overtime'] == True]['question_type'].value_counts()
+            print(overtime_by_type)
 
     # Create filtered dataset for subsequent chapters
     df_di_filtered = df_di[df_di['is_invalid'] == False].copy()
@@ -440,15 +478,29 @@ def run_di_diagnosis(df_di):
 
     # --- DEBUG PRINT ---
     print("DEBUG (di_diagnostic.py): Columns before return:", df_to_return.columns.tolist())
-    if 'diagnostic_params_list' in df_to_return.columns:
-        print("DEBUG (di_diagnostic.py): 'diagnostic_params_list' head:")
-        # Show more rows to be sure
-        print(df_to_return['diagnostic_params_list'].head(10))
+    
+    # --- 關鍵檢查: 確認overtime列確實存在 ---
+    if 'overtime' not in df_to_return.columns:
+        print("錯誤: overtime列在返回前消失!")
+        if 'overtime' in df_di.columns:
+            print("正在重新添加overtime列...")
+            df_to_return['overtime'] = df_di['overtime'].copy()
+        else:
+            print("df_di也不包含overtime列！")
     else:
-        print("DEBUG (di_diagnostic.py): 'diagnostic_params_list' column MISSING before return!")
-    # --- END DEBUG PRINT ---
-
-    # Return results dictionary, report string, AND the potentially diagnosed dataframe
+        # 檢查overtime內容
+        print("overtime列存在，值分布:")
+        print(df_to_return['overtime'].value_counts())
+    
+    # --- 確保 Subject 欄位存在 ---
+    if 'Subject' not in df_to_return.columns:
+        print("警告: 'Subject' 欄位在 DI 返回前缺失，正在重新添加...")
+        df_to_return['Subject'] = 'DI'
+    elif df_to_return['Subject'].isnull().any() or (df_to_return['Subject'] != 'DI').any():
+         print("警告: 'Subject' 欄位存在但包含空值或錯誤值，正在修正...")
+         df_to_return['Subject'] = 'DI' # 強制修正
+    
+    # 返回原始函數簽名需要的三個值
     return di_diagnosis_results, report_str, df_to_return
 
 # --- Root Cause Diagnosis Helper (Chapter 3 Logic) --- REWRITTEN ---
@@ -467,6 +519,7 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
 
     all_diagnostic_params = []
     all_is_sfe = []
+    all_time_performance_categories = []
 
     # Prepare max_correct_difficulty mapping
     max_diff_dict = {}
@@ -522,6 +575,23 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
             if q_diff < max_correct_diff:
                 sfe_triggered = True
                 params.append('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+
+        # Determine time performance category
+        current_time_performance_category = 'Unknown'
+        if is_correct:
+            if is_relatively_fast:
+                current_time_performance_category = 'Fast & Correct'
+            elif is_slow:
+                current_time_performance_category = 'Slow & Correct'
+            else:
+                current_time_performance_category = 'Normal Time & Correct'
+        else: # Incorrect
+            if is_relatively_fast:
+                current_time_performance_category = 'Fast & Wrong'
+            elif is_slow:
+                current_time_performance_category = 'Slow & Wrong'
+            else:
+                current_time_performance_category = 'Normal Time & Wrong'
 
         # --- Detailed Diagnostic Logic based on MD Chapter 3 ---
         # Use full names consistently for comparison if data uses them
@@ -618,20 +688,21 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
 
         all_diagnostic_params.append(unique_params)
         all_is_sfe.append(sfe_triggered)
+        all_time_performance_categories.append(current_time_performance_category)
 
     # Assign lists back to DataFrame
     if len(all_diagnostic_params) == len(df) and len(all_is_sfe) == len(df):
         df['diagnostic_params'] = all_diagnostic_params
         df['is_sfe'] = all_is_sfe
-        # Remove old time perf category if exists
-        if 'time_performance_category' in df.columns:
-             df.drop(columns=['time_performance_category'], inplace=True)
+        df['time_performance_category'] = all_time_performance_categories
     else:
         print(f"Error: Length mismatch during root cause diagnosis (detailed). Skipping assignment.")
         if 'diagnostic_params' not in df.columns:
             df['diagnostic_params'] = [[] for _ in range(len(df))]
         if 'is_sfe' not in df.columns:
             df['is_sfe'] = False
+        if 'time_performance_category' not in df.columns:
+            df['time_performance_category'] = 'Unknown'
 
     return df
 
@@ -1242,87 +1313,7 @@ def _generate_di_summary_report(di_results):
     elif not sfe_triggered:
         report_lines.append("- 未識別出明顯的核心問題模式。")
 
-    # --- Detailed Diagnostic List ---
-    report_lines.append("- **詳細診斷標籤 (錯誤或超時題目):**")
-    detailed_items = []
-    avg_time_per_type = ch3.get('avg_time_per_type_minutes', {})
-
-    if diagnosed_df is not None and not diagnosed_df.empty and 'diagnostic_params' in diagnosed_df.columns:
-        # Ensure required columns exist for filtering and display
-        filter_cols = ['is_correct', 'overtime']
-        display_cols = ['question_position', 'question_type', 'content_domain', 'diagnostic_params', 'question_time']
-        sort_cols = ['question_type', 'content_domain', 'question_position'] # Original columns for sorting
-
-        if all(col in diagnosed_df.columns for col in filter_cols + display_cols + sort_cols):
-            df_problem = diagnosed_df[ (diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True) ].copy()
-
-            # Sorting Logic
-            type_order = [_translate_di('Data Sufficiency'), _translate_di('Two-part analysis'), _translate_di('Multi-source reasoning'), _translate_di('Graph and Table'), _translate_di('Unknown Type')]
-            domain_order = [_translate_di('Math Related'), _translate_di('Non-Math Related'), _translate_di('Unknown Domain')]
-
-            # Translate first for sorting
-            df_problem['_q_type_zh'] = df_problem['question_type'].apply(_translate_di)
-            df_problem['_c_domain_zh'] = df_problem['content_domain'].apply(_translate_di)
-
-            df_problem['_q_type_cat'] = pd.Categorical(df_problem['_q_type_zh'], categories=type_order, ordered=True)
-            df_problem['_c_domain_cat'] = pd.Categorical(df_problem['_c_domain_zh'], categories=domain_order, ordered=True)
-
-            df_problem.sort_values(by=['_q_type_cat', '_c_domain_cat', 'question_position'], inplace=True)
-            # Drop temporary sort columns
-            df_problem.drop(columns=['_q_type_zh', '_c_domain_zh', '_q_type_cat', '_c_domain_cat'], inplace=True)
-
-
-            for index, row in df_problem.iterrows():
-                pos = row.get('question_position', 'N/A')
-                q_type = _translate_di(row.get('question_type', 'Unknown Type')) # Translate type
-                domain = _translate_di(row.get('content_domain', 'Unknown Domain')) # Translate domain
-                params_codes = row.get('diagnostic_params', [])
-                is_correct = row.get('is_correct')
-                is_overtime = row.get('overtime')
-                q_time = row.get('question_time')
-                # Use raw q_type for avg_time lookup
-                avg_time = avg_time_per_type.get(row.get('question_type'), np.inf)
-
-                # Determine performance label
-                is_relatively_fast_local = False
-                if pd.notna(q_time) and avg_time != np.inf and q_time < avg_time * 0.75:
-                    is_relatively_fast_local = True
-
-                performance_zh = '未知表現'
-                if is_correct == False:
-                    if is_relatively_fast_local: performance_zh = '快錯'
-                    elif is_overtime: performance_zh = '慢錯'
-                    else: performance_zh = '正常時間 & 錯'
-                elif is_correct == True and is_overtime:
-                    performance_zh = '慢對'
-
-                # Translate parameters and group by category
-                params_by_category = {}
-                if isinstance(params_codes, list) and params_codes:
-                    translated_params = _translate_di(params_codes)
-                    for p_code, p_zh in zip(params_codes, translated_params):
-                        category = DI_PARAM_TO_CATEGORY.get(p_code, 'Unknown')
-                        params_by_category.setdefault(category, []).append(p_zh)
-
-                line_parts = [f"  - 題號 {pos}: [{performance_zh}, 類型: {q_type}, 領域: {domain}] - 診斷:"]
-                items_added_for_row = False
-                for category in DI_PARAM_CATEGORY_ORDER:
-                    if category in params_by_category:
-                        sorted_category_params = sorted(params_by_category[category])
-                        line_parts.append(f"    - [{', '.join(sorted_category_params)}]")
-                        items_added_for_row = True
-
-                if not items_added_for_row: # If no params were categorized or existed
-                    line_parts.append("    - [無特定診斷標籤]")
-
-                detailed_items.append("\n".join(line_parts))
-
-    if not detailed_items:
-        report_lines.append("  - 無錯誤或超時題目可供詳細分析。")
-    else:
-        report_lines.extend(detailed_items)
-    report_lines.append("")
-
+    # Detailed Diagnostic List removed per user request
 
     # 4. 特殊模式觀察 (基於第四章結果)
     report_lines.append("**4. 特殊模式觀察**")
@@ -1377,44 +1368,60 @@ def _generate_di_summary_report(di_results):
         report_lines.append("  - 如果您對報告中指出的某些問題（尤其是非數學相關的邏輯或閱讀理解錯誤）仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。")
 
     # 7.3 Second Evidence Suggestion
+    # --- Re-introduce variable preparation for this section --- 
+    detailed_items = [] # Initialize list, even though we don't iterate it for output here
+    avg_time_per_type = ch3.get('avg_time_per_type_minutes', {}) # Get avg times from ch3 results
+    df_problem = pd.DataFrame() # Initialize empty df
+    if diagnosed_df is not None and not diagnosed_df.empty and 'diagnostic_params' in diagnosed_df.columns:
+        filter_cols = ['is_correct', 'overtime']
+        if all(col in diagnosed_df.columns for col in filter_cols):
+            df_problem = diagnosed_df[ (diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True) ].copy()
+            # Check if df_problem is actually populated after filtering
+            if not df_problem.empty:
+                 detailed_items = df_problem.to_dict('records') # Populate detailed_items minimally if needed by logic below
+    # --- End variable preparation --- 
+    
     report_lines.append("  **二級證據參考建議:**")
-    # Check if detailed items were generated
-    if detailed_items: # Use the flag from detailed list generation
+    # Check if detailed items were generated (based on df_problem being non-empty)
+    # Use df_problem instead of detailed_items directly for the condition
+    if not df_problem.empty: # Check if df_problem was successfully created and populated
         report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
         # Report the breakdown by performance type (Reusing logic slightly adapted)
         details_added_2nd_ev = False
-        # Check if df_problem exists from detailed list generation
-        if 'df_problem' in locals() and not df_problem.empty:
-             performance_map_2nd = {
-                 '快錯': {'types': set(), 'domains': set()},
-                 '慢錯': {'types': set(), 'domains': set()},
-                 '正常時間 & 錯': {'types': set(), 'domains': set()},
-                 '慢對': {'types': set(), 'domains': set()}
-             }
-             for index, row in df_problem.iterrows():
-                  q_type_zh = _translate_di(row.get('question_type'))
-                  domain_zh = _translate_di(row.get('content_domain'))
-                  is_correct = row.get('is_correct')
-                  is_overtime = row.get('overtime')
-                  q_time = row.get('question_time')
-                  avg_time = avg_time_per_type.get(row.get('question_type'), np.inf)
+        # Check if df_problem exists from detailed list generation (already done above)
+        # if 'df_problem' in locals() and not df_problem.empty:
+        performance_map_2nd = {
+            '快錯': {'types': set(), 'domains': set()},
+            '慢錯': {'types': set(), 'domains': set()},
+            '正常時間 & 錯': {'types': set(), 'domains': set()},
+            '慢對': {'types': set(), 'domains': set()}
+        }
+        for index, row in df_problem.iterrows():
+            q_type_zh = _translate_di(row.get('question_type'))
+            domain_zh = _translate_di(row.get('content_domain'))
+            is_correct = row.get('is_correct')
+            is_overtime = row.get('overtime')
+            q_time = row.get('question_time')
+            avg_time = avg_time_per_type.get(row.get('question_type'), np.inf)
 
-                  is_relatively_fast_local = False
-                  if pd.notna(q_time) and avg_time != np.inf and q_time < avg_time * 0.75:
-                      is_relatively_fast_local = True
+            is_relatively_fast_local = False
+            if pd.notna(q_time) and avg_time != np.inf and q_time < avg_time * 0.75:
+                is_relatively_fast_local = True
 
-                  performance_zh = '未知表現'
-                  if is_correct == False:
-                      if is_relatively_fast_local: performance_zh = '快錯'
-                      elif is_overtime: performance_zh = '慢錯'
-                      else: performance_zh = '正常時間 & 錯'
-                  elif is_correct == True and is_overtime:
-                      performance_zh = '慢對'
+            performance_zh = '未知表現'
+            if is_correct == False:
+                if is_relatively_fast_local: performance_zh = '快錯'
+                elif is_overtime: performance_zh = '慢錯'
+                else: performance_zh = '正常時間 & 錯'
+            elif is_correct == True and is_overtime:
+                performance_zh = '慢對'
 
-                  if performance_zh in performance_map_2nd:
-                      performance_map_2nd[performance_zh]['types'].add(q_type_zh)
-                      performance_map_2nd[performance_zh]['domains'].add(domain_zh)
+            if performance_zh in performance_map_2nd:
+                performance_map_2nd[performance_zh]['types'].add(q_type_zh)
+                performance_map_2nd[performance_zh]['domains'].add(domain_zh)
 
+        for perf_zh, data in performance_map_2nd.items():
+            if data['types'] or data['domains']:
              for perf_zh, data in performance_map_2nd.items():
                  if data['types'] or data['domains']:
                      type_list = sorted(list(data['types']))

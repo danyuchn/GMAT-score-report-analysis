@@ -348,12 +348,28 @@ def run_diagnosis(df):
     # --- Combine results from subject modules --- 
     if processed_dfs_list:
         try:
-            # Use outer join to keep all rows even if columns differ slightly initially
-            # Although ideally, all modules should return the same core columns
+            print(f"Combining {len(processed_dfs_list)} processed DataFrames...")
             df_final_for_diagnosis = pd.concat(processed_dfs_list, ignore_index=True, sort=False, join='outer') 
             
+            # --- DEBUG: Check Subject column IMMEDIATELY after concat ---
+            if 'Subject' in df_final_for_diagnosis.columns:
+                print("DEBUG: 'Subject' column EXISTS after concat.")
+                print(f"DEBUG: 'Subject' column non-null count: {df_final_for_diagnosis['Subject'].notna().sum()} / {len(df_final_for_diagnosis)}")
+                print(f"DEBUG: 'Subject' column value counts:\n{df_final_for_diagnosis['Subject'].value_counts(dropna=False)}")
+            else:
+                print("ERROR: 'Subject' column MISSING immediately after concat!")
+            # --- END DEBUG ---
+            
+            # 檢查各科目的overtime統計
+            print("各科目overtime計數:")
+            processed_subjects = [df['Subject'].iloc[0] for df in processed_dfs_list if not df.empty and 'Subject' in df.columns] # Get subjects from the list
+            # The original line below had a NameError: name 'processed_subjects' is not defined. Corrected to use subjects_present or derive from list.
+            for subject, df in [(s, df[df['Subject'] == s]) for s, df in zip(processed_subjects, processed_dfs_list) if 'Subject' in df.columns and 'overtime' in df.columns]:
+                overtime_count = df['overtime'].sum() if not df.empty else 0
+                print(f"  {subject}: {overtime_count}/{len(df)} ({overtime_count/len(df)*100:.1f}% 超時)")
+            
             # --- Post-Concatenation Column Check and Initialization --- 
-            required_display_cols = ['Subject', 'question_position', 'is_correct', 'question_time', 'question_difficulty', 'time_performance_category', 'is_sfe', 'diagnostic_params_list']
+            required_display_cols = ['Subject', 'question_position', 'is_correct', 'question_time', 'question_difficulty', 'time_performance_category', 'is_sfe', 'diagnostic_params_list', 'overtime']
             missing_display_cols = [col for col in required_display_cols if col not in df_final_for_diagnosis.columns]
             if missing_display_cols:
                 print(f"WARNING: Final combined DataFrame is missing expected display columns: {missing_display_cols}")
@@ -363,7 +379,7 @@ def run_diagnosis(df):
                           # Ensure initialization creates actual list objects for each row
                           num_rows = len(df_final_for_diagnosis)
                           df_final_for_diagnosis[col] = pd.Series([[] for _ in range(num_rows)], index=df_final_for_diagnosis.index)
-                     elif col == 'is_sfe' or col == 'is_correct':
+                     elif col in ['is_sfe', 'is_correct', 'overtime']:
                           df_final_for_diagnosis[col] = False # Default boolean
                      elif col == 'time_performance_category':
                           df_final_for_diagnosis[col] = 'Unknown' # Default category
@@ -373,6 +389,19 @@ def run_diagnosis(df):
             # --- End Column Check --- 
 
             print(f"Combined processed data from {len(processed_dfs_list)} subject(s). Final shape: {df_final_for_diagnosis.shape}")
+            
+            # --- DEBUG OVERTIME COLUMN SPECIFICALLY ---
+            if 'overtime' in df_final_for_diagnosis.columns:
+                overtime_count = df_final_for_diagnosis['overtime'].sum()
+                print(f"DEBUG: df_final_for_diagnosis['overtime'] column contains {overtime_count} True values.")
+                # Count by subject
+                for subject in df_final_for_diagnosis['Subject'].unique():
+                    subject_overtime = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == subject]['overtime'].sum()
+                    print(f"DEBUG:   - Subject {subject}: {subject_overtime} overtime rows")
+            else:
+                print("DEBUG: 'overtime' column MISSING from final DataFrame!")
+            # --- END DEBUG OVERTIME COLUMN ---
+
             # Verify diagnostic_params_list again
             if 'diagnostic_params_list' in df_final_for_diagnosis.columns:
                 print("Final DataFrame contains 'diagnostic_params_list' column.")

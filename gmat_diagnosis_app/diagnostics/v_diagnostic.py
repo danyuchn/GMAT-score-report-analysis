@@ -882,6 +882,14 @@ def run_v_diagnosis(df_v, v_time_pressure_status, v_avg_time_per_type, v_invalid
         print("DEBUG (v_diagnostic.py): 'diagnostic_params_list' column MISSING before return!")
     # --- END DEBUG PRINT ---
 
+    # --- 確保 Subject 欄位存在 ---
+    if 'Subject' not in df_v.columns:
+        print("警告: 'Subject' 欄位在 V 返回前缺失，正在重新添加...")
+        df_v['Subject'] = 'V'
+    elif df_v['Subject'].isnull().any() or (df_v['Subject'] != 'V').any():
+        print("警告: 'Subject' 欄位存在但包含空值或錯誤值，正在修正...")
+        df_v['Subject'] = 'V' # 強制修正
+
     print("  Verbal Diagnosis Complete.")
     # Return results dictionary, report string, and the diagnosed dataframe
     return v_diagnosis_results, v_report_content, df_v # Return the generated report
@@ -1228,48 +1236,48 @@ def _generate_v_summary_report(v_diagnosis_results):
     if not core_issues_params and not sfe_triggered_overall:
         report_lines.append("- 未識別出明顯的核心問題模式 (基於錯誤及效率分析)。")
 
-    # Detailed Diagnostics List
-    if all_problem_items:
-        report_lines.append("- **詳細診斷標籤 (含時間表現和技能):**")
-        def sort_key(item):
-            q_type = item.get('question_type', 'Unknown Type')
-            skill_en = item.get('skill', 'zzzzz')
-            skill_zh = _translate_v(skill_en)
-            position = item.get('position', float('inf'))
-            type_order = 0 if q_type == 'Critical Reasoning' else (1 if q_type == 'Reading Comprehension' else 2)
-            sfe_order = 0 if item.get('is_sfe') else 1 # Prioritize SFE
-            return (sfe_order, type_order, skill_zh, position)
-        sorted_items = sorted(all_problem_items, key=sort_key)
-
-        for item in sorted_items:
-            pos = item['position']
-            skill_en = item['skill']
-            skill_zh = _translate_v(skill_en)
-            performance_en = item['performance']
-            params_codes = item['params']
-            performance_zh = _translate_v(performance_en)
-            translated_params = [_translate_v(p) for p in params_codes]
-            sfe_marker = "*" if item.get('is_sfe') else ""
-
-            line_parts = [f"  - {sfe_marker}題號 {pos}: [{performance_zh}, 技能: {skill_zh}] - 診斷:"]
-            if translated_params:
-                # Group params by category for readability
-                params_by_category = {}
-                for p_code, p_zh in zip(params_codes, translated_params):
-                    category_en = V_PARAM_TO_CATEGORY.get(p_code, 'Unknown')
-                    category_zh = _translate_v(category_en) if category_en != 'Unknown' else '其他'
-                    if category_zh not in params_by_category:
-                        params_by_category[category_zh] = []
-                    params_by_category[category_zh].append(p_zh)
-
-                # Define order for categories (translate from V_PARAM_CATEGORY_ORDER)
-                category_order_zh = [_translate_v(c) for c in V_PARAM_CATEGORY_ORDER if _translate_v(c) in params_by_category] + [c for c in params_by_category if c not in [_translate_v(cat) for cat in V_PARAM_CATEGORY_ORDER]]
-
-                for cat_zh in category_order_zh:
-                     line_parts.append(f"    - [{cat_zh}] {', '.join(params_by_category[cat_zh])}")
-            else:
-                line_parts.append("    - [無特定診斷標籤]")
-            report_lines.append("\n".join(line_parts))
+    # Detailed Diagnostics List (REMOVED per user request - details in table)
+    # if all_problem_items:
+    #     report_lines.append("- **詳細診斷標籤 (含時間表現和技能):**")
+    #     def sort_key(item):
+    #         q_type = item.get('question_type', 'Unknown Type')
+    #         skill_en = item.get('skill', 'zzzzz')
+    #         skill_zh = _translate_v(skill_en)
+    #         position = item.get('position', float('inf'))
+    #         type_order = 0 if q_type == 'Critical Reasoning' else (1 if q_type == 'Reading Comprehension' else 2)
+    #         sfe_order = 0 if item.get('is_sfe') else 1 # Prioritize SFE
+    #         return (sfe_order, type_order, skill_zh, position)
+    #     sorted_items = sorted(all_problem_items, key=sort_key)
+    #
+    #     for item in sorted_items:
+    #         pos = item['position']
+    #         skill_en = item['skill']
+    #         skill_zh = _translate_v(skill_en)
+    #         performance_en = item['performance']
+    #         params_codes = item['params']
+    #         performance_zh = _translate_v(performance_en)
+    #         translated_params = [_translate_v(p) for p in params_codes]
+    #         sfe_marker = "*" if item.get('is_sfe') else ""
+    #
+    #         line_parts = [f"  - {sfe_marker}題號 {pos}: [{performance_zh}, 技能: {skill_zh}] - 診斷:"]
+    #         if translated_params:
+    #             # Group params by category for readability
+    #             params_by_category = {}
+    #             for p_code, p_zh in zip(params_codes, translated_params):
+    #                 category_en = V_PARAM_TO_CATEGORY.get(p_code, 'Unknown')
+    #                 category_zh = _translate_v(category_en) if category_en != 'Unknown' else '其他'
+    #                 if category_zh not in params_by_category:
+    #                     params_by_category[category_zh] = []
+    #                 params_by_category[category_zh].append(p_zh)
+    #
+    #             # Define order for categories (translate from V_PARAM_CATEGORY_ORDER)
+    #             category_order_zh = [_translate_v(c) for c in V_PARAM_CATEGORY_ORDER if _translate_v(c) in params_by_category] + [c for c in params_by_category if c not in [_translate_v(cat) for cat in V_PARAM_CATEGORY_ORDER]]
+    #
+    #             for cat_zh in category_order_zh:
+    #                  line_parts.append(f"    - [{cat_zh}] {', '.join(params_by_category[cat_zh])}")
+    #         else:
+    #             line_parts.append("    - [無特定診斷標籤]")
+    #         report_lines.append("\n".join(line_parts))
     report_lines.append("")
 
     # --- Section 4: 正確但低效分析 --- #
@@ -1648,12 +1656,16 @@ def _generate_v_recommendations(v_diagnosis_results, exempted_skills):
                     # This requires linking back params to original triggers - difficult with current structure
                     # Simplified: Generate case rec if error or slow (overtime=True)
                     is_error = not row['is_correct']
-                    is_slow = row.get('overtime', False)
+                    q_type = row['question_type']
+                    # 判斷是否慢 (is_slow): (CR: overtime == True; RC: group_overtime == True 或 individual_overtime == True)
+                    if q_type == 'Critical Reasoning':
+                        is_slow = row.get('overtime', False)
+                    else:  # Reading Comprehension
+                        is_slow = row.get('group_overtime', False) or row.get('individual_overtime', False)
                     is_sfe = row.get('is_sfe', False)
                     q_pos = row['question_position']
                     difficulty = row.get('question_difficulty')
                     time = row.get('question_time')
-                    q_type = row['question_type']
 
                     # Only generate case rec if it was an error or correct-slow
                     if is_error or (row['is_correct'] and is_slow):
