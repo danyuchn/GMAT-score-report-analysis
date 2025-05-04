@@ -573,14 +573,19 @@ def _generate_report_section7(triggered_params_translated, param_to_positions, s
 
     # --- Secondary Evidence ---
     lines.append("- **二級證據參考建議:**")
-    if df_diagnosed is not None and not df_diagnosed.empty and 'time_performance_category' in df_diagnosed.columns:
-        df_problem = df_diagnosed[ (df_diagnosed['is_correct'] == False) | (df_diagnosed.get('overtime', False) == True) | (df_diagnosed.get('is_invalid', False) == True)].copy()
+    if df_diagnosed is not None and not df_diagnosed.empty and 'time_performance_category' in df_diagnosed.columns and 'is_correct' in df_diagnosed.columns:
+        # Filter out invalid data upfront for this section's analysis
+        df_problem = df_diagnosed[
+            (df_diagnosed['is_invalid'] == False) &
+            ((df_diagnosed['is_correct'] == False) | (df_diagnosed.get('overtime', False) == True))
+        ].copy()
+
         if not df_problem.empty:
-            lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題、超時或標記為無效的題目。")
+            lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
             details_added_2nd_ev = False
             performance_order_en = ['Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 'Slow & Correct', 'Unknown']
-            has_invalid = 'is_invalid' in df_problem.columns and df_problem['is_invalid'].any()
-            grouped_by_performance = df_problem[df_problem['is_invalid'] == False].groupby('time_performance_category')
+            # Group by performance category ONLY on the filtered (valid) problem data
+            grouped_by_performance = df_problem.groupby('time_performance_category')
 
             for perf_en in performance_order_en:
                 if perf_en in grouped_by_performance.groups:
@@ -597,24 +602,19 @@ def _generate_report_section7(triggered_params_translated, param_to_positions, s
                         all_labels_in_group = set()
                         if 'diagnostic_params_list' in group_df.columns:
                             for labels_list in group_df['diagnostic_params_list']:
-                                if isinstance(labels_list, list): all_labels_in_group.update(labels_list)
+                                if isinstance(labels_list, list):
+                                    # Exclude invalid tag if somehow present (should not be due to filter)
+                                    valid_labels = {label for label in labels_list if label != _get_translation(INVALID_DATA_TAG_Q.split("：")[0])}
+                                    all_labels_in_group.update(valid_labels)
                         sorted_labels_zh = sorted(list(all_labels_in_group))
                         report_line = f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_in_group)}】；涉及技能：【{', '.join(skills_in_group)}】。"
                         if sorted_labels_zh: report_line += f" 注意相關問題點：【{', '.join(sorted_labels_zh)}】。"
                         lines.append(report_line)
                         details_added_2nd_ev = True
-            if has_invalid:
-                 df_invalid = df_problem[df_problem['is_invalid'] == True]
-                 if not df_invalid.empty:
-                    types_zh = sorted(list(df_invalid['question_type'].dropna().unique()))
-                    skills_zh = sorted(list(df_invalid['question_fundamental_skill'].dropna().unique()))
-                    invalid_tag_zh = _get_translation(INVALID_DATA_TAG_Q.split("：")[0])
-                    report_line = f"  - **{invalid_tag_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及技能：【{', '.join(skills_zh)}】。"
-                    lines.append(report_line)
-                    details_added_2nd_ev = True
-            if not details_added_2nd_ev: lines.append("  - (本次分析未聚焦到特定的問題類型或技能)")
+
+            if not details_added_2nd_ev: lines.append("  - (本次分析未聚焦到特定的有效問題類型或技能)")
             lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
-        else: lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
+        else: lines.append("  - (本次分析未發現需要二級證據深入探究的有效問題點)")
     else:
         lines.append("  - *觸發時機：* 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時。")
         lines.append("  - *建議行動：* 為了更精確地定位具體困難點，建議您查看近期的練習記錄（例如考前 2-4 週），整理相關錯題，歸納是哪些知識點或題型反覆出現問題。如果樣本不足，請在接下來的做題中注意收集，累積到足夠樣本後再進行分析。")

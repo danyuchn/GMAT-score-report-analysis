@@ -110,17 +110,33 @@ ERROR_FONT_COLOR = '#D32F2F' # Red for errors
 OVERTIME_FILL_COLOR = '#FFCDD2' # Light red fill for overtime
 
 def apply_styles(row):
-    """Applies styling for incorrect answers and overtime."""
+    """Applies styling for invalid rows, incorrect answers, and overtime."""
     styles = [''] * len(row)
+    INVALID_FONT_COLOR = '#A9A9A9' # DarkGray
+    ERROR_FONT_COLOR = '#D32F2F' # Red for errors
+    OVERTIME_FILL_COLOR = '#FFCDD2' # Light red fill for overtime
+
     try:
-        # Red text for incorrect
+        # Grey text for invalid rows (overrides other text styles)
+        if 'is_invalid' in row.index and row['is_invalid']:
+            styles = [f'color: {INVALID_FONT_COLOR}'] * len(row)
+            # Apply overtime background even if invalid
+            if 'overtime' in row.index and row['overtime'] and 'question_time' in row.index:
+                time_col_idx = row.index.get_loc('question_time')
+                styles[time_col_idx] = f'{styles[time_col_idx]}; background-color: {OVERTIME_FILL_COLOR}'.lstrip('; ')
+            return styles # Return early if invalid
+
+        # Red text for incorrect (only if not invalid)
         if 'is_correct' in row.index and not row['is_correct']:
             styles = [f'color: {ERROR_FONT_COLOR}'] * len(row)
-        # Red background for overtime time cell
+
+        # Red background for overtime time cell (applies to correct or incorrect, but not invalid text color)
         if 'overtime' in row.index and row['overtime'] and 'question_time' in row.index:
             time_col_idx = row.index.get_loc('question_time')
             current_style = styles[time_col_idx]
+            # Add background without overriding potential error text color
             styles[time_col_idx] = f'{current_style}; background-color: {OVERTIME_FILL_COLOR}'.lstrip('; ')
+
     except (KeyError, IndexError):
         pass # Ignore styling errors if columns are missing
     return styles
@@ -142,6 +158,7 @@ def to_excel(df, column_map):
         # Define formats
         error_format = workbook.add_format({'font_color': ERROR_FONT_COLOR})
         overtime_format = workbook.add_format({'bg_color': OVERTIME_FILL_COLOR})
+        invalid_format = workbook.add_format({'font_color': '#A9A9A9'})
 
         # --- Apply Conditional Formatting ---
         header_list = list(df_renamed.columns)
@@ -151,28 +168,39 @@ def to_excel(df, column_map):
             correct_col_disp = next(v for k, v in column_map.items() if k == 'is_correct')
             time_col_disp = next(v for k, v in column_map.items() if k == 'question_time')
             overtime_col_disp = next(v for k, v in column_map.items() if k == 'overtime') # Name of the overtime flag column
+            invalid_col_disp = next(v for k, v in column_map.items() if k == 'is_invalid') # Name of the invalid flag column
 
             correct_col_idx = header_list.index(correct_col_disp)
             time_col_idx = header_list.index(time_col_disp)
             overtime_col_idx = header_list.index(overtime_col_disp)
+            invalid_col_idx = header_list.index(invalid_col_disp)
 
             correct_col_letter = chr(ord('A') + correct_col_idx)
             time_col_letter = chr(ord('A') + time_col_idx)
             overtime_col_letter = chr(ord('A') + overtime_col_idx)
+            invalid_col_letter = chr(ord('A') + invalid_col_idx)
 
             data_range = f'A2:{chr(ord("A") + len(header_list)-1)}{max_row}'
             time_col_range = f'{time_col_letter}2:{time_col_letter}{max_row}'
 
-            # Red text for incorrect answers (whole row)
+            # Grey text for invalid rows (apply first or ensure it overrides)
             worksheet.conditional_format(data_range, {'type': 'formula',
-                                                     'criteria': f'=${correct_col_letter}2=FALSE',
+                                                     'criteria': f'=${invalid_col_letter}2="True"', # Check text value
+                                                     'format': invalid_format})
+
+            # Red text for incorrect answers (whole row) - might be overridden by grey if invalid
+            worksheet.conditional_format(data_range, {'type': 'formula',
+                                                     'criteria': f'=${correct_col_letter}2="False"', # Check text value
                                                      'format': error_format})
+
             # Red background for overtime time cells
             worksheet.conditional_format(time_col_range, {'type': 'formula',
-                                                          'criteria': f'=${overtime_col_letter}2=TRUE', # Check the flag column
+                                                          'criteria': f'=${overtime_col_letter}2=TRUE', # Check the flag column (still bool maybe?)
                                                           'format': overtime_format})
-            # Hide the overtime flag column
+
+            # Hide the overtime flag column ONLY
             worksheet.set_column(overtime_col_idx, overtime_col_idx, None, None, {'hidden': True})
+            # Do NOT hide the invalid column
 
         except (StopIteration, ValueError, IndexError) as e:
             st.warning(f"無法應用 Excel 樣式或隱藏欄位: {e}", icon="⚠️") # Use warning
@@ -1042,7 +1070,7 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
         "question_fundamental_skill": st.column_config.TextColumn("考察能力"),
         "is_correct": st.column_config.CheckboxColumn("答對?", help="是否回答正確"),
         "question_difficulty": st.column_config.NumberColumn("難度(模擬)", help="系統模擬的題目難度 (有效題目)", format="%.2f", width="small"),
-        "estimated_ability": st.column_config.NumberColumn("能力估計", help="本科目最終能力估計值", format="%.2f", width="small"), # Add overall ability back
+        # "estimated_ability": st.column_config.NumberColumn("能力估計", help="本科目最終能力估計值", format="%.2f", width="small"), # Add overall ability back (Removed)
         "question_time": st.column_config.NumberColumn("用時(分)", format="%.2f", width="small"),
         "time_performance_category": st.column_config.TextColumn("時間表現"),
         "is_sfe": st.column_config.CheckboxColumn("SFE?", help="是否為Special Focus Error", width="small"),
@@ -1061,7 +1089,7 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
         "question_fundamental_skill": "考察能力",
         "is_correct": "答對", # Use text TRUE/FALSE (converted in display_subject_results)
         "question_difficulty": "難度(模擬)",
-        "estimated_ability": "能力估計",
+        # "estimated_ability": "能力估計", # Removed as per user request
         "question_time": "用時(分)",
         "time_performance_category": "時間表現",
         "is_sfe": "SFE", # Use text TRUE/FALSE
@@ -1069,16 +1097,6 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
         "is_invalid": "是否無效", # Use text TRUE/FALSE
         "overtime": "overtime_flag", # Internal flag for Excel styling, will be hidden by to_excel
     }
-
-    # --- Display Final Thetas ---
-    if st.session_state.final_thetas:
-        st.subheader("最終能力估計 (Final Thetas)")
-        theta_data = {
-            "科目": list(st.session_state.final_thetas.keys()),
-            "能力估計值 (Theta)": [f"{v:.3f}" for v in st.session_state.final_thetas.values()] # Format here
-        }
-        st.dataframe(pd.DataFrame(theta_data), hide_index=True, use_container_width=True)
-
 
     # --- Display Subject Reports and DataFrames using Refactored Function ---
     if st.session_state.diagnosis_complete and st.session_state.processed_df is not None:
@@ -1097,7 +1115,6 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
                 with result_tabs[i]:
                     report_md = subject_reports.get(subject)
                     df_subject_specific = df_processed[df_processed['Subject'] == subject].copy()
-
                     # Call the refactored display function
                     display_subject_results(
                         subject,
@@ -1126,4 +1143,4 @@ elif 'analysis_run' in st.session_state and not st.session_state.analysis_run: #
 
 # --- Footer or other UI elements ---
 st.markdown("---")
-st.caption("GMAT 診斷平台 vX.Y") # Add version if desired
+st.caption("GMAT 診斷平台 v1.0") # Add version if desire
