@@ -1243,6 +1243,18 @@ APPENDIX_A_TRANSLATION_DI = {
     'Fast & Correct': "快對",
     'Normal Time & Correct': "正常時間 & 對",
     # --- End Time Performance Categories ---
+    
+    # 添加類別名稱翻譯
+    'SFE': '基礎掌握',
+    'Reading/Interpretation': '閱讀/解讀',
+    'Concept/Application': '概念/應用',
+    'Data/Calculation': '數據/計算',
+    'Logic/Reasoning': '邏輯/推理',
+    'Multi-Source': '多源整合',
+    'Efficiency': '效率問題',
+    'Carelessness': '粗心問題',
+    'Behavioral': '行為模式',
+    'Unknown': '未分類',
 }
 
 # --- DI Tool/Prompt Recommendations Map (Example Structure) ---
@@ -1276,14 +1288,15 @@ DI_TOOL_RECOMMENDATIONS_MAP = {
 # --- Parameter Categories for Report Grouping (DI) --- Updated ---
 DI_PARAM_CATEGORY_ORDER = [
     'SFE',
-    'Reading/Interpretation',
-    'Concept/Application (Math)',
-    'Logical Reasoning (Non-Math)',
-    'Data Handling', # Includes Calculation, Extraction
-    'MSR Specific',
-    'Efficiency',
-    'Behavioral',
-    'Unknown' # Catch-all for unmapped params
+    'Reading/Interpretation',  # 閱讀/解讀
+    'Concept/Application',     # 概念/應用
+    'Data/Calculation',        # 數據/計算
+    'Logic/Reasoning',         # 邏輯/推理
+    'Multi-Source',            # 多源整合
+    'Efficiency',              # 效率問題
+    'Carelessness',            # 粗心問題
+    'Behavioral',              # 行為模式
+    'Unknown'                  # 未知類別
 ]
 
 DI_PARAM_TO_CATEGORY = {
@@ -1292,20 +1305,19 @@ DI_PARAM_TO_CATEGORY = {
     # Reading/Interpretation
     'DI_READING_COMPREHENSION_ERROR': 'Reading/Interpretation',
     'DI_GRAPH_TABLE_INTERPRETATION_ERROR': 'Reading/Interpretation',
-    # Concept/Application (Math)
-    'DI_CONCEPT_APPLICATION_ERROR': 'Concept/Application (Math)',
-    # Logical Reasoning (Non-Math)
-    'DI_LOGICAL_REASONING_ERROR': 'Logical Reasoning (Non-Math)',
-    # Data Handling
-    'DI_DATA_EXTRACTION_ERROR': 'Data Handling',
-    'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR': 'Data Handling',
-    'DI_CALCULATION_ERROR': 'Data Handling',
-    # MSR Specific
-    'DI_MULTI_SOURCE_INTEGRATION_ERROR': 'MSR Specific',
-    'DI_MSR_READING_COMPREHENSION_BARRIER': 'MSR Specific',
-    'DI_MSR_SINGLE_Q_BOTTLENECK': 'MSR Specific',
-    # Question Type Specific
-    'DI_QUESTION_TYPE_SPECIFIC_ERROR': 'Unknown',
+    # Concept/Application
+    'DI_CONCEPT_APPLICATION_ERROR': 'Concept/Application',
+    # Data/Calculation
+    'DI_DATA_EXTRACTION_ERROR': 'Data/Calculation',
+    'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR': 'Data/Calculation',
+    'DI_CALCULATION_ERROR': 'Data/Calculation',
+    # Logic/Reasoning
+    'DI_LOGICAL_REASONING_ERROR': 'Logic/Reasoning',
+    'DI_QUESTION_TYPE_SPECIFIC_ERROR': 'Logic/Reasoning',
+    # Multi-Source
+    'DI_MULTI_SOURCE_INTEGRATION_ERROR': 'Multi-Source',
+    'DI_MSR_READING_COMPREHENSION_BARRIER': 'Multi-Source',
+    'DI_MSR_SINGLE_Q_BOTTLENECK': 'Multi-Source',
     # Efficiency
     'DI_EFFICIENCY_BOTTLENECK_READING': 'Efficiency',
     'DI_EFFICIENCY_BOTTLENECK_CONCEPT': 'Efficiency',
@@ -1313,10 +1325,11 @@ DI_PARAM_TO_CATEGORY = {
     'DI_EFFICIENCY_BOTTLENECK_LOGIC': 'Efficiency',
     'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE': 'Efficiency',
     'DI_EFFICIENCY_BOTTLENECK_INTEGRATION': 'Efficiency',
+    # Carelessness
+    'DI_CARELESSNESS_DETAIL_OMISSION': 'Carelessness',
     # Behavioral
-    'DI_CARELESSNESS_DETAIL_OMISSION': 'Behavioral',
     'DI_BEHAVIOR_CARELESSNESS_ISSUE': 'Behavioral',
-    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': 'Behavioral',
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': 'Behavioral'
 }
 
 def _translate_di(param):
@@ -1680,6 +1693,12 @@ def _generate_di_summary_report(di_results):
                 'Unknown' # Include Unknown as a fallback
             ]
 
+            # 創建中文標籤到英文代碼的反向映射
+            chinese_label_to_english_code = {}
+            for code, label in APPENDIX_A_TRANSLATION_DI.items():
+                if isinstance(label, str) and label != code:  # 避免自引用
+                    chinese_label_to_english_code[label] = code
+
             grouped_by_performance = df_problem.groupby('time_performance_category')
 
             # Iterate in the desired order
@@ -1694,56 +1713,57 @@ def _generate_di_summary_report(di_results):
                     group_df = grouped_by_performance.get_group(perf_en)
                     if not group_df.empty:
                         perf_zh = _translate_di(perf_en)
-
-                        # Extract unique types and domains from this group
                         types_in_group = group_df['question_type'].dropna().unique()
                         domains_in_group = group_df['content_domain'].dropna().unique()
-
                         types_zh = sorted([_translate_di(t) for t in types_in_group])
                         domains_zh = sorted([_translate_di(d) for d in domains_in_group])
 
-                        # --- START Extract Unique Labels (Revised) ---
+                        # --- 分類標籤處理 (保持不變) ---
                         all_labels_in_group = set()
-                        target_label_col = None
-                        # Use the final column name directly
-                        if 'diagnostic_params_list' in group_df.columns:
-                             target_label_col = 'diagnostic_params_list'
-                             # print(f"DEBUG (di_report): Using existing 'diagnostic_params_list' column.") # DEBUG
-                        # Fallback to original english codes if needed and available
-                        elif 'diagnostic_params' in group_df.columns:
-                             target_label_col = 'diagnostic_params'
-                             # print(f"DEBUG (di_report): Fallback: Using 'diagnostic_params' column, will translate.") # DEBUG
-                        # else:
-                             # print(f"DEBUG (di_report): No diagnostic params column found for this group!") # DEBUG
-
+                        target_label_col = 'diagnostic_params_list' if 'diagnostic_params_list' in group_df.columns else 'diagnostic_params' if 'diagnostic_params' in group_df.columns else None
                         if target_label_col:
-                            # print(f"DEBUG (di_report):   Processing labels from column: {target_label_col}") # DEBUG
-                            # labels_head = group_df[target_label_col].head().tolist() # Get first 5 lists
-                            # print(f"DEBUG (di_report):   Head of {target_label_col}: {labels_head}") # DEBUG
-
                             for labels_list in group_df[target_label_col]:
-                                if isinstance(labels_list, list): # Check if it's a list
-                                     # If using original English codes, translate them now
-                                     if target_label_col == 'diagnostic_params':
-                                         translated_list = _translate_di(labels_list) # Translate the list
-                                         all_labels_in_group.update(p for p in translated_list if p) # Add non-empty translations
-                                     else: # Already Chinese (or intended final list)
-                                         all_labels_in_group.update(p for p in labels_list if p) # Add non-empty labels
+                                if isinstance(labels_list, list):
+                                    if target_label_col == 'diagnostic_params':
+                                        translated_list = [_translate_di(p) for p in labels_list if isinstance(p, str)]
+                                        all_labels_in_group.update(p for p in translated_list if p and p != INVALID_DATA_TAG_DI)
+                                    else:
+                                        all_labels_in_group.update(p for p in labels_list if p and p != INVALID_DATA_TAG_DI)
 
-                        # Labels in all_labels_in_group should now be Chinese
-                        sorted_labels_zh = sorted(list(all_labels_in_group))
-                        # print(f"DEBUG (di_report):   Sorted unique Chinese labels found: {sorted_labels_zh}") # DEBUG
-                        # --- END Extract Unique Labels (Revised) ---
+                        labels_by_category = {category: [] for category in DI_PARAM_CATEGORY_ORDER}
+                        unknown_labels = []
+                        for label_zh in all_labels_in_group:
+                            english_code = chinese_label_to_english_code.get(label_zh)
+                            if english_code:
+                                category = DI_PARAM_TO_CATEGORY.get(english_code, 'Unknown')
+                                labels_by_category[category].append(label_zh)
+                            elif label_zh != INVALID_DATA_TAG_DI:
+                                unknown_labels.append(label_zh)
+                        if unknown_labels:
+                            labels_by_category['Unknown'].extend(unknown_labels)
+                        # --- END 分類標籤處理 ---
 
-                        # --- Modify Report Line ---
-                        report_line = f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及領域：【{', '.join(domains_zh)}】。"
-                        if sorted_labels_zh:
-                             # Filter out the invalid data tag before joining
-                             filtered_labels = [label for label in sorted_labels_zh if label != INVALID_DATA_TAG_DI]
-                             if filtered_labels:
-                                report_line += f" 注意相關問題點：【{', '.join(filtered_labels)}】。"
-                        report_lines.append(report_line)
-                        # --- End Modify Report Line ---
+                        # --- Modify Report Lines using Markdown List Structure ---
+                        # 1. Add the main bullet point for the performance category
+                        report_lines.append(f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及領域：【{', '.join(domains_zh)}】。")
+
+                        # 2. Check if there are labels to add
+                        label_parts_data = [] # Store tuples of (category_zh, sorted_labels_zh)
+                        for category in DI_PARAM_CATEGORY_ORDER:
+                            category_labels = labels_by_category.get(category, [])
+                            if category_labels:
+                                category_zh = _translate_di(category)
+                                sorted_category_labels = sorted(category_labels)
+                                label_parts_data.append((category_zh, sorted_category_labels))
+
+                        # 3. If labels exist, add the header and sub-bullets
+                        if label_parts_data:
+                            # Add the indented header line
+                            report_lines.append("    注意相關問題點：")
+                            # Add each category as an indented sub-bullet point
+                            for category_zh, sorted_labels_zh in label_parts_data:
+                                report_lines.append(f"      - 【{category_zh}: {', '.join(sorted_labels_zh)}】")
+                        # --- End Modify Report Lines ---
 
                         details_added_2nd_ev = True
         else:
