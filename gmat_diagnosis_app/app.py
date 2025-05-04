@@ -14,6 +14,7 @@ from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.utils import get_column_letter
 import plotly.graph_objects as go # Add plotly import
+import openai # Keep openai import
 
 # --- Project Path Setup --- (Keep as is)
 try:
@@ -33,7 +34,6 @@ try:
     from gmat_diagnosis_app.diagnostics.v_diagnostic import run_v_diagnosis_processed
     from gmat_diagnosis_app.diagnostics.di_diagnostic import run_di_diagnosis_processed
     from gmat_diagnosis_app.diagnostics.q_diagnostic import run_q_diagnosis_processed
-    import openai # Keep openai import
 except ImportError as e:
     st.error(f"導入模組時出錯: {e}. 請確保環境設定正確，且 gmat_diagnosis_app 在 Python 路徑中。")
     st.stop()
@@ -411,6 +411,72 @@ def create_theta_plot(theta_history_df, subject_name):
     )
     return fig
 # --- End NEW Plotting Function ---
+
+# --- NEW OpenAI Summarization Helper ---
+def summarize_report_with_openai(report_markdown, api_key):
+    """Attempts to summarize/reformat a report using OpenAI API."""
+    if not api_key:
+        logging.warning("OpenAI API key is missing. Skipping summarization.")
+        return report_markdown # Return original if no key
+
+    try:
+        # Ensure openai library is accessible here
+        if 'openai' not in sys.modules:
+             st.warning("OpenAI library not loaded correctly.", icon="⚠️")
+             return report_markdown
+
+        client = openai.OpenAI(api_key=api_key) # Initialize client
+        system_prompt = """You are an assistant that reformats GMAT diagnostic reports.
+You will receive a report in Markdown format.
+Your task is to reformat the content into clear Markdown tables where appropriate.
+Fix any minor grammatical errors or awkward phrasing for better readability.
+IMPORTANT: Do NOT add or remove any substantive information or conclusions from the original report. Only reformat and polish the existing text.
+Output the result strictly in Markdown format."""
+
+        response = client.chat.completions.create(
+            model="o4-mini", # Use the specified model
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": report_markdown}
+            ],
+            # temperature=0.2 # Removed: o4-mini only supports default (1)
+        )
+        summarized_report = response.choices[0].message.content
+        # Basic check if response seems valid (not empty)
+        if summarized_report and summarized_report.strip():
+             logging.info(f"OpenAI summarization successful for report starting with: {report_markdown[:50]}...")
+             return summarized_report.strip()
+        else:
+             logging.warning("OpenAI returned empty response. Using original report.")
+             st.warning("AI 整理報告時返回了空內容，將使用原始報告。", icon="⚠️")
+             return report_markdown
+
+    except openai.AuthenticationError:
+        st.warning("OpenAI API Key 無效或權限不足，無法整理報告文字。請檢查側邊欄輸入或環境變數。", icon="🔑")
+        logging.error("OpenAI AuthenticationError.")
+        return report_markdown
+    except openai.RateLimitError:
+        st.warning("OpenAI API 請求頻率過高，請稍後再試。暫時使用原始報告文字。", icon="⏳")
+        logging.error("OpenAI RateLimitError.")
+        return report_markdown
+    except openai.APIConnectionError as e:
+        st.warning(f"無法連接至 OpenAI API ({e})，請檢查網路連線。暫時使用原始報告文字。", icon="🌐")
+        logging.error(f"OpenAI APIConnectionError: {e}")
+        return report_markdown
+    except openai.APITimeoutError:
+         st.warning("OpenAI API 請求超時。暫時使用原始報告文字。", icon="⏱️")
+         logging.error("OpenAI APITimeoutError.")
+         return report_markdown
+    except openai.BadRequestError as e:
+         # Often happens with context length issues or invalid requests
+         st.warning(f"OpenAI API 請求無效 ({e})。可能是報告過長或格式問題。暫時使用原始報告文字。", icon="❗") # Use valid emoji
+         logging.error(f"OpenAI BadRequestError: {e}")
+         return report_markdown
+    except Exception as e:
+        st.warning(f"調用 OpenAI API 時發生未知錯誤：{e}。暫時使用原始報告文字。", icon="⚠️")
+        logging.error(f"Unknown OpenAI API error: {e}", exc_info=True)
+        return report_markdown
+# --- End OpenAI Summarization Helper ---
 
 # --- Refactored Data Input Tab Function ---
 def process_subject_tab(subject, tab_container, base_rename_map):
@@ -1121,13 +1187,28 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
 
 
                      if subj_report is not None and df_subj_diagnosed is not None:
-                         temp_report_dict[subject] = subj_report
-                         all_diagnosed_dfs.append(df_subj_diagnosed)
-                         st.write(f"    {subject} 科診斷完成。")
+                         # --- Attempt OpenAI Summarization --- #
+                         final_report_for_subject = subj_report # Start with the original
+                         # Retrieve api key (it's loaded near the top)
+                         if openai_api_key and subj_report and "發生錯誤" not in subj_report and "未成功執行" not in subj_report:
+                             st.write(f"    嘗試使用 OpenAI 整理 {subject} 科報告...")
+                             summarized_report = summarize_report_with_openai(subj_report, openai_api_key)
+                             if summarized_report != subj_report: # Check if summarization actually changed something
+                                 st.write(f"      -> {subject} 科報告已由 AI 整理。")
+                                 final_report_for_subject = summarized_report
+                             else:
+                                 # Warning/info might have been shown inside the function if API failed or no change needed
+                                 st.write(f"      -> {subject} 科報告整理失敗或無需整理。")
+                         elif not openai_api_key:
+                              st.info(f"    未提供 OpenAI API Key，跳過 {subject} 科報告整理。")
+
+                         temp_report_dict[subject] = final_report_for_subject # Store the final version
+                         all_diagnosed_dfs.append(df_subj_diagnosed) # Append the diagnosed dataframe
+                         st.write(f"    {subject} 科診斷處理完成。") # Updated message
+
                      else:
                          st.error(f"  {subject} 科診斷未返回預期結果。")
                          temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 診斷未成功執行或未返回結果。*\n"
-                         all_diagnosed_dfs.append(df_subj) # Append original df on failure
 
 
                  # Combine results *after* loop
@@ -1237,6 +1318,17 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
                     subject_excel_map = EXCEL_COLUMN_MAP
                     subject_col_config = COLUMN_DISPLAY_CONFIG
 
+                    # --- 添加日誌調試 ---
+                    if subject == 'DI' and not df_subject.empty:
+                        if 'time_performance_category' in df_subject.columns:
+                            unique_vals = df_subject['time_performance_category'].unique()
+                            value_counts = df_subject['time_performance_category'].value_counts().to_dict()
+                            logging.info(f"APP DEBUG (DI): Before display - time_performance_category unique: {unique_vals}")
+                            logging.info(f"APP DEBUG (DI): Before display - time_performance_category counts: {value_counts}")
+                        else:
+                            logging.warning("APP DEBUG (DI): Before display - time_performance_category column MISSING!")
+                    # --- 結束日誌調試 ---
+
                     # --- NEW: Display Theta Plot --- #
                     st.subheader(f"{subject} 科能力估計 (Theta) 走勢")
                     theta_plot = st.session_state.theta_plots.get(subject)
@@ -1251,7 +1343,6 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
                     st.divider() # Add a separator
                     # --- End NEW --- #
 
-                    st.subheader(f"{subject} 科診斷報告詳情")
                     display_subject_results(subject, subject_tab, report_md, df_subject, subject_col_config, subject_excel_map)
 
 # --- Sidebar for Language --- #

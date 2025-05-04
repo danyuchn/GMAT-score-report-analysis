@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import math # For floor function
+import logging # 添加日誌模塊
 
 # --- DI-Specific Constants (from Markdown Chapter 0 & 1) ---
 MAX_ALLOWED_TIME_DI = 45.0  # minutes
@@ -148,6 +149,7 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
         str: A string containing the summary report for the DI section.
         pd.DataFrame: The processed DI DataFrame with added diagnostic columns.
     """
+    logging.info("開始DI診斷處理...")
     di_diagnosis_results = {}
 
     if df_di_processed.empty:
@@ -324,6 +326,10 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
                      ['question_type', 'content_domain']
                  )['question_difficulty'].max().unstack(fill_value=-np.inf)
 
+        # 確保time_performance_category列存在初始值
+        if 'time_performance_category' not in df_di_filtered.columns:
+            df_di_filtered['time_performance_category'] = 'Unknown'
+
         df_di_filtered = _diagnose_root_causes(df_di_filtered, avg_time_per_type, max_correct_difficulty_per_combination, thresholds)
 
         di_diagnosis_results['chapter_3'] = {
@@ -353,6 +359,16 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     override_analysis = _check_foundation_override(df_for_ch4, type_analysis_ch2)
     di_diagnosis_results['chapter_5'] = override_analysis
 
+    # --- 記錄 Ch4/Ch5 後 df_for_ch4 (即將成為 diagnosed_df_ch4_ch5) 的狀態 ---
+    if 'time_performance_category' in df_for_ch4.columns:
+        ch4_unique_vals = df_for_ch4['time_performance_category'].unique()
+        ch4_value_counts = df_for_ch4['time_performance_category'].value_counts().to_dict()
+        logging.info(f"DI DEBUG: After Ch4/5 - df_for_ch4 time_perf unique: {ch4_unique_vals}")
+        logging.info(f"DI DEBUG: After Ch4/5 - df_for_ch4 time_perf counts: {ch4_value_counts}")
+    else:
+        logging.warning("DI DEBUG: After Ch4/5 - df_for_ch4 MISSING time_performance_category!")
+    # --- 結束記錄 ---
+
     # --- Chapter 6: Practice Planning & Recommendations ---
     # Use the potentially modified df from Ch4/Ch5
     diagnosed_df_ch4_ch5 = df_for_ch4
@@ -371,42 +387,91 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
 
     # --- Final DataFrame Preparation ---
     # Start with the original DataFrame containing all rows (including invalid)
-    df_to_return = df_di.copy()
-
-    # Identify columns added/modified during diagnosis (based on filtered data)
-    # These likely exist in diagnosed_df_ch4_ch5
-    diagnostic_columns = []
+    df_base = df_di.copy()
+    # Select only the diagnostic columns we calculated on the filtered data
+    diagnostic_cols_to_merge = [] 
     if diagnosed_df_ch4_ch5 is not None and not diagnosed_df_ch4_ch5.empty:
-        potential_cols = ['diagnostic_params', 'is_sfe', 'time_performance_category'] # Add others if needed
-        diagnostic_columns = [col for col in potential_cols if col in diagnosed_df_ch4_ch5.columns]
+        potential_cols = ['diagnostic_params', 'is_sfe', 'time_performance_category']
+        diagnostic_cols_to_merge = [col for col in potential_cols if col in diagnosed_df_ch4_ch5.columns]
 
-        # Merge/Update these columns back into the full DataFrame based on index
-        if diagnostic_columns:
-            # Using update is generally safer if indices match perfectly
-            df_to_return.update(diagnosed_df_ch4_ch5[diagnostic_columns])
-            # If update fails or indices mismatch, use merge:
-            # df_to_return = df_to_return.merge(
-            #     diagnosed_df_ch4_ch5[diagnostic_columns],
-            #     left_index=True,
-            #     right_index=True,
-            #     how='left',
-            #     suffixes=('', '_diag') # Add suffix to handle potential original columns
-            # )
-            # # Handle potential duplicated columns after merge if necessary
-
-    # Translate params (now operating on the full df_to_return)
-    if 'diagnostic_params' in df_to_return.columns:
-        # Ensure the column exists and handle potential NaNs introduced by merge/update if invalid rows didn't have params
-        df_to_return['diagnostic_params'] = df_to_return['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, tuple, set)) else [])
-        df_to_return['diagnostic_params_list_chinese'] = df_to_return['diagnostic_params'].apply(
-            lambda params_list: _translate_di(params_list) # Already ensures list
+    if diagnostic_cols_to_merge:
+        # Merge diagnostic columns from the filtered/diagnosed df back to the base df
+        # Merge on index, keep all rows from the base df ('left' merge)
+        logging.info(f"DI DEBUG: Before merge - df_base columns: {df_base.columns.tolist()}")
+        logging.info(f"DI DEBUG: Before merge - diagnosed_df_ch4_ch5 columns: {diagnosed_df_ch4_ch5.columns.tolist()}")
+        logging.info(f"DI DEBUG: Before merge - Columns to merge: {diagnostic_cols_to_merge}")
+        df_merged = pd.merge(
+            df_base,
+            diagnosed_df_ch4_ch5[diagnostic_cols_to_merge], # Only select the columns to merge
+            left_index=True,
+            right_index=True,
+            how='left', # Keep all rows from df_base
+            suffixes=('', '_diag') # Add suffix in case of potential name conflicts
         )
-        df_to_return.drop(columns=['diagnostic_params'], inplace=True)
-        df_to_return.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
+        # Check if merge created duplicate columns (e.g., time_performance_category_diag)
+        # Prioritize the _diag version if it exists
+        for col in diagnostic_cols_to_merge:
+            diag_col = col + '_diag'
+            if diag_col in df_merged.columns:
+                # Use the merged value (_diag), potentially overwriting original or filling NaNs
+                df_merged[col] = df_merged[diag_col]
+                df_merged.drop(columns=[diag_col], inplace=True)
+                logging.info(f"Prioritized merged column '{col}' from '{diag_col}'.")
+
+        df_to_return = df_merged # Use the merged result
+        logging.info(f"Merged diagnostic columns: {diagnostic_cols_to_merge}")
+        if 'time_performance_category' in df_to_return.columns:
+             logging.info(f"DI DEBUG: After merge - df_to_return time_perf unique: {df_to_return['time_performance_category'].unique()}")
+             logging.info(f"DI DEBUG: After merge - df_to_return time_perf counts: {df_to_return['time_performance_category'].value_counts(dropna=False).to_dict()}") # include NaN counts
+        else:
+             logging.warning("DI DEBUG: After merge - df_to_return MISSING time_performance_category!")
+
     else:
-        # Initialize if missing
+        # If no diagnostic columns were calculated (e.g., filtered df was empty)
+        df_to_return = df_base
+        logging.warning("No diagnostic columns found to merge back.")
+
+    # Translate params (now operating on the potentially merged df_to_return)
+    if 'diagnostic_params' in df_to_return.columns:
+        # Ensure list type after potential merge (NaNs might appear for rows not in diagnosed_df)
+        df_to_return['diagnostic_params'] = df_to_return['diagnostic_params'].apply(
+            lambda x: list(x) if isinstance(x, (list, tuple, set)) else ([] if pd.isna(x) else [x] if isinstance(x, str) else [])
+        )
+        df_to_return['diagnostic_params_list_chinese'] = df_to_return['diagnostic_params'].apply(
+            lambda params_list: _translate_di(params_list)
+        )
+        # Safely drop and rename
+        if 'diagnostic_params' in df_to_return.columns: df_to_return.drop(columns=['diagnostic_params'], inplace=True)
+        if 'diagnostic_params_list_chinese' in df_to_return.columns: df_to_return.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
+    else:
+        # Initialize if missing entirely
         df_to_return['diagnostic_params_list'] = [[] for _ in range(len(df_to_return))]
 
+    # --- Refined fillna logic --- 
+    # 1. Ensure the time_performance_category column exists, default to 'Unknown'
+    if 'time_performance_category' not in df_to_return.columns:
+        df_to_return['time_performance_category'] = 'Unknown'
+        logging.info("Initialized 'time_performance_category' column as 'Unknown'.")
+    
+    # 2. Fill NaNs potentially introduced by the merge (for rows NOT diagnosed) with 'Unknown'
+    # Also ensure empty strings are treated as 'Unknown'
+    df_to_return['time_performance_category'] = df_to_return['time_performance_category'].fillna('Unknown').replace('', 'Unknown')
+    logging.info(f"After fillna/replace('Unknown'): unique values: {df_to_return['time_performance_category'].unique()}")
+
+    # 3. Specifically set 'Invalid/Excluded' for rows marked as invalid
+    if 'is_invalid' in df_to_return.columns:
+        invalid_mask = df_to_return['is_invalid'] == True
+        if invalid_mask.any():
+            df_to_return.loc[invalid_mask, 'time_performance_category'] = 'Invalid/Excluded'
+            logging.info(f"Set 'Invalid/Excluded' for {invalid_mask.sum()} rows. Final unique values: {df_to_return['time_performance_category'].unique()}")
+
+    # Handle potential NaNs in 'is_sfe' after merge
+    if 'is_sfe' in df_to_return.columns:
+        df_to_return['is_sfe'].fillna(False, inplace=True)
+        df_to_return['is_sfe'] = df_to_return['is_sfe'].astype(bool)
+    else:
+        df_to_return['is_sfe'] = False # Initialize if missing
+    
     # Ensure Subject column exists
     if 'Subject' not in df_to_return.columns:
         df_to_return['Subject'] = 'DI'
@@ -435,6 +500,17 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     # if 'is_invalid' in df_to_return.columns and df_to_return['is_invalid'].sum() > 0:
     #     print(f"DEBUG (DI): Before return - Invalid rows index: {df_to_return[df_to_return['is_invalid']].index.tolist()}")
     # --- Remove DEBUG END ---
+
+    # 在return前最後記錄狀態
+    if 'time_performance_category' in df_to_return.columns:
+        unique_values = df_to_return['time_performance_category'].unique()
+        value_counts = df_to_return['time_performance_category'].value_counts().to_dict()
+        logging.info(f"最終time_performance_category唯一值: {unique_values}")
+        logging.info(f"最終time_performance_category計數: {value_counts}")
+    else:
+        logging.warning("最終df_to_return中缺少time_performance_category列!")
+    
+    logging.info("DI診斷處理完成。")
     return di_diagnosis_results, report_str, df_to_return
 
 
@@ -513,7 +589,6 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
             else: current_time_performance_category = 'Normal Time & Wrong'
 
         # --- Detailed Diagnostic Logic ---
-        # (Logic identical to previous version, using is_slow/is_correct etc.)
         # A. Data Sufficiency
         if q_type == 'Data Sufficiency':
             if q_domain == 'Math Related':
@@ -574,24 +649,15 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                      if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
         # --- End Detailed Logic ---
 
-        unique_params = sorted(list(set(params)))
-        if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in unique_params:
-            unique_params.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-            unique_params.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-
-        all_diagnostic_params.append(unique_params)
+        # Add the results to our lists
+        all_diagnostic_params.append(params)
         all_is_sfe.append(sfe_triggered)
         all_time_performance_categories.append(current_time_performance_category)
 
-    if len(all_diagnostic_params) == len(df) and len(all_is_sfe) == len(df) and len(all_time_performance_categories) == len(df):
-        df['diagnostic_params'] = all_diagnostic_params
-        df['is_sfe'] = all_is_sfe
-        df['time_performance_category'] = all_time_performance_categories
-    else:
-        # Fallback assignment if lengths mismatch (shouldn't happen ideally)
-        if 'diagnostic_params' not in df.columns: df['diagnostic_params'] = [[] for _ in range(len(df))]
-        if 'is_sfe' not in df.columns: df['is_sfe'] = False
-        if 'time_performance_category' not in df.columns: df['time_performance_category'] = 'Unknown'
+    # Update the dataframe with all the collected information
+    df['diagnostic_params'] = all_diagnostic_params
+    df['is_sfe'] = all_is_sfe
+    df['time_performance_category'] = all_time_performance_categories
 
     return df
 
@@ -599,14 +665,14 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
 # --- Special Pattern Observation Helper (Chapter 4 Logic) --- MODIFIED ---
 
 def _observe_di_patterns(df, avg_times):
-    """Observes special patterns for Chapter 4: Carelessness and Early Rushing.
-       Adds 'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK' to diagnostic_params of relevant rows.
-       Returns a dictionary containing carelessness flag/param and early rushing details.
-       Modifies the input DataFrame (df) by adding early rushing param to specific rows.
+    """
+    Observes special patterns like carelessness or early rushing (Chapter 4).
+    Combines averages with diagnostic output from Chapter 3.
+    Uses 'question_type', 'question_time', 'is_correct', 'question_position'.
     """
     analysis = {
-        'carelessness_issue_triggered': False,
         'triggered_behavioral_params': [],
+        'carelessness_issue_triggered': False,
         'fast_wrong_rate': 0.0,
         'early_rushing_risk_triggered': False,
         'early_rushing_questions': []
@@ -618,19 +684,38 @@ def _observe_di_patterns(df, avg_times):
     else:
         df['diagnostic_params'] = df['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, tuple, set)) else [])
 
-    # 1. Carelessness Issue
-    # Avoid modifying df directly if possible, calculate mask on the fly
-    is_relatively_fast_mask = pd.Series(False, index=df.index)
-    for q_type, group in df.groupby('question_type'):
-        avg_time = avg_times.get(q_type, np.inf)
-        if avg_time != np.inf:
-            is_relatively_fast_mask.loc[group.index] = group['question_time'].notna() & (group['question_time'] < avg_time * 0.75)
+    # 檢查並確保time_performance_category存在
+    if 'time_performance_category' not in df.columns:
+        df['time_performance_category'] = 'Unknown'
+    else:
+        # 確保沒有空值或空字串
+        df['time_performance_category'] = df['time_performance_category'].fillna('Unknown')
+        df.loc[df['time_performance_category'] == '', 'time_performance_category'] = 'Unknown'
 
-    num_relatively_fast_total = is_relatively_fast_mask.sum()
-    if num_relatively_fast_total > 0:
-        fast_wrong_mask = is_relatively_fast_mask & (df['is_correct'] == False)
-        num_relatively_fast_incorrect = fast_wrong_mask.sum()
-        fast_wrong_rate = num_relatively_fast_incorrect / num_relatively_fast_total
+    # 1. Carelessness Issue - 現在我們可以使用time_performance_category列
+    fast_wrong_count = 0
+    fast_total_count = 0
+    if 'time_performance_category' in df.columns:
+        fast_wrong_count = df[df['time_performance_category'] == 'Fast & Wrong'].shape[0]
+        fast_total_count = df[(df['time_performance_category'].str.startswith('Fast'))].shape[0]
+    
+    # 如果沒有time_performance_category或計數為0，使用原始邏輯計算fast_wrong_rate
+    if fast_total_count == 0:
+        # 原始邏輯使用is_relatively_fast的計算
+        is_relatively_fast_mask = pd.Series(False, index=df.index)
+        for q_type, group in df.groupby('question_type'):
+            avg_time = avg_times.get(q_type, np.inf)
+            if avg_time != np.inf:
+                is_relatively_fast_mask.loc[group.index] = group['question_time'].notna() & (group['question_time'] < avg_time * 0.75)
+
+        fast_total_count = is_relatively_fast_mask.sum()
+        if fast_total_count > 0:
+            fast_wrong_mask = is_relatively_fast_mask & (df['is_correct'] == False)
+            fast_wrong_count = fast_wrong_mask.sum()
+
+    # 計算快錯率並設置觸發條件
+    if fast_total_count > 0:
+        fast_wrong_rate = fast_wrong_count / fast_total_count
         analysis['fast_wrong_rate'] = fast_wrong_rate
         if fast_wrong_rate > 0.3:
             analysis['carelessness_issue_triggered'] = True
@@ -904,6 +989,7 @@ APPENDIX_A_TRANSLATION_DI = {
     # Time Performance Categories
     'Fast & Wrong': "快錯", 'Slow & Wrong': "慢錯", 'Normal Time & Wrong': "正常時間 & 錯",
     'Slow & Correct': "慢對", 'Fast & Correct': "快對", 'Normal Time & Correct': "正常時間 & 對",
+    'Unknown': "未知", 'Invalid/Excluded': "已排除/無效",
     # Parameter Categories
     'SFE': '基礎掌握', 'Reading/Interpretation': '閱讀/解讀', 'Concept/Application': '概念/應用',
     'Data/Calculation': '數據/計算', 'Logic/Reasoning': '邏輯/推理', 'Multi-Source': '多源整合',
@@ -1200,3 +1286,33 @@ def _generate_di_summary_report(di_results):
     # Tool/Prompt section was removed earlier
 
     return "\n\n".join(report_lines)
+
+# --- DI Diagnosis Wrapper (to match expected import signature in diagnosis_module.py) ---
+def run_di_diagnosis(df_di):
+    """
+    Wrapper function that matches the expected signature in diagnosis_module.py.
+    Calculates time pressure status and then calls run_di_diagnosis_processed.
+    
+    Args:
+        df_di (pd.DataFrame): DataFrame containing DI responses.
+        
+    Returns:
+        Tuple: (results_dict, report_str, processed_df) - Same as run_di_diagnosis_processed
+    """
+    # Calculate time pressure status for DI
+    if df_di.empty:
+        return {}, "Data Insights (DI) 部分無數據可供診斷。", pd.DataFrame()
+        
+    # Convert question_time to numeric if needed
+    if 'question_time' not in df_di.columns:
+        return {}, "Data Insights (DI) 資料缺少必要欄位：question_time。", pd.DataFrame()
+    
+    # Use same logic as in run_di_diagnosis_processed
+    total_test_time = df_di['question_time'].sum(skipna=True)
+    time_diff = MAX_ALLOWED_TIME_DI - total_test_time
+    
+    # Determine time pressure (simplified rule for wrapper)
+    di_time_pressure_status = time_diff < TIME_PRESSURE_THRESHOLD_DI
+    
+    # Call the full processor with calculated pressure status
+    return run_di_diagnosis_processed(df_di, di_time_pressure_status)
