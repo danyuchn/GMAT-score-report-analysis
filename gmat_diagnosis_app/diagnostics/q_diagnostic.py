@@ -1385,5 +1385,14 @@ def _apply_ch1_rules_internal(df_raw_q, time_pressure_from_main):
             # Assign the potentially modified list back
             df.loc[idx, 'diagnostic_params'] = current_list
 
-    print(f"    Finished Q Chapter 1 Internal Rules. Total invalid count: {df['is_invalid'].sum()}")
-    return df
+    # --- Calculate outputs expected by the caller ---
+    num_invalid_q = df['is_invalid'].sum()
+    # Determine Q overtime threshold based on pressure (aligning with diagnosis_module logic)
+    # Using 2.5 min if pressure=True, 3.0 min if pressure=False based on description in diagnosis_module
+    # NOTE: Please double-check if this Q threshold logic is correct per your documentation.
+    overtime_threshold_q = 2.5 if time_pressure_from_main else 3.0 
+
+    print(f"    Finished Q Chapter 1 Internal Rules. Total invalid count: {num_invalid_q}")
+    
+    # --- Return the 4 expected values --- 
+    return df, time_pressure_from_main, num_invalid_q, overtime_threshold_q
