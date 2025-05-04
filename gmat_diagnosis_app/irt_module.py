@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.special import expit # Sigmoid function
+from scipy.stats import norm
 import logging # Import logging
 
 # Configure basic logging
@@ -91,7 +92,7 @@ def neg_log_likelihood(theta, history):
     """Calculates the negative log-likelihood of a response history given theta.
 
     Args:
-        theta (float): The ability estimate.
+        theta (float or np.ndarray): Ability estimate(s). Typically a float or a numpy array with one element from optimizer.
         history (list[dict]): List of response dictionaries with keys
                                'a', 'b', 'c', 'answered_correctly'.
 
@@ -102,15 +103,34 @@ def neg_log_likelihood(theta, history):
         TypeError: If history is not a list or theta is not numeric.
         ValueError: If items in history are invalid (missing keys, non-numeric params).
     """
-    if not isinstance(history, list):
-        raise TypeError("History must be a list of response dictionaries.")
-    if not isinstance(theta, (int, float, np.number)):
-         raise TypeError("Theta must be numeric.")
-    if not history:
-        return 0.0
+    logging.debug(f"neg_log_likelihood called with theta type: {type(theta)}, value: {theta}")
 
-    total_neg_ll = 0.0
-    epsilon = 1e-9 # To prevent log(0)
+    # --- More robust handling of theta from scipy.optimize.minimize ---
+    # Minimize often passes a numpy array, even for a scalar objective function.
+    if isinstance(theta, np.ndarray):
+        if theta.size == 1:
+            current_theta = float(theta[0]) # Extract scalar value
+        else:
+            # This case should not happen for scalar optimization like L-BFGS-B
+            logging.error(f"neg_log_likelihood received unexpected numpy array theta shape: {theta.shape}")
+            return np.inf # Indicate error
+    elif isinstance(theta, (int, float, np.number)):
+         current_theta = float(theta)
+    # --- Check for list/tuple as a fallback, although less likely from minimize ---
+    elif isinstance(theta, (list, tuple)):
+         if len(theta) == 1 and isinstance(theta[0], (int, float, np.number)):
+             current_theta = float(theta[0])
+         else:
+              logging.error(f"neg_log_likelihood received unsupported list/tuple theta format: {theta}")
+              return np.inf
+    else:
+        # If none of the above, log the type and raise error
+        logging.error(f"neg_log_likelihood received non-numeric theta type: {type(theta)}, value: {theta}")
+        raise TypeError("Theta must be numeric or a single-element array/list.") # More specific error
+
+    # --- Original log-likelihood calculation ---
+    log_likelihood = 0.0
+    tiny_val = 1e-9 # Small value to prevent log(0)
 
     for i, resp in enumerate(history):
         # Check format concisely
@@ -124,76 +144,78 @@ def neg_log_likelihood(theta, history):
             c = float(resp['c'])
             correct = bool(resp['answered_correctly'])
             # probability_correct will raise error if a,b,c invalid or c outside [0,1]
-            P = probability_correct(theta, a, b, c)
+            P = probability_correct(current_theta, a, b, c)
         except (ValueError, TypeError) as e:
              # Catch errors from float(), bool(), or probability_correct()
              raise ValueError(f"Invalid data for item at index {i}: {e}") from e
 
         # Clamp probabilities just before log to avoid log(0)
-        P_clipped = np.clip(P, epsilon, 1.0 - epsilon)
+        P_clipped = np.clip(P, tiny_val, 1.0 - tiny_val)
 
         if correct:
-            log_prob = np.log(P_clipped)
+            log_likelihood += np.log(P_clipped)
         else:
-            log_prob = np.log(1.0 - P_clipped)
+            log_likelihood += np.log(1.0 - P_clipped)
 
         # Check for NaNs or Infs resulting from log (should be less likely with clipping)
-        if np.isnan(log_prob) or np.isinf(log_prob):
-            logging.warning(f"Log calculation resulted in NaN/Inf for item {i}. Theta: {theta}, P: {P}, P_clipped: {P_clipped}")
+        if np.isnan(log_likelihood) or np.isinf(log_likelihood):
+            logging.warning(f"Log calculation resulted in NaN/Inf for item {i}. Theta: {current_theta}, P: {P}, P_clipped: {P_clipped}")
             # Decide handling: raise error, return large value? Raising error is cleaner.
             raise ValueError(f"Log likelihood calculation failed for item {i} (NaN/Inf).")
 
-        total_neg_ll -= log_prob
+    # Check for NaN or Inf likelihood which can stop optimization
+    if np.isnan(log_likelihood) or np.isinf(log_likelihood):
+        logging.warning(f"Log-likelihood became NaN or Inf for theta={current_theta:.4f}. History length={len(history)}. Returning Inf.")
+        return np.inf
 
-    return total_neg_ll
+    return -log_likelihood # Return negative for minimization
 
 def estimate_theta(history, initial_theta_guess=0.0, bounds=(-4, 4)):
-    """Estimates theta using Maximum Likelihood Estimation.
+    """Estimates the ability (theta) based on response history.
 
     Args:
-        history (list[dict]): List of response dictionaries.
-        initial_theta_guess (float, optional): Starting point. Defaults to 0.0.
-        bounds (tuple, optional): Bounds for theta. Defaults to (-4, 4).
+        history (list[dict]): List of response dictionaries, each containing
+                               'a', 'b', 'c', 'answered_correctly'.
+        initial_theta_guess (float): Starting point for the optimizer.
+        bounds (tuple): Lower and upper bounds for theta.
 
     Returns:
-        float: Estimated theta. Returns initial_theta_guess on failure or empty history.
+        float: Estimated theta, or initial_theta_guess on failure.
     """
     if not history:
-        logging.warning("Cannot estimate theta with empty history. Returning initial guess.")
-        return initial_theta_guess
-
-    # Validate history format and initial calculation feasibility *once*
-    try:
-        # Test with initial guess. neg_log_likelihood will raise errors on bad data.
-        _ = neg_log_likelihood(initial_theta_guess, history)
-    except (TypeError, ValueError) as e:
-        logging.error(f"Invalid history data or initial parameters for theta estimation: {e}")
+        logging.info("Theta estimation: No history provided, returning initial guess.")
         return initial_theta_guess
 
     try:
+        # Ensure bounds format is correct for minimize
+        bounds_list = [bounds]
+
         result = minimize(
             neg_log_likelihood,
             initial_theta_guess,
             args=(history,),
             method='L-BFGS-B',
-            bounds=[bounds]
+            bounds=bounds_list
         )
 
         if result.success:
             estimated_theta = result.x[0]
-            # Clip just in case optimization slightly violates bounds
-            estimated_theta = np.clip(estimated_theta, bounds[0], bounds[1])
-            return estimated_theta
+            # Clamp the result within the bounds explicitly
+            final_theta = np.clip(estimated_theta, bounds[0], bounds[1])
+            logging.debug(f"Theta estimation successful. Theta: {final_theta:.4f} (Optimizer status: {result.message})")
+            return final_theta
         else:
-            logging.warning(f"Theta estimation optimization failed. Message: {result.message}. Returning initial guess.")
-            # Optionally return result.x[0] if available and seems reasonable despite lack of convergence
-            return initial_theta_guess
-    except (ValueError, TypeError) as e:
-        # Catch potential errors from neg_log_likelihood if called by minimize with problematic values
-        logging.error(f"Error during optimization process: {e}")
+            # Log detailed failure information
+            logging.warning(f"Theta estimation optimization FAILED. Status: {result.status}, Message: {result.message}")
+            logging.warning(f"Optimizer Result Details: {result}") # Log the full result object for debugging
+            logging.warning(f"Returning previous guess: {initial_theta_guess:.4f}")
+            return initial_theta_guess # Return previous guess
+
+    except ValueError as ve:
+        # This might catch the TypeError from neg_log_likelihood now, or other value issues
+        logging.error(f"ValueError or TypeError during theta estimation (check history data or theta type?): {ve}")
         return initial_theta_guess
     except Exception as e:
-        # Catch unexpected errors during minimization
         logging.error(f"Unexpected error during theta estimation: {e}", exc_info=True)
         return initial_theta_guess
 

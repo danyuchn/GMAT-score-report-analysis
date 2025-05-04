@@ -7,6 +7,13 @@ import pandas as pd # Ensure pandas is imported
 import streamlit as st
 from io import StringIO # Use io.StringIO directly
 import traceback # For detailed error logging
+import numpy as np
+import logging
+import openpyxl # Required by pandas for Excel export
+from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.utils import get_column_letter
+import plotly.graph_objects as go # Add plotly import
 
 # --- Project Path Setup --- (Keep as is)
 try:
@@ -216,6 +223,7 @@ def preprocess_skill(skill):
 def validate_dataframe(df, subject):
     """Validates the DataFrame rows based on predefined rules for the subject."""
     errors = []
+    warnings = []
     required_original = REQUIRED_ORIGINAL_COLS.get(subject, [])
 
     # Determine actual required columns considering potential BOM in 'Question'
@@ -229,7 +237,7 @@ def validate_dataframe(df, subject):
 
     if missing_cols:
         errors.append(f"資料缺少必要欄位: {', '.join(missing_cols)}。請檢查欄位標頭。")
-        return errors # Stop if essential columns are missing
+        return errors, warnings # Stop if essential columns are missing
 
     # 2. Validate cell values row by row
     for index, row in df.iterrows():
@@ -341,9 +349,64 @@ def validate_dataframe(df, subject):
                 if not is_valid:
                     errors.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 值 '{value}' 無效。{error_detail}")
 
-    return errors
+    return errors, warnings
 # --- End Validation Helper ---
 
+# --- NEW Plotting Function ---
+def create_theta_plot(theta_history_df, subject_name):
+    """Creates a Plotly line chart of theta estimation history, starting from question 0 (initial theta)."""
+    if theta_history_df is None or theta_history_df.empty:
+        logging.warning(f"無法為 {subject_name} 生成 Theta 圖表，因為歷史數據為空。")
+        return None
+
+    # Check if we can get the initial theta from the 'before' column
+    if 'theta_est_before_answer' in theta_history_df.columns and not theta_history_df['theta_est_before_answer'].empty:
+        initial_theta = theta_history_df['theta_est_before_answer'].iloc[0]
+        # Prepare data starting from question 0
+        x_values = [0] + (theta_history_df.index + 1).tolist()
+        y_values = [initial_theta] + theta_history_df['theta_est_after_answer'].tolist()
+        hover_text = [f"初始 Theta: {initial_theta:.3f}<extra></extra>"] + \
+                     [f"題號 {i+1}<br>Theta: {theta:.3f}<extra></extra>" for i, theta in enumerate(theta_history_df['theta_est_after_answer'])]
+
+    elif 'theta_est_after_answer' in theta_history_df.columns and not theta_history_df['theta_est_after_answer'].empty:
+        # Fallback: Start from question 1 if 'before' data is missing
+        logging.warning(f"在 {subject_name} 的歷史數據中找不到 'theta_est_before_answer'，圖表將從題號 1 開始。")
+        x_values = (theta_history_df.index + 1).tolist()
+        y_values = theta_history_df['theta_est_after_answer'].tolist()
+        hover_text = [f"題號 {i+1}<br>Theta: {theta:.3f}<extra></extra>" for i, theta in enumerate(y_values)]
+    else:
+        logging.warning(f"無法為 {subject_name} 生成 Theta 圖表，因為歷史數據缺少必要的 Theta 列。")
+        return None
+
+    fig = go.Figure()
+    # Add trace using the prepared x and y values
+    fig.add_trace(go.Scatter(
+        x=x_values,
+        y=y_values,
+        mode='lines+markers',
+        name='Theta 估計值',
+        line=dict(color='royalblue', width=2),
+        marker=dict(color='royalblue', size=5),
+        hovertemplate=hover_text # Use the combined hover text
+    ))
+
+    fig.update_layout(
+        title=f"{subject_name} 科目能力 (Theta) 估計變化",
+        xaxis_title="題號 (0=初始值)", # Update axis title
+        yaxis_title="Theta (能力估計值)",
+        xaxis=dict(
+            showgrid=True,
+            zeroline=False,
+            # Adjust dtick for potentially starting from 0
+            dtick=max(1, (len(x_values)-1) // 10 if len(x_values) > 1 else 1),
+            tick0=0 # Ensure ticks start nicely from 0
+        ),
+        yaxis=dict(showgrid=True, zeroline=True),
+        hovermode="x unified",
+        legend_title_text='估計值類型'
+    )
+    return fig
+# --- End NEW Plotting Function ---
 
 # --- Refactored Data Input Tab Function ---
 def process_subject_tab(subject, tab_container, base_rename_map):
@@ -484,7 +547,7 @@ def process_subject_tab(subject, tab_container, base_rename_map):
             # --- Post-Edit Validation ---
             # Create a fresh copy for validation to avoid modifying editor's state directly if validation fails mid-way
             df_to_validate = edited_df.copy()
-            validation_errors = validate_dataframe(df_to_validate, subject) # validate_dataframe now modifies df_to_validate in place for corrections
+            validation_errors, warnings = validate_dataframe(df_to_validate, subject) # validate_dataframe now modifies df_to_validate in place for corrections
 
             if validation_errors:
                 tab_container.error(f"{subject} 科目: 發現以下輸入錯誤，請修正：")
@@ -539,7 +602,7 @@ def process_subject_tab(subject, tab_container, base_rename_map):
             final_df['Subject'] = subject
 
             tab_container.success(f"{subject} 科目資料讀取與驗證成功 ({data_source_type})！")
-            return final_df, data_source_type, [] # Return the processed DataFrame
+            return final_df, data_source_type, warnings
 
         except pd.errors.ParserError as pe:
              tab_container.error(f"無法解析 {subject} 資料。請檢查是否為有效的 CSV 或 Tab 分隔格式，且標頭正確。錯誤: {pe}")
@@ -650,15 +713,30 @@ def init_session_state():
         'final_thetas': {},
         'processed_df': None, # Store the final DataFrame after processing+diagnosis
         'error_message': None,
+        'analysis_error': False, # Initialize analysis_error flag
         'input_dfs': {}, # Store loaded & validated DFs from tabs
         'validation_errors': {}, # Store validation errors per subject
-        'data_source_types': {} # Store how data was loaded ('File Upload' or 'Pasted Data')
+        'data_source_types': {}, # Store how data was loaded ('File Upload' or 'Pasted Data')
+        'theta_plots': {} # NEW: Initialize dict for plots
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
 
-init_session_state()
+init_session_state() # Call it once at the start
+
+# Function to reset state for new upload or analysis start
+def reset_session_for_new_upload():
+    st.session_state.analysis_run = False # Reset run flag too
+    st.session_state.diagnosis_complete = False
+    st.session_state.report_dict = {}
+    st.session_state.ai_summary = None
+    st.session_state.final_thetas = {}
+    st.session_state.processed_df = None
+    st.session_state.error_message = None
+    st.session_state.analysis_error = False # Reset error flag
+    # Keep input_dfs, validation_errors, data_source_types as they are related to input
+    st.session_state.theta_plots = {} # Reset plots
 
 # --- Sidebar Settings ---
 st.sidebar.subheader("OpenAI 設定 (選用)")
@@ -694,10 +772,10 @@ tabs = {'Q': tab_q, 'V': tab_v, 'DI': tab_di}
 for subject in SUBJECTS:
     tab_container = tabs[subject]
     with tab_container:
-        processed_df, source_type, errors = process_subject_tab(subject, tab_container, BASE_RENAME_MAP)
+        processed_df, source_type, warnings = process_subject_tab(subject, tab_container, BASE_RENAME_MAP)
         # Store results in session state immediately after processing each tab
         st.session_state.input_dfs[subject] = processed_df # Will be None if error/no data
-        st.session_state.validation_errors[subject] = errors
+        st.session_state.validation_errors[subject] = warnings
         if source_type:
              st.session_state.data_source_types[subject] = source_type
 
@@ -728,7 +806,7 @@ if len(valid_input_dfs) == len(SUBJECTS): # Only combine if ALL subjects are val
 st.divider()
 
 # Check if *any* validation errors occurred across all tabs
-any_validation_errors = any(bool(errors) for errors in validation_errors.values())
+any_validation_errors = any(bool(warnings) for warnings in validation_errors.values())
 all_subjects_loaded_and_valid = (len(valid_input_dfs) == len(SUBJECTS)) and (df_combined_input is not None)
 
 # Determine button state
@@ -820,6 +898,7 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
         # --- 3. IRT Simulation ---
         all_simulation_histories = {}
         final_thetas_local = {}
+        all_theta_plots = {} # NEW: Store plots locally first
         question_banks = {} # Define banks here
         if analysis_success:
             st.write("執行 IRT 模擬...")
@@ -883,10 +962,21 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                         final_theta_subj = history_df['theta_est_after_answer'].iloc[-1]
                         final_thetas_local[subject] = final_theta_subj
                         st.write(f"    {subject}: 模擬完成。最後 Theta 估計: {final_theta_subj:.3f}")
+                        # --- NEW: Generate and store plot ---
+                        try:
+                            theta_plot = create_theta_plot(history_df, subject)
+                            if theta_plot:
+                                all_theta_plots[subject] = theta_plot
+                                st.write(f"    {subject}: Theta 歷史圖表已生成。")
+                            else:
+                                st.warning(f"    {subject}: 未能生成 Theta 圖表。", icon="📊")
+                        except Exception as plot_err:
+                            st.warning(f"    {subject}: 生成 Theta 圖表時出錯: {plot_err}", icon="📊")
+                        # --- End NEW ---
                     elif history_df is not None and history_df.empty: # Succeeded but empty
                         st.warning(f"  {subject}: 模擬執行但未產生歷史記錄 (可能因無有效題目)。將使用初始 Theta。")
                         final_thetas_local[subject] = initial_theta
-                        all_simulation_histories[subject] = pd.DataFrame(columns=['question_index', 'b', 'response', 'theta_est_before_answer', 'theta_est_after_answer']) # Placeholder
+                        all_simulation_histories[subject] = pd.DataFrame(columns=['question_index', 'b', 'response', 'theta_est_before_answer', 'theta_est_after_answer']) # Use new cols
                         all_simulation_histories[subject].attrs['simulation_skipped'] = True # Mark skipped
                     else: # Failed (returned None)
                          raise ValueError(f"IRT simulation failed for subject {subject}")
@@ -1030,11 +1120,13 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                       st.session_state.processed_df = pd.concat(valid_diagnosed_dfs, ignore_index=True)
                       st.session_state.report_dict = temp_report_dict
                       st.session_state.final_thetas = final_thetas_local # Store thetas from sim
+                      st.session_state.theta_plots = all_theta_plots # NEW: Store the plots in session state
                       st.write("所有科目診斷完成。")
                  else:
                       st.error("所有科目均未能成功診斷或無數據。")
                       st.session_state.processed_df = None # Ensure no stale data
                       st.session_state.report_dict = temp_report_dict # Still show error reports
+                      st.session_state.theta_plots = {} # Clear plots
                       analysis_success = False
 
 
@@ -1053,12 +1145,13 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
              analysis_status.update(label="分析過程中斷或失敗。", state="error", expanded=True)
              st.session_state.diagnosis_complete = False # Ensure it's False on error
              st.session_state.error_message = "分析未能成功完成，請檢查上方錯誤訊息。"
+             st.session_state.theta_plots = {} # Clear plots on error
 
 
 # --- Display Results Section ---
 st.divider()
 if st.session_state.analysis_run: # Only show results area if analysis was at least started
-    st.header("診斷結果")
+    st.header("📊 診斷結果")
 
     # --- Define Column Configuration and Excel Map ---
     # (Moved near the top as constants/config)
@@ -1098,49 +1191,52 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
         "overtime": "overtime_flag", # Internal flag for Excel styling, will be hidden by to_excel
     }
 
-    # --- Display Subject Reports and DataFrames using Refactored Function ---
-    if st.session_state.diagnosis_complete and st.session_state.processed_df is not None:
-        subject_reports = st.session_state.report_dict
-        df_processed = st.session_state.processed_df
-
-        subjects_with_data = sorted(df_processed['Subject'].unique()) # Sort for consistent tab order
-
+    if st.session_state.analysis_error:
+        st.error(st.session_state.error_message)
+    elif not st.session_state.diagnosis_complete:
+        st.info("分析正在進行中或尚未完成。")
+    elif st.session_state.processed_df is None or st.session_state.processed_df.empty:
+        st.warning("診斷完成，但沒有可顯示的數據。")
+        # Display any report messages even if df is empty (e.g., all invalid)
+        if st.session_state.report_dict:
+            st.subheader("診斷摘要")
+            for subject, report_md in st.session_state.report_dict.items():
+                st.markdown(f"### {subject} 科:")
+                st.markdown(report_md, unsafe_allow_html=True)
+    else:
+        st.success("診斷分析已完成！")
+        # --- Results Display Tabs --- #
+        subjects_with_data = [subj for subj in SUBJECTS if subj in st.session_state.processed_df['Subject'].unique()]
         if not subjects_with_data:
-             st.warning("診斷已完成，但未找到任何科目的有效處理數據以供顯示。")
+            st.warning("處理後的數據中未找到任何有效科目。")
         else:
             # Create tabs for each subject with data
-            result_tabs = st.tabs([f"{subj} 科診斷報告與數據" for subj in subjects_with_data])
+            result_tabs = st.tabs([f"{subj} 科結果" for subj in subjects_with_data])
 
             for i, subject in enumerate(subjects_with_data):
-                with result_tabs[i]:
-                    report_md = subject_reports.get(subject)
-                    df_subject_specific = df_processed[df_processed['Subject'] == subject].copy()
-                    # Call the refactored display function
-                    display_subject_results(
-                        subject,
-                        result_tabs[i], # Pass the inner container
-                        report_md,
-                        df_subject_specific,
-                        COLUMN_DISPLAY_CONFIG, # Pass the config dictionary
-                        EXCEL_COLUMN_MAP      # Pass the Excel map
-                    )
+                subject_tab = result_tabs[i]
+                with subject_tab:
+                    df_subject = st.session_state.processed_df[st.session_state.processed_df['Subject'] == subject]
+                    report_md = st.session_state.report_dict.get(subject, f"*未找到 {subject} 科的報告。*")
+                    subject_excel_map = EXCEL_COLUMN_MAP
+                    subject_col_config = COLUMN_DISPLAY_CONFIG
 
-    elif st.session_state.error_message:
-         st.error(f"診斷過程中發生錯誤，無法顯示完整結果: {st.session_state.error_message}")
-         # Display any partial reports if they exist
-         if st.session_state.report_dict:
-              st.subheader("部分診斷報告 (可能不完整)")
-              partial_report_tabs = st.tabs([f"{subj} 科報告" for subj in st.session_state.report_dict.keys()])
-              for i, subject in enumerate(st.session_state.report_dict.keys()):
-                  with partial_report_tabs[i]:
-                       st.markdown(st.session_state.report_dict[subject])
+                    # --- NEW: Display Theta Plot --- #
+                    st.subheader(f"{subject} 科能力估計 (Theta) 走勢")
+                    theta_plot = st.session_state.theta_plots.get(subject)
+                    if theta_plot:
+                        st.plotly_chart(theta_plot, use_container_width=True)
+                    else:
+                        # Access the original simulation history from run_analysis output if needed
+                        # This might require passing all_simulation_histories to session state too,
+                        # or recalculating the skipped status here.
+                        # For simplicity, let's just check if the plot exists.
+                        st.info(f"{subject} 科目的 Theta 估計圖表不可用。")
+                    st.divider() # Add a separator
+                    # --- End NEW --- #
 
-    else: # Analysis run but not complete, or processed_df is None, and no specific error message set
-        st.info('診斷正在執行或遇到問題，請稍候或檢查上方狀態。')
+                    st.subheader(f"{subject} 科診斷報告詳情")
+                    display_subject_results(subject, subject_tab, report_md, df_subject, subject_col_config, subject_excel_map)
 
-elif 'analysis_run' in st.session_state and not st.session_state.analysis_run: # Analysis never started
-    st.info('請在上方為所有科目提供有效數據，然後點擊 "開始分析"。')
-
-# --- Footer or other UI elements ---
-st.markdown("---")
-st.caption("GMAT 診斷平台 v1.0") # Add version if desire
+# --- Sidebar for Language --- #
+# ... (Sidebar code) ...
