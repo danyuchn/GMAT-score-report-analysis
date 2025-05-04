@@ -1542,10 +1542,10 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
 
     # --- Display Final Thetas if available ---
     # This section remains unchanged as it shows subject-level theta, not per-question theta
-    if st.session_state.final_thetas:
-        st.subheader("最終能力估計 (Final Thetas)")
-        theta_data = {"科目": list(st.session_state.final_thetas.keys()), "能力估計值 (Theta)": list(st.session_state.final_thetas.values())}
-        st.dataframe(pd.DataFrame(theta_data), hide_index=True)
+    # if st.session_state.final_thetas:
+    #     st.subheader("最終能力估計 (Final Thetas)")
+    #     theta_data = {"科目": list(st.session_state.final_thetas.keys()), "能力估計值 (Theta)": list(st.session_state.final_thetas.values())}
+    #     st.dataframe(pd.DataFrame(theta_data), hide_index=True)
 
     # --- Display Subject Reports and DataFrames ---
     # Check if results exist in session state
