@@ -2,6 +2,10 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.special import expit # Sigmoid function
+import logging # Import logging
+
+# Configure basic logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def probability_correct(theta, a, b, c):
     """Calculates the probability of a correct response using the 3PL IRT model.
@@ -14,23 +18,29 @@ def probability_correct(theta, a, b, c):
 
     Returns:
         float: Probability of a correct response.
+
+    Raises:
+        TypeError: If any input parameter is not numeric.
+        ValueError: If 'c' is outside the valid [0, 1] range (stricter than original).
+                    Alternatively, keep clipping but log a warning.
     """
-    # P = c + (1 - c) * sigmoid(a * (theta - b))
-    if not all(isinstance(p, (int, float)) for p in [theta, a, b, c]):
+    # Stricter validation: raise errors instead of just printing warnings/clipping implicitly.
+    if not all(isinstance(p, (int, float, np.number)) for p in [theta, a, b, c]):
         raise TypeError("All parameters (theta, a, b, c) must be numeric.")
-    # Ensure c is within the valid range [0, 1]
     if not (0 <= c <= 1):
-         # Using print for now, consider logging or raising specific errors in production
-         print(f"Warning: Guessing parameter c={c} is outside the typical [0, 1] range. Clipping.")
-         c = np.clip(c, 0, 1)
+        # Option 1: Strict - Raise error
+        raise ValueError(f"Guessing parameter c={c} is outside the valid [0, 1] range.")
+        # Option 2: Clip but warn loudly
+        # logging.warning(f"Guessing parameter c={c} is outside [0, 1]. Clipping to range.")
+        # c = np.clip(c, 0, 1)
 
     linear_component = a * (theta - b)
     probability = c + (1 - c) * expit(linear_component)
-    return probability
+    # Ensure probability is within [0, 1] due to potential float inaccuracies
+    return np.clip(probability, 0.0, 1.0)
 
 def item_information(theta, a, b, c):
-    """Calculates the Fisher Information for an item at a given ability level (3PL model).
-       Uses the formula found in the reference notebook.
+    """Calculates the Fisher Information for an item (3PL model, notebook formula).
 
     Args:
         theta (float): Examinee's ability estimate.
@@ -39,31 +49,37 @@ def item_information(theta, a, b, c):
         c (float): Item guessing parameter.
 
     Returns:
-        float: Item information. Returns 0 if c=1 to avoid division by zero.
+        float: Item information. Returns 0 if c=1.
+
+    Raises:
+        TypeError: If any input parameter is not numeric.
+        ValueError: If 'c' is outside the valid [0, 1) range for the formula.
+                     (Note: probability_correct already checks [0, 1]).
     """
-    if not all(isinstance(p, (int, float)) for p in [theta, a, b, c]):
-        raise TypeError("All parameters (theta, a, b, c) must be numeric.")
-
-    # Ensure c is in [0, 1) for the formula division
+    # probability_correct will handle initial type/range checks for c in [0,1]
+    # We only need to ensure c is not exactly 1 for the denominator.
+    if not isinstance(theta, (int, float, np.number)): # Check theta separately if needed
+         raise TypeError("Theta must be numeric.")
     if not (0 <= c < 1):
-        if c >= 1.0: # If c is 1 or more, information is effectively 0
-             return 0.0
-        else: # If c < 0, clip it to 0 for calculation, though unusual
-            print(f"Warning: Guessing parameter c={c} is below 0. Clipping to 0 for information calculation.")
-            c = 0.0
+        if np.isclose(c, 1.0) or c > 1.0: # If c is effectively 1 or more
+            return 0.0
+        else: # c < 0, already handled by probability_correct raising ValueError
+             # If probability_correct clips instead, this check might be needed
+             raise ValueError(f"Guessing parameter c={c} cannot be negative for information calculation.")
 
+    # This will raise errors if params are invalid based on probability_correct's rules
     P = probability_correct(theta, a, b, c)
 
-    # Clip P slightly away from 0 and 1 for numerical stability
+    # Clip P slightly away from 0 and 1 for numerical stability in division/logs (if any)
+    # Although the formula used here might not strictly need it, it's safer.
     epsilon = 1e-9
     P_clipped = np.clip(P, epsilon, 1.0 - epsilon)
-    Q_clipped = 1.0 - P_clipped
+    Q_clipped = 1.0 - P_clipped # Q based on clipped P
 
-    # Formula from the reference notebook: (a^2 * P * Q) / (1 - c)^2
-    # Note: Standard 3PL Fisher Information is typically I = a^2 * Q * (P-c)^2 / (P * (1-c)^2).
-    # Using the notebook's version for consistency as requested.
+    # Formula from the reference notebook: (a^2 * P_clipped * Q_clipped) / (1 - c)^2
+    # Denominator check implicitly handled by the c < 1 check above.
     denominator = (1.0 - c) ** 2
-    # Avoid division by zero if c is exactly 1 (already handled by the check above, but good practice)
+    # Added check for extremely small denominator just in case
     if denominator < epsilon:
         return 0.0
 
@@ -72,42 +88,48 @@ def item_information(theta, a, b, c):
 
 
 def neg_log_likelihood(theta, history):
-    """Calculates the negative log-likelihood of a response history given a theta.
+    """Calculates the negative log-likelihood of a response history given theta.
 
     Args:
         theta (float): The ability estimate.
-        history (list[dict]): A list of dictionaries, where each dictionary represents
-                               a response and must contain keys 'a', 'b', 'c'
-                               (item parameters) and 'answered_correctly' (bool).
+        history (list[dict]): List of response dictionaries with keys
+                               'a', 'b', 'c', 'answered_correctly'.
 
     Returns:
-        float: The negative log-likelihood. Returns float('inf') if invalid inputs lead to errors.
+        float: The negative log-likelihood.
+
+    Raises:
+        TypeError: If history is not a list or theta is not numeric.
+        ValueError: If items in history are invalid (missing keys, non-numeric params).
     """
     if not isinstance(history, list):
         raise TypeError("History must be a list of response dictionaries.")
+    if not isinstance(theta, (int, float, np.number)):
+         raise TypeError("Theta must be numeric.")
     if not history:
-        return 0.0 # Log-likelihood is zero for no data
+        return 0.0
 
     total_neg_ll = 0.0
     epsilon = 1e-9 # To prevent log(0)
 
     for i, resp in enumerate(history):
-        if not isinstance(resp, dict) or not all(k in resp for k in ['a', 'b', 'c', 'answered_correctly']):
-            raise ValueError(f"Item at index {i} in history is missing required keys ('a', 'b', 'c', 'answered_correctly') or is not a dict.")
+        # Check format concisely
+        if not isinstance(resp, dict) or not {'a', 'b', 'c', 'answered_correctly'}.issubset(resp):
+            raise ValueError(f"Item at index {i} in history is invalid (not dict or missing keys).")
 
         try:
+            # Convert and validate parameters via probability_correct
             a = float(resp['a'])
             b = float(resp['b'])
             c = float(resp['c'])
             correct = bool(resp['answered_correctly'])
-            theta_val = float(theta) # Ensure theta is float for calculations
+            # probability_correct will raise error if a,b,c invalid or c outside [0,1]
+            P = probability_correct(theta, a, b, c)
         except (ValueError, TypeError) as e:
-             print(f"Error converting parameters to numbers for item at index {i}: {e}")
-             return float('inf') # Return infinity on bad data
+             # Catch errors from float(), bool(), or probability_correct()
+             raise ValueError(f"Invalid data for item at index {i}: {e}") from e
 
-        P = probability_correct(theta_val, a, b, c)
-
-        # Clamp probabilities to avoid log(0)
+        # Clamp probabilities just before log to avoid log(0)
         P_clipped = np.clip(P, epsilon, 1.0 - epsilon)
 
         if correct:
@@ -115,232 +137,257 @@ def neg_log_likelihood(theta, history):
         else:
             log_prob = np.log(1.0 - P_clipped)
 
-        # Check for NaNs or Infs resulting from log
+        # Check for NaNs or Infs resulting from log (should be less likely with clipping)
         if np.isnan(log_prob) or np.isinf(log_prob):
-            print(f"Warning: Log calculation resulted in NaN or Inf for item {i}. Theta: {theta_val}, P: {P}, P_clipped: {P_clipped}")
-            # Decide handling: return large value, skip item, etc. Returning large value for minimization.
-            return float('inf')
+            logging.warning(f"Log calculation resulted in NaN/Inf for item {i}. Theta: {theta}, P: {P}, P_clipped: {P_clipped}")
+            # Decide handling: raise error, return large value? Raising error is cleaner.
+            raise ValueError(f"Log likelihood calculation failed for item {i} (NaN/Inf).")
 
         total_neg_ll -= log_prob
 
     return total_neg_ll
 
 def estimate_theta(history, initial_theta_guess=0.0, bounds=(-4, 4)):
-    """Estimates the ability parameter (theta) using Maximum Likelihood Estimation.
+    """Estimates theta using Maximum Likelihood Estimation.
 
     Args:
-        history (list[dict]): List of response dictionaries (see neg_log_likelihood).
-        initial_theta_guess (float, optional): Starting point for the optimization. Defaults to 0.0.
-        bounds (tuple, optional): Bounds for the theta estimate during optimization. Defaults to (-4, 4).
+        history (list[dict]): List of response dictionaries.
+        initial_theta_guess (float, optional): Starting point. Defaults to 0.0.
+        bounds (tuple, optional): Bounds for theta. Defaults to (-4, 4).
 
     Returns:
-        float: The estimated theta value. Returns initial_theta_guess if history is empty
-               or optimization fails.
+        float: Estimated theta. Returns initial_theta_guess on failure or empty history.
     """
     if not history:
-        print("Warning: Cannot estimate theta with empty history. Returning initial guess.")
+        logging.warning("Cannot estimate theta with empty history. Returning initial guess.")
         return initial_theta_guess
 
-    # Validate history format once before optimization
+    # Validate history format and initial calculation feasibility *once*
     try:
-        test_ll = neg_log_likelihood(initial_theta_guess, history)
-        if np.isinf(test_ll): # Check if initial calculation yields infinity
-             print(f"Warning: Initial neg_log_likelihood is infinite for guess {initial_theta_guess}. Check history data or bounds.")
-             # Maybe try a different starting point or return guess? Returning guess.
-             return initial_theta_guess
+        # Test with initial guess. neg_log_likelihood will raise errors on bad data.
+        _ = neg_log_likelihood(initial_theta_guess, history)
     except (TypeError, ValueError) as e:
-        print(f"Error validating history format for theta estimation: {e}")
-        return initial_theta_guess # Return guess if format is bad
+        logging.error(f"Invalid history data or initial parameters for theta estimation: {e}")
+        return initial_theta_guess
 
-    # Minimize the negative log-likelihood function
-    result = minimize(
-        neg_log_likelihood,
-        initial_theta_guess,
-        args=(history,),
-        method='L-BFGS-B', # Method supporting bounds
-        bounds=[bounds]     # Pass bounds as a list containing one tuple
-    )
+    try:
+        result = minimize(
+            neg_log_likelihood,
+            initial_theta_guess,
+            args=(history,),
+            method='L-BFGS-B',
+            bounds=[bounds]
+        )
 
-    if result.success:
-        estimated_theta = result.x[0]
-        # Ensure estimate is strictly within bounds if needed, though L-BFGS-B should respect them
-        estimated_theta = np.clip(estimated_theta, bounds[0], bounds[1])
-        return estimated_theta
-    else:
-        print(f"Warning: Theta estimation optimization failed. Message: {result.message}. Returning initial guess.")
-        # Consider returning result.x[0] anyway if available, or stick to initial guess
+        if result.success:
+            estimated_theta = result.x[0]
+            # Clip just in case optimization slightly violates bounds
+            estimated_theta = np.clip(estimated_theta, bounds[0], bounds[1])
+            return estimated_theta
+        else:
+            logging.warning(f"Theta estimation optimization failed. Message: {result.message}. Returning initial guess.")
+            # Optionally return result.x[0] if available and seems reasonable despite lack of convergence
+            return initial_theta_guess
+    except (ValueError, TypeError) as e:
+        # Catch potential errors from neg_log_likelihood if called by minimize with problematic values
+        logging.error(f"Error during optimization process: {e}")
+        return initial_theta_guess
+    except Exception as e:
+        # Catch unexpected errors during minimization
+        logging.error(f"Unexpected error during theta estimation: {e}", exc_info=True)
         return initial_theta_guess
 
 
 def select_next_question(theta, remaining_questions_df):
-    """Selects the next question to administer based on maximum item information.
+    """Selects the next question based on maximum item information.
 
     Args:
         theta (float): Current ability estimate.
-        remaining_questions_df (pd.DataFrame): DataFrame of available questions.
-                                               Must contain 'a', 'b', 'c' columns.
-                                               The index should represent the question identifier.
+        remaining_questions_df (pd.DataFrame): DataFrame with 'a', 'b', 'c' columns and question ID index.
 
     Returns:
-        The index label (identifier) of the selected question. Returns None if no
-        questions remain, the DataFrame is invalid, or information cannot be calculated.
+        Index label of the selected question, or None on failure.
     """
+    required_cols = ['a', 'b', 'c']
     if not isinstance(remaining_questions_df, pd.DataFrame) or remaining_questions_df.empty:
-        print("Warning: No remaining questions available for selection.")
+        logging.warning("No remaining questions available for selection.")
         return None
-    if not all(col in remaining_questions_df.columns for col in ['a', 'b', 'c']):
-        print("Error: remaining_questions_df must contain 'a', 'b', and 'c' columns.")
-        return None
-
-    # Ensure parameters are numeric before applying calculation
-    try:
-        q_df = remaining_questions_df[['a', 'b', 'c']].astype(float)
-    except (ValueError, TypeError) as e:
-        print(f"Error converting question parameters to float: {e}")
+    if not all(col in remaining_questions_df.columns for col in required_cols):
+        logging.error(f"remaining_questions_df must contain columns: {required_cols}.")
         return None
 
-    # Calculate information for all remaining questions at the current theta
+    # Check if columns are numeric before applying calculations
+    numeric_cols = True
+    for col in required_cols:
+        if not pd.api.types.is_numeric_dtype(remaining_questions_df[col]):
+             logging.warning(f"Column '{col}' is not numeric. Attempting conversion.")
+             numeric_cols = False
+             # Attempt conversion here or let apply handle it (might be slower)
+
+    q_df = remaining_questions_df[required_cols]
+
+    # Calculate information for all remaining questions
     try:
         information = q_df.apply(
-            lambda row: item_information(theta, row['a'], row['b'], row['c']),
+            # Ensure parameters passed to item_information are floats
+            lambda row: item_information(theta, float(row['a']), float(row['b']), float(row['c'])),
             axis=1
         )
-        # Check for NaNs or Infs in calculated information
+        # Handle potential NaN/Inf results robustly
         if information.isnull().any() or np.isinf(information).any():
-             print("Warning: NaN or Inf encountered during item information calculation. Handling these as low/zero information.")
-             # Replace NaN/Inf with a very small number or zero to avoid selecting them
+             logging.warning("NaN or Inf encountered during item information calculation. Treating as zero information.")
              information = information.fillna(0.0).replace([np.inf, -np.inf], 0.0)
 
+    except (TypeError, ValueError) as e:
+        # Catch errors from float conversion or item_information itself
+        logging.error(f"Error calculating item information across DataFrame: {e}")
+        return None
     except Exception as e:
-        # Catch any other exceptions during apply
-        print(f"Error calculating item information across DataFrame: {e}")
+        logging.error(f"Unexpected error calculating item information: {e}", exc_info=True)
         return None
 
-    # Find the index (question ID) of the question with the maximum information
-    if information.empty or information.max() <= 0: # Check if max info is non-positive
-         print("Warning: Could not find a question with positive information.")
-         # Handle this case: maybe return a random question, or the least difficult?
-         # Returning None for now.
+    # Find the index (question ID) of the question with the maximum *positive* information
+    if information.empty or information.max() <= 1e-9: # Use small threshold instead of zero
+         logging.warning(f"Could not find a question with positive information at theta={theta:.3f}.")
+         # Fallback strategy: Maybe choose the question with b closest to theta?
+         # Or just return None if no informative question exists.
          return None
 
     selected_question_idx = information.idxmax()
     return selected_question_idx
 
-# --- Simulation Functions (Added based on Notebook Logic) ---
+# --- Simulation Functions ---
 
 def initialize_question_bank(num_questions=1000, seed=None):
     """Creates a simulated question bank with random IRT parameters.
 
     Args:
-        num_questions (int, optional): Number of questions in the bank. Defaults to 1000.
-        seed (int, optional): Random seed for reproducibility. Defaults to None.
+        num_questions (int): Number of questions.
+        seed (int, optional): Random seed.
 
     Returns:
-        pd.DataFrame: DataFrame with columns ['id', 'a', 'b', 'c'].
-                      Returns None if num_questions is invalid.
+        pd.DataFrame or None: DataFrame with ['id', 'a', 'b', 'c'] or None if invalid input.
     """
     if not isinstance(num_questions, int) or num_questions <= 0:
-        print("Error: num_questions must be a positive integer.")
+        logging.error("num_questions must be a positive integer.")
         return None
 
-    if seed is not None:
-        np.random.seed(seed)
+    rng = np.random.default_rng(seed) # Modern way to handle seeding
 
-    # Parameter ranges similar to the notebook
-    a_params = np.random.uniform(0.2, 1.5, num_questions)
-    b_params = np.random.uniform(-2, 2, num_questions)
-    c_params = np.random.uniform(0.1, 0.25, num_questions)
+    # Parameter ranges (adjust as needed)
+    a_params = rng.uniform(0.2, 1.5, num_questions)
+    b_params = rng.uniform(-2, 2, num_questions)
+    c_params = rng.uniform(0.1, 0.25, num_questions) # Ensure c is within [0,1)
 
     question_bank = pd.DataFrame({
         'a': a_params,
         'b': b_params,
         'c': c_params,
-        'id': np.arange(1, num_questions + 1) # Assign unique IDs
+        # Use 0-based index internally, convert to 1-based ID if needed for display/output
+        'id': np.arange(num_questions) # Or 1 to num_questions+1 if preferred ID
     })
+    # Set index to be the question ID for easier selection later if 'id' is unique identifier
+    # question_bank.set_index('id', inplace=True)
     return question_bank
 
-def simulate_cat_exam(question_bank, wrong_question_indices, initial_theta, total_questions, theta_bounds=(-4, 4)):
+def simulate_cat_exam(question_bank, wrong_question_positions, initial_theta, total_questions, theta_bounds=(-4, 4)):
     """Simulates a Computerized Adaptive Test (CAT) exam section.
 
     Args:
-        question_bank (pd.DataFrame): The item bank (from initialize_question_bank).
-        wrong_question_indices (list[int]): 1-based list of question *positions* answered incorrectly.
+        question_bank (pd.DataFrame): Item bank with 'a', 'b', 'c', and index as ID.
+        wrong_question_positions (list[int]): 1-based list of question *positions*
+                                              (1st question, 2nd question, etc.) answered incorrectly.
         initial_theta (float): Starting ability estimate.
-        total_questions (int): The number of questions to administer in this section.
-        theta_bounds (tuple, optional): Bounds for theta estimation. Defaults to (-4, 4).
+        total_questions (int): Number of questions to administer.
+        theta_bounds (tuple, optional): Bounds for theta estimation.
 
     Returns:
-        pd.DataFrame: DataFrame containing the simulation history, including columns:
-                      ['question_number', 'question_id', 'a', 'b', 'c',
-                       'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'].
-                      Returns None if inputs are invalid.
+        pd.DataFrame: Simulation history, or empty DataFrame on failure.
     """
-    # Input validation
-    if not isinstance(question_bank, pd.DataFrame) or not all(col in question_bank.columns for col in ['a', 'b', 'c', 'id']):
-        print("Error: Invalid question_bank DataFrame format.")
-        return None
-    if not isinstance(wrong_question_indices, list):
-        print("Error: wrong_question_indices must be a list.")
-        return None
-    if not isinstance(initial_theta, (int, float)):
-        print("Error: initial_theta must be numeric.")
-        return None
-    if not isinstance(total_questions, int) or total_questions <= 0:
-        print("Error: total_questions must be a positive integer.")
-        return None
-    if total_questions > len(question_bank):
-         print(f"Warning: total_questions ({total_questions}) exceeds bank size ({len(question_bank)}). Adjusting total questions.")
-         total_questions = len(question_bank)
+    # --- Input Validation ---
+    if not isinstance(question_bank, pd.DataFrame) or not all(col in question_bank.columns for col in ['a', 'b', 'c']):
+        logging.error("Invalid question_bank DataFrame format (missing a/b/c).")
+        return pd.DataFrame() # Return empty DataFrame
+    # Check if index is suitable as ID (e.g., unique) - assumes index is the ID here
+    if not question_bank.index.is_unique:
+        logging.warning("Question bank index is not unique. Selection might be ambiguous.")
+        # Or try using an 'id' column if available: question_bank.set_index('id', inplace=True) if 'id' in question_bank.columns else error...
 
-    remaining_questions = question_bank.copy()
-    history = []
+    if not isinstance(wrong_question_positions, list):
+        logging.error("wrong_question_positions must be a list.")
+        return pd.DataFrame()
+    if not isinstance(initial_theta, (int, float, np.number)):
+        logging.error("initial_theta must be numeric.")
+        return pd.DataFrame()
+    if not isinstance(total_questions, int) or total_questions <= 0:
+        logging.error("total_questions must be a positive integer.")
+        return pd.DataFrame()
+    if total_questions > len(question_bank):
+         logging.warning(f"total_questions ({total_questions}) exceeds bank size ({len(question_bank)}). Adjusting.")
+         total_questions = len(question_bank)
+    if not question_bank.index.name: # Often useful to have a named index
+        question_bank.index.name = 'question_id' # Assume index is the ID
+
+    # --- Simulation Setup ---
+    # Use the index of the bank directly, assuming it represents unique question IDs
+    remaining_questions_df = question_bank.copy()
+    history = [] # Stores response dicts for theta estimation
+    results_log = [] # Stores more detailed info for the final output DataFrame
     theta_est = initial_theta
 
-    print(f"Starting simulation: Initial Theta = {theta_est:.2f}, Total Questions = {total_questions}")
+    logging.info(f"Starting CAT simulation: Initial Theta = {theta_est:.3f}, Total Questions = {total_questions}")
 
+    # --- Simulation Loop ---
     for i in range(total_questions):
-        question_number = i + 1
-        theta_before = theta_est # Record theta before selecting/answering
+        question_number = i + 1 # 1-based position in the test sequence
+        theta_before = theta_est
 
-        # Select the next question based on current theta estimate
-        next_q_idx = select_next_question(theta_est, remaining_questions)
-        if next_q_idx is None:
-            print(f"Error: Could not select next question at step {question_number}. Stopping simulation.")
-            break # Stop simulation if no question can be selected
+        # Select next question (returns index label/ID)
+        next_q_id = select_next_question(theta_est, remaining_questions_df)
+        if next_q_id is None:
+            logging.error(f"Could not select next question at step {question_number}. Stopping simulation.")
+            break
 
-        question = remaining_questions.loc[next_q_idx]
+        # Get question parameters using the selected ID (index)
+        question_params = remaining_questions_df.loc[next_q_id]
 
-        # Determine if the answer is correct based on the provided list of wrong indices
-        answered_correctly = question_number not in wrong_question_indices
+        # Determine correctness based on *position*
+        answered_correctly = question_number not in wrong_question_positions
 
-        # Append response to history *before* updating theta
-        response_info = {
-            'question_number': question_number,
-            'question_id': question['id'], # ID from the bank
-            'a': question['a'],
-            'b': question['b'], # This is the difficulty parameter
-            'c': question['c'],
+        # Prepare response info for history (used in theta estimation)
+        # Ensure keys match neg_log_likelihood requirements
+        response_info_for_est = {
+            'a': question_params['a'],
+            'b': question_params['b'],
+            'c': question_params['c'],
             'answered_correctly': answered_correctly,
-            'theta_est_before_answer': theta_before
-            # 'theta_est_after_answer' will be added after estimation
+            # Add other info if neg_log_likelihood needs it
         }
-        current_history_for_estimation = history + [response_info] # Use current step info for estimation
+        # Append to history *before* estimation (more efficient)
+        history.append(response_info_for_est)
 
-        # Estimate new theta based on the updated history
-        theta_est = estimate_theta(current_history_for_estimation, theta_est, bounds=theta_bounds)
+        # Estimate new theta using the *entire* history up to this point
+        theta_est = estimate_theta(history, theta_est, bounds=theta_bounds) # Pass updated history
 
-        # Add the updated theta to the history entry for this step
-        response_info['theta_est_after_answer'] = theta_est
-        history.append(response_info)
+        # Log detailed results for this step
+        step_result = {
+            'question_number': question_number,
+            'question_id': next_q_id, # The ID from the bank index
+            'a': question_params['a'],
+            'b': question_params['b'],
+            'c': question_params['c'],
+            'answered_correctly': answered_correctly,
+            'theta_est_before_answer': theta_before,
+            'theta_est_after_answer': theta_est
+        }
+        results_log.append(step_result)
 
-        # Remove the administered question from the bank
-        remaining_questions = remaining_questions.drop(next_q_idx)
+        # Remove administered question from the *copy*
+        remaining_questions_df = remaining_questions_df.drop(next_q_id)
 
-        print(f"  Q {question_number}: ID={question['id']}, b={question['b']:.2f}, Answer={'Correct' if answered_correctly else 'Incorrect'}, New Theta={theta_est:.2f}")
+        logging.info(f"  Q {question_number}: ID={next_q_id}, b={question_params['b']:.2f}, "
+                     f"Answer={'Correct' if answered_correctly else 'Incorrect'}, New Theta={theta_est:.3f}")
 
-    print(f"Simulation finished. Final Theta = {theta_est:.2f}")
+    logging.info(f"Simulation finished. Final Theta = {theta_est:.3f}")
 
-    if not history:
-        return pd.DataFrame() # Return empty DataFrame if simulation didn't run
-
-    return pd.DataFrame(history)
+    return pd.DataFrame(results_log)

@@ -7,7 +7,6 @@ MAX_ALLOWED_TIME_DI = 45.0  # minutes
 TOTAL_QUESTIONS_DI = 20
 TIME_PRESSURE_THRESHOLD_DI = 3.0  # minutes difference
 INVALID_TIME_THRESHOLD_MINUTES = 1.0  # 1.0 minute
-LAST_THIRD_FRACTION = 2/3
 INVALID_DATA_TAG_DI = "數據無效：用時過短（受時間壓力影響）" # Added invalid tag
 
 # Overtime thresholds (minutes) based on time pressure
@@ -85,7 +84,7 @@ def _analyze_dimension(df_filtered, dimension_col):
 def _calculate_msr_metrics(df):
     """Calculates MSR group total time and reading time (for first question).
        Assumes MSR questions are grouped by a 'msr_group_id' column.
-       Adds 'msr_group_total_time', 'msr_reading_time', and 'is_first_msr_q' columns. # Added is_first_msr_q
+       Adds 'msr_group_total_time', 'msr_reading_time', and 'is_first_msr_q' columns.
     """
     if df.empty or 'msr_group_id' not in df.columns or 'question_time' not in df.columns:
         df['msr_group_total_time'] = np.nan
@@ -93,8 +92,6 @@ def _calculate_msr_metrics(df):
         df['is_first_msr_q'] = False # Initialize column
         return df
 
-    # Use full type name
-    # Corrected type name to match the rest of the file/md if needed, assuming 'Multi-source reasoning' is correct
     df_msr = df[df['question_type'] == 'Multi-source reasoning'].copy()
     if df_msr.empty:
         df['msr_group_total_time'] = np.nan
@@ -102,93 +99,40 @@ def _calculate_msr_metrics(df):
         df['is_first_msr_q'] = False # Initialize column even if no MSR
         return df
 
-    # Calculate group total time
     group_times = df_msr.groupby('msr_group_id')['question_time'].sum()
     df_msr['msr_group_total_time'] = df_msr['msr_group_id'].map(group_times)
 
-    # Calculate reading time and identify first question
     reading_times = {}
-    first_q_indices = set() # Keep track of indices of first questions
+    first_q_indices = set()
     for group_id, group_df in df_msr.groupby('msr_group_id'):
         group_df_sorted = group_df.sort_values('question_position')
         first_q_index = group_df_sorted.index[0]
-        first_q_indices.add(first_q_index) # Mark this index as a first question
+        first_q_indices.add(first_q_index)
 
         if len(group_df_sorted) >= 2:
             first_q_time = group_df_sorted['question_time'].iloc[0]
-            # Applying the logic from .py (first q time - avg time of others) which user confirmed
             other_q_times_avg = group_df_sorted['question_time'].iloc[1:].mean()
-            reading_time = first_q_time - other_q_times_avg
-            reading_times[first_q_index] = reading_time
+            # Handle potential NaN in average calculation if only 2 questions and one has NaN time
+            if pd.notna(first_q_time) and pd.notna(other_q_times_avg):
+                 reading_time = first_q_time - other_q_times_avg
+                 reading_times[first_q_index] = reading_time
+            else:
+                 reading_times[first_q_index] = np.nan # Cannot calculate reading time if times are missing
         elif len(group_df_sorted) == 1:
-             reading_times[first_q_index] = np.nan # Keep as NaN for single MSR
+             reading_times[first_q_index] = np.nan
 
-    # Apply reading times only to the first question of each group
     df_msr['msr_reading_time'] = df_msr.index.map(reading_times)
-    # Create the is_first_msr_q flag
     df_msr['is_first_msr_q'] = df_msr.index.isin(first_q_indices)
 
-    # Merge back into the original dataframe
-    # Ensure is_first_msr_q is included in the merge
     df = df.merge(df_msr[['msr_group_total_time', 'msr_reading_time', 'is_first_msr_q']], left_index=True, right_index=True, how='left')
-    # Fill NaN for non-MSR questions in the new flag column
     df['is_first_msr_q'].fillna(False, inplace=True)
+    # Fill NaN for MSR times for robustness, although merge 'left' should handle non-MSR
+    df['msr_group_total_time'].fillna(np.nan, inplace=True)
+    df['msr_reading_time'].fillna(np.nan, inplace=True)
     return df
 
-# --- DI-Specific Placeholder Diagnosis Functions (will be replaced/used later) ---
-
-def _diagnose_ds(df_ds):
-    """Placeholder diagnosis for Data Sufficiency (DS)."""
-    # ... (Logic for Ch2 onwards)
-    return {}
-
-def _diagnose_tpa(df_tpa):
-    """Placeholder diagnosis for Two-Part Analysis (TPA)."""
-    # ... (Logic for Ch2 onwards)
-    return {}
-
-def _diagnose_msr(df_msr):
-    """Placeholder diagnosis for Multi-Source Reasoning (MSR)."""
-    # ... (Logic for Ch2 onwards)
-    return {}
-
-def _diagnose_gt(df_gt):
-    """Placeholder diagnosis for Graph & Table (GT)."""
-    # ... (Logic for Ch2 onwards)
-    return {}
 
 # --- Main DI Diagnosis Runner ---
-
-def run_di_diagnosis(df_di_raw):
-    """
-    DEPRECATED - Logic moved to run_di_diagnosis_processed.
-    Runs the diagnostic analysis specifically for the Data Insights section.
-    PRIORITIZES the 'is_manually_invalid' flag.
-
-    Args:
-        df_di_raw (pd.DataFrame): DataFrame containing only DI response data.
-                              Needs columns like 'question_time', 'is_correct', 'question_type',
-                              'question_position' (acts as identifier), 'msr_group_id' (if MSR exists), etc.
-                              'question_difficulty' (simulated) is expected.
-                              May contain 'is_manually_invalid'.
-
-    Returns:
-        dict: A dictionary containing the results of the DI diagnosis, structured by chapter.
-        str: A string containing the summary report for the DI section.
-        pd.DataFrame: The processed DI DataFrame with added diagnostic columns.
-    """
-    # This function's core logic is now in run_di_diagnosis_processed
-    # It should ideally not be called directly anymore.
-    print("WARNING: Calling deprecated run_di_diagnosis. Preprocessing should happen upstream.")
-
-    # Simulate the preprocessing step here for compatibility, although it shouldn't be needed
-    time_pressure_status_map = {'DI': False} # Assume no pressure if not provided
-    # Need a helper or main app logic to calculate actual pressure status
-    from gmat_diagnosis_app.preprocess_helpers import suggest_invalid_questions
-    df_di_preprocessed = suggest_invalid_questions(df_di_raw, time_pressure_status_map)
-
-    return run_di_diagnosis_processed(df_di_preprocessed, time_pressure_status_map.get('DI', False))
-
 
 def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     """
@@ -204,186 +148,128 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
         str: A string containing the summary report for the DI section.
         pd.DataFrame: The processed DI DataFrame with added diagnostic columns.
     """
-    print("DEBUG: >>>>>> Entering run_di_diagnosis >>>>>>") # DEBUG
-    print("  Running Data Insights Diagnosis...")
     di_diagnosis_results = {}
 
     if df_di_processed.empty:
-        print("    No DI data provided. Skipping DI diagnosis.")
-        # Return empty df with expected columns for downstream consistency
         empty_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type',
                       'question_fundamental_skill', 'content_domain', 'Subject', 'is_invalid',
                       'overtime', 'suspiciously_fast', 'msr_group_id', 'msr_group_total_time',
                       'msr_reading_time', 'is_first_msr_q', 'is_sfe',
                       'time_performance_category', 'diagnostic_params_list']
-        # --- Fix: Add Subject column initialization for empty case --- #
         df_to_return = pd.DataFrame(columns=empty_cols)
         if 'Subject' not in df_to_return.columns:
             df_to_return['Subject'] = 'DI'
         return {}, "Data Insights (DI) 部分無數據可供診斷。", df_to_return
 
-    df_di = df_di_processed.copy() # Use the processed dataframe
+    df_di = df_di_processed.copy()
 
-    # --- Chapter 0: Derivative Data Calculation & Basic Prep (Using processed df) ---
-    print("    Chapter 0: Calculating Derivative Metrics & Basic Prep...")
-    # Ensure 'question_time' is numeric (minutes)
+    # --- Chapter 0: Derivative Data Calculation & Basic Prep ---
     df_di['question_time'] = pd.to_numeric(df_di['question_time'], errors='coerce')
-    # Ensure other critical columns exist and have basic types
     if 'question_position' not in df_di.columns: df_di['question_position'] = range(len(df_di))
     else: df_di['question_position'] = pd.to_numeric(df_di['question_position'], errors='coerce')
-    if 'is_correct' not in df_di.columns: df_di['is_correct'] = True # Default if missing
+    if 'is_correct' not in df_di.columns: df_di['is_correct'] = True
     else: df_di['is_correct'] = df_di['is_correct'].astype(bool)
     if 'question_type' not in df_di.columns: df_di['question_type'] = 'Unknown Type'
-    # Initialize potential MSR group id if missing
     if 'msr_group_id' not in df_di.columns: df_di['msr_group_id'] = np.nan
+    if 'is_invalid' not in df_di.columns: df_di['is_invalid'] = False
 
-    # Ensure 'is_invalid' exists (should be present from preprocessing)
-    if 'is_invalid' not in df_di.columns:
-        print("ERROR: 'is_invalid' column missing in df_di_processed!")
-        df_di['is_invalid'] = False # Add a default if missing
-    df_di = _calculate_msr_metrics(df_di) # Now adds 'is_first_msr_q'
+    df_di = _calculate_msr_metrics(df_di)
 
     # --- Chapter 1: Time Strategy & Validity ---
-    print("    Chapter 1: Time Strategy & Validity Analysis (DI Specific)")
-    total_test_time_di = df_di['question_time'].sum() # Already in minutes
+    total_test_time_di = df_di['question_time'].sum(skipna=True) # Ensure NaNs are skipped
     time_diff = MAX_ALLOWED_TIME_DI - total_test_time_di
-    time_pressure = time_diff <= TIME_PRESSURE_THRESHOLD_DI
-    print(f"      DI Total Time: {total_test_time_di:.2f} min, Allowed: {MAX_ALLOWED_TIME_DI:.1f} min, Diff: {time_diff:.2f} min, Pressure: {time_pressure}")
-    # Note: time_pressure calculated here might differ from di_time_pressure_status passed in, use passed value for consistency
-    print(f"      Using time pressure status from input: {di_time_pressure_status}")
 
-    # --- Automatic Invalid rule application is REMOVED ---
-    # 'is_invalid' status is taken directly from the input df_di_processed
     num_invalid_questions_total = df_di['is_invalid'].sum()
     di_diagnosis_results['invalid_count'] = num_invalid_questions_total
-    print(f"      Finished DI invalid marking. Total invalid count: {num_invalid_questions_total}")
 
-    # --- Initialize diagnostic_params and add tag ---
+    # Initialize diagnostic_params if needed
     if 'diagnostic_params' not in df_di.columns:
         df_di['diagnostic_params'] = [[] for _ in range(len(df_di))]
     else:
+        # Ensure it's a mutable list
         df_di['diagnostic_params'] = df_di['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, set, tuple)) else [])
 
-    # --- Add Tag logic adjusted: Add tag if 'is_invalid' is True (final state) ---
-    # This should happen AFTER the invalid flag is finalized by the user.
+    # Add invalid tag
     final_invalid_mask_di = df_di['is_invalid']
     if final_invalid_mask_di.any():
-        print(f"      Adding/Ensuring '{INVALID_DATA_TAG_DI}' tag for {final_invalid_mask_di.sum()} invalid DI rows.")
         for idx in df_di.index[final_invalid_mask_di]:
             current_list = df_di.loc[idx, 'diagnostic_params']
             if not isinstance(current_list, list): current_list = []
             if INVALID_DATA_TAG_DI not in current_list:
                 current_list.append(INVALID_DATA_TAG_DI)
             df_di.loc[idx, 'diagnostic_params'] = current_list
-    # --- End Add Tag ---
 
-    # Mark Overtime (on non-invalid data)
+    # --- Mark Overtime (Vectorized Approach) ---
     df_di['overtime'] = False
-    thresholds = OVERTIME_THRESHOLDS[di_time_pressure_status] # Use passed-in pressure status
-
-    print("DEBUG (di_diagnostic.py): 開始標記超時 - DI數據包含以下題型:")
-    print(df_di['question_type'].value_counts())
-    print(f"DEBUG (di_diagnostic.py): 使用閾值: {thresholds}")
+    thresholds = OVERTIME_THRESHOLDS[di_time_pressure_status]
     
-    overtime_count = 0
-
-    for index, row in df_di[df_di['is_invalid'] == False].iterrows():
-        q_type = row['question_type']
-        q_time = row['question_time']
-        
-        # 調試單個行的處理
-        if index % 5 == 0:  # 僅打印每5行，避免過多輸出
-            print(f"DEBUG (di_diagnostic.py): 檢查行 {index}, 題型='{q_type}', 時間={q_time}")
-
-        # 兼容可能的題型名稱差異
-        overtime_threshold = None
-        if q_type == 'Two-part analysis' or q_type == 'TPA':
-            overtime_threshold = thresholds['TPA']
-            if pd.notna(q_time) and q_time > overtime_threshold:
-                df_di.loc[index, 'overtime'] = True
-                overtime_count += 1
-                print(f"DEBUG (di_diagnostic.py): 標記TPA超時 - 位置={row.get('question_position', index)}, 時間={q_time}, 閾值={overtime_threshold}")
-                
-        elif q_type == 'Graph and Table' or q_type == 'GT':
-            overtime_threshold = thresholds['GT']
-            if pd.notna(q_time) and q_time > overtime_threshold:
-                df_di.loc[index, 'overtime'] = True
-                overtime_count += 1
-                print(f"DEBUG (di_diagnostic.py): 標記GT超時 - 位置={row.get('question_position', index)}, 時間={q_time}, 閾值={overtime_threshold}")
-                
-        elif q_type == 'Data Sufficiency' or q_type == 'DS':
-            overtime_threshold = thresholds['DS']
-            if pd.notna(q_time) and q_time > overtime_threshold:
-                df_di.loc[index, 'overtime'] = True
-                overtime_count += 1
-                print(f"DEBUG (di_diagnostic.py): 標記DS超時 - 位置={row.get('question_position', index)}, 時間={q_time}, 閾值={overtime_threshold}")
-                
-        elif q_type == 'Multi-source reasoning' or q_type == 'MSR':
-            # --- MSR Overtime Logic (Revised according to rules) ---
-            group_time = row.get('msr_group_total_time')
-            is_first = row.get('is_first_msr_q', False)
-            reading_time = row.get('msr_reading_time')
-            group_threshold = thresholds.get('MSR_GROUP', 7.0) # Default if not found
-            reading_threshold = thresholds.get('MSR_READING', 1.5)
-            single_q_threshold = thresholds.get('MSR_SINGLE_Q', 1.5)
-            position = row.get('question_position', index) # Use position for logging
-
-            # 1. Check Group Overtime First
-            if pd.notna(group_time) and group_time > group_threshold:
-                df_di.loc[index, 'overtime'] = True
-                overtime_count += 1 # Increment count (Note: this might overcount if multiple rows in the same OT group are processed)
-                # We need a way to mark the whole group based on one check, or adjust counting.
-                # Current loop structure will mark each row individually if group time exceeds.
-                print(f"DEBUG (di_diagnostic.py): 標記MSR超時 (組) - 位置={position}, 組時間={group_time:.2f}, 閾值={group_threshold:.1f}")
-            else:
-                # 2. If Group NOT Overtime, check Individual/Reading time
-                if is_first:
-                    # Check Reading Overtime
-                    if pd.notna(reading_time) and reading_time > reading_threshold:
-                        df_di.loc[index, 'overtime'] = True
-                        overtime_count += 1
-                        print(f"DEBUG (di_diagnostic.py): 標記MSR超時 (閱讀) - 位置={position}, 閱讀時間={reading_time:.2f}, 閾值={reading_threshold:.1f}")
-                    # Check Adjusted Single Question Overtime for First Question
-                    elif pd.notna(reading_time) and pd.notna(q_time):
-                        adjusted_time = q_time - reading_time
-                        if adjusted_time > single_q_threshold:
-                             df_di.loc[index, 'overtime'] = True
-                             overtime_count += 1
-                             print(f"DEBUG (di_diagnostic.py): 標記MSR超時 (首題調整後) - 位置={position}, 調整時間={adjusted_time:.2f}, 閾值={single_q_threshold:.1f}")
-                else:
-                    # Check Single Question Overtime for Non-First Questions
-                    if pd.notna(q_time) and q_time > single_q_threshold:
-                        df_di.loc[index, 'overtime'] = True
-                        overtime_count += 1
-                        print(f"DEBUG (di_diagnostic.py): 標記MSR超時 (非首題單題) - 位置={position}, 時間={q_time:.2f}, 閾值={single_q_threshold:.1f}")
-            # --- End MSR Overtime Logic ---
+    # Define masks for non-invalid rows
+    valid_mask = ~df_di['is_invalid']
     
-    # 總結標記結果 - Recalculate sum after the loop for accuracy
-    final_overtime_sum = df_di['overtime'].sum()
+    # --- Non-MSR Overtime ---
+    # TPA
+    tpa_mask = valid_mask & ((df_di['question_type'] == 'Two-part analysis') | (df_di['question_type'] == 'TPA'))
+    tpa_over_mask = tpa_mask & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['TPA'])
+    
+    # GT
+    gt_mask = valid_mask & ((df_di['question_type'] == 'Graph and Table') | (df_di['question_type'] == 'GT'))
+    gt_over_mask = gt_mask & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['GT'])
+    
+    # DS
+    ds_mask = valid_mask & ((df_di['question_type'] == 'Data Sufficiency') | (df_di['question_type'] == 'DS'))
+    ds_over_mask = ds_mask & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['DS'])
 
-    # 總結標記結果
-    print(f"DEBUG (di_diagnostic.py): 總共標記了 {overtime_count} 個超時題目 (共 {len(df_di)} 題)")
-    print(f"DEBUG (di_diagnostic.py): df_di['overtime'].sum() = {df_di['overtime'].sum()}")
-    if overtime_count > 0:
-        print("DEBUG (di_diagnostic.py): 超時題目分布:")
-        if 'question_type' in df_di.columns and 'overtime' in df_di.columns:
-            overtime_by_type = df_di[df_di['overtime'] == True]['question_type'].value_counts()
-            print(overtime_by_type)
+    # --- MSR Overtime ---
+    msr_mask = valid_mask & ((df_di['question_type'] == 'Multi-source reasoning') | (df_di['question_type'] == 'MSR'))
+    
+    # 1. Group Overtime
+    msr_group_over = msr_mask & df_di['msr_group_total_time'].notna() & \
+                     (df_di['msr_group_total_time'] > thresholds['MSR_GROUP'])
 
-    # Create filtered dataset for subsequent chapters
-    df_di_filtered = df_di[df_di['is_invalid'] == False].copy()
-    print(f"      Filtered dataset size for Chapters 2-6: {len(df_di_filtered)} questions.")
+    # 2. Reading Overtime (First Q, if Group not Overtime)
+    msr_reading_over = msr_mask & (~msr_group_over) & \
+                       df_di['is_first_msr_q'] & df_di['msr_reading_time'].notna() & \
+                       (df_di['msr_reading_time'] > thresholds['MSR_READING'])
 
+    # 3. Adjusted Single Q Overtime (First Q, if Group/Reading not Overtime)
+    # Calculate adjusted time safely
+    adj_time = df_di['question_time'] - df_di['msr_reading_time']
+    msr_adj_first_over = msr_mask & (~msr_group_over) & (~msr_reading_over) & \
+                         df_di['is_first_msr_q'] & \
+                         df_di['msr_reading_time'].notna() & df_di['question_time'].notna() & \
+                         adj_time.notna() & \
+                         (adj_time > thresholds['MSR_SINGLE_Q'])
+
+    # 4. Single Q Overtime (Non-First Q, if Group not Overtime)
+    msr_non_first_over = msr_mask & (~msr_group_over) & \
+                         (~df_di['is_first_msr_q']) & df_di['question_time'].notna() & \
+                         (df_di['question_time'] > thresholds['MSR_SINGLE_Q'])
+
+    # Combine all MSR overtime conditions
+    msr_over_mask = msr_group_over | msr_reading_over | msr_adj_first_over | msr_non_first_over
+    
+    # --- Combine all Overtime conditions ---
+    # Ensure only valid rows are considered by applying valid_mask implicitly through component masks
+    overall_overtime_mask = tpa_over_mask | gt_over_mask | ds_over_mask | msr_over_mask
+    
+    # Apply the final mask to set the 'overtime' column
+    df_di.loc[overall_overtime_mask, 'overtime'] = True
+    
+    # --- End Vectorized Overtime ---
+
+    # Store Chapter 1 results
     di_diagnosis_results['chapter_1'] = {
         'total_test_time_minutes': total_test_time_di,
         'time_difference_minutes': time_diff,
-        'time_pressure': time_pressure,
+        'time_pressure': di_time_pressure_status, # Store the status used
         'invalid_questions_excluded': num_invalid_questions_total,
         'overtime_thresholds_minutes': thresholds
     }
 
-    # --- Chapter 2: Multidimensional Performance Analysis (Using df_di_filtered) ---
-    print("    Chapter 2: Multidimensional Performance Analysis")
+    # Create filtered dataset for subsequent chapters
+    df_di_filtered = df_di[~df_di['is_invalid']].copy() # Use ~is_invalid
+
+    # --- Chapter 2: Multidimensional Performance Analysis ---
     domain_analysis = {}
     type_analysis = {}
     difficulty_analysis = {}
@@ -394,11 +280,8 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     }
 
     if not df_di_filtered.empty:
-        # Analyze by Content Domain
         if 'content_domain' in df_di_filtered.columns:
             domain_analysis = _analyze_dimension(df_di_filtered, 'content_domain')
-            print(f"      Domain Analysis: {domain_analysis}")
-            # Significant difference check for domain
             math_metrics = domain_analysis.get('Math Related', {})
             non_math_metrics = domain_analysis.get('Non-Math Related', {})
             math_errors = math_metrics.get('errors', 0)
@@ -408,36 +291,20 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
 
             if abs(math_errors - non_math_errors) >= 2:
                 domain_comparison_tags['significant_diff_error'] = True
-                if math_errors > non_math_errors:
-                    domain_comparison_tags['poor_math_related'] = True
-                else:
-                    domain_comparison_tags['poor_non_math_related'] = True
+                domain_comparison_tags['poor_math_related'] = math_errors > non_math_errors
+                domain_comparison_tags['poor_non_math_related'] = non_math_errors > math_errors
 
             if abs(math_overtime - non_math_overtime) >= 2:
                  domain_comparison_tags['significant_diff_overtime'] = True
-                 if math_overtime > non_math_overtime:
-                     domain_comparison_tags['slow_math_related'] = True
-                 else:
-                     domain_comparison_tags['slow_non_math_related'] = True
-            print(f"      Domain Comparison Tags: {domain_comparison_tags}")
-        else:
-            print("      Skipping Domain analysis: 'content_domain' column missing.")
+                 domain_comparison_tags['slow_math_related'] = math_overtime > non_math_overtime
+                 domain_comparison_tags['slow_non_math_related'] = non_math_overtime > math_overtime
 
-        # Analyze by Question Type
         if 'question_type' in df_di_filtered.columns:
             type_analysis = _analyze_dimension(df_di_filtered, 'question_type')
-            print(f"      Type Analysis: {type_analysis}")
-        else:
-            print("      Skipping Type analysis: 'question_type' column missing.")
 
-        # Analyze by Difficulty Grade
         if 'question_difficulty' in df_di_filtered.columns:
-            # Ensure difficulty grade calculation happens before Ch3 uses it if needed
             df_di_filtered['difficulty_grade'] = df_di_filtered['question_difficulty'].apply(_grade_difficulty_di)
             difficulty_analysis = _analyze_dimension(df_di_filtered, 'difficulty_grade')
-            print(f"      Difficulty Analysis: {difficulty_analysis}")
-        else:
-            print("      Skipping Difficulty analysis: 'question_difficulty' column missing.")
 
     di_diagnosis_results['chapter_2'] = {
         'by_domain': domain_analysis,
@@ -446,161 +313,91 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
         'domain_comparison_tags': domain_comparison_tags
     }
 
-    # --- Chapter 3: Root Cause Diagnosis (Using df_di_filtered) ---
-    print("    Chapter 3: Root Cause Diagnosis (Applying Detailed Logic)") # Updated print
-    if not df_di_filtered.empty and 'question_type' in df_di_filtered.columns: # Added check for question_type
-        # Calculate prerequisites for Chapter 3
+    # --- Chapter 3: Root Cause Diagnosis ---
+    if not df_di_filtered.empty and 'question_type' in df_di_filtered.columns:
         avg_time_per_type = df_di_filtered.groupby('question_type')['question_time'].mean().to_dict()
-        print(f"      Avg Time Per Type (minutes): {avg_time_per_type}")
+        max_correct_difficulty_per_combination = pd.DataFrame() # Init empty
+        if 'content_domain' in df_di_filtered.columns and 'question_difficulty' in df_di_filtered.columns:
+             correct_rows = df_di_filtered['is_correct'] == True
+             if correct_rows.any(): # Ensure there are correct rows before grouping
+                 max_correct_difficulty_per_combination = df_di_filtered[correct_rows].groupby(
+                     ['question_type', 'content_domain']
+                 )['question_difficulty'].max().unstack(fill_value=-np.inf)
 
-        # Use 'is_correct' here
-        # Check if 'content_domain' exists before grouping
-        if 'content_domain' in df_di_filtered.columns:
-             max_correct_difficulty_per_combination = df_di_filtered[df_di_filtered['is_correct'] == True].groupby(
-                 ['question_type', 'content_domain']
-             )['question_difficulty'].max().unstack(fill_value=-np.inf) # Use -inf for missing combos
-             print(f"      Max Correct Difficulty Per Combination:\n{max_correct_difficulty_per_combination}")
-        else:
-             print("      Skipping Max Correct Difficulty calculation: 'content_domain' missing.")
-             max_correct_difficulty_per_combination = pd.DataFrame() # Empty df
-
-        # Apply root cause diagnosis logic row by row (using the new detailed function)
         df_di_filtered = _diagnose_root_causes(df_di_filtered, avg_time_per_type, max_correct_difficulty_per_combination, thresholds)
 
-        # Store the dataframe with added diagnostic info
         di_diagnosis_results['chapter_3'] = {
-            'diagnosed_dataframe': df_di_filtered, # Contains 'diagnostic_params' and 'is_sfe' columns
+            'diagnosed_dataframe': df_di_filtered.copy(), # Store a copy
             'avg_time_per_type_minutes': avg_time_per_type,
             'max_correct_difficulty': max_correct_difficulty_per_combination.to_dict() if not max_correct_difficulty_per_combination.empty else {}
         }
-        # Optional: Print summary of triggered params from the updated df
-        if 'diagnostic_params' in df_di_filtered.columns:
-             all_params = [p for params_list in df_di_filtered['diagnostic_params'] if isinstance(params_list, list) for p in params_list]
-             param_counts = pd.Series(all_params).value_counts()
-             print(f"      Triggered Diagnostic Parameter Counts (New Logic):\n{param_counts}")
-        else:
-            print("      'diagnostic_params' column missing after detailed diagnosis.")
-
     else:
-        print("      Skipping Chapter 3 due to empty filtered data or missing columns.")
         di_diagnosis_results['chapter_3'] = {
              'diagnosed_dataframe': pd.DataFrame(),
              'avg_time_per_type_minutes': {},
              'max_correct_difficulty': {}
          }
 
-    # --- Chapter 4: Special Pattern Observation (Using df_di_filtered) ---
-    print("    Chapter 4: Special Pattern Observation")
-    # Need avg_time_per_type from Chapter 3 results
+    # --- Chapter 4: Special Pattern Observation ---
     avg_times_ch3 = di_diagnosis_results.get('chapter_3', {}).get('avg_time_per_type_minutes', {})
-    # Pass the dataframe to be potentially modified by _observe_di_patterns
-    pattern_analysis_results = _observe_di_patterns(df_di_filtered, avg_times_ch3)
-    di_diagnosis_results['chapter_4'] = pattern_analysis_results # Store the dict returned
-    # Optional: Print pattern results
-    print(f"      Carelessness Issue Triggered: {pattern_analysis_results.get('carelessness_issue_triggered')}")
-    print(f"      Early Rushing Risk Triggered: {pattern_analysis_results.get('early_rushing_risk_triggered')}")
-    # Note: df_di_filtered might now have 'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK' added to some rows
+    # Pass the potentially modified df from Ch3
+    df_ch3_diagnosed = di_diagnosis_results['chapter_3']['diagnosed_dataframe']
+    # Operate on a copy if _observe_di_patterns modifies in place, or ensure it returns modified df
+    df_for_ch4 = df_ch3_diagnosed.copy()
+    pattern_analysis_results = _observe_di_patterns(df_for_ch4, avg_times_ch3) # Assume modifies df_for_ch4
+    di_diagnosis_results['chapter_4'] = pattern_analysis_results
 
-    # --- Chapter 5: Foundation Ability Override Rule (Using df_di_filtered & Ch2 results) ---
-    print("    Chapter 5: Foundation Ability Override Rule")
+    # --- Chapter 5: Foundation Ability Override Rule ---
     type_analysis_ch2 = di_diagnosis_results.get('chapter_2', {}).get('by_type', {})
-    override_analysis = _check_foundation_override(df_di_filtered, type_analysis_ch2)
+    # Use the potentially modified df from Ch4
+    override_analysis = _check_foundation_override(df_for_ch4, type_analysis_ch2)
     di_diagnosis_results['chapter_5'] = override_analysis
-    # Optional: Print override results
-    for q_type, results in override_analysis.items():
-        if results.get('override_triggered'):
-            print(f"      Override Triggered for {q_type}: Y_agg={results.get('Y_agg')}, Z_agg={results.get('Z_agg')}")
 
-    # --- Chapter 6: Practice Planning & Recommendations (Using Ch3 diagnosed_dataframe, Ch5 override, Ch2 tags) ---
-    print("    Chapter 6: Practice Planning & Recommendations")
-    # Use the potentially modified df_di_filtered from Ch4 as input for Ch6
-    diagnosed_df_ch3_ch4 = df_di_filtered # Use df_di_filtered as it contains Ch3+Ch4 results now
-    # Get domain comparison tags from Chapter 2 results
+    # --- Chapter 6: Practice Planning & Recommendations ---
+    # Use the potentially modified df from Ch4/Ch5
+    diagnosed_df_ch4_ch5 = df_for_ch4
     domain_tags_ch2 = di_diagnosis_results.get('chapter_2', {}).get('domain_comparison_tags', {})
-    # Get override analysis from Chapter 5 results
     override_analysis_ch5 = di_diagnosis_results.get('chapter_5', {})
 
-    recommendations = [] # Default to empty list
-    if not diagnosed_df_ch3_ch4.empty:
-        recommendations = _generate_di_recommendations(diagnosed_df_ch3_ch4, override_analysis_ch5, domain_tags_ch2)
-        print(f"      Generated {len(recommendations)} final recommendation items/groups.")
-    else:
-        print("      Skipping Chapter 6 recommendation generation due to empty diagnosed data.")
-
-    di_diagnosis_results['chapter_6'] = {
-         'recommendations_list': recommendations
-    }
+    recommendations = []
+    if not diagnosed_df_ch4_ch5.empty:
+        recommendations = _generate_di_recommendations(diagnosed_df_ch4_ch5, override_analysis_ch5, domain_tags_ch2)
+    di_diagnosis_results['chapter_6'] = {'recommendations_list': recommendations}
 
     # --- Chapter 7: Summary Report Generation ---
-    print("    Chapter 7: Summary Report Generation")
-    # Need to pass the full results dict to generate the report
-    # The diagnosed_df inside the dict might be the one before Ch4 modifications,
-    # ensure report uses the latest df if necessary (e.g., for listing params)
-    # Let's update the df in the results dict before generating the report
-    di_diagnosis_results['chapter_3']['diagnosed_dataframe'] = diagnosed_df_ch3_ch4.copy()
-
-    print("  Data Insights Diagnosis Complete.")
-
-    # --- Generate Final Report String --- # Keep this call as its result is returned
+    # Ensure the latest df (after Ch4 modifications) is used for the report
+    di_diagnosis_results['chapter_3']['diagnosed_dataframe'] = diagnosed_df_ch4_ch5.copy()
     report_str = _generate_di_summary_report(di_diagnosis_results)
 
-    print("DEBUG: <<<<<< Exiting run_di_diagnosis <<<<<<") # DEBUG
+    # --- Final DataFrame Preparation ---
+    df_to_return = diagnosed_df_ch4_ch5.copy()
 
-    # --- Get the final dataframe to return (likely from Chapter 3 results, now updated post-Ch4) ---
-    df_to_return = diagnosed_df_ch3_ch4.copy() # Use the latest df
-
-    # --- Translate English diagnostic codes to Chinese ---
+    # Translate params
     if 'diagnostic_params' in df_to_return.columns:
-        print("DEBUG (di_diagnostic.py): Translating 'diagnostic_params' to Chinese...")
-        # Apply the translation function to each list in the column
         df_to_return['diagnostic_params_list_chinese'] = df_to_return['diagnostic_params'].apply(
             lambda params_list: _translate_di(params_list) if isinstance(params_list, list) else []
         )
-    else:
-        print("WARNING (di_diagnostic.py): 'diagnostic_params' column not found for translation.")
-        # Initialize the chinese list column anyway to avoid errors later
-        df_to_return['diagnostic_params_list_chinese'] = [[] for _ in range(len(df_to_return))]
-
-    # --- Drop the original English params column ---
-    if 'diagnostic_params' in df_to_return.columns:
         df_to_return.drop(columns=['diagnostic_params'], inplace=True)
-        print("DEBUG (di_diagnostic.py): Dropped 'diagnostic_params' column.")
-
-    # --- Rename column for consistency and Return all results ---
-    if 'diagnostic_params_list_chinese' in df_to_return.columns:
         df_to_return.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
-        print("DEBUG (di_diagnostic.py): Renamed 'diagnostic_params_list_chinese' to 'diagnostic_params_list'")
     else:
-        # Initialize the column if it wasn't created and couldn't be renamed from chinese list
-        print("DEBUG (di_diagnostic.py): Target list column not found or renamed. Initializing 'diagnostic_params_list'.")
-        df_to_return['diagnostic_params_list'] = np.empty((len(df_to_return),0)).tolist()
+        # Initialize if missing
+        df_to_return['diagnostic_params_list'] = [[] for _ in range(len(df_to_return))]
 
-    # --- DEBUG PRINT ---
-    print("DEBUG (di_diagnostic.py): Columns before return:", df_to_return.columns.tolist())
-    
-    # --- 關鍵檢查: 確認overtime列確實存在 ---
-    if 'overtime' not in df_to_return.columns:
-        print("錯誤: overtime列在返回前消失!")
-        if 'overtime' in df_di.columns:
-            print("正在重新添加overtime列...")
-            df_to_return['overtime'] = df_di['overtime'].copy()
-        else:
-            print("df_di也不包含overtime列！")
-    else:
-        # 檢查overtime內容
-        print("overtime列存在，值分布:")
-        print(df_to_return['overtime'].value_counts())
-    
-    # --- 確保 Subject 欄位存在 ---
+    # Ensure Subject column exists
     if 'Subject' not in df_to_return.columns:
-        print("警告: 'Subject' 欄位在 DI 返回前缺失，正在重新添加...")
         df_to_return['Subject'] = 'DI'
-    elif df_to_return['Subject'].isnull().any() or (df_to_return['Subject'] != 'DI').any():
-         print("警告: 'Subject' 欄位存在但包含空值或錯誤值，正在修正...")
-         df_to_return['Subject'] = 'DI' # 強制修正
-    
-    # 返回原始函數簽名需要的三個值
+    else:
+         df_to_return['Subject'] = 'DI' # Force correct value
+
+    # Final check for overtime column existence (added defensively)
+    if 'overtime' not in df_to_return.columns:
+        if 'overtime' in df_di.columns: # Check original df_di where it was calculated
+             df_to_return['overtime'] = df_di.loc[df_to_return.index, 'overtime'] # Align indices
+        else:
+             df_to_return['overtime'] = False # Fallback if completely lost
+
     return di_diagnosis_results, report_str, df_to_return
+
 
 # --- Root Cause Diagnosis Helper (Chapter 3 Logic) --- REWRITTEN ---
 
@@ -611,30 +408,27 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
     Relies on 'question_type', 'content_domain', 'question_difficulty', 'question_time',
     'is_correct', 'overtime', 'msr_reading_time', 'is_first_msr_q'.
     """
+    # NOTE: This function still uses iterrows() and could be further optimized,
+    # but that involves more complex refactoring than requested. Keeping as is.
     if df.empty:
         df['diagnostic_params'] = [[] for _ in range(len(df))]
         df['is_sfe'] = False
+        df['time_performance_category'] = 'Unknown' # Added init
         return df
 
     all_diagnostic_params = []
     all_is_sfe = []
     all_time_performance_categories = []
 
-    # Prepare max_correct_difficulty mapping
     max_diff_dict = {}
-    if isinstance(max_diffs, pd.DataFrame):
-        for q_type_col in max_diffs.columns: # Iterate through columns (types)
-            # Use full type names for matching if needed
-            # Map potential abbreviated names from df to full names used in max_diffs if necessary
-            # Assuming column names in max_diffs are full names like 'Data Sufficiency'
+    if isinstance(max_diffs, pd.DataFrame) and not max_diffs.empty:
+        for q_type_col in max_diffs.columns:
             q_type = q_type_col
             for domain in max_diffs.index:
                  max_val = max_diffs.loc[domain, q_type]
                  if pd.notna(max_val) and max_val != -np.inf:
                      max_diff_dict[(q_type, domain)] = max_val
 
-
-    # Get MSR specific thresholds
     msr_reading_threshold = ch1_thresholds.get('MSR_READING', 1.5)
     msr_single_q_threshold = ch1_thresholds.get('MSR_SINGLE_Q', 1.5)
 
@@ -642,177 +436,123 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
         params = []
         sfe_triggered = False
 
-        # Extract data safely
         q_type = row.get('question_type', 'Unknown')
         q_domain = row.get('content_domain', 'Unknown')
         q_diff = row.get('question_difficulty', None)
         q_time = row.get('question_time', None)
         is_correct = bool(row.get('is_correct', True))
-        is_overtime = bool(row.get('overtime', False)) # Individual overtime flag
+        is_overtime = bool(row.get('overtime', False))
         msr_reading_time = row.get('msr_reading_time', None)
         is_first_msr_q = bool(row.get('is_first_msr_q', False))
 
-        # Determine Time Performance Flags
         is_relatively_fast = False
-        is_slow = is_overtime # Use the row's overtime status (which includes MSR group logic from Ch1)
+        is_slow = is_overtime
         is_normal_time = False
-        # Need to handle potential KeyError if q_type from data isn't in avg_times dict
-        avg_time_for_type = avg_times.get(q_type, np.inf) # Get avg time or infinity
+        avg_time_for_type = avg_times.get(q_type, np.inf)
 
-        if pd.notna(q_time) and avg_time_for_type != np.inf: # Check q_time is not NaN
+        if pd.notna(q_time) and avg_time_for_type != np.inf:
             if q_time < (avg_time_for_type * 0.75):
                 is_relatively_fast = True
             if not is_relatively_fast and not is_slow:
                 is_normal_time = True
-        # If q_time is NaN, flags remain False
 
-        # --- Check SFE ---
-        if not is_correct and pd.notna(q_diff): # Check q_diff is not NaN
-            # Ensure q_type and q_domain are valid keys for max_diff_dict
+        if not is_correct and pd.notna(q_diff):
             max_correct_diff_key = (q_type, q_domain)
             max_correct_diff = max_diff_dict.get(max_correct_diff_key, -np.inf)
             if q_diff < max_correct_diff:
                 sfe_triggered = True
                 params.append('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
 
-        # Determine time performance category
         current_time_performance_category = 'Unknown'
         if is_correct:
-            if is_relatively_fast:
-                current_time_performance_category = 'Fast & Correct'
-            elif is_slow:
-                current_time_performance_category = 'Slow & Correct'
-            else:
-                current_time_performance_category = 'Normal Time & Correct'
-        else: # Incorrect
-            if is_relatively_fast:
-                current_time_performance_category = 'Fast & Wrong'
-            elif is_slow:
-                current_time_performance_category = 'Slow & Wrong'
-            else:
-                current_time_performance_category = 'Normal Time & Wrong'
+            if is_relatively_fast: current_time_performance_category = 'Fast & Correct'
+            elif is_slow: current_time_performance_category = 'Slow & Correct'
+            else: current_time_performance_category = 'Normal Time & Correct'
+        else:
+            if is_relatively_fast: current_time_performance_category = 'Fast & Wrong'
+            elif is_slow: current_time_performance_category = 'Slow & Wrong'
+            else: current_time_performance_category = 'Normal Time & Wrong'
 
-        # --- Detailed Diagnostic Logic based on MD Chapter 3 ---
-        # Use full names consistently for comparison if data uses them
-        # Example: Assuming data has 'Data Sufficiency', 'Two-part analysis', etc.
-
+        # --- Detailed Diagnostic Logic ---
+        # (Logic identical to previous version, using is_slow/is_correct etc.)
         # A. Data Sufficiency
         if q_type == 'Data Sufficiency':
             if q_domain == 'Math Related':
-                if is_slow and not is_correct:
-                    params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                elif is_slow and is_correct:
-                    params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
+                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
                 elif (is_normal_time or is_relatively_fast) and not is_correct:
                     params.append('DI_CONCEPT_APPLICATION_ERROR')
                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
             elif q_domain == 'Non-Math Related':
-                if is_slow and not is_correct:
-                    params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                elif is_slow and is_correct:
-                    params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
                 elif (is_normal_time or is_relatively_fast) and not is_correct:
                     params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-
         # B. Two-Part Analysis
         elif q_type == 'Two-part analysis':
              if q_domain == 'Math Related':
-                if is_slow and not is_correct:
-                    params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                elif is_slow and is_correct:
-                    params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
+                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
                 elif (is_normal_time or is_relatively_fast) and not is_correct:
                     params.append('DI_CONCEPT_APPLICATION_ERROR')
                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
              elif q_domain == 'Non-Math Related':
-                if is_slow and not is_correct:
-                    params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                elif is_slow and is_correct:
-                    params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
                 elif (is_normal_time or is_relatively_fast) and not is_correct:
                     params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-
         # C. Graph & Table
         elif q_type == 'Graph and Table':
              if q_domain == 'Math Related':
-                if is_slow and not is_correct:
-                    params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_DATA_EXTRACTION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                elif is_slow and is_correct:
-                    params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                if is_slow and not is_correct: params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_DATA_EXTRACTION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
+                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
                 elif (is_normal_time or is_relatively_fast) and not is_correct:
                     params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
              elif q_domain == 'Non-Math Related':
-                if is_slow and not is_correct:
-                    params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                elif is_slow and is_correct:
-                    params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                if is_slow and not is_correct: params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
                 elif (is_normal_time or is_relatively_fast) and not is_correct:
                     params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-
         # D. Multi-Source Reasoning
         elif q_type == 'Multi-source reasoning':
-            # Independent MSR Time Checks (from MD)
-            if is_first_msr_q and pd.notna(msr_reading_time) and msr_reading_time > msr_reading_threshold:
-                params.append('DI_MSR_READING_COMPREHENSION_BARRIER')
-            if not is_first_msr_q and pd.notna(q_time) and q_time > msr_single_q_threshold:
-                 params.append('DI_MSR_SINGLE_Q_BOTTLENECK')
-
-            # Logic based on slow/fast/normal and correct/incorrect
+            if is_first_msr_q and pd.notna(msr_reading_time) and msr_reading_time > msr_reading_threshold: params.append('DI_MSR_READING_COMPREHENSION_BARRIER')
+            if not is_first_msr_q and pd.notna(q_time) and q_time > msr_single_q_threshold: params.append('DI_MSR_SINGLE_Q_BOTTLENECK')
             if q_domain == 'Math Related':
-                if is_slow and not is_correct:
-                    params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                elif is_slow and is_correct:
-                    params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                if is_slow and not is_correct: params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
+                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
                 elif (is_normal_time or is_relatively_fast) and not is_correct:
                     params.append('DI_CONCEPT_APPLICATION_ERROR')
                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
             elif q_domain == 'Non-Math Related':
-                 if is_slow and not is_correct:
-                    params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_LOGICAL_REASONING_ERROR', 'DI_QUESTION_TYPE_SPECIFIC_ERROR'])
-                 elif is_slow and is_correct:
-                    params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                 if is_slow and not is_correct: params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_LOGICAL_REASONING_ERROR', 'DI_QUESTION_TYPE_SPECIFIC_ERROR'])
+                 elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
                  elif (is_normal_time or is_relatively_fast) and not is_correct:
                      params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
                      if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+        # --- End Detailed Logic ---
 
-        # --- Finalize Params for the row ---
         unique_params = sorted(list(set(params)))
         if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in unique_params:
-            # Ensure SFE is at the front if present
             unique_params.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
             unique_params.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-
-        # --- DEBUG: Check calculated params per row ---
-        if not unique_params: # Print only if the list is empty
-            # Check index existence safely
-            row_identifier = f"Index {index}" if df.index.is_unique else f"Row position {df.index.get_loc(index)}"
-            print(f"DEBUG (_diagnose_root_causes): {row_identifier} - No diagnostic params triggered. Correct: {is_correct}, TimePerf: {current_time_performance_category}")
-        # Print first few non-empty lists (e.g., first 5 based on original index)
-        elif index < 5: # Check original index
-             print(f"DEBUG (_diagnose_root_causes): Row {index} - Triggered params: {unique_params}")
-        # --- END DEBUG ---
 
         all_diagnostic_params.append(unique_params)
         all_is_sfe.append(sfe_triggered)
         all_time_performance_categories.append(current_time_performance_category)
 
-    # Assign lists back to DataFrame
-    if len(all_diagnostic_params) == len(df) and len(all_is_sfe) == len(df):
+    if len(all_diagnostic_params) == len(df) and len(all_is_sfe) == len(df) and len(all_time_performance_categories) == len(df):
         df['diagnostic_params'] = all_diagnostic_params
         df['is_sfe'] = all_is_sfe
         df['time_performance_category'] = all_time_performance_categories
     else:
-        print(f"Error: Length mismatch during root cause diagnosis (detailed). Skipping assignment.")
-        if 'diagnostic_params' not in df.columns:
-            df['diagnostic_params'] = [[] for _ in range(len(df))]
-        if 'is_sfe' not in df.columns:
-            df['is_sfe'] = False
-        if 'time_performance_category' not in df.columns:
-            df['time_performance_category'] = 'Unknown'
+        # Fallback assignment if lengths mismatch (shouldn't happen ideally)
+        if 'diagnostic_params' not in df.columns: df['diagnostic_params'] = [[] for _ in range(len(df))]
+        if 'is_sfe' not in df.columns: df['is_sfe'] = False
+        if 'time_performance_category' not in df.columns: df['time_performance_category'] = 'Unknown'
 
     return df
 
@@ -826,89 +566,72 @@ def _observe_di_patterns(df, avg_times):
        Modifies the input DataFrame (df) by adding early rushing param to specific rows.
     """
     analysis = {
-        'carelessness_issue_triggered': False, # Keep the flag for overall reporting
-        'triggered_behavioral_params': [], # Store global behavioral params here
+        'carelessness_issue_triggered': False,
+        'triggered_behavioral_params': [],
         'fast_wrong_rate': 0.0,
-        'early_rushing_risk_triggered': False, # Keep flag for reporting convenience
+        'early_rushing_risk_triggered': False,
         'early_rushing_questions': []
     }
-    if df.empty:
-        return analysis
+    if df.empty: return analysis
 
-    # Ensure 'diagnostic_params' column exists and is list type for modification
     if 'diagnostic_params' not in df.columns:
         df['diagnostic_params'] = [[] for _ in range(len(df))]
     else:
-        # Ensure existing entries are mutable lists
         df['diagnostic_params'] = df['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, tuple, set)) else [])
 
+    # 1. Carelessness Issue
+    # Avoid modifying df directly if possible, calculate mask on the fly
+    is_relatively_fast_mask = pd.Series(False, index=df.index)
+    for q_type, group in df.groupby('question_type'):
+        avg_time = avg_times.get(q_type, np.inf)
+        if avg_time != np.inf:
+            is_relatively_fast_mask.loc[group.index] = group['question_time'].notna() & (group['question_time'] < avg_time * 0.75)
 
-    # 1. Carelessness Issue (Fast & Wrong Rate)
-    # Use a temporary column for calculation to avoid permanent modification here
-    df['_is_relatively_fast_temp'] = False
-    for index, row in df.iterrows():
-        q_type = row['question_type']
-        q_time = row['question_time']
-        avg_time = avg_times.get(q_type, np.inf) # Use passed-in avg_times
-        if pd.notna(q_time) and q_time < avg_time * 0.75:
-            df.loc[index, '_is_relatively_fast_temp'] = True
-
-    fast_mask = df['_is_relatively_fast_temp'] == True
-    fast_wrong_mask = fast_mask & (df['is_correct'] == False)
-
-    num_relatively_fast_total = fast_mask.sum()
-    num_relatively_fast_incorrect = fast_wrong_mask.sum()
-
+    num_relatively_fast_total = is_relatively_fast_mask.sum()
     if num_relatively_fast_total > 0:
+        fast_wrong_mask = is_relatively_fast_mask & (df['is_correct'] == False)
+        num_relatively_fast_incorrect = fast_wrong_mask.sum()
         fast_wrong_rate = num_relatively_fast_incorrect / num_relatively_fast_total
         analysis['fast_wrong_rate'] = fast_wrong_rate
         if fast_wrong_rate > 0.3:
             analysis['carelessness_issue_triggered'] = True
-            # Add the global param to the analysis dict
             analysis['triggered_behavioral_params'].append('DI_BEHAVIOR_CARELESSNESS_ISSUE')
 
-    # Clean up temporary column
-    df.drop(columns=['_is_relatively_fast_temp'], inplace=True)
-
-
     # 2. Early Rushing Risk
-    early_pos_limit = TOTAL_QUESTIONS_DI / 3
-    early_rush_mask = (
-        (df['question_position'] <= early_pos_limit) &
-        (pd.notna(df['question_time'])) & # Ensure time is not NaN
-        (df['question_time'] < INVALID_TIME_THRESHOLD_MINUTES)
-    )
+    # Ensure necessary columns exist before masking
+    if 'question_position' in df.columns and 'question_time' in df.columns:
+        early_pos_limit = TOTAL_QUESTIONS_DI / 3
+        early_rush_mask = (
+            (df['question_position'] <= early_pos_limit) &
+            (df['question_time'].notna()) &
+            (df['question_time'] < INVALID_TIME_THRESHOLD_MINUTES)
+        )
+        early_rushing_indices = df.index[early_rush_mask].tolist()
 
-    early_rushing_indices = df[early_rush_mask].index.tolist() # Get indices as list
+        if early_rushing_indices:
+            analysis['early_rushing_risk_triggered'] = True
+            early_rush_param = 'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK'
+            for index in early_rushing_indices:
+                # Safely access and modify the list
+                current_params = df.loc[index, 'diagnostic_params']
+                if not isinstance(current_params, list): current_params = []
+                if early_rush_param not in current_params:
+                     current_params.append(early_rush_param)
+                     df.loc[index, 'diagnostic_params'] = current_params # Assign back
 
-    if early_rushing_indices: # Check if the list is not empty
-        analysis['early_rushing_risk_triggered'] = True
-        early_rush_param = 'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK'
+                # Collect details safely using .get()
+                row = df.loc[index]
+                analysis['early_rushing_questions'].append({
+                    'id': row.get('Question ID', index),
+                    'type': row.get('question_type', 'Unknown'),
+                    'domain': row.get('content_domain', 'Unknown'),
+                    'time': row.get('question_time', np.nan)
+                })
+    else:
+        # Handle missing columns needed for early rush check if necessary
+        pass
 
-        # Add the parameter to the specific rows and collect details
-        for index in early_rushing_indices:
-            # Ensure the diagnostic_params for this row is a list before appending
-            current_params = df.loc[index, 'diagnostic_params']
-            if not isinstance(current_params, list):
-                current_params = [] # Initialize as empty list if not already
-
-            # Append param only if not already present
-            if early_rush_param not in current_params:
-                 current_params.append(early_rush_param)
-                 # Assign the modified list back to the DataFrame
-                 df.loc[index, 'diagnostic_params'] = current_params
-
-
-            # Get row data for reporting details
-            row = df.loc[index]
-            analysis['early_rushing_questions'].append({
-                'id': row.get('Question ID', index), # Use index as fallback ID
-                'type': row['question_type'],
-                'domain': row.get('content_domain', 'Unknown'), # Handle missing domain
-                'time': row['question_time']
-            })
-
-    return analysis # Returns dict, but modifies df in place for early rushing params
+    return analysis
 
 
 # --- Foundation Ability Override Helper (Chapter 5 Logic) ---
@@ -916,151 +639,110 @@ def _observe_di_patterns(df, avg_times):
 def _check_foundation_override(df, type_metrics):
     """Checks for foundation override rule for each question type."""
     override_results = {}
-    # Use full type names or map if necessary from df['question_type'].unique()
-    # Assuming df uses full names that match keys in type_metrics potentially
+    if df.empty or 'question_type' not in df.columns: return override_results
+
     question_types_in_data = df['question_type'].unique()
 
-
     for q_type in question_types_in_data:
-        # Skip if type is unknown or NaN
         if pd.isna(q_type): continue
 
         metrics = type_metrics.get(q_type, {})
         error_rate = metrics.get('error_rate', 0.0)
         overtime_rate = metrics.get('overtime_rate', 0.0)
-
         triggered = False
         y_agg = None
         z_agg = None
 
-        # Check if override is triggered
         if error_rate > 0.5 or overtime_rate > 0.5:
             triggered = True
+            # Check required columns exist before filtering
+            req_cols = ['question_type', 'is_correct', 'overtime', 'question_difficulty', 'question_time']
+            if all(c in df.columns for c in req_cols):
+                triggering_mask = (
+                    (df['question_type'] == q_type) &
+                    ((df['is_correct'] == False) | (df['overtime'] == True))
+                )
+                triggering_df = df[triggering_mask]
 
-            # Find relevant questions if triggered
-            triggering_mask = (
-                (df['question_type'] == q_type) &
-                ((df['is_correct'] == False) | (df['overtime'] == True))
-            )
-            triggering_df = df[triggering_mask]
+                if not triggering_df.empty:
+                    if triggering_df['question_difficulty'].notna().any():
+                         min_difficulty = triggering_df['question_difficulty'].min()
+                         y_agg = _grade_difficulty_di(min_difficulty)
+                    else: y_agg = "Unknown Difficulty"
 
-            if not triggering_df.empty:
-                # Calculate Y_agg (lowest difficulty grade among triggering questions)
-                # Ensure 'question_difficulty' exists and has valid values
-                if 'question_difficulty' in triggering_df.columns and triggering_df['question_difficulty'].notna().any():
-                     min_difficulty = triggering_df['question_difficulty'].min()
-                     y_agg = _grade_difficulty_di(min_difficulty)
+                    if triggering_df['question_time'].notna().any():
+                         max_time_minutes = triggering_df['question_time'].max()
+                         # Ensure max_time_minutes is not NaN before floor operation
+                         if pd.notna(max_time_minutes):
+                             z_agg = math.floor(max_time_minutes * 2) / 2.0
+                         else: z_agg = None
+                    else: z_agg = None
                 else:
                      y_agg = "Unknown Difficulty"
+                     z_agg = None
+            else: # Handle missing columns case
+                y_agg = "Unknown Difficulty"
+                z_agg = None
 
-
-                # Calculate Z_agg (max time among triggering questions, floored to 0.5 min)
-                # Ensure 'question_time' exists and has valid values
-                if 'question_time' in triggering_df.columns and triggering_df['question_time'].notna().any():
-                     max_time_minutes = triggering_df['question_time'].max()
-                     # Floor to nearest 0.5 minute: floor(time * 2) / 2
-                     z_agg = math.floor(max_time_minutes * 2) / 2.0
-                else:
-                     z_agg = None # Cannot calculate if time is missing
-
-            else:
-                 # Should not happen if error_rate or overtime_rate > 0.5, but handle defensively
-                 y_agg = "Unknown Difficulty"
-                 z_agg = None
 
         override_results[q_type] = {
             'override_triggered': triggered,
             'Y_agg': y_agg,
             'Z_agg': z_agg,
-            'triggering_error_rate': error_rate, # Store for context
-            'triggering_overtime_rate': overtime_rate # Store for context
+            'triggering_error_rate': error_rate,
+            'triggering_overtime_rate': overtime_rate
         }
-
     return override_results
+
 
 # --- Recommendation Generation Helper (Chapter 6 Logic) ---
 
 def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
     """Generates practice recommendations based on Chapters 3, 5, and 2 results."""
-    # Ensure 'question_type' exists before proceeding
-    if 'question_type' not in df_diagnosed.columns:
-         print("Warning: 'question_type' column missing in diagnosed data for recommendations. Skipping.")
-         return []
+    if 'question_type' not in df_diagnosed.columns: return []
 
-    # Use type names present in the actual data
     question_types_in_data = df_diagnosed['question_type'].unique()
-    # Filter out NaN types if any
     question_types_valid = [qt for qt in question_types_in_data if pd.notna(qt)]
-
     recommendations_by_type = {q_type: [] for q_type in question_types_valid}
     processed_override_types = set()
 
-    # --- ADD Exemption Rule Calculation (Matches MD Ch6) ---
+    # Exemption Rule
     exempted_types = set()
     if 'is_correct' in df_diagnosed.columns and 'overtime' in df_diagnosed.columns:
         for q_type in question_types_valid:
             type_df = df_diagnosed[df_diagnosed['question_type'] == q_type]
-            # Check if NO questions are incorrect OR overtime for this type
             if not type_df.empty and not ((type_df['is_correct'] == False) | (type_df['overtime'] == True)).any():
                 exempted_types.add(q_type)
-        print(f"      Exempted types (perfect performance): {exempted_types}") # Debug print
-    else:
-        print("Warning: Cannot calculate exempted types due to missing 'is_correct' or 'overtime' columns.")
-    # --- END Exemption Rule Calculation ---
 
-
-    # 2. Generate Macro Recommendations (from Chapter 5 override)
+    # Macro Recommendations
+    math_related_zh = _translate_di('Math Related') # Translate once
+    non_math_related_zh = _translate_di('Non-Math Related') # Translate once
     for q_type, override_info in override_results.items():
-        # Check if this type exists in our current data's recommendations dict
         if q_type in recommendations_by_type and override_info.get('override_triggered'):
-            # --- Skip Macro if type is Exempted --- #
-            if q_type in exempted_types:
-                print(f"Info: Skipping Macro recommendation for {q_type} because it is exempted.")
-                continue
-            # --- End Skip --- #
+            if q_type in exempted_types: continue
             y_agg = override_info.get('Y_agg', '未知難度')
             z_agg = override_info.get('Z_agg')
-            z_agg_text = f"{z_agg:.1f} 分鐘" if pd.notna(z_agg) else "未知限時" # Check for NaN Z_agg
+            z_agg_text = f"{z_agg:.1f} 分鐘" if pd.notna(z_agg) else "未知限時"
             error_rate_str = _format_rate(override_info.get('triggering_error_rate', 0.0))
             overtime_rate_str = _format_rate(override_info.get('triggering_overtime_rate', 0.0))
             rec_text = f"**宏觀建議 ({q_type}):** 由於整體表現有較大提升空間 (錯誤率 {error_rate_str} 或 超時率 {overtime_rate_str}), "
             rec_text += f"建議全面鞏固 **{q_type}** 題型的基礎，可從 **{y_agg}** 難度題目開始系統性練習，掌握核心方法，建議限時 **{z_agg_text}**。"
-            recommendations_by_type[q_type].append({
-                'type': 'macro',
-                'text': rec_text,
-                'question_type': q_type # Add type for potential later use/sorting
-            })
+            recommendations_by_type[q_type].append({'type': 'macro', 'text': rec_text, 'question_type': q_type})
             processed_override_types.add(q_type)
 
-    # 3. Generate Case Recommendations (Using AGGREGATED logic)
-    target_times_minutes = {
-        'Data Sufficiency': 2.0,
-        'Two-part analysis': 3.0,
-        'Graph and Table': 3.0,
-        'Multi-source reasoning': 2.0 # Target time per question for MSR
-    }
-
-    required_cols = ['is_correct', 'overtime', 'question_type', 'content_domain',
-                     'question_difficulty', 'question_time', 'is_sfe', 'diagnostic_params']
-    if not all(col in df_diagnosed.columns for col in required_cols):
-        print("Warning: Missing required columns for aggregated recommendation generation. Skipping.")
-    else:
+    # Case Recommendations
+    target_times_minutes = {'Data Sufficiency': 2.0, 'Two-part analysis': 3.0, 'Graph and Table': 3.0, 'Multi-source reasoning': 2.0}
+    required_cols = ['is_correct', 'overtime', 'question_type', 'content_domain', 'question_difficulty', 'question_time', 'is_sfe', 'diagnostic_params']
+    if all(col in df_diagnosed.columns for col in required_cols):
         df_trigger = df_diagnosed[((df_diagnosed['is_correct'] == False) | (df_diagnosed['overtime'] == True))]
-
         if not df_trigger.empty:
-            # Use try-except for groupby robustness
             try:
-                grouped_triggers = df_trigger.groupby(['question_type', 'content_domain'], observed=False) # Use observed=False if using categorical
-
+                grouped_triggers = df_trigger.groupby(['question_type', 'content_domain'], observed=False, dropna=False) # Handle potential NaNs in grouping keys
                 for name, group_df in grouped_triggers:
                     q_type, domain = name
                     if pd.isna(q_type) or pd.isna(domain): continue
+                    if q_type in processed_override_types or q_type in exempted_types: continue
 
-                    # Skip if covered by macro override or exemption
-                    if q_type in processed_override_types or q_type in exempted_types:
-                        continue
-
-                    # --- Aggregate information within the group ---
                     min_difficulty_score = group_df['question_difficulty'].min()
                     y_grade = _grade_difficulty_di(min_difficulty_score)
 
@@ -1070,10 +752,7 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
                         q_time_minutes = row['question_time']
                         is_overtime = row['overtime']
                         if pd.notna(q_time_minutes):
-                            base_time_minutes = q_time_minutes
-                            if is_overtime:
-                                base_time_minutes = q_time_minutes - 0.5
-                            base_time_minutes = max(0, base_time_minutes)
+                            base_time_minutes = max(0, q_time_minutes - 0.5 if is_overtime else q_time_minutes)
                             z_raw_minutes = math.floor(base_time_minutes * 2) / 2.0
                             z = max(z_raw_minutes, target_time_minutes)
                             z_minutes_list.append(z)
@@ -1081,106 +760,62 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
                     max_z_minutes = max(z_minutes_list) if z_minutes_list else target_time_minutes
                     z_text = f"{max_z_minutes:.1f} 分鐘"
                     target_time_text = f"{target_time_minutes:.1f} 分鐘"
-
                     group_sfe = group_df['is_sfe'].any()
-
-                    diag_params_codes = set()
-                    for params_list in group_df['diagnostic_params']:
-                        if isinstance(params_list, list):
-                            diag_params_codes.update(params_list)
-
-                    translated_params_list = _translate_di(list(diag_params_codes))
-                    param_text = "" # Set param_text to empty string
+                    diag_params_codes = set().union(*[s for s in group_df['diagnostic_params'] if isinstance(s, list)]) # More concise set union
+                    translated_params_list = _translate_di(list(diag_params_codes)) # Translate here if needed for text, else done later
 
                     problem_desc = "錯誤或超時"
                     sfe_prefix = "*基礎掌握不穩* " if group_sfe else ""
-                    translated_domain = _translate_di(domain)
+                    translated_domain = _translate_di(domain) # Translate domain
 
                     rec_text = f"{sfe_prefix}針對 **{translated_domain}** 領域的 **{q_type}** 題目 ({problem_desc})，"
                     rec_text += f"建議練習 **{y_grade}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。"
-
                     if max_z_minutes - target_time_minutes > 2.0:
                         rec_text += " **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效。**"
 
-                    # Add to the dict, key is q_type
                     if q_type in recommendations_by_type:
-                         recommendations_by_type[q_type].append({
-                             'type': 'case_aggregated',
-                             'is_sfe': group_sfe,
-                             'domain': domain,
-                             'difficulty_grade': y_grade,
-                             'time_limit_z': max_z_minutes,
-                             'text': rec_text,
-                             'question_type': q_type
-                         })
-                    else:
-                         print(f"Warning: q_type '{q_type}' from groupby not in recommendations_by_type keys. Skipping recommendation.")
+                         recommendations_by_type[q_type].append({'type': 'case_aggregated', 'is_sfe': group_sfe, 'domain': domain, 'difficulty_grade': y_grade, 'time_limit_z': max_z_minutes, 'text': rec_text, 'question_type': q_type})
+            except Exception:
+                 # Error handling or logging can be added here
+                 pass
 
-            except Exception as e:
-                print(f"Error during recommendation grouping/aggregation: {e}")
-                # Continue without aggregated recommendations if grouping fails
-
-    # 4. Final Assembly and Domain Focus Rules
+    # Final Assembly
     final_recommendations = []
-
-    # --- ADD Exemption Note Generation (Matches MD Ch6) ---
-    for q_type in sorted(list(exempted_types)): # Sort for consistent order
-         # Check if this q_type exists in our valid types
+    for q_type in sorted(list(exempted_types)):
          if q_type in question_types_valid:
-              exemption_note_text = f"您在 **{q_type}** 題型上表現穩定，所有題目均在時限內正確完成，無需針對性個案練習。"
-              final_recommendations.append({
-                  'type': 'exemption_note',
-                  'text': exemption_note_text,
-                  'question_type': q_type
-              })
-    # --- END Exemption Note Generation ---
+              final_recommendations.append({'type': 'exemption_note', 'text': f"您在 **{q_type}** 題型上表現穩定，所有題目均在時限內正確完成，無需針對性個案練習。", 'question_type': q_type})
 
-    # Process recommendations by type, applying focus rules
-    # Iterate through the original valid types to maintain order if needed
     for q_type in question_types_valid:
-        # Skip exempted types here, they are already handled above
-        if q_type in exempted_types:
-            continue
-
+        if q_type in exempted_types: continue
         type_recs = recommendations_by_type.get(q_type, [])
         if not type_recs: continue
+        type_recs.sort(key=lambda rec: 0 if rec['type'] == 'macro' else 1)
 
-        # Sort recommendations: Macro first, then Aggregated cases
-        def sort_key(rec):
-            if rec['type'] == 'macro': return 0
-            # Aggregated cases sorted (e.g., by SFE status if needed)
-            # return 1 if rec.get('is_sfe') else 2 # Example SFE sort
-            return 1 # All aggregated cases at same level for now
-        type_recs.sort(key=sort_key)
-
-        # Apply domain focus rules
         focus_note = ""
         has_math_case_agg = any(r.get('domain') == 'Math Related' for r in type_recs if r['type'] == 'case_aggregated')
         has_non_math_case_agg = any(r.get('domain') == 'Non-Math Related' for r in type_recs if r['type'] == 'case_aggregated')
 
-        if domain_tags.get('poor_math_related') or domain_tags.get('slow_math_related'):
-            if has_math_case_agg: focus_note += f" **建議增加 {q_type} 題型下 `{_translate_di('Math Related')}` 題目的練習比例。**"
-        if domain_tags.get('poor_non_math_related') or domain_tags.get('slow_non_math_related'):
-            if has_non_math_case_agg: focus_note += f" **建議增加 {q_type} 題型下 `{_translate_di('Non-Math Related')}` 題目的練習比例。**"
+        # Use pre-translated domain names
+        if (domain_tags.get('poor_math_related') or domain_tags.get('slow_math_related')) and has_math_case_agg:
+            focus_note += f" **建議增加 {q_type} 題型下 `{math_related_zh}` 題目的練習比例。**"
+        if (domain_tags.get('poor_non_math_related') or domain_tags.get('slow_non_math_related')) and has_non_math_case_agg:
+            focus_note += f" **建議增加 {q_type} 題型下 `{non_math_related_zh}` 題目的練習比例。**"
 
-        # Add focus note to the last non-macro recommendation
-        if focus_note:
+        if focus_note and type_recs:
+            # Find last non-macro index safely
             last_agg_rec_index = -1
             for i in range(len(type_recs) - 1, -1, -1):
-                if type_recs[i]['type'] == 'case_aggregated':
-                    last_agg_rec_index = i
-                    break
+                 if type_recs[i]['type'] != 'macro': # Attach to last non-macro/exemption
+                     last_agg_rec_index = i
+                     break
             if last_agg_rec_index != -1:
                  type_recs[last_agg_rec_index]['text'] += focus_note
-            elif type_recs: # Append to macro if only macro exists
+            else: # Attach to the only rec (must be macro if list not empty)
                  type_recs[-1]['text'] += focus_note
 
-        # Add the processed recommendations for this non-exempted type
+
         final_recommendations.extend(type_recs)
 
-
-    # Final sort of all recommendations? (e.g., by type order) - Already done above implicitly by iterating `question_types_valid`
-    # But let's re-sort explicitly including exemption notes
     type_order_final = ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
     final_recommendations.sort(key=lambda x: type_order_final.index(x['question_type']) if x.get('question_type') in type_order_final else 99)
 
@@ -1191,7 +826,6 @@ APPENDIX_A_TRANSLATION_DI = {
     # DI - Reading & Understanding
     'DI_READING_COMPREHENSION_ERROR': "DI 閱讀理解: 文字/題意理解錯誤/障礙 (Math/Non-Math)",
     'DI_GRAPH_TABLE_INTERPRETATION_ERROR': "DI 圖表解讀: 圖形/表格信息解讀錯誤/障礙",
-    # 'DI_DATA_INTERPRETATION_ERROR': "DI 數據解讀: 數據/信息解讀錯誤", # Removed - Placeholder
     # DI - Concept & Application (Math)
     'DI_CONCEPT_APPLICATION_ERROR': "DI 概念應用 (Math): 數學觀念/公式應用錯誤/障礙",
     # DI - Logical Reasoning (Non-Math)
@@ -1202,14 +836,12 @@ APPENDIX_A_TRANSLATION_DI = {
     'DI_CALCULATION_ERROR': "DI 計算: 數學計算錯誤/障礙",
     # DI - MSR Specific
     'DI_MULTI_SOURCE_INTEGRATION_ERROR': "DI 多源整合 (MSR): 跨分頁/來源信息整合錯誤/障礙",
-    'DI_MSR_READING_COMPREHENSION_BARRIER': "DI MSR 閱讀障礙: 題組整體閱讀時間過長", # Matched MD
-    'DI_MSR_SINGLE_Q_BOTTLENECK': "DI MSR 單題瓶頸: 題組內單題回答時間過長", # Matched MD
-    # 'DI_MSR_READING_BOTTLENECK': "..." # Removed - Old py param
-    # 'DI_MSR_GROUP_INEFFICIENCY': "..." # Removed - Old py param
+    'DI_MSR_READING_COMPREHENSION_BARRIER': "DI MSR 閱讀障礙: 題組整體閱讀時間過長",
+    'DI_MSR_SINGLE_Q_BOTTLENECK': "DI MSR 單題瓶頸: 題組內單題回答時間過長",
     # DI - Question Type Specific
     'DI_QUESTION_TYPE_SPECIFIC_ERROR': "DI 特定題型障礙 (例如 MSR Non-Math 子題型)",
     # DI - Foundational & Efficiency
-    'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': "DI 基礎掌握: 應用不穩定 (Special Focus Error)", # Using MD version
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': "DI 基礎掌握: 應用不穩定 (Special Focus Error)",
     'DI_EFFICIENCY_BOTTLENECK_READING': "DI 效率瓶頸: 閱讀理解耗時 (Math/Non-Math)",
     'DI_EFFICIENCY_BOTTLENECK_CONCEPT': "DI 效率瓶頸: 概念/公式應用耗時 (Math)",
     'DI_EFFICIENCY_BOTTLENECK_CALCULATION': "DI 效率瓶頸: 計算耗時",
@@ -1223,111 +855,48 @@ APPENDIX_A_TRANSLATION_DI = {
     # Domains
     'Math Related': "數學相關",
     'Non-Math Related': "非數學相關",
-    'Unknown Domain': "未知領域", # Added for robustness
+    'Unknown Domain': "未知領域",
     # Time Pressure
-    'High': "高",
-    'Moderate': "中等",
-    'Low': "低",
-    'Unknown': "未知",
-    # Question Types (if needed for translation anywhere)
-    'Data Sufficiency': 'Data Sufficiency',
-    'Two-part analysis': 'Two-part analysis',
-    'Multi-source reasoning': 'Multi-source reasoning',
-    'Graph and Table': 'Graph and Table',
-    'Unknown Type': '未知類型', # Added for robustness
-    # --- Time Performance Categories ---
-    'Fast & Wrong': "快錯",
-    'Slow & Wrong': "慢錯",
-    'Normal Time & Wrong': "正常時間 & 錯",
-    'Slow & Correct': "慢對",
-    'Fast & Correct': "快對",
-    'Normal Time & Correct': "正常時間 & 對",
-    # --- End Time Performance Categories ---
-    
-    # 添加類別名稱翻譯
-    'SFE': '基礎掌握',
-    'Reading/Interpretation': '閱讀/解讀',
-    'Concept/Application': '概念/應用',
-    'Data/Calculation': '數據/計算',
-    'Logic/Reasoning': '邏輯/推理',
-    'Multi-Source': '多源整合',
-    'Efficiency': '效率問題',
-    'Carelessness': '粗心問題',
-    'Behavioral': '行為模式',
-    'Unknown': '未分類',
+    'High': "高", 'Low': "低", 'Unknown': "未知",
+    # Question Types
+    'Data Sufficiency': 'Data Sufficiency', 'Two-part analysis': 'Two-part analysis',
+    'Multi-source reasoning': 'Multi-source reasoning', 'Graph and Table': 'Graph and Table',
+    'Unknown Type': '未知類型',
+    # Time Performance Categories
+    'Fast & Wrong': "快錯", 'Slow & Wrong': "慢錯", 'Normal Time & Wrong': "正常時間 & 錯",
+    'Slow & Correct': "慢對", 'Fast & Correct': "快對", 'Normal Time & Correct': "正常時間 & 對",
+    # Parameter Categories
+    'SFE': '基礎掌握', 'Reading/Interpretation': '閱讀/解讀', 'Concept/Application': '概念/應用',
+    'Data/Calculation': '數據/計算', 'Logic/Reasoning': '邏輯/推理', 'Multi-Source': '多源整合',
+    'Efficiency': '效率問題', 'Carelessness': '粗心問題', 'Behavioral': '行為模式', 'Unknown': '未分類',
 }
-
-# --- DI Tool/Prompt Recommendations Map (Example Structure) ---
-# Maps sets of diagnostic parameters to strings containing tool/prompt recommendations
-DI_TOOL_RECOMMENDATIONS_MAP = {
-    # Example: Non-Math DS Logic Issues
-    frozenset(['DI_LOGICAL_REASONING_ERROR']): # Trigger based on parameter only
-        "針對非數學 DS 邏輯問題，考慮使用工具 `Dustin_GMAT_DI_Non-math_DS_Simulator`。相關 AI 提示可能包括 `DI-related/ds_logic_patterns.md`。", # Tool and Prompt
-    # Example: Calculation Errors or Efficiency Bottleneck
-    frozenset(['DI_CALCULATION_ERROR', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION']):
-        "計算錯誤或效率低下，可使用 AI 提示 `Quant-related/calculation_shortcuts.md` 或 `Quant-related/error_analysis_calculation.md`。", # Only Prompts
-    # Example: Data Interpretation Errors (General - replaced placeholder with reading comp)
-    frozenset(['DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR']):
-        "數據或文本解讀錯誤，嘗試 AI 提示 `DI-related/interpret_complex_text.md` 或 `DI-related/common_interpretation_pitfalls.md`。", # Only Prompts
-    # Example: MSR Integration Issues
-    frozenset(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_EFFICIENCY_BOTTLENECK_INTEGRATION']):
-        "MSR 信息整合困難或耗時，可考慮使用工具 `Dustin_GMAT_DI_MSR_Integrator`。AI 提示可嘗試 `DI-related/msr_integration_strategy.md`。", # Tool and Prompt
-    # Example: Carelessness (using the global param)
-    frozenset(['DI_BEHAVIOR_CARELESSNESS_ISSUE']):
-        "粗心問題導致失誤，建議使用 AI 提示 `General/attention_to_detail_checklist.md` 或 `General/self_reflection_careless_errors.md`。", # Only Prompts
-    # Example: Foundational Mastery (SFE)
-    frozenset(['DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE']):
-        "基礎掌握不穩定 (SFE)，建議優先使用 AI 提示 `Quant-related/01_basic_explanation.md` 或 `DI-related/basic_concept_review.md` 鞏固基礎。", # Only Prompts
-    # Example: MSR Specific Barriers
-    frozenset(['DI_MSR_READING_COMPREHENSION_BARRIER', 'DI_MSR_SINGLE_Q_BOTTLENECK']):
-        "MSR 閱讀或單題作答耗時過長，可參考 AI 提示 `DI-related/msr_time_management.md` 或 `DI-related/msr_reading_strategy.md`。",
-    # Add more mappings as needed based on DI parameters and available tools/prompts
-}
-
 
 # --- Parameter Categories for Report Grouping (DI) --- Updated ---
 DI_PARAM_CATEGORY_ORDER = [
-    'SFE',
-    'Reading/Interpretation',  # 閱讀/解讀
-    'Concept/Application',     # 概念/應用
-    'Data/Calculation',        # 數據/計算
-    'Logic/Reasoning',         # 邏輯/推理
-    'Multi-Source',            # 多源整合
-    'Efficiency',              # 效率問題
-    'Carelessness',            # 粗心問題
-    'Behavioral',              # 行為模式
-    'Unknown'                  # 未知類別
+    'SFE', 'Reading/Interpretation', 'Concept/Application', 'Data/Calculation',
+    'Logic/Reasoning', 'Multi-Source', 'Efficiency', 'Carelessness', 'Behavioral', 'Unknown'
 ]
 
 DI_PARAM_TO_CATEGORY = {
-    # SFE
     'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': 'SFE',
-    # Reading/Interpretation
     'DI_READING_COMPREHENSION_ERROR': 'Reading/Interpretation',
     'DI_GRAPH_TABLE_INTERPRETATION_ERROR': 'Reading/Interpretation',
-    # Concept/Application
     'DI_CONCEPT_APPLICATION_ERROR': 'Concept/Application',
-    # Data/Calculation
     'DI_DATA_EXTRACTION_ERROR': 'Data/Calculation',
     'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR': 'Data/Calculation',
     'DI_CALCULATION_ERROR': 'Data/Calculation',
-    # Logic/Reasoning
     'DI_LOGICAL_REASONING_ERROR': 'Logic/Reasoning',
-    'DI_QUESTION_TYPE_SPECIFIC_ERROR': 'Logic/Reasoning',
-    # Multi-Source
+    'DI_QUESTION_TYPE_SPECIFIC_ERROR': 'Logic/Reasoning', # Or specific category?
     'DI_MULTI_SOURCE_INTEGRATION_ERROR': 'Multi-Source',
-    'DI_MSR_READING_COMPREHENSION_BARRIER': 'Multi-Source',
-    'DI_MSR_SINGLE_Q_BOTTLENECK': 'Multi-Source',
-    # Efficiency
+    'DI_MSR_READING_COMPREHENSION_BARRIER': 'Multi-Source', # Or Efficiency? Let's keep Multi-Source
+    'DI_MSR_SINGLE_Q_BOTTLENECK': 'Multi-Source', # Or Efficiency? Let's keep Multi-Source
     'DI_EFFICIENCY_BOTTLENECK_READING': 'Efficiency',
     'DI_EFFICIENCY_BOTTLENECK_CONCEPT': 'Efficiency',
     'DI_EFFICIENCY_BOTTLENECK_CALCULATION': 'Efficiency',
     'DI_EFFICIENCY_BOTTLENECK_LOGIC': 'Efficiency',
     'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE': 'Efficiency',
     'DI_EFFICIENCY_BOTTLENECK_INTEGRATION': 'Efficiency',
-    # Carelessness
     'DI_CARELESSNESS_DETAIL_OMISSION': 'Carelessness',
-    # Behavioral
     'DI_BEHAVIOR_CARELESSNESS_ISSUE': 'Behavioral',
     'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': 'Behavioral'
 }
@@ -1335,134 +904,102 @@ DI_PARAM_TO_CATEGORY = {
 def _translate_di(param):
     """Translates an internal DI param/skill name using APPENDIX_A_TRANSLATION_DI."""
     if isinstance(param, list):
-        # Filter out None or non-string items before translation
-        return [APPENDIX_A_TRANSLATION_DI.get(p, p) for p in param if isinstance(p, str)]
+        return [APPENDIX_A_TRANSLATION_DI.get(p, str(p)) for p in param if isinstance(p, str)]
     elif isinstance(param, str):
          return APPENDIX_A_TRANSLATION_DI.get(param, param)
     else:
-         return str(param) # Return string representation of other types
+         return str(param)
 
 
 # --- DI Summary Report Generation Helper (Chapter 7 Logic) ---
 
 def _generate_di_summary_report(di_results):
     """Generates the summary report string for the Data Insights section."""
-    report_lines = []
-    # Keep only the more descriptive title
-    report_lines.append("---（基於用戶數據與模擬難度分析）---")
-    report_lines.append("")
-
-    # Extract chapters safely
+    report_lines = ["---（基於用戶數據與模擬難度分析）---", ""]
     ch1 = di_results.get('chapter_1', {})
     ch2 = di_results.get('chapter_2', {})
     ch3 = di_results.get('chapter_3', {})
     ch4 = di_results.get('chapter_4', {})
-    ch5 = di_results.get('chapter_5', {})
+    # ch5 = di_results.get('chapter_5', {}) # Ch5 results not directly used in report text
     ch6 = di_results.get('chapter_6', {})
+    diagnosed_df = ch3.get('diagnosed_dataframe')
 
-    # Get diagnosed dataframe and calculate triggered params from it
-    diagnosed_df = ch3.get('diagnosed_dataframe') # This should be the latest df passed to Ch7
-    all_triggered_params = set() # Use set for faster lookup and uniqueness
-    sfe_triggered = False
-    # --- NEW: Prepare data for reflection mapping --- #
-    param_to_positions = {} # Maps English code -> set of positions
-    domain_to_positions = {} # Maps Domain -> set of positions
+    # Pre-translate common terms
+    math_related_zh = _translate_di('Math Related')
+    non_math_related_zh = _translate_di('Non-Math Related')
+
+    # Prepare data for reflection mapping and param counts
+    all_triggered_params = set()
+    param_to_positions = {}
+    domain_to_positions = {}
+    param_counts_all = pd.Series(dtype=int)
 
     if diagnosed_df is not None and not diagnosed_df.empty:
-        # Try to use the final translated list first, fallback to English codes
-        # Use English codes for logic and mapping keys
         param_col_eng = 'diagnostic_params' if 'diagnostic_params' in diagnosed_df.columns else None
-
-        # Check if necessary columns exist
-        required_cols_for_mapping = ['content_domain', 'question_position']
-        if param_col_eng and all(col in diagnosed_df.columns for col in required_cols_for_mapping):
-             for index, row in diagnosed_df.iterrows():
+        map_cols = ['content_domain', 'question_position']
+        if param_col_eng and all(col in diagnosed_df.columns for col in map_cols):
+            all_param_lists_for_count = []
+            for index, row in diagnosed_df.iterrows(): # Iteration needed for detailed mapping
                  pos = row.get('question_position')
                  domain = row.get('content_domain', 'Unknown Domain')
-                 params = row.get(param_col_eng, []) # Get English codes/list
-                 if not isinstance(params, list): params = [] # Ensure it's a list
+                 params = row.get(param_col_eng, [])
+                 if not isinstance(params, list): params = []
+                 params = [p for p in params if isinstance(p, str)] # Ensure strings
 
-                 # Populate all_triggered_params with codes
-                 all_triggered_params.update(p for p in params if isinstance(p, str))
+                 all_triggered_params.update(params)
+                 all_param_lists_for_count.extend(params) # For counting
 
-                 # Populate mappings if position is valid
                  if pos is not None and pos != 'N/A':
                      if domain != 'Unknown Domain':
                           domain_to_positions.setdefault(domain, set()).add(pos)
-                     # Map param codes to positions
                      for p in params:
-                         if isinstance(p, str): # Ensure param is a string code
-                            param_to_positions.setdefault(p, set()).add(pos)
-        else:
-            print(f"Warning (_generate_di_summary_report): Missing one or more required columns for detailed reflection mapping ('diagnostic_params', {', '.join(required_cols_for_mapping)}). Trying fallback.")
-            # Fallback to get triggered params if mapping failed
-            if param_col_eng: # Check if at least the param column exists
-                 param_lists_fallback = diagnosed_df[param_col_eng][diagnosed_df[param_col_eng].apply(isinstance, args=(list,))].tolist()
-                 all_triggered_params.update(p for params_list in param_lists_fallback for p in params_list if isinstance(p, str))
+                         param_to_positions.setdefault(p, set()).add(pos)
+            if all_param_lists_for_count:
+                 param_counts_all = pd.Series(all_param_lists_for_count).value_counts()
 
-        # Add behavioral params from Ch4 (ensure they are codes)
-        ch4_behavioral_params = ch4.get('triggered_behavioral_params', [])
-        all_triggered_params.update(p for p in ch4_behavioral_params if isinstance(p, str))
+        ch4_behavioral_params = [p for p in ch4.get('triggered_behavioral_params', []) if isinstance(p, str)]
+        all_triggered_params.update(ch4_behavioral_params)
+        # Add Ch4 params to counts if not already counted (assuming they aren't in df)
+        # This might slightly inflate counts if they *are* also in df - depends on Ch4 logic
+        param_counts_all = param_counts_all.add(pd.Series(ch4_behavioral_params).value_counts(), fill_value=0)
 
-    # Convert sets in mappings to sorted lists
+
     for param in param_to_positions: param_to_positions[param] = sorted(list(param_to_positions[param]))
     for domain in domain_to_positions: domain_to_positions[domain] = sorted(list(domain_to_positions[domain]))
-
-    # Check SFE status based on collected param codes
     sfe_triggered = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in all_triggered_params
-    # --- End Data Preparation --- #
+    sfe_code = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'
 
-    # 1. 開篇總結 (基於第一章)
+    # 1. 開篇總結
     report_lines.append("**1. 開篇總結（時間策略與有效性）**")
-    tp_status_key = ch1.get('time_pressure') # Get boolean or None
-    # Translate boolean to High/Low or Unknown (use equality check)
-    if tp_status_key == True: # Use == True
-        tp_status = _translate_di('High')
-    elif tp_status_key == False: # Use == False
-        tp_status = _translate_di('Low')
-    else: # Handles None or other types
-        tp_status = _translate_di('Unknown')
-
+    tp_status = _translate_di(ch1.get('time_pressure', 'Unknown')) # Use translated status directly
     total_time = ch1.get('total_test_time_minutes', 0)
     time_diff = ch1.get('time_difference_minutes', 0)
     invalid_count = ch1.get('invalid_questions_excluded', 0)
     report_lines.append(f"- 整體作答時間：{total_time:.2f} 分鐘（允許 {MAX_ALLOWED_TIME_DI:.1f} 分鐘，剩餘 {time_diff:.2f} 分鐘）")
-    report_lines.append(f"- 時間壓力感知：**{tp_status}**") # Use translated status
-    if invalid_count > 0:
-        report_lines.append(f"- **警告：** 因時間壓力下末段作答過快，有 {invalid_count} 題被標記為無效數據，未納入後續分析。")
+    report_lines.append(f"- 時間壓力感知：**{tp_status}**")
+    if invalid_count > 0: report_lines.append(f"- **警告：** 因時間壓力下末段作答過快，有 {invalid_count} 題被標記為無效數據，未納入後續分析。")
     report_lines.append("")
 
-    # 2. 表現概覽 (基於第二章)
+    # 2. 表現概覽
     report_lines.append("**2. 表現概覽（內容領域對比）**")
     domain_tags = ch2.get('domain_comparison_tags', {})
     if domain_tags.get('significant_diff_error') or domain_tags.get('significant_diff_overtime'):
-        if domain_tags.get('poor_math_related'): report_lines.append(f"- **{_translate_di('Math Related')}** 領域的 **錯誤率** 明顯更高。") # Translate domain
-        if domain_tags.get('poor_non_math_related'): report_lines.append(f"- **{_translate_di('Non-Math Related')}** 領域的 **錯誤率** 明顯更高。") # Translate domain
-        if domain_tags.get('slow_math_related'): report_lines.append(f"- **{_translate_di('Math Related')}** 領域的 **超時率** 明顯更高。") # Translate domain
-        if domain_tags.get('slow_non_math_related'): report_lines.append(f"- **{_translate_di('Non-Math Related')}** 領域的 **超時率** 明顯更高。") # Translate domain
-    else:
-        report_lines.append(f"- {_translate_di('Math Related')}與{_translate_di('Non-Math Related')}領域的表現在錯誤率和超時率上無顯著差異。")
+        if domain_tags.get('poor_math_related'): report_lines.append(f"- **{math_related_zh}** 領域的 **錯誤率** 明顯更高。")
+        if domain_tags.get('poor_non_math_related'): report_lines.append(f"- **{non_math_related_zh}** 領域的 **錯誤率** 明顯更高。")
+        if domain_tags.get('slow_math_related'): report_lines.append(f"- **{math_related_zh}** 領域的 **超時率** 明顯更高。")
+        if domain_tags.get('slow_non_math_related'): report_lines.append(f"- **{non_math_related_zh}** 領域的 **超時率** 明顯更高。")
+    else: report_lines.append(f"- {math_related_zh}與{non_math_related_zh}領域的表現在錯誤率和超時率上無顯著差異。")
     report_lines.append("")
 
-    # 3. 核心問題分析 (基於第三章參數 + Ch4 global params)
+    # 3. 核心問題分析
     report_lines.append("**3. 核心問題分析**")
-    core_issues = []
-    sfe_domains_involved = set()
-    sfe_types_involved = set()
-
-    # --- SFE Summary Logic --- #
     if sfe_triggered and diagnosed_df is not None and 'is_sfe' in diagnosed_df.columns:
         sfe_rows = diagnosed_df[diagnosed_df['is_sfe'] == True]
         if not sfe_rows.empty:
-            # Ensure domain/type columns exist before accessing
-            if 'content_domain' in sfe_rows.columns:
-                 sfe_domains_involved = set(sfe_rows['content_domain'].dropna())
-            if 'question_type' in sfe_rows.columns:
-                 sfe_types_involved = set(sfe_rows['question_type'].dropna())
-
-            sfe_label = _translate_di('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+            sfe_domains_involved = set(sfe_rows['content_domain'].dropna()) if 'content_domain' in sfe_rows else set()
+            sfe_types_involved = set(sfe_rows['question_type'].dropna()) if 'question_type' in sfe_rows else set()
+            sfe_label = _translate_di(sfe_code)
             sfe_domains_zh = "，".join(sorted([_translate_di(d) for d in sfe_domains_involved]))
-            # Use translated types if translation map includes them, else use raw names
             sfe_types_zh = "，".join(sorted([_translate_di(t) for t in sfe_types_involved]))
             sfe_note = f"**尤其需要注意：{sfe_label}**"
             if sfe_domains_involved: sfe_note += f"（涉及領域：{sfe_domains_zh}）"
@@ -1470,37 +1007,17 @@ def _generate_di_summary_report(di_results):
             sfe_note += "。（註：SFE 指在已掌握難度範圍內題目失誤）"
             report_lines.append(f"- {sfe_note}")
 
-    # --- Core Issue Summary --- #
-    # Get counts of all triggered param codes
-    param_counts_all = {}
-    if all_triggered_params: # Check if the set is not empty
-        # Count occurrences in the original df column if available
-        param_col_for_count = 'diagnostic_params' # Assume English codes
-        if diagnosed_df is not None and param_col_for_count in diagnosed_df.columns:
-             all_param_lists = [p for sublist in diagnosed_df[param_col_for_count] if isinstance(sublist, list) for p in sublist if isinstance(p, str)]
-             param_counts_all = pd.Series(all_param_lists).value_counts()
-        else:
-            # Basic count from the set if column is missing
-             param_counts_all = pd.Series({p: 1 for p in all_triggered_params}) # Simple count
-
-    # Exclude SFE for "other" top params
     top_other_params_codes = []
     if not param_counts_all.empty:
-        top_other_params_codes = param_counts_all[param_counts_all.index != 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'].head(2).index.tolist()
-
+        top_other_params_codes = param_counts_all[param_counts_all.index != sfe_code].head(2).index.tolist()
     if top_other_params_codes:
         report_lines.append("- **其他主要問題點：**")
-        for param_code in top_other_params_codes:
-            report_lines.append(f"  - {_translate_di(param_code)}")
-    elif not sfe_triggered:
-        report_lines.append("- 未識別出明顯的核心問題模式。")
+        for param_code in top_other_params_codes: report_lines.append(f"  - {_translate_di(param_code)}")
+    elif not sfe_triggered: report_lines.append("- 未識別出明顯的核心問題模式。")
+    report_lines.append("")
 
-    # Detailed Diagnostic List removed per user request
-    report_lines.append("") # Add blank line after section
-
-    # 4. 特殊模式觀察 (基於第四章結果)
+    # 4. 特殊模式觀察
     report_lines.append("**4. 特殊模式觀察**")
-    # Use flags from Ch4 results dict
     careless_triggered_ch4 = ch4.get('carelessness_issue_triggered')
     rushing_triggered_ch4 = ch4.get('early_rushing_risk_triggered')
     patterns_found = False
@@ -1512,328 +1029,135 @@ def _generate_di_summary_report(di_results):
         num_rush = len(ch4.get('early_rushing_questions', []))
         report_lines.append(f"- **{_translate_di('DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')}**：測驗前期（{num_rush} 題）出現作答時間過短（<1分鐘）的情況，可能影響準確率。")
         patterns_found = True
-    if not patterns_found:
-        report_lines.append("- 未發現明顯的粗心或前期過快等負面行為模式。")
+    if not patterns_found: report_lines.append("- 未發現明顯的粗心或前期過快等負面行為模式。")
     report_lines.append("")
 
-    # 5. 詳細診斷說明 (Skipped as per previous logic)
-
-    # 6. 練習建議 (基於第六章)
+    # 6. 練習建議
     report_lines.append("**6. 練習建議**")
     recommendations = ch6.get('recommendations_list', [])
-    if not recommendations:
-        report_lines.append("- 根據當前分析，暫無特別的練習建議。請保持全面複習。")
+    if not recommendations: report_lines.append("- 根據當前分析，暫無特別的練習建議。請保持全面複習。")
     else:
-        # Keep simple numbered list for now
-        for i, rec in enumerate(recommendations):
-            rec_text = rec.get('text', '無建議內容')
-            report_lines.append(f"{i+1}. {rec_text}")
-        report_lines.append("") # Add space after the list
-
+        for i, rec in enumerate(recommendations): report_lines.append(f"{i+1}. {rec.get('text', '無建議內容')}")
+    report_lines.append("")
 
     # 7. 後續行動指引
     report_lines.append("**7. 後續行動指引**")
-
-    # --- START: Refactored "引導反思" Section --- #
     report_lines.append("- **引導反思：**")
     reflection_prompts = []
-
-    # --- Define Helper Functions Locally --- #
+    # Define Helper Functions Locally (can be moved outside if preferred)
     def get_pos_context_str_di(param_keys):
-        """Gets formatted question position context string for DI."""
-        positions = set()
-        # Use the param_to_positions dict calculated earlier
-        for key in param_keys:
-             # Ensure key exists and is a string code before lookup
-             if isinstance(key, str) and key in param_to_positions:
-                 positions.update(param_to_positions.get(key, set()))
+        positions = set().union(*[param_to_positions.get(key, set()) for key in param_keys if isinstance(key, str)])
         return f"（涉及題號：{sorted(list(positions))}）" if positions else ""
-
     def get_relevant_domains_di(param_keys):
-        """Gets relevant content domains associated with triggered DI parameters."""
-        relevant_positions = set()
-        # Use the param_to_positions dict calculated earlier
-        for key in param_keys:
-             if isinstance(key, str) and key in param_to_positions:
-                 relevant_positions.update(param_to_positions.get(key, set()))
-
-        relevant_domains_set = set()
-        # Use the domain_to_positions dict calculated earlier
-        for domain, positions in domain_to_positions.items():
-            if not relevant_positions.isdisjoint(positions):
-                 relevant_domains_set.add(_translate_di(domain)) # Translate domain name
-
+        relevant_positions = set().union(*[param_to_positions.get(key, set()) for key in param_keys if isinstance(key, str)])
+        relevant_domains_set = {_translate_di(domain) for domain, positions in domain_to_positions.items() if not relevant_positions.isdisjoint(positions)}
         return sorted(list(relevant_domains_set))
-    # --- End Helper Functions --- #
-
-    # --- Define DI Reflection Parameter Lists (using English codes) --- #
-    reading_interpretation_params_di = [
-        'DI_READING_COMPREHENSION_ERROR',
-        'DI_GRAPH_TABLE_INTERPRETATION_ERROR'
-    ]
-    concept_logic_params_di = [
-        'DI_CONCEPT_APPLICATION_ERROR', # Math
-        'DI_LOGICAL_REASONING_ERROR', # Non-Math
-        'DI_QUESTION_TYPE_SPECIFIC_ERROR' # Example: MSR Non-Math sub-type logic
-    ]
-    data_handling_calc_params_di = [
-        'DI_DATA_EXTRACTION_ERROR',
-        'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR',
-        'DI_CALCULATION_ERROR'
-    ]
-    msr_specific_params_di = [
-        'DI_MULTI_SOURCE_INTEGRATION_ERROR',
-        'DI_MSR_READING_COMPREHENSION_BARRIER',
-        'DI_MSR_SINGLE_Q_BOTTLENECK'
-    ]
-    efficiency_params_di = [
-        'DI_EFFICIENCY_BOTTLENECK_READING',
-        'DI_EFFICIENCY_BOTTLENECK_CONCEPT',
-        'DI_EFFICIENCY_BOTTLENECK_CALCULATION',
-        'DI_EFFICIENCY_BOTTLENECK_LOGIC',
-        'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE',
-        'DI_EFFICIENCY_BOTTLENECK_INTEGRATION'
-    ]
-    carelessness_params_di = [
-        'DI_CARELESSNESS_DETAIL_OMISSION',
-        'DI_BEHAVIOR_CARELESSNESS_ISSUE',
-        # Consider if 'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK' belongs here or needs own prompt
-    ]
-    # --- End Parameter Lists --- #
-
-    # --- Generate Reflection Prompts --- #
-    # Concept/Logic Prompt
-    # Use the 'all_triggered_params' set calculated earlier
-    if any(p in all_triggered_params for p in concept_logic_params_di) or sfe_triggered: # Check SFE flag too
-        relevant_keys = [p for p in concept_logic_params_di if p in all_triggered_params]
-        if sfe_triggered: relevant_keys.append('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-        domains_involved = get_relevant_domains_di(relevant_keys)
-        domain_context = f" [`{'，'.join(domains_involved)}`] " if domains_involved else " "
-        reflection_prompts.append(f"  - 回想一下，在做錯的{domain_context}題目時，具體是卡在哪個數學概念、邏輯關係或題目要求上？是完全沒思路，理解錯誤，還是知道方法但應用出錯？" + get_pos_context_str_di(relevant_keys))
-
-    # Reading/Interpretation Prompt
-    if any(p in all_triggered_params for p in reading_interpretation_params_di):
-        relevant_keys = [p for p in reading_interpretation_params_di if p in all_triggered_params]
-        domains_involved = get_relevant_domains_di(relevant_keys)
-        domain_context = f" [`{'，'.join(domains_involved)}`] " if domains_involved else " "
-        reflection_prompts.append(f"  - 對於做錯/慢的{domain_context}題目，是文字資訊、圖表解讀有困難，還是無法準確理解問題要求？" + get_pos_context_str_di(relevant_keys))
-
-    # Data Handling/Calculation Prompt
-    if any(p in all_triggered_params for p in data_handling_calc_params_di):
-        relevant_keys = [p for p in data_handling_calc_params_di if p in all_triggered_params]
-        domains_involved = get_relevant_domains_di(relevant_keys)
-        domain_context = f" [`{'，'.join(domains_involved)}`] " if domains_involved else " "
-        reflection_prompts.append(f"  - 在處理{domain_context}題目時，是提取數據、整合信息出錯，還是計算過程容易失誤？" + get_pos_context_str_di(relevant_keys))
-
-    # MSR Specific Prompt (Integration/Time)
-    if any(p in all_triggered_params for p in msr_specific_params_di):
-        relevant_keys = [p for p in msr_specific_params_di if p in all_triggered_params]
-        domains_involved = get_relevant_domains_di(relevant_keys)
-        domain_context = f" [`{'，'.join(domains_involved)}`] " if domains_involved else " " # Should usually be Non-Math
-        reflection_prompts.append(f"  - 對於 MSR 題目，是多源資訊的整合理解有困難，還是閱讀材料或回答單題耗時過長？" + get_pos_context_str_di(relevant_keys))
-
-    # Efficiency Prompt (Generic)
-    if any(p in all_triggered_params for p in efficiency_params_di):
-        relevant_keys = [p for p in efficiency_params_di if p in all_triggered_params]
-        domains_involved = get_relevant_domains_di(relevant_keys)
-        domain_context = f" [`{'，'.join(domains_involved)}`] " if domains_involved else " "
-        reflection_prompts.append(f"  - 回想耗時過長的{domain_context}題目，主要瓶頸是在閱讀、理解、思考、整合還是計算？" + get_pos_context_str_di(relevant_keys))
-
-    # Carelessness Prompt
-    if any(p in all_triggered_params for p in carelessness_params_di):
-        relevant_keys = [p for p in carelessness_params_di if p in all_triggered_params]
-        reflection_prompts.append("  - 回想一下，是否存在因為看錯字、忽略細節、誤解圖表或計算粗心導致的失誤？" + get_pos_context_str_di(relevant_keys))
-
-    if not reflection_prompts:
-        reflection_prompts.append("  - （本次分析未觸發典型的反思問題，建議結合練習計劃進行）")
+    # Define DI Reflection Parameter Lists (using English codes)
+    reading_interpretation_params_di = ['DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR']
+    concept_logic_params_di = ['DI_CONCEPT_APPLICATION_ERROR', 'DI_LOGICAL_REASONING_ERROR', 'DI_QUESTION_TYPE_SPECIFIC_ERROR']
+    data_handling_calc_params_di = ['DI_DATA_EXTRACTION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_CALCULATION_ERROR']
+    msr_specific_params_di = ['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_MSR_READING_COMPREHENSION_BARRIER', 'DI_MSR_SINGLE_Q_BOTTLENECK']
+    efficiency_params_di = ['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION', 'DI_EFFICIENCY_BOTTLENECK_LOGIC', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_INTEGRATION']
+    carelessness_params_di = ['DI_CARELESSNESS_DETAIL_OMISSION', 'DI_BEHAVIOR_CARELESSNESS_ISSUE']
+    # Generate Reflection Prompts
+    active_concept_logic = [p for p in concept_logic_params_di if p in all_triggered_params]
+    if active_concept_logic or sfe_triggered:
+        keys = active_concept_logic + ([sfe_code] if sfe_triggered else [])
+        domains = get_relevant_domains_di(keys)
+        ctx = f" [`{'，'.join(domains)}`] " if domains else " "
+        reflection_prompts.append(f"  - 回想一下，在做錯的{ctx}題目時，具體是卡在哪個數學概念、邏輯關係或題目要求上？是完全沒思路，理解錯誤，還是知道方法但應用出錯？" + get_pos_context_str_di(keys))
+    active_reading = [p for p in reading_interpretation_params_di if p in all_triggered_params]
+    if active_reading:
+        domains = get_relevant_domains_di(active_reading)
+        ctx = f" [`{'，'.join(domains)}`] " if domains else " "
+        reflection_prompts.append(f"  - 對於做錯/慢的{ctx}題目，是文字資訊、圖表解讀有困難，還是無法準確理解問題要求？" + get_pos_context_str_di(active_reading))
+    active_data = [p for p in data_handling_calc_params_di if p in all_triggered_params]
+    if active_data:
+        domains = get_relevant_domains_di(active_data)
+        ctx = f" [`{'，'.join(domains)}`] " if domains else " "
+        reflection_prompts.append(f"  - 在處理{ctx}題目時，是提取數據、整合信息出錯，還是計算過程容易失誤？" + get_pos_context_str_di(active_data))
+    active_msr = [p for p in msr_specific_params_di if p in all_triggered_params]
+    if active_msr:
+        reflection_prompts.append(f"  - 對於 MSR 題目，是多源資訊的整合理解有困難，還是閱讀材料或回答單題耗時過長？" + get_pos_context_str_di(active_msr))
+    active_efficiency = [p for p in efficiency_params_di if p in all_triggered_params]
+    if active_efficiency:
+        domains = get_relevant_domains_di(active_efficiency)
+        ctx = f" [`{'，'.join(domains)}`] " if domains else " "
+        reflection_prompts.append(f"  - 回想耗時過長的{ctx}題目，主要瓶頸是在閱讀、理解、思考、整合還是計算？" + get_pos_context_str_di(active_efficiency))
+    active_careless = [p for p in carelessness_params_di if p in all_triggered_params]
+    if active_careless: reflection_prompts.append("  - 回想一下，是否存在因為看錯字、忽略細節、誤解圖表或計算粗心導致的失誤？" + get_pos_context_str_di(active_careless))
+    if not reflection_prompts: reflection_prompts.append("  - （本次分析未觸發典型的反思問題，建議結合練習計劃進行）")
     report_lines.extend(reflection_prompts)
-    # --- END: Refactored "引導反思" Section --- #
 
-
-    # 7.2 Qualitative Analysis Suggestion
-    qual_needed = any(p in all_triggered_params for p in ['DI_LOGICAL_REASONING_ERROR', 'DI_READING_COMPREHENSION_ERROR'])
-    if qual_needed:
-        report_lines.append("- **質化分析建議：**") # Changed from 7.3 to 7.2
+    # Qualitative Analysis Suggestion
+    if any(p in all_triggered_params for p in ['DI_LOGICAL_REASONING_ERROR', 'DI_READING_COMPREHENSION_ERROR']):
+        report_lines.append("- **質化分析建議：**")
         report_lines.append("  - 如果您對報告中指出的某些問題（尤其是非數學相關的邏輯或閱讀理解錯誤）仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。")
 
-    # 7.3 Second Evidence Suggestion
-    # --- Re-introduce variable preparation for this section --- #
-    detailed_items = [] # Initialize list, even though we don't iterate it for output here
-    avg_time_per_type = ch3.get('avg_time_per_type_minutes', {}) # Get avg times from ch3 results
-    df_problem = pd.DataFrame() # Initialize empty df
-    if diagnosed_df is not None and not diagnosed_df.empty: # Remove check for diagnostic_params, check later
-        filter_cols = ['is_correct', 'overtime']
-        if all(col in diagnosed_df.columns for col in filter_cols):
-            df_problem = diagnosed_df[ (diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True) ].copy()
-            # Check if df_problem is actually populated after filtering
-            if not df_problem.empty:
-                 # Minimal population if needed by logic below
-                 detailed_items = df_problem[['question_position']].head().values.tolist()
-    # --- End variable preparation --- #
+    # Second Evidence Suggestion
+    report_lines.append("- **二級證據參考建議：**")
+    df_problem = pd.DataFrame() # Re-init for safety
+    if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
+        df_problem = diagnosed_df[(diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True)].copy()
 
-    report_lines.append("- **二級證據參考建議：**") # Changed from 7.4 to 7.3
-    if not df_problem.empty: # Check if df_problem was successfully created and populated
+    if not df_problem.empty:
         report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
-
-        # --- START NEW LOGIC: Group by time_performance_category --- #
         details_added_2nd_ev = False
-        if 'time_performance_category' in df_problem.columns:
-            # Define the desired order for performance categories
-            performance_order_en = [
-                'Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong',
-                'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct',
-                'Unknown' # Include Unknown as a fallback
-            ]
+        if 'time_performance_category' in df_problem.columns and 'question_type' in df_problem.columns and 'content_domain' in df_problem.columns and 'diagnostic_params' in df_problem.columns:
+            performance_order = ['Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct', 'Unknown']
+            try: # Add try-except for robustness of groupby
+                grouped_by_performance = df_problem.groupby('time_performance_category')
+                for perf_en in performance_order:
+                    if perf_en == 'Fast & Correct': continue # Skip Fast & Correct
+                    if perf_en in grouped_by_performance.groups:
+                        group_df = grouped_by_performance.get_group(perf_en)
+                        if not group_df.empty:
+                            perf_zh = _translate_di(perf_en)
+                            types_zh = sorted([_translate_di(t) for t in group_df['question_type'].dropna().unique()])
+                            domains_zh = sorted([_translate_di(d) for d in group_df['content_domain'].dropna().unique()])
+                            report_lines.append(f"  - **{perf_zh}：** 需關注題型：【{', '.join(types_zh)}】；涉及領域：【{', '.join(domains_zh)}】。")
 
-            # 創建中文標籤到英文代碼的反向映射
-            chinese_label_to_english_code = {}
-            for code, label in APPENDIX_A_TRANSLATION_DI.items():
-                if isinstance(label, str) and label != code:  # 避免自引用
-                    chinese_label_to_english_code[label] = code
+                            # Categorize parameters within the group
+                            all_eng_codes_in_group = set().union(*[s for s in group_df['diagnostic_params'] if isinstance(s, list)])
+                            all_eng_codes_in_group.discard(INVALID_DATA_TAG_DI) # Remove invalid tag from categorization
 
-            grouped_by_performance = df_problem.groupby('time_performance_category')
+                            labels_by_category = {category: [] for category in DI_PARAM_CATEGORY_ORDER}
+                            for code_en in all_eng_codes_in_group:
+                                category = DI_PARAM_TO_CATEGORY.get(code_en, 'Unknown')
+                                labels_by_category[category].append(code_en)
 
-            # Iterate in the desired order
-            for perf_en in performance_order_en:
-                if perf_en in grouped_by_performance.groups: # Check if this group exists
-                    # --- ADD SKIP LOGIC for 'Fast & Correct' --- #
-                    if perf_en == 'Fast & Correct':
-                        print(f"DEBUG (di_report): Skipping category '{perf_en}' as requested.") # DEBUG
-                        continue # Skip to the next category
-                    # --- END SKIP LOGIC --- #
+                            label_parts_data = []
+                            for category in DI_PARAM_CATEGORY_ORDER:
+                                category_eng_codes = labels_by_category.get(category, [])
+                                if category_eng_codes:
+                                    category_zh = _translate_di(category)
+                                    category_labels_zh = sorted([_translate_di(code) for code in category_eng_codes])
+                                    label_parts_data.append((category_zh, category_labels_zh))
 
-                    group_df = grouped_by_performance.get_group(perf_en)
-                    if not group_df.empty:
-                        perf_zh = _translate_di(perf_en)
-                        types_in_group = group_df['question_type'].dropna().unique()
-                        domains_in_group = group_df['content_domain'].dropna().unique()
-                        types_zh = sorted([_translate_di(t) for t in types_in_group])
-                        domains_zh = sorted([_translate_di(d) for d in domains_in_group])
+                            if label_parts_data:
+                                report_lines.append("    注意相關問題點：")
+                                for category_zh, sorted_labels_zh in label_parts_data:
+                                    report_lines.append(f"      - 【{category_zh}：{'、'.join(sorted_labels_zh)}】")
+                            details_added_2nd_ev = True
+            except Exception:
+                 # Log error if needed, prevent report generation from crashing
+                 report_lines.append("  - （分組分析時出現內部錯誤）")
+                 details_added_2nd_ev = True # Mark as detail attempted
 
-                        # --- 分類標籤處理 (REVISED LOGIC - Directly use English codes for categorization) --- #
-                        all_eng_codes_in_group = set()
-                        param_eng_col = 'diagnostic_params' # Assume English codes are here
-                        if param_eng_col in group_df.columns:
-                            for labels_list in group_df[param_eng_col]:
-                                if isinstance(labels_list, list):
-                                    # Exclude invalid data tag from the set used for categorization
-                                    all_eng_codes_in_group.update(p for p in labels_list if isinstance(p, str) and p != INVALID_DATA_TAG_DI)
-                        else:
-                            print(f"Warning (_generate_di_summary_report): Column '{param_eng_col}' not found in DI group_df. Cannot categorize by English code.")
-
-                        labels_by_category = {category: [] for category in DI_PARAM_CATEGORY_ORDER}
-                        # Removed unknown_labels, categorization based on V_PARAM_TO_CATEGORY handles unknowns
-
-                        # Categorize using English codes
-                        for code_en in all_eng_codes_in_group:
-                            category = DI_PARAM_TO_CATEGORY.get(code_en, 'Unknown')
-                            labels_by_category[category].append(code_en) # Store English code
-                        
-                        # Translate codes to Chinese labels *after* categorization
-                        label_parts_data = []
-                        for category in DI_PARAM_CATEGORY_ORDER: # Iterate in defined order
-                            category_eng_codes = labels_by_category.get(category, [])
-                            if category_eng_codes:
-                                category_zh = _translate_di(category)
-                                # Translate the English codes in this category to Chinese labels
-                                category_labels_zh = sorted([_translate_di(code) for code in category_eng_codes])
-                                label_parts_data.append((category_zh, category_labels_zh))
-                        # --- END 分類標籤處理 --- #
-
-                        # --- Modify Report Lines using Markdown List Structure --- #
-                        # 1. Add the main bullet point for the performance category
-                        report_lines.append(f"  - **{perf_zh}：** 需關注題型：【{', '.join(types_zh)}】；涉及領域：【{', '.join(domains_zh)}】。")
-
-                        # 2. Check if there are labels to add
-                        # label_parts_data = [] # Store tuples of (category_zh, sorted_labels_zh)
-                        # (Logic moved up)
-
-                        # 3. If labels exist, add the header and sub-bullets
-                        if label_parts_data:
-                            # Add the indented header line
-                            report_lines.append("    注意相關問題點：")
-                            # Add each category as an indented sub-bullet point
-                            for category_zh, sorted_labels_zh in label_parts_data:
-                                report_lines.append(f"      - 【{category_zh}：{'、'.join(sorted_labels_zh)}】") # Use dunhao comma
-                        # --- End Modify Report Lines --- #
-
-                        details_added_2nd_ev = True
-        else:
-            report_lines.append("  - （警告：缺少 'time_performance_category' 欄位，無法按時間表現分類。）")
-            # Fallback? Or just skip the detailed breakdown. Skipping is simpler.
-            pass
-        # --- END NEW LOGIC --- #
-
-        # Report core issues again (Keep this part)
+        # Report core issues again
         core_issue_texts = []
-        if sfe_triggered: core_issue_texts.append(_translate_di('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'))
-        # Assuming top_other_params_codes is still calculated correctly earlier in the function
+        if sfe_triggered: core_issue_texts.append(_translate_di(sfe_code))
         if 'top_other_params_codes' in locals() and top_other_params_codes:
              core_issue_texts.extend([_translate_di(p) for p in top_other_params_codes])
+        filtered_core_issues = [issue for issue in core_issue_texts if issue != _translate_di(INVALID_DATA_TAG_DI)]
+        if filtered_core_issues:
+             report_lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題：【{', '.join(filtered_core_issues)}】。")
+             details_added_2nd_ev = True
 
-        if core_issue_texts:
-             # Filter out invalid tag from core issues text as well
-             filtered_core_issues = [issue for issue in core_issue_texts if issue != INVALID_DATA_TAG_DI]
-             if filtered_core_issues:
-                 report_lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題：【{', '.join(filtered_core_issues)}】。")
-             details_added_2nd_ev = True # Mark as details added even if only core issues shown
-
-        if not details_added_2nd_ev:
-             report_lines.append("  - （本次分析未聚焦到特定的問題類型或領域）")
-
+        if not details_added_2nd_ev: report_lines.append("  - （本次分析未聚焦到特定的問題類型或領域）")
         report_lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
-    else:
-        report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
+    else: report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
 
-
-    # 7.4 Tools and Prompts Recommendation (Keep original commented out state)
-    # report_lines.append("  **輔助工具與 AI 提示推薦建議:**")
-    # recommended_di_tools = set()
-    # recommended_di_prompts = set()
-    # processed_for_tools_di = set()
-    # recommendations_made_di = False
-
-    # Use all_triggered_params calculated at the start of Ch7 generation
-    # unique_triggered_params = set(all_triggered_params) # Ensure uniqueness
-
-    # for params_set, tool_desc in DI_TOOL_RECOMMENDATIONS_MAP.items():
-    #     # Check if the required set of params is a subset of triggered params
-    #     # Or if ANY of the params in the set were triggered (depending on desired logic)
-    #     # Let's use 'any' for broader matching based on the examples provided
-    #     trigger_match = any(p in unique_triggered_params for p in params_set)
-
-    #     if trigger_match and not params_set.issubset(processed_for_tools_di):
-    #         import re
-    #         all_backticked = re.findall(r'`([^`]+?)`', tool_desc)
-    #         current_tools = {item for item in all_backticked if not item.endswith('.md') and item.strip()}
-    #         current_prompts = {item for item in all_backticked if item.endswith('.md')}
-
-    #         if current_tools:
-    #             recommended_di_tools.update(current_tools)
-    #             recommendations_made_di = True
-    #         if current_prompts:
-    #             recommended_di_prompts.update(current_prompts)
-    #             recommendations_made_di = True
-
-    #         processed_for_tools_di.update(params_set)
-
-    # Output collected tools and prompts
-    # tools_were_recommended_di = bool(recommended_di_tools)
-    # prompts_were_recommended_di = bool(recommended_di_prompts)
-
-    # if tools_were_recommended_di:
-    #     report_lines.append("  - *工具:*") # + (" (請根據問題選用)" if len(recommended_di_tools)>1 else ""))
-    #     for tool in sorted(list(recommended_di_tools)):
-    #         report_lines.append(f"    - `{tool}`")
-
-    # if prompts_were_recommended_di:
-    #     if tools_were_recommended_di:
-    #          report_lines.append("")
-    #     report_lines.append("  - *AI提示:*") # + (" (請根據問題選用)" if len(recommended_di_prompts)>1 else ""))
-    #     for prompt in sorted(list(recommended_di_prompts)):
-    #         report_lines.append(f"    - `{prompt}`")
-
-    # if not recommendations_made_di:
-    #     report_lines.append("  - 根據當前診斷，暫無特別推薦的輔助工具或 AI 提示。")
+    # Tool/Prompt section was removed earlier
 
     return "\n\n".join(report_lines)
