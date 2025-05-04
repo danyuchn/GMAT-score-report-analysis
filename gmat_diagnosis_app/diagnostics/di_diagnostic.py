@@ -1349,18 +1349,64 @@ def _generate_di_summary_report(di_results):
 
     # Get diagnosed dataframe and calculate triggered params from it
     diagnosed_df = ch3.get('diagnosed_dataframe') # This should be the latest df passed to Ch7
-    all_triggered_params = []
+    all_triggered_params = set() # Use set for faster lookup and uniqueness
     sfe_triggered = False
-    if diagnosed_df is not None and not diagnosed_df.empty and 'diagnostic_params' in diagnosed_df.columns:
-         # Ensure params are lists before iterating
-         param_lists = diagnosed_df['diagnostic_params'][diagnosed_df['diagnostic_params'].apply(isinstance, args=(list,))].tolist()
-         all_triggered_params = list(set(p for params_list in param_lists for p in params_list))
-         sfe_triggered = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in all_triggered_params
-         # Also consider global behavioral params from Ch4 results
-         ch4_behavioral_params = ch4.get('triggered_behavioral_params', [])
-         all_triggered_params.extend(ch4_behavioral_params)
-         all_triggered_params = list(set(all_triggered_params)) # Update unique list
+    # --- NEW: Prepare data for reflection mapping ---
+    param_to_positions = {}
+    domain_to_positions = {}
 
+    if diagnosed_df is not None and not diagnosed_df.empty:
+        # Try to use the final translated list first, fallback to English codes
+        param_col = 'diagnostic_params_list' # Final column name after translation
+        if param_col not in diagnosed_df.columns and 'diagnostic_params' in diagnosed_df.columns:
+             param_col = 'diagnostic_params' # Fallback to original English codes if list missing
+
+        # Check if necessary columns exist
+        required_cols_for_mapping = [param_col, 'content_domain', 'question_position']
+        if all(col in diagnosed_df.columns for col in required_cols_for_mapping):
+             for index, row in diagnosed_df.iterrows():
+                 pos = row.get('question_position')
+                 domain = row.get('content_domain', 'Unknown Domain')
+                 params = row.get(param_col, []) # Get codes/list
+                 if not isinstance(params, list): params = [] # Ensure it's a list
+
+                 # Collect triggered param codes (use original codes if fallback)
+                 param_codes_for_set = params
+                 if param_col == 'diagnostic_params_list' and 'diagnostic_params' in diagnosed_df.columns:
+                      # If using translated list, get original codes from the other column for logic check
+                      original_codes = diagnosed_df.loc[index, 'diagnostic_params']
+                      if isinstance(original_codes, list):
+                          param_codes_for_set = original_codes
+
+                 # Populate all_triggered_params with codes
+                 all_triggered_params.update(p for p in param_codes_for_set if isinstance(p, str)) # Ensure only strings are added
+
+                 # Populate mappings if position is valid
+                 if pos is not None and pos != 'N/A':
+                     if domain != 'Unknown Domain':
+                          domain_to_positions.setdefault(domain, set()).add(pos)
+                     # Map param codes to positions
+                     for p in param_codes_for_set:
+                         if isinstance(p, str): # Ensure param is a string code
+                            param_to_positions.setdefault(p, set()).add(pos)
+        else:
+            print(f"Warning (_generate_di_summary_report): Missing one or more required columns for detailed reflection mapping ({', '.join(required_cols_for_mapping)}).")
+            # Fallback to get triggered params if mapping failed
+            if 'diagnostic_params' in diagnosed_df.columns: # Check original English params if available
+                 param_lists_fallback = diagnosed_df['diagnostic_params'][diagnosed_df['diagnostic_params'].apply(isinstance, args=(list,))].tolist()
+                 all_triggered_params.update(p for params_list in param_lists_fallback for p in params_list if isinstance(p, str))
+
+        # Add behavioral params from Ch4 (ensure they are codes)
+        ch4_behavioral_params = ch4.get('triggered_behavioral_params', [])
+        all_triggered_params.update(p for p in ch4_behavioral_params if isinstance(p, str))
+
+    # Convert sets in mappings to sorted lists
+    for param in param_to_positions: param_to_positions[param] = sorted(list(param_to_positions[param]))
+    for domain in domain_to_positions: domain_to_positions[domain] = sorted(list(domain_to_positions[domain]))
+
+    # Check SFE status based on collected param codes
+    sfe_triggered = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in all_triggered_params
+    # --- End Data Preparation ---
 
     # 1. 開篇總結 (基於第一章)
     report_lines.append("**1. 開篇總結 (時間策略與有效性)**")
@@ -1421,11 +1467,22 @@ def _generate_di_summary_report(di_results):
             report_lines.append(f"- {sfe_note}")
 
     # --- Core Issue Summary ---
-    # Get counts of all triggered params (including behavioral from Ch4)
-    param_counts_all = pd.Series(all_triggered_params).value_counts()
+    # Get counts of all triggered param codes
+    param_counts_all = {}
+    if all_triggered_params: # Check if the set is not empty
+        # Count occurrences in the original df column if available
+        param_col_for_count = 'diagnostic_params_list' # Or 'diagnostic_params' if fallback
+        if param_col_for_count in diagnosed_df.columns:
+             all_param_lists = [p for sublist in diagnosed_df[param_col_for_count] if isinstance(sublist, list) for p in sublist if isinstance(p, str)]
+             param_counts_all = pd.Series(all_param_lists).value_counts()
+        else:
+            # Basic count from the set if column is missing
+             param_counts_all = pd.Series({p: 1 for p in all_triggered_params}) # Simple count
 
     # Exclude SFE for "other" top params
-    top_other_params_codes = param_counts_all[param_counts_all.index != 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'].head(2).index.tolist()
+    top_other_params_codes = []
+    if not param_counts_all.empty:
+        top_other_params_codes = param_counts_all[param_counts_all.index != 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'].head(2).index.tolist()
 
     if top_other_params_codes:
         report_lines.append("- **其他主要問題點:**")
@@ -1471,55 +1528,160 @@ def _generate_di_summary_report(di_results):
 
     # 7. 後續行動指引
     report_lines.append("**7. 後續行動指引**")
-    # 7.1 Diagnosis Confirmation
-    report_lines.append("  **診斷理解確認:**")
-    report_lines.append("  - 請仔細閱讀報告，特別是核心問題分析部分。您是否認同報告指出的主要問題點？這與您考試時的感受是否一致？")
-    if sfe_triggered:
-        report_lines.append(f"  - 報告顯示您觸發了 '{_translate_di('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')}'。您認為這主要是粗心，還是某些基礎概念確實存在模糊地帶？")
-    # Add generic prompt for efficiency bottlenecks if any were triggered
-    efficiency_params_present = any(p.startswith('DI_EFFICIENCY_BOTTLENECK_') for p in all_triggered_params)
-    if efficiency_params_present:
-         report_lines.append(f"  - 報告指出您在某些答對的題目上耗時較長，請回憶效率瓶頸所在。")
+
+    # --- START: Refactored "引導反思" Section ---
+    report_lines.append("- **引導反思:**")
+    reflection_prompts = []
+
+    # --- Define Helper Functions Locally ---
+    def get_pos_context_str_di(param_keys):
+        """Gets formatted question position context string for DI."""
+        positions = set()
+        # Use the param_to_positions dict calculated earlier
+        for key in param_keys:
+             # Ensure key exists and is a string code before lookup
+             if isinstance(key, str) and key in param_to_positions:
+                 positions.update(param_to_positions.get(key, set()))
+        return f" (涉及題號: {sorted(list(positions))})" if positions else ""
+
+    def get_relevant_domains_di(param_keys):
+        """Gets relevant content domains associated with triggered DI parameters."""
+        relevant_positions = set()
+        # Use the param_to_positions dict calculated earlier
+        for key in param_keys:
+             if isinstance(key, str) and key in param_to_positions:
+                 relevant_positions.update(param_to_positions.get(key, set()))
+
+        relevant_domains_set = set()
+        # Use the domain_to_positions dict calculated earlier
+        for domain, positions in domain_to_positions.items():
+            if not relevant_positions.isdisjoint(positions):
+                 relevant_domains_set.add(_translate_di(domain)) # Translate domain name
+
+        return sorted(list(relevant_domains_set))
+    # --- End Helper Functions ---
+
+    # --- Define DI Reflection Parameter Lists (using English codes) ---
+    reading_interpretation_params_di = [
+        'DI_READING_COMPREHENSION_ERROR',
+        'DI_GRAPH_TABLE_INTERPRETATION_ERROR'
+    ]
+    concept_logic_params_di = [
+        'DI_CONCEPT_APPLICATION_ERROR', # Math
+        'DI_LOGICAL_REASONING_ERROR', # Non-Math
+        'DI_QUESTION_TYPE_SPECIFIC_ERROR' # Example: MSR Non-Math sub-type logic
+    ]
+    data_handling_calc_params_di = [
+        'DI_DATA_EXTRACTION_ERROR',
+        'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR',
+        'DI_CALCULATION_ERROR'
+    ]
+    msr_specific_params_di = [
+        'DI_MULTI_SOURCE_INTEGRATION_ERROR',
+        'DI_MSR_READING_COMPREHENSION_BARRIER',
+        'DI_MSR_SINGLE_Q_BOTTLENECK'
+    ]
+    efficiency_params_di = [
+        'DI_EFFICIENCY_BOTTLENECK_READING',
+        'DI_EFFICIENCY_BOTTLENECK_CONCEPT',
+        'DI_EFFICIENCY_BOTTLENECK_CALCULATION',
+        'DI_EFFICIENCY_BOTTLENECK_LOGIC',
+        'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE',
+        'DI_EFFICIENCY_BOTTLENECK_INTEGRATION'
+    ]
+    carelessness_params_di = [
+        'DI_CARELESSNESS_DETAIL_OMISSION',
+        'DI_BEHAVIOR_CARELESSNESS_ISSUE',
+        # Consider if 'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK' belongs here or needs own prompt
+    ]
+    # --- End Parameter Lists ---
+
+    # --- Generate Reflection Prompts ---
+    # Concept/Logic Prompt
+    # Use the 'all_triggered_params' set calculated earlier
+    if any(p in all_triggered_params for p in concept_logic_params_di) or sfe_triggered: # Check SFE flag too
+        relevant_keys = [p for p in concept_logic_params_di if p in all_triggered_params]
+        if sfe_triggered: relevant_keys.append('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+        domains_involved = get_relevant_domains_di(relevant_keys)
+        domain_context = f" [`{', '.join(domains_involved)}`] " if domains_involved else " "
+        reflection_prompts.append(f"  - 回想一下，在做錯的{domain_context}題目時，具體是卡在哪個數學概念、邏輯關係或題目要求上？是完全沒思路，理解錯誤，還是知道方法但應用出錯？" + get_pos_context_str_di(relevant_keys))
+
+    # Reading/Interpretation Prompt
+    if any(p in all_triggered_params for p in reading_interpretation_params_di):
+        relevant_keys = [p for p in reading_interpretation_params_di if p in all_triggered_params]
+        domains_involved = get_relevant_domains_di(relevant_keys)
+        domain_context = f" [`{', '.join(domains_involved)}`] " if domains_involved else " "
+        reflection_prompts.append(f"  - 對於做錯/慢的{domain_context}題目，是文字資訊、圖表解讀有困難，還是無法準確理解問題要求？" + get_pos_context_str_di(relevant_keys))
+
+    # Data Handling/Calculation Prompt
+    if any(p in all_triggered_params for p in data_handling_calc_params_di):
+        relevant_keys = [p for p in data_handling_calc_params_di if p in all_triggered_params]
+        domains_involved = get_relevant_domains_di(relevant_keys)
+        domain_context = f" [`{', '.join(domains_involved)}`] " if domains_involved else " "
+        reflection_prompts.append(f"  - 在處理{domain_context}題目時，是提取數據、整合信息出錯，還是計算過程容易失誤？" + get_pos_context_str_di(relevant_keys))
+
+    # MSR Specific Prompt (Integration/Time)
+    if any(p in all_triggered_params for p in msr_specific_params_di):
+        relevant_keys = [p for p in msr_specific_params_di if p in all_triggered_params]
+        domains_involved = get_relevant_domains_di(relevant_keys)
+        domain_context = f" [`{', '.join(domains_involved)}`] " if domains_involved else " " # Should usually be Non-Math
+        reflection_prompts.append(f"  - 對於 MSR 題目，是多源資訊的整合理解有困難，還是閱讀材料或回答單題耗時過長？" + get_pos_context_str_di(relevant_keys))
+
+    # Efficiency Prompt (Generic)
+    if any(p in all_triggered_params for p in efficiency_params_di):
+        relevant_keys = [p for p in efficiency_params_di if p in all_triggered_params]
+        domains_involved = get_relevant_domains_di(relevant_keys)
+        domain_context = f" [`{', '.join(domains_involved)}`] " if domains_involved else " "
+        reflection_prompts.append(f"  - 回想耗時過長的{domain_context}題目，主要瓶頸是在閱讀、理解、思考、整合還是計算？" + get_pos_context_str_di(relevant_keys))
+
+    # Carelessness Prompt
+    if any(p in all_triggered_params for p in carelessness_params_di):
+        relevant_keys = [p for p in carelessness_params_di if p in all_triggered_params]
+        reflection_prompts.append("  - 回想一下，是否存在因為看錯字、忽略細節、誤解圖表或計算粗心導致的失誤？" + get_pos_context_str_di(relevant_keys))
+
+    if not reflection_prompts:
+        reflection_prompts.append("  - (本次分析未觸發典型的反思問題，建議結合練習計劃進行)")
+    report_lines.extend(reflection_prompts)
+    # --- END: Refactored "引導反思" Section ---
 
 
     # 7.2 Qualitative Analysis Suggestion
     qual_needed = any(p in all_triggered_params for p in ['DI_LOGICAL_REASONING_ERROR', 'DI_READING_COMPREHENSION_ERROR'])
     if qual_needed:
-        report_lines.append("  **質化分析建議:**")
+        report_lines.append("- **質化分析建議:**") # Changed from 7.3 to 7.2
         report_lines.append("  - 如果您對報告中指出的某些問題（尤其是非數學相關的邏輯或閱讀理解錯誤）仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。")
 
     # 7.3 Second Evidence Suggestion
-    # --- Re-introduce variable preparation for this section --- 
+    # --- Re-introduce variable preparation for this section ---
     detailed_items = [] # Initialize list, even though we don't iterate it for output here
     avg_time_per_type = ch3.get('avg_time_per_type_minutes', {}) # Get avg times from ch3 results
     df_problem = pd.DataFrame() # Initialize empty df
-    if diagnosed_df is not None and not diagnosed_df.empty and 'diagnostic_params' in diagnosed_df.columns:
+    if diagnosed_df is not None and not diagnosed_df.empty: # Remove check for diagnostic_params, check later
         filter_cols = ['is_correct', 'overtime']
         if all(col in diagnosed_df.columns for col in filter_cols):
             df_problem = diagnosed_df[ (diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True) ].copy()
             # Check if df_problem is actually populated after filtering
             if not df_problem.empty:
-                 detailed_items = df_problem.to_dict('records') # Populate detailed_items minimally if needed by logic below
-    # --- End variable preparation --- 
-    
-    report_lines.append("  **二級證據參考建議:**")
-    # Check if detailed items were generated (based on df_problem being non-empty)
-    # Use df_problem instead of detailed_items directly for the condition
+                 # Minimal population if needed by logic below
+                 detailed_items = df_problem[['question_position']].head().values.tolist()
+    # --- End variable preparation ---
+
+    report_lines.append("- **二級證據參考建議:**") # Changed from 7.4 to 7.3
     if not df_problem.empty: # Check if df_problem was successfully created and populated
         report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
-        
+
         # --- START NEW LOGIC: Group by time_performance_category ---
         details_added_2nd_ev = False
         if 'time_performance_category' in df_problem.columns:
             # Define the desired order for performance categories
             performance_order_en = [
-                'Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 
+                'Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong',
                 'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct',
                 'Unknown' # Include Unknown as a fallback
             ]
-            
+
             grouped_by_performance = df_problem.groupby('time_performance_category')
-            
+
             # Iterate in the desired order
             for perf_en in performance_order_en:
                 if perf_en in grouped_by_performance.groups: # Check if this group exists
@@ -1528,63 +1690,65 @@ def _generate_di_summary_report(di_results):
                         print(f"DEBUG (di_report): Skipping category '{perf_en}' as requested.") # DEBUG
                         continue # Skip to the next category
                     # --- END SKIP LOGIC ---
-                    
+
                     group_df = grouped_by_performance.get_group(perf_en)
                     if not group_df.empty:
                         perf_zh = _translate_di(perf_en)
-                        
+
                         # Extract unique types and domains from this group
                         types_in_group = group_df['question_type'].dropna().unique()
                         domains_in_group = group_df['content_domain'].dropna().unique()
-                        
+
                         types_zh = sorted([_translate_di(t) for t in types_in_group])
                         domains_zh = sorted([_translate_di(d) for d in domains_in_group])
 
                         # --- START Extract Unique Labels (Revised) ---
                         all_labels_in_group = set()
                         target_label_col = None
-                        # Check if the final Chinese list column exists
+                        # Use the final column name directly
                         if 'diagnostic_params_list' in group_df.columns:
                              target_label_col = 'diagnostic_params_list'
-                             print(f"DEBUG (di_report): Using existing 'diagnostic_params_list' column.") # DEBUG
-                        # If not, check if the original English column exists
+                             # print(f"DEBUG (di_report): Using existing 'diagnostic_params_list' column.") # DEBUG
+                        # Fallback to original english codes if needed and available
                         elif 'diagnostic_params' in group_df.columns:
                              target_label_col = 'diagnostic_params'
-                             print(f"DEBUG (di_report): Found 'diagnostic_params' column, will translate internally.") # DEBUG
-                        else:
-                             print(f"DEBUG (di_report): Neither 'diagnostic_params_list' nor 'diagnostic_params' found for this group!") # DEBUG
+                             # print(f"DEBUG (di_report): Fallback: Using 'diagnostic_params' column, will translate.") # DEBUG
+                        # else:
+                             # print(f"DEBUG (di_report): No diagnostic params column found for this group!") # DEBUG
 
                         if target_label_col:
-                            print(f"DEBUG (di_report):   Processing labels from column: {target_label_col}") # DEBUG
-                            labels_head = group_df[target_label_col].head().tolist() # Get first 5 lists
-                            print(f"DEBUG (di_report):   Head of {target_label_col}: {labels_head}") # DEBUG
-                            
+                            # print(f"DEBUG (di_report):   Processing labels from column: {target_label_col}") # DEBUG
+                            # labels_head = group_df[target_label_col].head().tolist() # Get first 5 lists
+                            # print(f"DEBUG (di_report):   Head of {target_label_col}: {labels_head}") # DEBUG
+
                             for labels_list in group_df[target_label_col]:
                                 if isinstance(labels_list, list): # Check if it's a list
                                      # If using original English codes, translate them now
                                      if target_label_col == 'diagnostic_params':
                                          translated_list = _translate_di(labels_list) # Translate the list
-                                         all_labels_in_group.update(translated_list)
-                                     else: # Already Chinese
-                                         all_labels_in_group.update(labels_list)
-                        
+                                         all_labels_in_group.update(p for p in translated_list if p) # Add non-empty translations
+                                     else: # Already Chinese (or intended final list)
+                                         all_labels_in_group.update(p for p in labels_list if p) # Add non-empty labels
+
                         # Labels in all_labels_in_group should now be Chinese
                         sorted_labels_zh = sorted(list(all_labels_in_group))
-                        print(f"DEBUG (di_report):   Sorted unique Chinese labels found: {sorted_labels_zh}") # DEBUG
+                        # print(f"DEBUG (di_report):   Sorted unique Chinese labels found: {sorted_labels_zh}") # DEBUG
                         # --- END Extract Unique Labels (Revised) ---
 
                         # --- Modify Report Line ---
                         report_line = f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及領域：【{', '.join(domains_zh)}】。"
                         if sorted_labels_zh:
-                             report_line += f" 注意相關問題點：【{', '.join(sorted_labels_zh)}】。"
+                             # Filter out the invalid data tag before joining
+                             filtered_labels = [label for label in sorted_labels_zh if label != INVALID_DATA_TAG_DI]
+                             if filtered_labels:
+                                report_line += f" 注意相關問題點：【{', '.join(filtered_labels)}】。"
                         report_lines.append(report_line)
                         # --- End Modify Report Line ---
-                        
+
                         details_added_2nd_ev = True
         else:
             report_lines.append("  - (警告：缺少 'time_performance_category' 欄位，無法按時間表現分類。)")
-            # --- FALLBACK TO OLD LOGIC (optional, or just skip?) ---
-            # Maybe skip fallback to avoid confusion
+            # Fallback? Or just skip the detailed breakdown. Skipping is simpler.
             pass
         # --- END NEW LOGIC ---
 
@@ -1592,12 +1756,15 @@ def _generate_di_summary_report(di_results):
         core_issue_texts = []
         if sfe_triggered: core_issue_texts.append(_translate_di('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'))
         # Assuming top_other_params_codes is still calculated correctly earlier in the function
-        if 'top_other_params_codes' in locals() and top_other_params_codes: 
+        if 'top_other_params_codes' in locals() and top_other_params_codes:
              core_issue_texts.extend([_translate_di(p) for p in top_other_params_codes])
 
         if core_issue_texts:
-             report_lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題：【{', '.join(core_issue_texts)}】。")
-             details_added_2nd_ev = True
+             # Filter out invalid tag from core issues text as well
+             filtered_core_issues = [issue for issue in core_issue_texts if issue != INVALID_DATA_TAG_DI]
+             if filtered_core_issues:
+                 report_lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題：【{', '.join(filtered_core_issues)}】。")
+             details_added_2nd_ev = True # Mark as details added even if only core issues shown
 
         if not details_added_2nd_ev:
              report_lines.append("  - (本次分析未聚焦到特定的問題類型或領域)")
@@ -1607,7 +1774,7 @@ def _generate_di_summary_report(di_results):
         report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
 
 
-    # 7.4 Tools and Prompts Recommendation
+    # 7.4 Tools and Prompts Recommendation (Keep original commented out state)
     # report_lines.append("  **輔助工具與 AI 提示推薦建議:**")
     # recommended_di_tools = set()
     # recommended_di_prompts = set()
