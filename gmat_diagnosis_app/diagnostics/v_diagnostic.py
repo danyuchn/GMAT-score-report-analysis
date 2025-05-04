@@ -1073,8 +1073,9 @@ def _format_rate(rate_value):
 def _generate_v_summary_report(v_diagnosis_results):
     """Generates the summary report string for the Verbal section."""
     report_lines = []
-    report_lines.append("## GMAT 語文 (Verbal) 診斷報告")
-    report_lines.append("--- (基於用戶數據與模擬難度分析) ---")
+    # Keep only the more descriptive title
+    report_lines.append("## GMAT 語文（Verbal）診斷報告")
+    report_lines.append("---（基於用戶數據與模擬難度分析）---")
     report_lines.append("")
 
     # Extract chapters safely
@@ -1092,7 +1093,7 @@ def _generate_v_summary_report(v_diagnosis_results):
     invalid_count = ch1.get('invalid_questions_excluded', 0)
 
     if time_pressure_detected:
-        report_lines.append("- 根據分析，您在語文部分可能處於**時間壓力**下 (測驗時間剩餘不多或末尾部分題目作答過快)。")
+        report_lines.append("- 根據分析，您在語文部分可能處於**時間壓力**下（測驗時間剩餘不多或末尾部分題目作答過快）。")
     else:
         report_lines.append("- 根據分析，您在語文部分未處於明顯的時間壓力下。")
 
@@ -1104,7 +1105,7 @@ def _generate_v_summary_report(v_diagnosis_results):
     report_lines.append("")
 
     # --- Section 2: 表現概覽 --- #
-    report_lines.append("**2. 表現概覽 (CR vs RC)**")
+    report_lines.append("**2. 表現概覽（CR vs RC）**")
     # --- Corrected Metrics Retrieval --- #
     chapter_2_results = v_diagnosis_results.get('chapter_2', {})
     v_metrics_by_type = chapter_2_results.get('by_type', {})
@@ -1126,8 +1127,8 @@ def _generate_v_summary_report(v_diagnosis_results):
     if cr_data_valid and rc_data_valid:
         cr_total = cr_metrics.get('total_questions', 0)
         rc_total = rc_metrics.get('total_questions', 0)
-        report_lines.append(f"- CR ({cr_total} 題): 錯誤率 {_format_rate(cr_error_rate)}, 超時率 {_format_rate(cr_overtime_rate)}")
-        report_lines.append(f"- RC ({rc_total} 題): 錯誤率 {_format_rate(rc_error_rate)}, 超時率 {_format_rate(rc_overtime_rate)}")
+        report_lines.append(f"- CR（{cr_total} 題）：錯誤率 {_format_rate(cr_error_rate)}，超時率 {_format_rate(cr_overtime_rate)}")
+        report_lines.append(f"- RC（{rc_total} 題）：錯誤率 {_format_rate(rc_error_rate)}，超時率 {_format_rate(rc_overtime_rate)}")
         # Comparison logic (significant difference)
         error_diff = abs(cr_error_rate - rc_error_rate)
         overtime_diff = abs(cr_overtime_rate - rc_overtime_rate)
@@ -1138,10 +1139,10 @@ def _generate_v_summary_report(v_diagnosis_results):
             comparison_notes = []
             if significant_error:
                 comparison_notes.append(f"錯誤率差異{'顯著' if significant_error else '不顯著'}")
-                report_lines.append(f"  - **錯誤率對比:** {'CR 更高' if cr_error_rate > rc_error_rate else 'RC 更高'} (差異 {_format_rate(error_diff)})")
+                report_lines.append(f"  - **錯誤率對比：** {'CR 更高' if cr_error_rate > rc_error_rate else 'RC 更高'}（差異 {_format_rate(error_diff)}）")
             if significant_overtime:
                 comparison_notes.append(f"超時率差異{'顯著' if significant_overtime else '不顯著'}")
-                report_lines.append(f"  - **超時率對比:** {'CR 更高' if cr_overtime_rate > rc_overtime_rate else 'RC 更高'} (差異 {_format_rate(overtime_diff)})")
+                report_lines.append(f"  - **超時率對比：** {'CR 更高' if cr_overtime_rate > rc_overtime_rate else 'RC 更高'}（差異 {_format_rate(overtime_diff)}）")
         else:
             report_lines.append("  - CR 與 RC 在錯誤率和超時率上表現相當，無顯著差異。")
     elif not cr_data_valid and not rc_data_valid:
@@ -1150,18 +1151,18 @@ def _generate_v_summary_report(v_diagnosis_results):
         report_lines.append("- **CR 與 RC 表現對比：** 因缺乏有效的 CR 數據，無法進行比較。")
         if rc_data_valid: # Still show RC data if available
              rc_total = rc_metrics.get('total_questions', 0)
-             report_lines.append(f"  - (RC ({rc_total} 題): 錯誤率 {_format_rate(rc_error_rate)}, 超時率 {_format_rate(rc_overtime_rate)})")
+             report_lines.append(f"  - （RC（{rc_total} 題）：錯誤率 {_format_rate(rc_error_rate)}，超時率 {_format_rate(rc_overtime_rate)}）")
     elif not rc_data_valid:
         report_lines.append("- **CR 與 RC 表現對比：** 因缺乏有效的 RC 數據，無法進行比較。")
         if cr_data_valid: # Still show CR data if available
              cr_total = cr_metrics.get('total_questions', 0)
-             report_lines.append(f"  - (CR ({cr_total} 題): 錯誤率 {_format_rate(cr_error_rate)}, 超時率 {_format_rate(cr_overtime_rate)})")
+             report_lines.append(f"  - （CR（{cr_total} 題）：錯誤率 {_format_rate(cr_error_rate)}，超時率 {_format_rate(cr_overtime_rate)}）")
     # --- End refined check ---
 
     report_lines.append("")
 
     # --- Section 3: 核心問題診斷 --- #
-    report_lines.append("**3. 核心問題診斷 (基於觸發的診斷標籤)**")
+    report_lines.append("**3. 核心問題診斷（基於觸發的診斷標籤）**")
     diagnosed_df = ch3.get('diagnosed_dataframe')
     all_problem_items = []
     sfe_triggered_overall = False
@@ -1193,7 +1194,7 @@ def _generate_v_summary_report(v_diagnosis_results):
     # Add behavioral params from Chapter 5
     if ch5:
         triggered_params_all.update(ch5.get('param_triggers', []))
-    # --- End Defining triggered_params_all ---
+    # --- End Defining triggered_params_all --- #
 
     if diagnosed_df is not None and not diagnosed_df.empty:
         # Check if 'diagnostic_params_list' column exists before trying to iterate
@@ -1267,12 +1268,12 @@ def _generate_v_summary_report(v_diagnosis_results):
         sfe_skills_en = sorted(list(sfe_skills_involved))
         sfe_note = f"{sfe_label}"
         if sfe_skills_en:
-            sfe_note += f" (涉及技能: {', '.join(sfe_skills_en)})"
-        report_lines.append(f"- **尤其需要注意:** {sfe_note}。(註：SFE 指在已掌握技能範圍內的題目失誤)")
+            sfe_note += f"（涉及技能：{', '.join(sfe_skills_en)}）"
+        report_lines.append(f"- **尤其需要注意：** {sfe_note}。（註：SFE 指在已掌握技能範圍內的題目失誤）")
 
     # Report if no core issues AND no SFE
     if not core_issues_params and not sfe_triggered_overall:
-        report_lines.append("- 未識別出明顯的核心問題模式 (基於錯誤及效率分析)。")
+        report_lines.append("- 未識別出明顯的核心問題模式（基於錯誤及效率分析）。")
 
     report_lines.append("")
 
@@ -1289,7 +1290,7 @@ def _generate_v_summary_report(v_diagnosis_results):
         avg_diff = f"{avg_diff_val:.2f}" if avg_diff_val is not None else 'N/A'
         avg_time = f"{avg_time_val:.2f}" if avg_time_val is not None else 'N/A'
         bottleneck = _translate_v(cr_slow_correct.get('dominant_bottleneck_type', 'N/A'))
-        report_lines.append(f"- CR: {count} 題正確但慢 (佔比 {rate})。平均難度 {avg_diff}，平均耗時 {avg_time} 分鐘。主要瓶頸: {bottleneck}。")
+        report_lines.append(f"- CR：{count} 題正確但慢（佔比 {rate}）。平均難度 {avg_diff}，平均耗時 {avg_time} 分鐘。主要瓶頸：{bottleneck}。")
         slow_correct_found = True
     if rc_slow_correct and rc_slow_correct.get('correct_slow_count', 0) > 0:
         count = rc_slow_correct['correct_slow_count']
@@ -1299,7 +1300,7 @@ def _generate_v_summary_report(v_diagnosis_results):
         avg_diff = f"{avg_diff_val:.2f}" if avg_diff_val is not None else 'N/A'
         avg_time = f"{avg_time_val:.2f}" if avg_time_val is not None else 'N/A'
         bottleneck = _translate_v(rc_slow_correct.get('dominant_bottleneck_type', 'N/A'))
-        report_lines.append(f"- RC: {count} 題正確但慢 (佔比 {rate})。平均難度 {avg_diff}，平均耗時 {avg_time} 分鐘。主要瓶頸: {bottleneck}。")
+        report_lines.append(f"- RC：{count} 題正確但慢（佔比 {rate}）。平均難度 {avg_diff}，平均耗時 {avg_time} 分鐘。主要瓶頸：{bottleneck}。")
         slow_correct_found = True
     if not slow_correct_found:
         report_lines.append("- 未發現明顯的正確但低效問題。")
@@ -1313,12 +1314,12 @@ def _generate_v_summary_report(v_diagnosis_results):
     pattern_found = False
     if early_rushing_flag:
          early_rush_param_translated = _translate_v('BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
-         report_lines.append(f"- **提示:** {early_rush_param_translated} - 測驗開始階段的部分題目作答速度較快，建議注意保持穩定的答題節奏。")
+         report_lines.append(f"- **提示：** {early_rush_param_translated} - 測驗開始階段的部分題目作答速度較快，建議注意保持穩定的答題節奏。")
          pattern_found = True
     if carelessness_issue:
         careless_param_translated = _translate_v('BEHAVIOR_CARELESSNESS_ISSUE')
         fast_wrong_rate_str = _format_rate(fast_wrong_rate) if fast_wrong_rate is not None else "N/A"
-        report_lines.append(f"- **提示:** {careless_param_translated} - 分析顯示，「快而錯」的情況佔比較高 ({fast_wrong_rate_str})，提示可能需關注答題仔細程度。")
+        report_lines.append(f"- **提示：** {careless_param_translated} - 分析顯示，「快而錯」的情況佔比較高（{fast_wrong_rate_str}），提示可能需關注答題仔細程度。")
         pattern_found = True
     if not pattern_found:
         report_lines.append("- 未發現明顯的特殊作答模式。")
@@ -1329,11 +1330,11 @@ def _generate_v_summary_report(v_diagnosis_results):
     override_triggered = ch6.get('skill_override_triggered', {}) # Use result from _calculate_skill_override
     triggered_skills = [s for s, triggered in override_triggered.items() if bool(triggered)]
     if not override_triggered:
-         report_lines.append("- 無法進行技能覆蓋分析 (可能缺少數據或計算錯誤)。")
+         report_lines.append("- 無法進行技能覆蓋分析（可能缺少數據或計算錯誤）。")
     elif triggered_skills:
         # Keep skill names in English
         triggered_skills_en = sorted(triggered_skills)
-        report_lines.append(f"- **以下核心技能整體表現顯示較大提升空間 (錯誤率 > 50%)，建議優先系統性鞏固:** {', '.join(triggered_skills_en)}")
+        report_lines.append(f"- **以下核心技能整體表現顯示較大提升空間（錯誤率 > 50%），建議優先系統性鞏固：** {', '.join(triggered_skills_en)}")
     else:
         report_lines.append("- 未觸發需要優先進行基礎鞏固的技能覆蓋規則。")
     report_lines.append("")
@@ -1354,7 +1355,7 @@ def _generate_v_summary_report(v_diagnosis_results):
              elif rec_type == 'behavioral':
                  report_lines.append(f"- {rec_text}")
     else:
-        report_lines.append("- 無具體練習建議生成 (可能因所有技能均豁免或無觸發項)。")
+        report_lines.append("- 無具體練習建議生成（可能因所有技能均豁免或無觸發項）。")
     report_lines.append("")
 
     # --- Section 8: 後續行動指引 --- #
@@ -1395,11 +1396,11 @@ def _generate_v_summary_report(v_diagnosis_results):
              for skill in skill_to_positions_v: skill_to_positions_v[skill] = sorted(list(skill_to_positions_v[skill]))
          else:
              print("Warning (_generate_v_summary_report): Missing param columns for detailed mapping.")
-    # --- End Data Preparation for Mapping ---
+    # --- End Data Preparation for Mapping --- #
 
 
     # 8.1 Reflection Prompts (Refactored)
-    report_lines.append("- **引導反思:**")
+    report_lines.append("- **引導反思：**")
     reflection_prompts_v = []
 
     # Define Helper Functions Locally for Verbal
@@ -1409,7 +1410,7 @@ def _generate_v_summary_report(v_diagnosis_results):
         for key in param_keys:
             if isinstance(key, str) and key in param_to_positions_v:
                 positions.update(param_to_positions_v.get(key, set()))
-        return f" (涉及題號: {sorted(list(positions))})" if positions else ""
+        return f"（涉及題號：{sorted(list(positions))}）" if positions else ""
 
     def get_relevant_skills_v(param_keys):
         """Gets relevant skills associated with triggered Verbal parameters."""
@@ -1465,63 +1466,85 @@ def _generate_v_summary_report(v_diagnosis_results):
         reflection_prompts_v.append(f"  - 是否存在因為倉促猜題、開頭搶時間或普遍粗心導致的失誤？" + get_pos_context_v(behavioral_params))
 
     if not reflection_prompts_v:
-        reflection_prompts_v.append("  - (本次分析未觸發典型的反思問題，建議結合練習計劃進行)")
+        reflection_prompts_v.append("  - （本次分析未觸發典型的反思問題，建議結合練習計劃進行）")
     report_lines.extend(reflection_prompts_v)
 
     # 8.2 Second Evidence Suggestion (Reformatted)
-    # --- Re-introduce variable preparation for this section ---
+    # --- Re-introduce variable preparation for this section --- #
     df_problem = pd.DataFrame() # Initialize empty df
     if diagnosed_df is not None and not diagnosed_df.empty: # Use diagnosed_df (which has diagnostic columns)
         filter_cols = ['is_correct', 'overtime']
         if all(col in diagnosed_df.columns for col in filter_cols):
             df_problem = diagnosed_df[ (diagnosed_df['is_correct'] == False) | (diagnosed_df.get('overtime', False) == True) ].copy()
-    # --- End variable preparation ---
+    # --- End variable preparation --- #
 
-    report_lines.append("- **二級證據參考建議:**")
+    report_lines.append("- **二級證據參考建議：**")
     if not df_problem.empty: # Check if df_problem has rows
         report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
-
-        # --- START NEW LOGIC: Group by time_performance_category ---
+        
+        # --- START NEW LOGIC: Group by time_performance_category --- #
         details_added_2nd_ev = False
         if 'time_performance_category' in df_problem.columns:
-            performance_order_en = [
-                'Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong',
-                'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct',
-                'Unknown' # Include Unknown as a fallback
-            ]
+                performance_order_en = [
+                    'Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 
+                    'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct',
+                    'Unknown' # Include Unknown as a fallback
+                ]
+                
+                grouped_by_performance = df_problem.groupby('time_performance_category')
+                
+                for perf_en in performance_order_en:
+                    if perf_en in grouped_by_performance.groups:
+                        if perf_en == 'Fast & Correct':
+                            print(f"DEBUG (v_report): Skipping category '{perf_en}' as requested.")
+                            continue
+                        
+                        group_df = grouped_by_performance.get_group(perf_en)
+                        if not group_df.empty:
+                            # Basic Info
+                            perf_zh_map = {
+                                'Fast & Wrong': "快錯", 'Slow & Wrong': "慢錯", 'Normal Time & Wrong': "正常時間錯",
+                                'Slow & Correct': "慢對", 'Fast & Correct': "快對", 'Normal Time & Correct': "正常時間對",
+                                'Unknown': "未知時間表現"
+                            }
+                            perf_zh = perf_zh_map.get(perf_en, perf_en)
+                            types_in_group = group_df['question_type'].dropna().unique()
+                            skills_in_group = group_df['question_fundamental_skill'].dropna().unique()
+                            types_zh = sorted([t for t in types_in_group])
+                            skills_zh = sorted([_translate_v(s) for s in skills_in_group]) # Translate skills
 
-            grouped_by_performance = df_problem.groupby('time_performance_category')
+                            # Parameter Categorization (REVISED LOGIC)
+                            all_eng_codes_in_group = set()
+                            param_eng_col = 'diagnostic_params' # Assume English codes are here
+                            if param_eng_col in group_df.columns:
+                                for labels_list in group_df[param_eng_col]:
+                                    if isinstance(labels_list, list):
+                                        all_eng_codes_in_group.update(p for p in labels_list if isinstance(p, str) and p != INVALID_DATA_TAG_V)
+                            else:
+                                 print(f"Warning (_generate_v_summary_report): Column '{param_eng_col}' not found in group_df. Cannot categorize by English code.")
 
-            for perf_en in performance_order_en:
-                if perf_en in grouped_by_performance.groups:
-                    if perf_en == 'Fast & Correct':
-                        print(f"DEBUG (v_report): Skipping category '{perf_en}' as requested.")
-                        continue
-
-                    group_df = grouped_by_performance.get_group(perf_en)
-                    if not group_df.empty:
-                        # Basic Info
-                        perf_zh_map = {
-                            'Fast & Wrong': "快錯", 'Slow & Wrong': "慢錯", 'Normal Time & Wrong': "正常時間錯",
-                            'Slow & Correct': "慢對", 'Fast & Correct': "快對", 'Normal Time & Correct': "正常時間對",
-                            'Unknown': "未知時間表現"
-                        }
-                        perf_zh = perf_zh_map.get(perf_en, perf_en)
-                        types_in_group = group_df['question_type'].dropna().unique()
-                        skills_in_group = group_df['question_fundamental_skill'].dropna().unique()
-                        types_zh = sorted([t for t in types_in_group])
-                        skills_zh = sorted([_translate_v(s) for s in skills_in_group]) # Translate skills
-
-                        # Parameter Categorization (REVISED LOGIC)
-                        all_eng_codes_in_group = set()
-                        param_eng_col = 'diagnostic_params' # Assume English codes are here
-                        if param_eng_col in group_df.columns:
-                            for labels_list in group_df[param_eng_col]:
-                                if isinstance(labels_list, list):
-                                    all_eng_codes_in_group.update(p for p in labels_list if isinstance(p, str) and p != INVALID_DATA_TAG_V)
-                        else:
-                             print(f"Warning (_generate_v_summary_report): Column '{param_eng_col}' not found in group_df. Cannot categorize by English code.")
-
+                            labels_by_category = {category: [] for category in V_PARAM_CATEGORY_ORDER}
+                            uncategorized_codes = []
+                            
+                            # Categorize using English codes
+                            for code_en in all_eng_codes_in_group:
+                                category = V_PARAM_TO_CATEGORY.get(code_en, 'Unknown')
+                                labels_by_category[category].append(code_en) # Store English code under category
+                                if category == 'Unknown':
+                                    uncategorized_codes.append(code_en)
+                            
+                            # Translate codes to Chinese labels *after* categorization
+                            label_parts_data = []
+                            for category in V_PARAM_CATEGORY_ORDER: # Iterate in defined order
+                                category_eng_codes = labels_by_category.get(category, [])
+                                if category_eng_codes:
+                                    # Translate category name itself
+                                    category_zh_map = {
+                                        'SFE': '基礎掌握', 'Reading': '閱讀理解', 'Reasoning': '邏輯推理',
+                                        'Timing': '時間管理', 'Process': '流程方法', 'AC_Analysis': '選項分析',
+                                        'Question_Understanding': '問題理解', 'Behavioral': '行為模式', 'Unknown': '未分類'
+                                    }
+                                    category_zh = category_zh_map.get(category, category)
                         labels_by_category = {category: [] for category in V_PARAM_CATEGORY_ORDER}
                         uncategorized_codes = []
                         

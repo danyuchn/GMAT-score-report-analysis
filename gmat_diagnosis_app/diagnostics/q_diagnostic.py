@@ -730,8 +730,8 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
          time_pressure_q = ch1_res.get('time_pressure_status', False)
          num_invalid_q = ch1_res.get('invalid_questions_excluded', 0)
          # Generate minimal report structure matching MD sections
-         report_lines.append("## GMAT 量化 (Quantitative) 診斷報告")
-         report_lines.append("--- (基於用戶數據與模擬難度分析) ---")
+         report_lines.append("## GMAT 量化（Quantitative）診斷報告")
+         report_lines.append("---（基於用戶數據與模擬難度分析）---")
          report_lines.append("\n**1. 開篇總結**") # MD Ch8.1 Title
          if time_pressure_q: report_lines.append("- 根據分析，您在本輪測驗中可能感受到明顯的**時間壓力**。")
          else: report_lines.append("- 根據分析，您在本輪測驗中未處於明顯的時間壓力下。")
@@ -779,8 +779,8 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
                         except ValueError: pass
     triggered_params.update({flag for flag, status in ch2_flags.items() if status})
 
-    report_lines.append("## GMAT 量化 (Quantitative) 診斷報告")
-    report_lines.append("--- (基於用戶數據與模擬難度分析) ---")
+    report_lines.append("## GMAT 量化（Quantitative）診斷報告")
+    report_lines.append("---（基於用戶數據與模擬難度分析）---")
     report_lines.append("")
 
     # 1. 開篇總結 (From Ch1 Results - Aligned with MD Ch8.1)
@@ -1082,7 +1082,10 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
 
 
     report_lines.append("\n--- 報告結束 ---")
-    return "\n\n".join(report_lines)
+    # Replace punctuation in the final joined string
+    final_report_string = "\n\n".join(report_lines)
+    final_report_string = final_report_string.replace(":", "：").replace("(", "（").replace(")", "）")
+    return final_report_string
 
 # --- Main Q Diagnosis Entry Point ---
 
