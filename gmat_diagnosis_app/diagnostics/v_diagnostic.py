@@ -646,66 +646,55 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
     # --- END DEBUG ---
 
     # Apply the rules - this function modifies df_v in place
-    df_v = _apply_ch3_diagnostic_rules(df_v_processed_full, max_correct_difficulty_per_skill_v, v_avg_time_per_type) # Apply to the full df
+    # df_v = _apply_ch3_diagnostic_rules(df_v_processed_full, max_correct_difficulty_per_skill_v, v_avg_time_per_type) # Apply to the full df
+    df_v = _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill_v, v_avg_time_per_type)
 
-    # --- DEBUG: Print columns AFTER applying rules ---
-    print("DEBUG (run_v_diagnosis): Columns in df_v AFTER _apply_ch3_diagnostic_rules:")
-    print(df_v.columns.tolist())
-    # Check if the key column was added
+    # --- DEBUG PRINT 1: After applying rules ---
+    print("DEBUG (run_v_diagnosis): >>> After _apply_ch3_diagnostic_rules <<<")
+    print("DEBUG (run_v_diagnosis): Columns:", df_v.columns.tolist())
     if 'diagnostic_params' in df_v.columns:
-        print("DEBUG (run_v_diagnosis): 'diagnostic_params' column head AFTER rules:")
-        # Print head safely, handle potential errors if column is somehow empty list etc.
-        try:
-            print(df_v['diagnostic_params'].head())
-        except Exception as e:
-            print(f"Error printing diagnostic_params head: {e}")
-            print(df_v['diagnostic_params']) # Print the whole series if head fails
+        print("DEBUG (run_v_diagnosis): 'diagnostic_params' (English) head:")
+        print(df_v['diagnostic_params'].head())
     else:
         print("ERROR (run_v_diagnosis): 'diagnostic_params' column MISSING AFTER rules!")
-    # --- END DEBUG ---
+    # --- END DEBUG PRINT 1 ---
 
-    # --- Translate diagnostic codes ---
+    # --- Translate diagnostic codes --- Create Chinese list, keep English column for now ---
+    # --- DEBUG PRINT 2: Before Translation ---
     if 'diagnostic_params' in df_v.columns:
-        print("DEBUG (v_diagnostic.py): Translating 'diagnostic_params' to Chinese...")
+        print("DEBUG (v_diagnostic.py): >>> Before Translation <<<")
+        print("DEBUG (v_diagnostic.py): 'diagnostic_params' (English) head:")
+        print(df_v['diagnostic_params'].head())
+    else:
+        print("DEBUG (v_diagnostic.py): 'diagnostic_params' column MISSING before translation.")
+    # --- END DEBUG PRINT 2 ---
+    if 'diagnostic_params' in df_v.columns:
+        print("DEBUG (v_diagnostic.py): Translating 'diagnostic_params' to Chinese into 'diagnostic_params_list'...")
         # Apply the translation function (already handles lists)
         # Ensure the lambda handles non-list elements gracefully if they sneak in
-        df_v['diagnostic_params_list_chinese'] = df_v['diagnostic_params'].apply(
+        # Store directly into the final column name 'diagnostic_params_list'
+        df_v['diagnostic_params_list'] = df_v['diagnostic_params'].apply(
             lambda params: [_translate_v(p) for p in params] if isinstance(params, list) else []
         )
+        print("DEBUG (v_diagnostic.py): Created 'diagnostic_params_list' (Chinese). Kept original 'diagnostic_params' (English).")
     else:
         print("WARNING (v_diagnostic.py): 'diagnostic_params' column not found for translation.")
-        # Initialize with empty lists if column doesn't exist
-        # Ensure correct initialization syntax and apply it to the dataframe
+        # Initialize the target column if source was missing
         num_rows = len(df_v)
-        df_v['diagnostic_params_list_chinese'] = pd.Series([[] for _ in range(num_rows)], index=df_v.index)
+        df_v['diagnostic_params_list'] = pd.Series([[] for _ in range(num_rows)], index=df_v.index)
 
+    # --- *** DO NOT DROP OR RENAME ENGLISH COLUMN YET *** ---
 
-    # --- Drop original English codes column --- 
+    # --- DEBUG PRINT 3: After Translation (Before Report Generation) ---
+    print("DEBUG (v_diagnostic.py): >>> After Translation (Before Report Generation) <<<")
+    print("DEBUG (v_diagnostic.py): Columns:", df_v.columns.tolist())
     if 'diagnostic_params' in df_v.columns:
-        try:
-             df_v.drop(columns=['diagnostic_params'], inplace=True)
-             print("DEBUG (v_diagnostic.py): Dropped 'diagnostic_params' column.")
-        except KeyError: # Handle case where column might have already been dropped or renamed
-             print("DEBUG (v_diagnostic.py): 'diagnostic_params' column not found during drop (might be already handled).")
-
-    # --- Rename translated column --- 
-    if 'diagnostic_params_list_chinese' in df_v.columns:
-        try:
-            df_v.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
-            print("DEBUG (v_diagnostic.py): Renamed 'diagnostic_params_list_chinese' to 'diagnostic_params_list'")
-        except Exception as e: # Catch potential errors during rename
-             print(f"ERROR renaming column: {e}")
-             # If rename fails, ensure the target column still exists or is created
-             if 'diagnostic_params_list' not in df_v.columns:
-                 print("Initializing 'diagnostic_params_list' after rename failed.")
-                 num_rows = len(df_v)
-                 df_v['diagnostic_params_list'] = pd.Series([[] for _ in range(num_rows)], index=df_v.index)
-    else:
-        # If rename source doesn't exist, still ensure target 'diagnostic_params_list' exists
-        print("DEBUG (v_diagnostic.py): Source column ('diagnostic_params_list_chinese') not found for rename. Ensuring 'diagnostic_params_list' exists.")
-        if 'diagnostic_params_list' not in df_v.columns:
-            num_rows = len(df_v)
-            df_v['diagnostic_params_list'] = pd.Series([[] for _ in range(num_rows)], index=df_v.index)
+        print("DEBUG (v_diagnostic.py): 'diagnostic_params' (English) head:")
+        print(df_v['diagnostic_params'].head())
+    if 'diagnostic_params_list' in df_v.columns:
+        print("DEBUG (v_diagnostic.py): 'diagnostic_params_list' (Chinese) head:")
+        print(df_v['diagnostic_params_list'].head())
+    # --- END DEBUG PRINT 3 ---
 
     # --- Initialize results dictionary --- 
     v_diagnosis_results = {}
@@ -732,19 +721,15 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
     v_diagnosis_results.setdefault('chapter_2', {})['by_difficulty'] = _analyze_dimension(df_valid_v, 'difficulty_grade')
     print("    Finished Chapter 2 V metrics.")
 
-    # --- Populate Chapter 3 Results (Error Analysis from diagnosed df) ---
-    print("  Extracting V Analysis (Chapter 3 - Errors)...")
-    # The actual diagnosis happened in _apply_ch3_diagnostic_rules, now we structure the result.
+    # --- Populate Chapter 3 Results (Store the df WITH BOTH English and Chinese columns) --- 
+    print("  Structuring V Analysis Results (Chapter 3)...")
     v_diagnosis_results['chapter_3'] = {
-        # Store the dataframe itself for report generation to access params/sfe/time_perf
-        'diagnosed_dataframe': df_v.copy(), 
-        # Optionally, extract summary stats like error counts per type/skill if needed
-        # 'cr_error_analysis': _analyze_error_types_from_params(df_v[df_v['question_type'] == 'CR'], 'CR'),
-        # 'rc_error_analysis': _analyze_error_types_from_params(df_v[df_v['question_type'] == 'RC'], 'RC'),
+        # Store the dataframe itself for report generation to access BOTH params columns
+        'diagnosed_dataframe': df_v.copy()
     }
-    print("    Finished Chapter 3 V error structuring.")
+    print("    Finished Chapter 3 V result structuring.")
 
-    # --- Populate Chapter 4 Results (Correct but Slow) ---
+    # --- Populate Chapter 4 Results (Correct but Slow) --- 
     print("  Executing V Analysis (Chapter 4 - Correct Slow)...")
     df_correct_v = df_valid_v[df_valid_v['is_correct'] == True]
     v_diagnosis_results['chapter_4'] = {
@@ -753,7 +738,7 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
     }
     print("    Finished Chapter 4 V correct slow analysis.")
 
-    # --- Populate Chapter 5 Results (Patterns) ---
+    # --- Populate Chapter 5 Results (Patterns) --- 
     print("  Executing V Analysis (Chapter 5 - Patterns)...")
     v_diagnosis_results['chapter_5'] = _observe_patterns(df_valid_v, v_time_pressure_status)
     print("    Finished Chapter 5 V pattern observation.")
@@ -777,18 +762,27 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
     v_recommendations = _generate_v_recommendations(v_diagnosis_results, exempted_skills)
     v_diagnosis_results['chapter_7'] = v_recommendations # Store recommendations
 
+    # --- *** PASS v_diagnosis_results (containing df with BOTH param cols) TO REPORT GENERATOR *** ---
     v_report_content = _generate_v_summary_report(v_diagnosis_results) # Generate the report
 
-    # --- DEBUG PRINT --- 
-    print("DEBUG (v_diagnostic.py): Columns before return:", df_v.columns.tolist())
+    # --- *** NOW Drop the English column AFTER report is generated *** ---
+    if 'diagnostic_params' in df_v.columns:
+        try:
+             df_v.drop(columns=['diagnostic_params'], inplace=True)
+             print("DEBUG (v_diagnostic.py): Dropped 'diagnostic_params' column AFTER report generation.")
+        except KeyError:
+             print("DEBUG (v_diagnostic.py): 'diagnostic_params' column not found during final drop.")
+
+    # --- DEBUG PRINT: Final Columns Before Return ---
+    print("DEBUG (v_diagnostic.py): Final Columns before return:", df_v.columns.tolist())
     if 'diagnostic_params_list' in df_v.columns:
-        print("DEBUG (v_diagnostic.py): 'diagnostic_params_list' head:")
+        print("DEBUG (v_diagnostic.py): Final 'diagnostic_params_list' head:")
         print(df_v['diagnostic_params_list'].head())
     else:
-        print("DEBUG (v_diagnostic.py): 'diagnostic_params_list' column MISSING before return!")
+        print("ERROR (v_diagnostic.py): Final 'diagnostic_params_list' column MISSING before return!")
     # --- END DEBUG PRINT ---
 
-    # --- 確保 Subject 欄位存在 ---
+    # --- 確保 Subject 欄位存在 --- 
     if 'Subject' not in df_v.columns:
         print("警告: 'Subject' 欄位在 V 返回前缺失，正在重新添加...")
         df_v['Subject'] = 'V'
@@ -979,7 +973,6 @@ def _format_rate(rate_value):
 
 def _generate_v_summary_report(v_diagnosis_results):
     """Generates the summary report string for the Verbal section."""
-    print("DEBUG: +++ Entering _generate_v_summary_report +++") # DEBUG
     report_lines = []
     report_lines.append("## GMAT 語文 (Verbal) 診斷報告")
     report_lines.append("--- (基於用戶數據與模擬難度分析) ---")
@@ -1016,27 +1009,16 @@ def _generate_v_summary_report(v_diagnosis_results):
     # --- Corrected Metrics Retrieval --- #
     chapter_2_results = v_diagnosis_results.get('chapter_2', {})
     v_metrics_by_type = chapter_2_results.get('by_type', {})
-    # print(f"DEBUG (_generate_v_summary_report): v_metrics_by_type = {v_metrics_by_type}") # REMOVED: Check available keys
     # Use the actual keys found in the data, default to empty dict if key missing
     cr_metrics = v_metrics_by_type.get('Critical Reasoning', v_metrics_by_type.get('CR', {}))
     rc_metrics = v_metrics_by_type.get('Reading Comprehension', v_metrics_by_type.get('RC', {}))
     # --- End Corrected Metrics Retrieval ---
-
-    # --- DEBUG: Print metrics before validity check ---
-    print(f"DEBUG (_generate_v_summary_report): Retrieved cr_metrics = {cr_metrics}")
-    print(f"DEBUG (_generate_v_summary_report): Retrieved rc_metrics = {rc_metrics}")
-    # --- END DEBUG ---
 
     # Check if metrics exist and contain necessary rates
     cr_error_rate = cr_metrics.get('error_rate')
     cr_overtime_rate = cr_metrics.get('overtime_rate')
     rc_error_rate = rc_metrics.get('error_rate')
     rc_overtime_rate = rc_metrics.get('overtime_rate')
-
-    # --- DEBUG: Print metrics before validity check --- # REMOVED
-    # print(f"DEBUG (_generate_v_summary_report): cr_metrics = {cr_metrics}") # REMOVED
-    # print(f"DEBUG (_generate_v_summary_report): rc_metrics = {rc_metrics}") # REMOVED
-    # --- END DEBUG --- # REMOVED
 
     # Refined check for comparison possibility
     cr_data_valid = cr_metrics and pd.notna(cr_error_rate) and pd.notna(cr_overtime_rate)
@@ -1284,43 +1266,125 @@ def _generate_v_summary_report(v_diagnosis_results):
         'Fast & Wrong': set(), 'Slow & Wrong': set(),
         'Normal Time & Wrong': set(), 'Slow & Correct': set()
     }
+    
+    # --- 重要修改: 直接使用 diagnosed_df 中的 'diagnostic_params' (英文標籤) ---
+    # 這確保 param_to_positions 的鍵是英文參數，與 triggered_params_all 能夠正確匹配
+    if diagnosed_df is not None and not diagnosed_df.empty and 'diagnostic_params' in diagnosed_df.columns:
+        for index, row in diagnosed_df.iterrows():
+            pos = row.get('question_position')
+            # 使用英文參數列表填充 param_to_positions
+            params_en = row.get('diagnostic_params', [])
+            if isinstance(params_en, list) and pos is not None and pos != 'N/A':
+                for p in params_en:
+                    param_to_positions.setdefault(p, set()).add(pos)
+    # --- 修改結束 ---
+    
     if all_problem_items:
         for item in all_problem_items:
             pos = item.get('position')
             skill = item.get('skill')
-            params = item.get('params', [])
             performance = item.get('performance')
             if pos is not None and pos != 'N/A':
                 if skill and skill != 'Unknown Skill':
                     skill_to_positions.setdefault(skill, set()).add(pos)
-                for p in params:
-                    param_to_positions.setdefault(p, set()).add(pos)
                 if performance in performance_to_skills and skill and skill != 'Unknown Skill':
                     performance_to_skills[performance].add(skill)
+    
     for param in param_to_positions: param_to_positions[param] = sorted(list(param_to_positions[param]))
     for skill in skill_to_positions: skill_to_positions[skill] = sorted(list(skill_to_positions[skill]))
-
-    triggered_params_all.update(p for sublist in all_param_lists for p in sublist)
-    if bool(ch5.get('early_rushing_flag_for_review', False)): triggered_params_all.add('BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
-    if bool(ch5.get('carelessness_issue', False)): triggered_params_all.add('BEHAVIOR_CARELESSNESS_ISSUE')
 
     # Guide Reflection
     report_lines.append("- **引導反思:**")
     reflection_prompts = []
-    def get_pos_context(param_keys):
+
+    # --- Helper Function to Get Relevant Skills ---
+    def get_relevant_skills(param_keys, param_to_positions_map, skill_to_positions_map):
+        # Find all positions related to the given parameters
+        relevant_positions = set()
+        for key in param_keys:
+            relevant_positions.update(param_to_positions_map.get(key, set()))
+
+        # Find skills associated with these positions
+        relevant_skills_set = set()
+        for skill, positions in skill_to_positions_map.items():
+            if not relevant_positions.isdisjoint(positions): # Check if any position matches
+                if skill != 'Unknown Skill': # Exclude 'Unknown Skill'
+                    relevant_skills_set.add(skill)
+
+        # Return sorted list of English skill names
+        return sorted(list(relevant_skills_set))
+    # --- End Helper Function ---
+
+    def get_pos_context(param_keys): # Keep existing helper
         positions = set().union(*(param_to_positions.get(key, set()) for key in param_keys))
         return f" (涉及題號: {sorted(list(positions))})" if positions else ""
-    logic_params = [...] # Same as before
-    reading_params = [...] # Same as before
-    efficiency_params = [...] # Same as before
-    if any(p in triggered_params_all for p in logic_params): reflection_prompts.append("  - 回想一下，在做錯的相關題目時，具體是卡在哪个推理步驟、邏輯關係或選項辨析上？是完全沒思路，還是思路有偏差？" + get_pos_context(logic_params))
-    if any(p in triggered_params_all for p in reading_params): reflection_prompts.append("  - 對於做錯的題目，是文章/題幹的關鍵信息沒讀懂、讀漏，還是題目要求理解錯誤？定位信息是否存在困難？" + get_pos_context(reading_params))
-    if any(p in triggered_params_all for p in efficiency_params): reflection_prompts.append("  - 回想耗時過長的題目，是閱讀花了太長時間，邏輯分析卡住，還是選項比較難以排除？" + get_pos_context(efficiency_params))
-    if 'BEHAVIOR_CARELESSNESS_ISSUE' in triggered_params_all:
-        fw_positions = set().union(*(param_to_positions.get(key, set()) for key in ['CR_READING_BASIC_OMISSION', 'BEHAVIOR_CARELESSNESS_ISSUE'])) # Link carelessness flag to positions
-        fw_context = f" (例如題號: {sorted(list(fw_positions))})" if fw_positions else ""
-        reflection_prompts.append("  - 回想一下，是否存在因為看錯字、忽略細節或誤解選項導致的失誤？" + fw_context)
-    if not reflection_prompts: reflection_prompts.append("  - (本次分析未觸發典型的反思問題，建議結合練習計劃進行)")
+
+    # --- Define Parameter Groups (Use English Codes) ---
+    # These groups should correspond to the specific reflection prompts
+    logic_params_v = [
+        'CR_REASONING_CHAIN_ERROR', 'CR_REASONING_ABSTRACTION_DIFFICULTY',
+        'CR_REASONING_PREDICTION_ERROR', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY',
+        'CR_AC_ANALYSIS_RELEVANCE_ERROR', 'CR_AC_ANALYSIS_DISTRACTOR_CONFUSION',
+        'RC_REASONING_INFERENCE_WEAKNESS', 'RC_AC_ANALYSIS_DIFFICULTY',
+        'CR_METHOD_TYPE_SPECIFIC_ERROR', # Added based on V-Doc Ch3
+        'RC_METHOD_TYPE_SPECIFIC_ERROR'  # Added based on V-Doc Ch3
+    ]
+    reading_params_v = [
+        'CR_READING_BASIC_OMISSION', 'CR_READING_DIFFICULTY_STEM',
+        'CR_QUESTION_UNDERSTANDING_MISINTERPRETATION',
+        'RC_READING_INFO_LOCATION_ERROR', 'RC_READING_KEYWORD_LOGIC_OMISSION',
+        'RC_READING_VOCAB_BOTTLENECK', 'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY',
+        'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY', 'RC_READING_DOMAIN_KNOWLEDGE_GAP',
+        'RC_READING_PRECISION_INSUFFICIENT', 'RC_QUESTION_UNDERSTANDING_MISINTERPRETATION',
+        'RC_LOCATION_ERROR_INEFFICIENCY', 'RC_READING_COMPREHENSION_BARRIER',
+        'CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY'
+    ]
+    efficiency_params_v = [
+        'CR_READING_TIME_EXCESSIVE', 'CR_REASONING_TIME_EXCESSIVE', 'CR_AC_ANALYSIS_TIME_EXCESSIVE',
+        'RC_READING_SPEED_SLOW_FOUNDATIONAL', 'RC_METHOD_INEFFICIENT_READING',
+        'RC_LOCATION_TIME_EXCESSIVE', 'RC_REASONING_TIME_EXCESSIVE', 'RC_AC_ANALYSIS_TIME_EXCESSIVE',
+        'EFFICIENCY_BOTTLENECK_READING', 'EFFICIENCY_BOTTLENECK_REASONING',
+        'EFFICIENCY_BOTTLENECK_LOCATION', 'EFFICIENCY_BOTTLENECK_AC_ANALYSIS'
+    ]
+    carelessness_params_v = [
+        'BEHAVIOR_CARELESSNESS_ISSUE'
+        # Add V-specific carelessness params if defined, e.g., from App A
+        # 'V_CARELESSNESS_DETAIL_OMISSION',
+        # 'V_CARELESSNESS_OPTION_MISREAD'
+    ]
+
+    # Logic Prompt Check
+    logic_trigger_check = any(p in triggered_params_all for p in logic_params_v)
+    if logic_trigger_check:
+        skills_involved = get_relevant_skills(logic_params_v, param_to_positions, skill_to_positions)
+        skill_context = f" [`{', '.join(skills_involved)}`] " if skills_involved else " "
+        reflection_prompts.append(f"  - 回想一下，在做錯/慢的{skill_context}題目時，具體是卡在哪个推理步驟、邏輯關係或選項辨析上？是完全沒思路，還是思路有偏差？" + get_pos_context(logic_params_v))
+
+    # Reading Prompt Check
+    reading_trigger_check = any(p in triggered_params_all for p in reading_params_v)
+    if reading_trigger_check:
+        skills_involved = get_relevant_skills(reading_params_v, param_to_positions, skill_to_positions)
+        skill_context = f" [`{', '.join(skills_involved)}`] " if skills_involved else " "
+        reflection_prompts.append(f"  - 對於做錯/慢的{skill_context}題目，是文章/題幹的關鍵信息沒讀懂、讀漏，還是題目要求理解錯誤？定位信息是否存在困難？" + get_pos_context(reading_params_v))
+
+    # Efficiency Prompt Check
+    efficiency_trigger_check = any(p in triggered_params_all for p in efficiency_params_v)
+    if efficiency_trigger_check:
+        skills_involved = get_relevant_skills(efficiency_params_v, param_to_positions, skill_to_positions)
+        skill_context = f" [`{', '.join(skills_involved)}`] " if skills_involved else " "
+        reflection_prompts.append(f"  - 回想耗時過長的{skill_context}題目，是閱讀花了太長時間，邏輯分析卡住，還是選項比較難以排除？" + get_pos_context(efficiency_params_v))
+
+    # Carelessness Prompt Check
+    carelessness_trigger_check = any(p in triggered_params_all for p in carelessness_params_v) # Use list defined above
+    if carelessness_trigger_check: # Check the specific list, not just the one flag 'BEHAVIOR_CARELESSNESS_ISSUE'
+        careless_positions = param_to_positions.get('BEHAVIOR_CARELESSNESS_ISSUE', set())
+        # If the main flag has no direct positions, maybe find positions linked to other detail omission params?
+        # For now, stick to the main flag's linked positions if any.
+        careless_context = f" (例如題號: {sorted(list(careless_positions))})" if careless_positions else ""
+        reflection_prompts.append("  - 回想一下，是否存在因為看錯字、忽略細節或誤解選項導致的失誤？" + careless_context)
+
+    if not reflection_prompts:
+        reflection_prompts.append("  - (本次分析未觸發典型的反思問題，建議結合練習計劃進行)")
     report_lines.extend(reflection_prompts)
 
     # Secondary Evidence Suggestion
