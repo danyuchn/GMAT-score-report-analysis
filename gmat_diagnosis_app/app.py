@@ -34,12 +34,12 @@ ALL_CONTENT_DOMAINS = list(set(cd for subj_cds in ALLOWED_CONTENT_DOMAIN.values(
 ALLOWED_QUESTION_TYPE = {
     'Q': ['REAL', 'PURE'],
     'V': ['Critical Reasoning', 'Reading Comprehension'],
-    'DI': ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
+    'DI': ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table', 'Graphs and Tables']
 }
 ALL_QUESTION_TYPES = list(set(qt for subj_qts in ALLOWED_QUESTION_TYPE.values() for qt in subj_qts))
 
 ALLOWED_FUNDAMENTAL_SKILLS = {
-    'Q': ['Equal/Unequal/ALG', 'Rates/Ratio/Percent', 'Value/Order/Factors', 'Counting/Sets/Series/Prob/Stats'],
+    'Q': ['Equal/Unequal/ALG', 'Rates/Ratio/Percent', 'Rates/Ratios/Percent', 'Value/Order/Factors', 'Counting/Sets/Series/Prob/Stats'],
     'V': ['Plan/Construct', 'Identify Stated Idea', 'Identify Inferred Idea', 'Analysis/Critique'],
     'DI': ['N/A'] # Assuming only N/A based on di.csv example
 }
@@ -94,6 +94,9 @@ def validate_dataframe(df, subject):
          # If neither standard 'Question' nor BOM version exists, flag 'Question' as missing
          pass # Let the check below handle it
 
+    # Helper function for preprocessing skill names (lowercase, strip, collapse spaces)
+    def preprocess_skill(skill):
+        return re.sub(r'\\s+', ' ', str(skill).strip()).lower()
 
     # 1. Check for missing required columns first (using the potentially BOM-adjusted list)
     missing_cols = [col for col in actual_required if col not in df.columns]
@@ -136,6 +139,7 @@ def validate_dataframe(df, subject):
 
                 is_valid = True
                 error_detail = rules['error']
+                correct_value = None # To store the value we might correct to
 
                 # Type checks (apply strip here for robustness)
                 if 'type' in rules:
@@ -164,7 +168,6 @@ def validate_dataframe(df, subject):
                          except (ValueError, TypeError):
                              is_valid = False
 
-
                 # Allowed list checks (case and space sensitive - use original value)
                 elif 'allowed' in rules:
                     allowed_values = rules['allowed']
@@ -172,16 +175,74 @@ def validate_dataframe(df, subject):
                     if 'subject_specific' in rules and subject in rules['subject_specific']:
                         allowed_values = rules['subject_specific'][subject]
 
-                    # --- Start Case-Insensitive Check and Correction ---
                     value_str_stripped = str(value).strip() # Value after stripping whitespace
                     value_str_lower = value_str_stripped.lower() # Lowercase version for comparison
 
-                    # Create a mapping from lowercase allowed value to original allowed value
-                    allowed_values_map = {str(v).lower(): v for v in allowed_values}
+                    # --- Start Specific Logic for Q: Question Type ---
+                    if col_name == 'Question Type' and subject == 'Q':
+                        if value_str_lower == 'real contexts':
+                            correct_value = 'REAL'
+                            is_valid = True
+                        elif value_str_lower == 'pure contexts':
+                            correct_value = 'PURE'
+                            is_valid = True
+                        else:
+                            # Fallback to standard check if not the special context values
+                            allowed_values_map = {str(v).lower(): v for v in allowed_values}
+                            if value_str_lower in allowed_values_map:
+                                correct_value = allowed_values_map[value_str_lower]
+                                is_valid = True
+                            else:
+                                is_valid = False
+                    # --- End Specific Logic for Q: Question Type ---
 
-                    if value_str_lower in allowed_values_map:
-                        correct_value = allowed_values_map[value_str_lower]
-                        # If the stripped original value differs from the correct capitalization, update the DataFrame
+                    # --- Start Specific Logic for Fundamental Skills (Fuzzy Match + Canonical Mapping) ---
+                    elif col_name == 'Fundamental Skills':
+                        processed_input = preprocess_skill(value_str_stripped)
+                        is_valid = False # Assume invalid initially
+                        correct_value = None
+
+                        # Build a map from preprocessed key to canonical value
+                        skill_map = {}
+                        for allowed_val in allowed_values: # allowed_values is subject-specific list
+                            processed_allowed = preprocess_skill(allowed_val)
+                            # Define the canonical value
+                            if processed_allowed == 'rates/ratios/percent':
+                                canonical_value = 'Rates/Ratio/Percent' # Standard singular form
+                            else:
+                                canonical_value = allowed_val # Use the value itself as canonical
+                            skill_map[processed_allowed] = canonical_value
+
+                        # Check if the preprocessed input exists as a key
+                        if processed_input in skill_map:
+                            correct_value = skill_map[processed_input] # Get the canonical value
+                            is_valid = True
+                    # --- End Specific Logic for Fundamental Skills ---
+
+                    # --- Default Case-Insensitive Check (Handles case and specific variations like Graphs/Graph) ---
+                    else:
+                        # Build a map from lowercase key to canonical value
+                        allowed_values_map = {}
+                        for v in allowed_values:
+                            key = str(v).lower()
+                            # Map specific variations to their canonical form
+                            if key == 'graphs and tables':
+                                canonical_value = 'Graph and Table' # Standard form
+                            else:
+                                canonical_value = v # Use the value itself as canonical
+                            allowed_values_map[key] = canonical_value
+
+                        # Check if the lowercased input exists as a key in the map
+                        if value_str_lower in allowed_values_map:
+                            correct_value = allowed_values_map[value_str_lower] # Get the canonical value
+                            is_valid = True
+                        else:
+                            is_valid = False
+                    # --- End Default Check ---
+
+                    # --- Correction Logic (Applies if a match was found above and correct_value is set) ---
+                    if is_valid and correct_value is not None:
+                        # If the stripped original value differs from the correct capitalization/format, update the DataFrame
                         if value_str_stripped != correct_value:
                             try:
                                 # Use .loc for safe assignment
@@ -189,19 +250,13 @@ def validate_dataframe(df, subject):
                                 # Optionally, log the correction?
                                 # print(f"Corrected row {index}, col '{current_col_name}': '{value}' -> '{correct_value}'")
                             except Exception as e:
-                                errors.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 嘗試自動修正大小寫時出錯 ({e})。")
+                                errors.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 嘗試自動修正大小寫/格式時出錯 ({e})。")
                                 is_valid = False # Mark as invalid if correction fails
-
-                        # If value_str_lower was found, it's considered valid (or correction failed above)
-                        if is_valid: # Check if not marked invalid by correction error
-                             is_valid = True
-                    else:
-                        # No match found even case-insensitively
-                        is_valid = False
-                        # Format allowed values clearly for the error message
+                    elif not is_valid:
+                        # Format allowed values clearly for the error message if validation failed
                         allowed_values_str = ", ".join(f"'{v}'" for v in allowed_values)
-                        error_detail += f" 允許的值: {allowed_values_str} (大小寫不敏感匹配失敗)。"
-                    # --- End Case-Insensitive Check and Correction ---
+                        error_detail += f" 允許的值: {allowed_values_str} (大小寫/空格不敏感匹配失敗)。"
+                    # --- End Correction Logic ---
 
                 if not is_valid:
                     # Add 1 to index for user-friendly row numbering (Excel/CSV style)
