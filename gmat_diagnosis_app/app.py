@@ -401,7 +401,11 @@ def create_theta_plot(theta_history_df, subject_name):
             dtick=max(1, (len(x_values)-1) // 10 if len(x_values) > 1 else 1),
             tick0=0 # Ensure ticks start nicely from 0
         ),
-        yaxis=dict(showgrid=True, zeroline=True),
+        yaxis=dict(
+            showgrid=True,
+            zeroline=True,
+            range=[-4, 4] # FIX: Set fixed y-axis range
+        ),
         hovermode="x unified",
         legend_title_text='估計值類型'
     )
@@ -917,44 +921,55 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                     st.write(f"  執行 {subject} 科目模擬...")
                     params = SUBJECT_SIM_PARAMS[subject]
                     initial_theta = st.session_state[params['initial_theta_key']]
-                    total_sim_questions = params['total_questions']
                     bank = question_banks[subject]
 
-                    # Get wrong indices based on final 'is_correct' and 'is_invalid' flags
-                    # Use the dataframe resulting from overtime calculation (df_final_input_for_sim)
+                    # Get user data for the subject, sorted by position
                     user_df_subj = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].sort_values(by='question_position')
 
-                    # Filter out invalid questions *before* determining wrong positions
-                    valid_responses = user_df_subj[~user_df_subj['is_invalid']].copy()
-
-                    # If all questions were marked invalid for a subject
-                    if valid_responses.empty:
-                        st.warning(f"  {subject}: 所有題目均被標記為無效，無法執行模擬。將使用初始 Theta ({initial_theta:.3f}) 作為最終估計。", icon="⚠️")
-                        # Simulate a "dummy" history with just the initial theta? Or just store initial?
-                        # Let's store the initial theta as the result for this subject.
+                    # --- Calculate total questions and wrong positions from user_df_subj --- #
+                    if user_df_subj.empty:
+                        st.warning(f"  {subject}: 沒有找到該科目的作答數據，無法執行模擬。", icon="⚠️")
                         final_thetas_local[subject] = initial_theta
-                        # Create an empty history df to avoid errors later, but mark it?
-                        all_simulation_histories[subject] = pd.DataFrame(columns=['question_index', 'b', 'response', 'theta_est_before_answer', 'theta_est_after_answer'])
-                        all_simulation_histories[subject].attrs['simulation_skipped'] = True # Mark skipped
-                        continue # Skip actual simulation call
+                        all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
+                        all_simulation_histories[subject].attrs['simulation_skipped'] = True
+                        continue
 
+                    try:
+                        total_questions_attempted = len(user_df_subj) # Correctly use the subject-specific dataframe length
+                        if total_questions_attempted <= 0:
+                            raise ValueError("Number of rows is not positive.")
 
-                    wrong_positions = valid_responses.loc[valid_responses['is_correct'] == False, 'question_position'].tolist()
+                        # Calculate wrong positions from the subject-specific dataframe
+                        if 'is_correct' not in user_df_subj.columns:
+                            raise ValueError(f"{subject}: 缺少 'is_correct' 欄位。")
+                        user_df_subj['is_correct'] = user_df_subj['is_correct'].astype(bool)
+                        user_df_subj['question_position'] = pd.to_numeric(user_df_subj['question_position'], errors='coerce')
+                        wrong_positions = user_df_subj.loc[(user_df_subj['is_correct'] == False) & user_df_subj['question_position'].notna(), 'question_position'].astype(int).tolist()
 
-                    # Adjust total_questions for simulation based on *valid* responses
-                    actual_sim_questions = len(valid_responses) # Simulate based on the number of valid items
-                    st.write(f"    {subject}: 共有 {actual_sim_questions} 個有效題目，其中錯誤位置: {wrong_positions}")
+                        st.write(f"    {subject}: 模擬全部 {total_questions_attempted} 個作答題目，其中錯誤位置: {wrong_positions}")
 
+                    except (KeyError, ValueError, TypeError) as e:
+                         st.error(f"  {subject}: 無法確定總作答題數或錯誤位置: {e}。跳過模擬。", icon="🚨")
+                         final_thetas_local[subject] = initial_theta
+                         all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
+                         all_simulation_histories[subject].attrs['simulation_skipped'] = True
+                         continue # Skip to next subject
+                    # --- End Calculation --- #
 
-                    # Run simulation using only valid responses
+                    # --- Filter valid responses for later difficulty assignment --- #
+                    valid_responses = user_df_subj[~user_df_subj['is_invalid']].copy()
+                    if valid_responses.empty:
+                        st.warning(f"  {subject}: 所有題目均被標記為無效，Theta 模擬仍基於完整序列。", icon="⚠️")
+                    # --- End Filtering --- #
+
+                    # --- Run simulation using the calculated total and wrong list --- #
                     history_df = irt.simulate_cat_exam(
                         question_bank=bank,
-                        wrong_question_positions=wrong_positions, # Corrected parameter name
-                        # NOTE: Ensure irt.simulate_cat_exam handles wrong_question_indices correctly based on the number of valid questions (actual_sim_questions)
-                        # If it expects indices relative to the full set, adjust logic here. Assuming it expects indices within the simulated sequence.
+                        wrong_question_positions=wrong_positions,
                         initial_theta=initial_theta,
-                        total_questions=actual_sim_questions # Simulate only for the valid items
+                        total_questions=total_questions_attempted # Pass the correct total number
                     )
+                    # --- End Simulation Call --- #
 
                     if history_df is not None and not history_df.empty:
                         # Store results only if simulation ran
@@ -962,21 +977,22 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                         final_theta_subj = history_df['theta_est_after_answer'].iloc[-1]
                         final_thetas_local[subject] = final_theta_subj
                         st.write(f"    {subject}: 模擬完成。最後 Theta 估計: {final_theta_subj:.3f}")
-                        # --- NEW: Generate and store plot ---
+
+                        # --- Generate and store plot ---
                         try:
                             theta_plot = create_theta_plot(history_df, subject)
                             if theta_plot:
                                 all_theta_plots[subject] = theta_plot
                                 st.write(f"    {subject}: Theta 歷史圖表已生成。")
                             else:
-                                st.warning(f"    {subject}: 未能生成 Theta 圖表。", icon="📊")
+                                st.warning(f"    {subject}: 未能生成 Theta 圖表 (create_theta_plot 返回 None)。", icon="📊") # More specific warning
                         except Exception as plot_err:
                             st.warning(f"    {subject}: 生成 Theta 圖表時出錯: {plot_err}", icon="📊")
-                        # --- End NEW ---
+                        # --- End plot generation ---
                     elif history_df is not None and history_df.empty: # Succeeded but empty
-                        st.warning(f"  {subject}: 模擬執行但未產生歷史記錄 (可能因無有效題目)。將使用初始 Theta。")
+                        st.warning(f"  {subject}: 模擬執行但未產生歷史記錄。將使用初始 Theta。")
                         final_thetas_local[subject] = initial_theta
-                        all_simulation_histories[subject] = pd.DataFrame(columns=['question_index', 'b', 'response', 'theta_est_before_answer', 'theta_est_after_answer']) # Use new cols
+                        all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
                         all_simulation_histories[subject].attrs['simulation_skipped'] = True # Mark skipped
                     else: # Failed (returned None)
                          raise ValueError(f"IRT simulation failed for subject {subject}")
