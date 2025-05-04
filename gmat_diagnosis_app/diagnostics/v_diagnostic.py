@@ -1345,10 +1345,11 @@ def _generate_v_summary_report(v_diagnosis_results):
     # Report SFE Summary
     if sfe_triggered_overall:
         sfe_label = _translate_v('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-        sfe_skills_zh = [_translate_v(s) for s in sorted(list(sfe_skills_involved))]
+        # Keep skill names in English
+        sfe_skills_en = sorted(list(sfe_skills_involved))
         sfe_note = f"{sfe_label}"
-        if sfe_skills_zh:
-            sfe_note += f" (涉及技能: {', '.join(sfe_skills_zh)})"
+        if sfe_skills_en:
+            sfe_note += f" (涉及技能: {', '.join(sfe_skills_en)})"
         report_lines.append(f"- **尤其需要注意:** {sfe_note}。(註：SFE 指在已掌握技能範圍內的題目失誤)")
 
     # Report if no core issues AND no SFE
@@ -1412,8 +1413,9 @@ def _generate_v_summary_report(v_diagnosis_results):
     if not override_triggered:
          report_lines.append("- 無法進行技能覆蓋分析 (可能缺少數據或計算錯誤)。")
     elif triggered_skills:
-        triggered_skills_zh = [_translate_v(s) for s in sorted(triggered_skills)]
-        report_lines.append(f"- **以下核心技能整體表現顯示較大提升空間 (錯誤率 > 50%)，建議優先系統性鞏固:** {', '.join(triggered_skills_zh)}")
+        # Keep skill names in English
+        triggered_skills_en = sorted(triggered_skills)
+        report_lines.append(f"- **以下核心技能整體表現顯示較大提升空間 (錯誤率 > 50%)，建議優先系統性鞏固:** {', '.join(triggered_skills_en)}")
     else:
         report_lines.append("- 未觸發需要優先進行基礎鞏固的技能覆蓋規則。")
     report_lines.append("")
@@ -1426,7 +1428,8 @@ def _generate_v_summary_report(v_diagnosis_results):
              rec_text = rec.get('text', '')
              if rec_type == 'skill_header' or rec_type == 'spacer':
                  report_lines.append(rec_text)
-             elif rec_type == 'macro' or rec_type == 'case':
+             # --- Corrected Condition to include macro and case_aggregated --- #
+             elif rec_type == 'macro' or rec_type == 'case' or rec_type == 'case_aggregated':
                  # Add indentation for list items
                  report_lines.append(f"- {rec_text}")
              # Add handling for behavioral if implemented
@@ -1532,7 +1535,8 @@ def _generate_v_summary_report(v_diagnosis_results):
                             skills_in_group = group_df['question_fundamental_skill'].dropna().unique()
                             
                             types_zh = sorted([t for t in types_in_group])
-                            skills_zh = sorted([s for s in skills_in_group])
+                            # Keep skill names in English
+                            skills_en = sorted([s for s in skills_in_group])
 
                             # --- Extract Unique Labels ---
                             all_labels_in_group = set()
@@ -1556,7 +1560,7 @@ def _generate_v_summary_report(v_diagnosis_results):
                             sorted_labels_zh = sorted(list(all_labels_in_group))
                             
                             # --- Modify Report Line ---
-                            report_line = f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及技能：【{', '.join(skills_zh)}】。"
+                            report_line = f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及技能：【{', '.join(skills_en)}】。"
                             if sorted_labels_zh:
                                 report_line += f" 注意相關問題點：【{', '.join(sorted_labels_zh)}】。"
                             review_prompt += f"\n{report_line}"
@@ -1722,7 +1726,7 @@ def _generate_v_recommendations(v_diagnosis_results, exempted_skills):
     """Generates practice recommendations based on V diagnosis results,
        applying skill exemption rules.
     """
-    print(f"DEBUG: +++ Entering _generate_v_recommendations (Exempted: {exempted_skills}) +++") # DEBUG
+    # print(f"DEBUG: +++ Entering _generate_v_recommendations (Exempted: {exempted_skills}) +++") # REMOVED DEBUG
     recommendations = []
     processed_macro_skills = set() # Keep track of skills covered by macro recs
 
@@ -1732,7 +1736,6 @@ def _generate_v_recommendations(v_diagnosis_results, exempted_skills):
     ch4 = v_diagnosis_results.get('chapter_4', {})
     ch5 = v_diagnosis_results.get('chapter_5', {})
     ch6 = v_diagnosis_results.get('chapter_6', {}) # Now contains skill_override_triggered
-    # Removed: ch7 = v_diagnosis_results.get('chapter_7', []) # This should be the output, not input
 
     # Get Ch6 override results
     skill_override_triggered = ch6.get('skill_override_triggered', {})
@@ -1745,119 +1748,180 @@ def _generate_v_recommendations(v_diagnosis_results, exempted_skills):
     all_skills_found = set() # Keep track of all unique skills encountered in diagnostic data
 
     # 1. Identify all skills from diagnostic parameters in Ch3
-    if diagnosed_df is not None and not diagnosed_df.empty and 'diagnostic_params' in diagnosed_df.columns:
-        # Also consider skills from correct-slow if needed for completeness (Ch4 data)
-        # For now, primarily focus on skills associated with diagnostic triggers (errors/SFE/slow)
-        # Extract unique skills from the 'diagnostic_params' which now holds the triggers
-        for params_list in diagnosed_df['diagnostic_params']:
-            # Need to associate params back to skill - iterate through df instead?
-            pass # Placeholder - Need a better way to get all relevant skills
+    # --- CORRECTED SKILL IDENTIFICATION --- #
+    if diagnosed_df is not None and not diagnosed_df.empty and \
+       'is_correct' in diagnosed_df.columns and \
+       'overtime' in diagnosed_df.columns and \
+       'question_fundamental_skill' in diagnosed_df.columns:
 
-        # Iterate through the diagnosed dataframe to get skills associated with problems
-        # This is complex because params are stored, not the original triggers. Rethink approach.
-
-        # Alternative: Get skills from Ch3 error records and Ch4 correct-slow records
-        if ch3:
-            cr_errors = ch3.get('cr_error_analysis', {}).get('error_records', [])
-            rc_errors = ch3.get('rc_error_analysis', {}).get('error_records', [])
-            for err in cr_errors + rc_errors:
-                 skill = err.get('question_skill')
-                 if skill and skill != 'Unknown Skill': all_skills_found.add(skill)
-        if ch4:
-            cr_slow = ch4.get('cr_correct_slow', {}).get('skill_breakdown_slow', {})
-            rc_slow = ch4.get('rc_correct_slow', {}).get('skill_breakdown_slow', {})
-            all_skills_found.update(cr_slow.keys())
-            all_skills_found.update(rc_slow.keys())
-            # Filter out 'Unknown Skill' if it snuck in
-            all_skills_found.discard('Unknown Skill')
+        problem_mask = (diagnosed_df['is_correct'] == False) | \
+                       ((diagnosed_df['is_correct'] == True) & (diagnosed_df['overtime'] == True))
+        problem_skills = diagnosed_df.loc[problem_mask, 'question_fundamental_skill'].dropna().unique()
+        all_skills_found = set(skill for skill in problem_skills if skill != 'Unknown Skill')
+        # print(f"      DEBUG (_generate_v_recommendations): Identified skills with problems (Error or SlowCorrect): {all_skills_found}") # REMOVED DEBUG
+    else:
+        print("      WARNING (_generate_v_recommendations): Could not identify problem skills due to missing columns in diagnosed_df.")
+    # --- END CORRECTED SKILL IDENTIFICATION --- #
 
     # 2. Generate Recommendations (Macro then Case)
+    if not all_skills_found:
+        # print("      DEBUG (_generate_v_recommendations): No problem skills found, skipping recommendation generation loop.") # REMOVED DEBUG
+        pass # Keep the logic flow
+
     for skill in all_skills_found:
         # --- APPLY EXEMPTION RULE (Task 3) ---
         if skill in exempted_skills:
-            print(f"      Skipping recommendations for exempted skill: {skill}")
+            # print(f"      DEBUG (_generate_v_recommendations): Skipping recommendations for exempted skill: {skill}") # REMOVED DEBUG
             continue # Skip generating any recommendation for this skill
         # --- END EXEMPTION RULE ---
 
         skill_recs_list = []
         # Check for override rule based on the results passed in v_diagnosis_results
         is_overridden = ch6.get('skill_override_triggered', {}).get(skill, False)
-        print(f"      Processing Skill: {skill}, Overridden: {is_overridden}")
+        # print(f"      DEBUG (_generate_v_recommendations): Processing Skill: {skill}, Overridden: {is_overridden}") # REMOVED DEBUG
 
         if is_overridden and skill not in processed_macro_skills:
             # Generate Macro Recommendation (V-Doc Ch7)
+            # Keep skill name in English for the recommendation text source
             macro_rec_text = f"針對【{skill}】技能，由於整體錯誤率偏高 (根據第六章分析)，建議全面鞏固基礎，可從中低難度題目開始系統性練習，掌握核心方法。"
             skill_recs_list.append({'type': 'macro', 'text': macro_rec_text, 'priority': 0})
             processed_macro_skills.add(skill)
-            print(f"      Generated MACRO recommendation for Skill: {skill}")
+            # print(f"      DEBUG (_generate_v_recommendations): Generated MACRO recommendation for Skill: {skill}") # REMOVED DEBUG
 
         elif not is_overridden:
+            case_recs_generated_for_skill = False # DEBUG flag
             # Generate Case-Specific Recommendations for this skill
             # Find relevant rows in diagnosed_df for this skill
             if diagnosed_df is not None and not diagnosed_df.empty:
-                skill_rows = diagnosed_df[diagnosed_df['question_fundamental_skill'] == skill]
-                for index, row in skill_rows.iterrows():
-                    # Check if this row triggered a recommendation (Error, SFE, Correct-Slow)
-                    # Need logic to determine if *this specific row* was a trigger
-                    # This requires linking back params to original triggers - difficult with current structure
-                    # Simplified: Generate case rec if error or slow (overtime=True)
-                    is_error = not row['is_correct']
-                    q_type = row['question_type']
-                    # 判斷是否慢 (is_slow): (CR: overtime == True; RC: group_overtime == True 或 individual_overtime == True)
-                    if q_type == 'Critical Reasoning':
-                        is_slow = row.get('overtime', False)
-                    else:  # Reading Comprehension
-                        is_slow = row.get('group_overtime', False) or row.get('individual_overtime', False)
-                    is_sfe = row.get('is_sfe', False)
-                    q_pos = row['question_position']
-                    difficulty = row.get('question_difficulty')
-                    time = row.get('question_time')
+                # Filter for the current skill AND problems (Error or SlowCorrect)
+                # Use the same problem_mask defined earlier for efficiency
+                skill_problem_mask = (diagnosed_df['question_fundamental_skill'] == skill) & problem_mask
+                skill_rows = diagnosed_df[skill_problem_mask]
 
-                    # Only generate case rec if it was an error or correct-slow
-                    if is_error or (row['is_correct'] and is_slow):
-                        # Determine Y and Z (V-Doc Ch7)
-                        y = _grade_difficulty_v(difficulty)
-                        target_time = 2.0 if q_type == 'Critical Reasoning' else 1.5
-                        base_time = time - 0.5 if is_slow and time is not None else time
-                        if base_time is not None and not pd.isna(base_time):
-                             z_raw = math.floor(base_time * 2) / 2 # Floor to nearest 0.5
-                             z = max(z_raw, target_time)
-                        else:
-                             z = target_time # Default if time is missing
+                if not skill_rows.empty:
+                    # --- AGGREGATED CASE RECOMMENDATION (Changed from row-by-row) ---
+                    # print(f"        DEBUG (_generate_v_recommendations): Found {len(skill_rows)} problem rows for Case Rec (Skill: {skill}).") # REMOVED DEBUG
+                    # Aggregate info for the skill
+                    min_difficulty = skill_rows['question_difficulty'].min()
+                    y_grade = _grade_difficulty_v(min_difficulty)
 
-                        # Build text
-                        trigger_desc = "基礎掌握不穩" if is_sfe else ("慢" if is_slow else "錯")
-                        case_rec_text = f"針對【{skill}】下的問題 (Position {q_pos}, {trigger_desc})：建議練習【{y}】難度題目，起始練習限時建議為【{z:.1f}】分鐘。(目標時間：{'CR 2.0 / RC 1.5'}分鐘)。"
-                        priority = 1 if is_sfe else (2 if is_error else 3) # SFE > Error > Slow
+                    # Calculate Max Z Time (Similar to DI logic)
+                    z_minutes_list = []
+                    q_type_for_skill = skill_rows['question_type'].iloc[0] # Assume skill maps to one type
+                    target_time_minutes = 2.0 if q_type_for_skill == 'Critical Reasoning' else 1.5 # Use 1.5 for RC
 
-                        # Add volume alert if Z is much higher than target
-                        if (z - target_time) > 2.0:
-                            case_rec_text += " **需加大練習量以確保逐步限時有效**。"
+                    for _, row in skill_rows.iterrows():
+                        q_time_minutes = row['question_time']
+                        is_overtime = row['overtime']
+                        if pd.notna(q_time_minutes):
+                            base_time_minutes = q_time_minutes
+                            # No adjustment needed here based on current V logic for Z
+                            base_time_minutes = max(0, base_time_minutes) # Ensure non-negative
+                            # Floor to nearest 0.5 minute
+                            z_raw_minutes = math.floor(base_time_minutes * 2) / 2.0
+                            z = max(z_raw_minutes, target_time_minutes) # Ensure Z is at least the target
+                            z_minutes_list.append(z)
 
-                        skill_recs_list.append({'type': 'case', 'text': case_rec_text, 'priority': priority})
+                    max_z_minutes = max(z_minutes_list) if z_minutes_list else target_time_minutes
+                    z_text = f"{max_z_minutes:.1f} 分鐘"
+                    target_time_text = f"{'CR 2.0 / RC 1.5'} 分鐘" # Clarify target time
 
-        # Add recommendations for this skill to the main dict
+                    group_sfe = skill_rows['is_sfe'].any()
+
+                    # Get triggered params for this group (Use the CHINESE list now)
+                    # Note: Param list is no longer included in the output string per user request
+                    # diag_params_zh = set()
+                    # chinese_params_available = False
+                    # Use the correct column name 'diagnostic_params_list'
+                    # if 'diagnostic_params_list' in diagnosed_df.columns:
+                    #      chinese_params_available = True
+                    #      for idx in skill_rows.index:
+                    #         row_params_zh = diagnosed_df.loc[idx, 'diagnostic_params_list']
+                    #         if isinstance(row_params_zh, list):
+                    #              diag_params_zh.update(row_params_zh)
+                    # translated_params_list = sorted(list(diag_params_zh)) if chinese_params_available else []
+                    # param_text = f"(問題點可能涉及: {', '.join(translated_params_list)})" if translated_params_list else "(具體問題點需進一步分析)"
+
+                    problem_desc = "錯誤或超時" # No longer used in output
+                    sfe_prefix = "*基礎掌握不穩* " if group_sfe else ""
+                    # Keep skill name in English
+                    # --- ADJUSTED FORMATTING --- #
+                    case_rec_text = f"{sfe_prefix}針對【{skill}】建議練習【{y_grade}】難度題目，起始練習限時建議為【{z_text}】(最終目標時間: {target_time_text})。"
+                    # Removed: ({problem_desc}) {param_text}
+                    # --- END ADJUSTED FORMATTING --- #
+
+
+                    if max_z_minutes - target_time_minutes > 2.0:
+                        case_rec_text += " **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效。**"
+
+                    priority = 1 if group_sfe else 2 # Prioritize SFE cases
+                    skill_recs_list.append({
+                        'type': 'case_aggregated',
+                        'text': case_rec_text,
+                        'priority': priority,
+                        'is_sfe': group_sfe # Store for potential sorting/filtering
+                    })
+                    case_recs_generated_for_skill = True # DEBUG flag
+                    # --- END AGGREGATED CASE RECOMMENDATION ---\
+                else:
+                     # print(f"        DEBUG (_generate_v_recommendations): No problem rows found for Skill {skill} after filtering.") # REMOVED DEBUG
+                     pass
+            else:
+                 # print(f"        DEBUG (_generate_v_recommendations): diagnosed_df is None or empty, cannot generate Case Rec for Skill {skill}.") # REMOVED DEBUG
+                 pass
+
+            # DEBUG print if no case recs were generated for a non-overridden skill
+            if not case_recs_generated_for_skill:
+                 # print(f"      WARNING (_generate_v_recommendations): No Case recommendations generated for non-overridden Skill: {skill}") # REMOVED DEBUG
+                 pass # Keep logic flow
+
+        # --- *** RE-ADD MISSING ASSIGNMENT HERE *** --- #
+        # Add recommendations for this skill to the main dict if any were generated
         if skill_recs_list:
              recommendations_by_skill[skill] = sorted(skill_recs_list, key=lambda x: x['priority'])
+        # --- *** END RE-ADD *** --- #
 
     # 3. Assemble Final List (excluding behavioral for now)
     final_recommendations = []
-    # Removed exemption logic
+
+    # --- DEBUG: Print recommendations_by_skill before assembly --- # REMOVED
+    # print(f"      DEBUG (_generate_v_recommendations): recommendations_by_skill = {recommendations_by_skill}") # REMOVED
+    # --- END DEBUG --- #
 
     # Sort skills: Macro skills first, then alphabetically
+    # This uses recommendations_by_skill which SHOULD contain the generated recs now
     sorted_skills = sorted(recommendations_by_skill.keys(), key=lambda s: (0 if s in processed_macro_skills else 1, s))
 
+    # print(f"      DEBUG (_generate_v_recommendations): Skills to assemble recommendations for: {sorted_skills}") # REMOVED DEBUG
+
     for skill in sorted_skills:
-        recs = recommendations_by_skill[skill]
-        final_recommendations.append({'type': 'skill_header', 'text': f"--- 技能: {skill} ---"}) # Add header as dict item
-        final_recommendations.extend(recs) # Add list of rec dicts
-        final_recommendations.append({'type': 'spacer', 'text': ""}) # Add spacer as dict item
+        # Check if skill exists in the dictionary before accessing
+        if skill in recommendations_by_skill:
+            recs = recommendations_by_skill[skill] # Get the list of recs for the skill
+            # print(f"        DEBUG (_generate_v_recommendations): Assembling recommendations for Skill: {skill}, Count: {len(recs)}") # REMOVED DEBUG
+            final_recommendations.append({'type': 'skill_header', 'text': f"--- 技能: {skill} ---"}) # Add header as dict item
+            final_recommendations.extend(recs) # Add list of rec dicts
+            final_recommendations.append({'type': 'spacer', 'text': ""}) # Add spacer as dict item
+        else:
+            # print(f"        WARNING (_generate_v_recommendations): Skill '{skill}' not found in recommendations_by_skill during assembly.") # REMOVED DEBUG
+            pass # Keep logic flow
+
 
     # 4. Add Behavioral Recommendations (from Ch5)
-    # ... (Keep existing behavioral recommendation logic) ...
+    # Placeholder for future implementation if needed
+    # if ch5:
+    #     behavioral_params = ch5.get('param_triggers', [])
+    #     if 'BEHAVIOR_EARLY_RUSHING_FLAG_RISK' in behavioral_params:
+    #         final_recommendations.append({'type': 'behavioral', 'text': '行為建議: 注意前期答題節奏，避免因過快而影響準確率。'})
+    #     if 'BEHAVIOR_CARELESSNESS_ISSUE' in behavioral_params:
+    #          final_recommendations.append({'type': 'behavioral', 'text': '行為建議: 「快而錯」比例偏高，練習時注意檢查細節，避免粗心錯誤。'})
 
-    print("DEBUG: --- Exiting _generate_v_recommendations ---") # DEBUG
-    return final_recommendations
+    # --- DEBUG: Print final recommendations before return --- # REMOVED
+    # print(f"DEBUG (_generate_v_recommendations): Final recommendations list (length {len(final_recommendations)}): {final_recommendations}") # REMOVED
+    # --- END DEBUG --- #
+
+    # print("DEBUG: --- Exiting _generate_v_recommendations ---\") # REMOVED DEBUG
+    return final_recommendations # Returns the list
 
 # --- RC Helper Functions (for Chapter 1 logic) ---
 
