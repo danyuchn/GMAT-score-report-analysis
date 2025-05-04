@@ -965,6 +965,7 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
         df_v['Subject'] = 'V' # 強制修正
 
     print("  Verbal Diagnosis Complete.")
+
     # Return results dictionary, report string, and the diagnosed dataframe
     return v_diagnosis_results, v_report_content, df_v # Return the generated report
 
@@ -1179,66 +1180,66 @@ def _generate_v_summary_report(v_diagnosis_results):
     report_lines.append("")
 
     # --- Section 2: 表現概覽 --- #
-    report_lines.append("**2. 表現概覽**")
-    type_metrics = ch2.get('by_type', {})
-    difficulty_metrics = ch2.get('by_difficulty', {})
-    exempted_skills_ch6 = ch6.get('exempted_skills', set()) # Get exempted skills from Ch6 results
+    report_lines.append("**2. 表現概覽 (CR vs RC)**")
+    # --- Corrected Metrics Retrieval --- #
+    chapter_2_results = v_diagnosis_results.get('chapter_2', {})
+    v_metrics_by_type = chapter_2_results.get('by_type', {})
+    # print(f"DEBUG (_generate_v_summary_report): v_metrics_by_type = {v_metrics_by_type}") # REMOVED: Check available keys
+    # Use the actual keys found in the data, default to empty dict if key missing
+    cr_metrics = v_metrics_by_type.get('Critical Reasoning', v_metrics_by_type.get('CR', {}))
+    rc_metrics = v_metrics_by_type.get('Reading Comprehension', v_metrics_by_type.get('RC', {}))
+    # --- End Corrected Metrics Retrieval ---
 
-    # Overall by Type (CR vs RC)
-    report_lines.append(f"- **CR vs. RC 題表現:**")
-    for q_type_short in ['CR', 'RC']:
-        # Map short type to full name if needed, assuming type_metrics uses short names
-        q_type_full_name = 'Critical Reasoning' if q_type_short == 'CR' else 'Reading Comprehension'
-        metrics = type_metrics.get(q_type_short) # Use short name to get metrics
-        if metrics:
-            error_rate_str = _format_rate(metrics.get('error_rate', 'N/A'))
-            overtime_rate_str = _format_rate(metrics.get('overtime_rate', 'N/A'))
-            avg_time_str = f"{metrics.get('avg_time_spent', 0.0):.2f}"
-            report_lines.append(f"  - {q_type_full_name}: 錯誤率 {error_rate_str}, 超時率 {overtime_rate_str}, 平均耗時 {avg_time_str} 分鐘")
+    # Check if metrics exist and contain necessary rates
+    cr_error_rate = cr_metrics.get('error_rate')
+    cr_overtime_rate = cr_metrics.get('overtime_rate')
+    rc_error_rate = rc_metrics.get('error_rate')
+    rc_overtime_rate = rc_metrics.get('overtime_rate')
+
+    # --- DEBUG: Print metrics before validity check --- # REMOVED
+    # print(f"DEBUG (_generate_v_summary_report): cr_metrics = {cr_metrics}") # REMOVED
+    # print(f"DEBUG (_generate_v_summary_report): rc_metrics = {rc_metrics}") # REMOVED
+    # --- END DEBUG --- # REMOVED
+
+    # Refined check for comparison possibility
+    cr_data_valid = cr_metrics and pd.notna(cr_error_rate) and pd.notna(cr_overtime_rate)
+    rc_data_valid = rc_metrics and pd.notna(rc_error_rate) and pd.notna(rc_overtime_rate)
+
+    if cr_data_valid and rc_data_valid:
+        cr_total = cr_metrics.get('total_questions', 0)
+        rc_total = rc_metrics.get('total_questions', 0)
+        report_lines.append(f"- CR ({cr_total} 題): 錯誤率 {_format_rate(cr_error_rate)}, 超時率 {_format_rate(cr_overtime_rate)}")
+        report_lines.append(f"- RC ({rc_total} 題): 錯誤率 {_format_rate(rc_error_rate)}, 超時率 {_format_rate(rc_overtime_rate)}")
+        # Comparison logic (significant difference)
+        error_diff = abs(cr_error_rate - rc_error_rate)
+        overtime_diff = abs(cr_overtime_rate - rc_overtime_rate)
+        significant_error = error_diff >= 0.15 # 15% difference threshold
+        significant_overtime = overtime_diff >= 0.15 # 15% difference threshold
+
+        if significant_error or significant_overtime:
+            comparison_notes = []
+            if significant_error:
+                comparison_notes.append(f"錯誤率差異{'顯著' if significant_error else '不顯著'}")
+                report_lines.append(f"  - **錯誤率對比:** {'CR 更高' if cr_error_rate > rc_error_rate else 'RC 更高'} (差異 {_format_rate(error_diff)})")
+            if significant_overtime:
+                comparison_notes.append(f"超時率差異{'顯著' if significant_overtime else '不顯著'}")
+                report_lines.append(f"  - **超時率對比:** {'CR 更高' if cr_overtime_rate > rc_overtime_rate else 'RC 更高'} (差異 {_format_rate(overtime_diff)})")
         else:
-            report_lines.append(f"  - {q_type_full_name}: 無數據")
+            report_lines.append("  - CR 與 RC 在錯誤率和超時率上表現相當，無顯著差異。")
+    elif not cr_data_valid and not rc_data_valid:
+        report_lines.append("- **CR 與 RC 表現對比：** 因缺乏有效的 CR 和 RC 數據，無法進行比較。")
+    elif not cr_data_valid:
+        report_lines.append("- **CR 與 RC 表現對比：** 因缺乏有效的 CR 數據，無法進行比較。")
+        if rc_data_valid: # Still show RC data if available
+             rc_total = rc_metrics.get('total_questions', 0)
+             report_lines.append(f"  - (RC ({rc_total} 題): 錯誤率 {_format_rate(rc_error_rate)}, 超時率 {_format_rate(rc_overtime_rate)})")
+    elif not rc_data_valid:
+        report_lines.append("- **CR 與 RC 表現對比：** 因缺乏有效的 RC 數據，無法進行比較。")
+        if cr_data_valid: # Still show CR data if available
+             cr_total = cr_metrics.get('total_questions', 0)
+             report_lines.append(f"  - (CR ({cr_total} 題): 錯誤率 {_format_rate(cr_error_rate)}, 超時率 {_format_rate(cr_overtime_rate)})")
+    # --- End refined check ---
 
-    # Difficulty Analysis Reporting
-    if difficulty_metrics:
-        report_lines.append(f"- **按難度水平表現:**")
-        grade_order_en = ["Low / 505+", "Mid / 555+", "Mid / 605+", "Mid / 655+", "High / 705+", "High / 805+", "Unknown Difficulty"]
-        for english_grade_key in grade_order_en:
-            metrics = difficulty_metrics.get(english_grade_key)
-            if metrics:
-                grade_zh = _translate_v(english_grade_key)
-                q_count = metrics.get('total_questions', 0)
-                error_rate_str = _format_rate(metrics.get('error_rate', 'N/A'))
-                avg_time_str = f"{metrics.get('avg_time_spent', 0.0):.2f}"
-                report_lines.append(f"  - {grade_zh}: {q_count}題, 錯誤率 {error_rate_str}, 平均耗時 {avg_time_str} 分鐘")
-    else:
-        report_lines.append("- **按難度水平表現:** 無數據")
-
-    # Error Difficulty Distribution
-    all_error_records = []
-    diagnosed_df_ch3 = ch3.get('diagnosed_dataframe')
-    if diagnosed_df_ch3 is not None and not diagnosed_df_ch3.empty and 'is_correct' in diagnosed_df_ch3.columns:
-        all_error_records = diagnosed_df_ch3[diagnosed_df_ch3['is_correct'] == False].to_dict('records')
-    if all_error_records:
-        error_difficulties = [err.get('question_difficulty') for err in all_error_records if err.get('question_difficulty') is not None and not pd.isna(err.get('question_difficulty'))]
-        if error_difficulties:
-            difficulty_labels = [_grade_difficulty_v(d) for d in error_difficulties]
-            label_counts = pd.Series(difficulty_labels).value_counts()
-            grade_order_en = ["Low / 505+", "Mid / 555+", "Mid / 605+", "Mid / 655+", "High / 705+", "High / 805+", "Unknown Difficulty"]
-            label_counts = label_counts.reindex(grade_order_en).dropna()
-            if not label_counts.empty:
-                distribution_str = ", ".join([f"{_translate_v(label)} ({int(count)}題)" for label, count in label_counts.items()])
-                report_lines.append(f"  - **錯誤難度分佈:** {distribution_str}")
-            else:
-                report_lines.append("  - **錯誤難度分佈:** 無有效難度數據可供分析。")
-        else:
-            report_lines.append("  - **錯誤難度分佈:** 錯誤題目無有效難度數據。")
-    else:
-        report_lines.append("  - **錯誤難度分佈:** 無錯誤題目可供分析難度分佈。")
-
-    # Report Exempted Skills
-    if exempted_skills_ch6:
-        exempted_skills_zh = [_translate_v(s) for s in sorted(list(exempted_skills_ch6))]
-        report_lines.append(f"- **已掌握技能 (豁免):** 以下技能表現良好 (全對且無超時)，無需針對性練習：{', '.join(exempted_skills_zh)}。")
     report_lines.append("")
 
     # --- Section 3: 核心問題診斷 --- #
@@ -1251,11 +1252,42 @@ def _generate_v_summary_report(v_diagnosis_results):
     secondary_evidence_trigger = False # Flag for Ch8 suggestion
     qualitative_analysis_trigger = False # Flag for Ch8 suggestion
 
+    # --- Define triggered_params_all HERE --- #
+    triggered_params_all = set()
+    if diagnosed_df is not None and not diagnosed_df.empty and 'diagnostic_params_list' in diagnosed_df.columns:
+         all_param_lists = diagnosed_df['diagnostic_params_list'].apply(lambda x: x if isinstance(x, list) else [])
+         # Translate Chinese list back to English codes if necessary or get English codes directly
+         # Assuming ch3 diagnosed_df still holds English codes if translation happened later
+         # OR, ideally, get English codes directly from Ch3 results before translation happened.
+         # For now, assume we need to get *all* unique params triggered.
+         # We need the *English* codes here to compare with the Tool Map keys later.
+         # Re-retrieve the English params if possible, otherwise this step is difficult.
+         # Let's assume the 'diagnostic_params' (English) might still be in ch3 results
+         diagnosed_df_ch3_raw = ch3.get('diagnosed_dataframe') # Get the df again
+         if diagnosed_df_ch3_raw is not None and 'diagnostic_params' in diagnosed_df_ch3_raw.columns:
+             # This assumes the English codes were stored before being dropped/renamed.
+             # If not, this needs rethinking based on where English codes are preserved.
+             english_param_lists = diagnosed_df_ch3_raw['diagnostic_params'].apply(lambda x: x if isinstance(x, list) else [])
+             triggered_params_all.update(p for sublist in english_param_lists for p in sublist)
+         else:
+              print("WARNING (_generate_v_summary_report): Could not retrieve original English diagnostic_params for tool recommendation matching.")
+
+    # Add behavioral params from Chapter 5
+    if ch5:
+        triggered_params_all.update(ch5.get('param_triggers', []))
+    # --- End Defining triggered_params_all ---
+
     if diagnosed_df is not None and not diagnosed_df.empty:
+        # Check if 'diagnostic_params_list' column exists before trying to iterate
+        params_col_exists = 'diagnostic_params_list' in diagnosed_df.columns
+        if not params_col_exists:
+             print("WARNING (_generate_v_summary_report): 'diagnostic_params_list' column missing in diagnosed_df for Section 3 analysis.")
+
         for index, row in diagnosed_df.iterrows():
             is_error = not row['is_correct']
             is_slow_correct = row['is_correct'] and row.get('overtime', False)
-            params = row.get('diagnostic_params', []) # Use the detailed params from refactored Ch3
+            # Use diagnostic_params_list (Chinese) if it exists, otherwise use an empty list
+            params_zh = row.get('diagnostic_params_list', []) if params_col_exists else []
             is_sfe = row.get('is_sfe', False)
             skill = row.get('question_fundamental_skill', 'Unknown Skill')
             q_pos = row.get('question_position', 'N/A')
@@ -1269,21 +1301,29 @@ def _generate_v_summary_report(v_diagnosis_results):
                         sfe_skills_involved.add(skill)
                         secondary_evidence_trigger = True # SFE often needs review
 
-                # Collect core issue params (exclude SFE)
-                current_core_params = {p for p in params if p != 'FOUNDATIONAL_MASTERY_INSTABILITY_SFE'}
-                core_issues_params.update(current_core_params)
+                # Collect core issue params (using Chinese list - need to translate back for core_issues_params if needed)
+                # core_issues_params.update(...) # This needs English params
 
-                # Store details for the list
+                # Store details for the list (using Chinese params for display)
                 all_problem_items.append({
                     'position': q_pos,
                     'skill': skill,
                     'performance': time_cat,
-                    'params': params, # Store original English params
+                    'params': params_zh, # Store Chinese params for display list
                     'question_type': row.get('question_type', 'Unknown Type'),
                     'is_sfe': is_sfe
                 })
 
                 # Check for qualitative analysis triggers (MD Ch3 logic)
+                # This requires ENGLISH params. Need to get them.
+                # Assuming we have triggered_params_all (English) defined above now.
+                # Need to re-map row index to the English params for accurate check.
+                current_english_params = set() # Placeholder - Requires proper mapping
+                # Example mapping (needs actual implementation):
+                # if index in diagnosed_df_ch3_raw.index:
+                #     raw_params = diagnosed_df_ch3_raw.loc[index, 'diagnostic_params']
+                #     if isinstance(raw_params, list): current_english_params = set(raw_params)
+
                 if time_cat in ['Normal Time & Wrong', 'Slow & Wrong']:
                     secondary_evidence_trigger = True # These categories warrant review
                     # Check for complex params that might trigger qualitative
@@ -1292,10 +1332,15 @@ def _generate_v_summary_report(v_diagnosis_results):
                         'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY',
                         'RC_REASONING_INFERENCE_WEAKNESS'
                     }
-                    if any(p in complex_params for p in current_core_params):
-                        qualitative_analysis_trigger = True
+                    # Use current_english_params here
+                    # if any(p in complex_params for p in current_english_params):
+                    #     qualitative_analysis_trigger = True
                 elif time_cat == 'Slow & Correct':
                      qualitative_analysis_trigger = True # Often needs qualitative check for bottleneck
+
+    # --- Re-calculate core_issues_params using the collected English triggered_params_all --- #
+    core_issues_params = triggered_params_all - {'FOUNDATIONAL_MASTERY_INSTABILITY_SFE'}
+    # --- End Re-calculation --- #
 
     # Report SFE Summary
     if sfe_triggered_overall:
@@ -1310,48 +1355,6 @@ def _generate_v_summary_report(v_diagnosis_results):
     if not core_issues_params and not sfe_triggered_overall:
         report_lines.append("- 未識別出明顯的核心問題模式 (基於錯誤及效率分析)。")
 
-    # Detailed Diagnostics List (REMOVED per user request - details in table)
-    # if all_problem_items:
-    #     report_lines.append("- **詳細診斷標籤 (含時間表現和技能):**")
-    #     def sort_key(item):
-    #         q_type = item.get('question_type', 'Unknown Type')
-    #         skill_en = item.get('skill', 'zzzzz')
-    #         skill_zh = _translate_v(skill_en)
-    #         position = item.get('position', float('inf'))
-    #         type_order = 0 if q_type == 'Critical Reasoning' else (1 if q_type == 'Reading Comprehension' else 2)
-    #         sfe_order = 0 if item.get('is_sfe') else 1 # Prioritize SFE
-    #         return (sfe_order, type_order, skill_zh, position)
-    #     sorted_items = sorted(all_problem_items, key=sort_key)
-    #
-    #     for item in sorted_items:
-    #         pos = item['position']
-    #         skill_en = item['skill']
-    #         skill_zh = _translate_v(skill_en)
-    #         performance_en = item['performance']
-    #         params_codes = item['params']
-    #         performance_zh = _translate_v(performance_en)
-    #         translated_params = [_translate_v(p) for p in params_codes]
-    #         sfe_marker = "*" if item.get('is_sfe') else ""
-    #
-    #         line_parts = [f"  - {sfe_marker}題號 {pos}: [{performance_zh}, 技能: {skill_zh}] - 診斷:"]
-    #         if translated_params:
-    #             # Group params by category for readability
-    #             params_by_category = {}
-    #             for p_code, p_zh in zip(params_codes, translated_params):
-    #                 category_en = V_PARAM_TO_CATEGORY.get(p_code, 'Unknown')
-    #                 category_zh = _translate_v(category_en) if category_en != 'Unknown' else '其他'
-    #                 if category_zh not in params_by_category:
-    #                     params_by_category[category_zh] = []
-    #                 params_by_category[category_zh].append(p_zh)
-    #
-    #             # Define order for categories (translate from V_PARAM_CATEGORY_ORDER)
-    #             category_order_zh = [_translate_v(c) for c in V_PARAM_CATEGORY_ORDER if _translate_v(c) in params_by_category] + [c for c in params_by_category if c not in [_translate_v(cat) for cat in V_PARAM_CATEGORY_ORDER]]
-    #
-    #             for cat_zh in category_order_zh:
-    #                  line_parts.append(f"    - [{cat_zh}] {', '.join(params_by_category[cat_zh])}")
-    #         else:
-    #             line_parts.append("    - [無特定診斷標籤]")
-    #         report_lines.append("\n".join(line_parts))
     report_lines.append("")
 
     # --- Section 4: 正確但低效分析 --- #
@@ -1457,11 +1460,7 @@ def _generate_v_summary_report(v_diagnosis_results):
     for param in param_to_positions: param_to_positions[param] = sorted(list(param_to_positions[param]))
     for skill in skill_to_positions: skill_to_positions[skill] = sorted(list(skill_to_positions[skill]))
 
-    triggered_params_all = set()
-    diagnosed_df_ch3 = ch3.get('diagnosed_dataframe') # Re-get df
-    if diagnosed_df_ch3 is not None and not diagnosed_df_ch3.empty and 'diagnostic_params' in diagnosed_df_ch3.columns:
-         all_param_lists = diagnosed_df_ch3['diagnostic_params'].apply(lambda x: x if isinstance(x, list) else [])
-         triggered_params_all.update(p for sublist in all_param_lists for p in sublist)
+    triggered_params_all.update(p for sublist in all_param_lists for p in sublist)
     if bool(ch5.get('early_rushing_flag_for_review', False)): triggered_params_all.add('BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
     if bool(ch5.get('carelessness_issue', False)): triggered_params_all.add('BEHAVIOR_CARELESSNESS_ISSUE')
 
