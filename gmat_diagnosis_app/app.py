@@ -758,14 +758,18 @@ if df_combined_input_list: # Only proceed if there's at least one *valid* df
          st.error(f"合併 *有效* 輸入資料時發生錯誤: {e}")
          df_combined_input = None
 elif any_data_attempted: # Data was loaded/pasted but ALL failed validation or processing
-     st.warning("所有輸入的科目數據均未能通過驗證或處理，請檢查上方各分頁的錯誤信息。分析無法進行。")
+     st.warning("所有輸入的科目數據均未能通過驗證或處理，請檢查上方各分頁的錯誤信息。分析無法進行。", icon="⚠️") # Changed icon
 # else: No data was ever loaded or pasted, message handled below
 
 # --- Analysis Trigger Button ---
 st.divider() # Add a visual separator
 
-# Display the button differently based on whether data is ready
-if df_combined_input is not None:
+# Check if any validation errors occurred across all tabs
+any_validation_errors = bool(validation_errors_q) or bool(validation_errors_v) or bool(validation_errors_di)
+
+# Display the button differently based on whether data is ready AND valid
+if df_combined_input is not None and not any_validation_errors:
+    # Case 1: Data is combined and NO validation errors exist - Enable button
     if st.button("🔍 開始分析", type="primary", key="analyze_button"):
         st.session_state.analysis_run = True
         # Reset previous results when starting new analysis
@@ -778,10 +782,12 @@ if df_combined_input is not None:
         # st.session_state.analysis_run = st.session_state.get('analysis_run', False) # Keep existing state if button not clicked
         pass # No need to explicitly set to false, just don't set to true
 
-elif any_data_attempted: # Data attempted but failed validation/combination
+elif any_data_attempted:
+    # Case 2: Data was attempted, but either failed combination OR had validation errors
     st.error("數據驗證失敗或無法合併，請修正上方標示的錯誤後再試。")
     st.button("🔍 開始分析", type="primary", disabled=True, key="analyze_button_disabled_invalid") # Disable button
-else:
+
+else: # Case 3: No data was ever loaded or pasted
     st.info("請在上方分頁中為至少一個科目上傳或貼上資料。")
     st.button("🔍 開始分析", type="primary", disabled=True, key="analyze_button_disabled_no_data") # Disable button
 
