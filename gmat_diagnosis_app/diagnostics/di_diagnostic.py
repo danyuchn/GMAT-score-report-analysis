@@ -370,12 +370,36 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     report_str = _generate_di_summary_report(di_diagnosis_results)
 
     # --- Final DataFrame Preparation ---
-    df_to_return = diagnosed_df_ch4_ch5.copy()
+    # Start with the original DataFrame containing all rows (including invalid)
+    df_to_return = df_di.copy()
 
-    # Translate params
+    # Identify columns added/modified during diagnosis (based on filtered data)
+    # These likely exist in diagnosed_df_ch4_ch5
+    diagnostic_columns = []
+    if diagnosed_df_ch4_ch5 is not None and not diagnosed_df_ch4_ch5.empty:
+        potential_cols = ['diagnostic_params', 'is_sfe', 'time_performance_category'] # Add others if needed
+        diagnostic_columns = [col for col in potential_cols if col in diagnosed_df_ch4_ch5.columns]
+
+        # Merge/Update these columns back into the full DataFrame based on index
+        if diagnostic_columns:
+            # Using update is generally safer if indices match perfectly
+            df_to_return.update(diagnosed_df_ch4_ch5[diagnostic_columns])
+            # If update fails or indices mismatch, use merge:
+            # df_to_return = df_to_return.merge(
+            #     diagnosed_df_ch4_ch5[diagnostic_columns],
+            #     left_index=True,
+            #     right_index=True,
+            #     how='left',
+            #     suffixes=('', '_diag') # Add suffix to handle potential original columns
+            # )
+            # # Handle potential duplicated columns after merge if necessary
+
+    # Translate params (now operating on the full df_to_return)
     if 'diagnostic_params' in df_to_return.columns:
+        # Ensure the column exists and handle potential NaNs introduced by merge/update if invalid rows didn't have params
+        df_to_return['diagnostic_params'] = df_to_return['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, tuple, set)) else [])
         df_to_return['diagnostic_params_list_chinese'] = df_to_return['diagnostic_params'].apply(
-            lambda params_list: _translate_di(params_list) if isinstance(params_list, list) else []
+            lambda params_list: _translate_di(params_list) # Already ensures list
         )
         df_to_return.drop(columns=['diagnostic_params'], inplace=True)
         df_to_return.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
@@ -389,13 +413,28 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     else:
          df_to_return['Subject'] = 'DI' # Force correct value
 
-    # Final check for overtime column existence (added defensively)
+    # Final check for overtime column existence (should be fine as we start with df_di)
     if 'overtime' not in df_to_return.columns:
-        if 'overtime' in df_di.columns: # Check original df_di where it was calculated
-             df_to_return['overtime'] = df_di.loc[df_to_return.index, 'overtime'] # Align indices
-        else:
-             df_to_return['overtime'] = False # Fallback if completely lost
+         df_to_return['overtime'] = False # Should not happen now
 
+    # Fill NaNs in diagnostic columns for invalid rows if introduced by update/merge
+    cols_to_fill_na = ['is_sfe', 'time_performance_category'] # Add others if needed
+    fill_values = {'is_sfe': False, 'time_performance_category': 'Invalid/Excluded'}
+    for col in cols_to_fill_na:
+        if col in df_to_return.columns:
+            df_to_return[col].fillna(fill_values.get(col, 'Unknown'), inplace=True)
+
+    # Ensure is_invalid column is boolean
+    if 'is_invalid' in df_to_return.columns:
+        df_to_return['is_invalid'] = df_to_return['is_invalid'].astype(bool)
+    else:
+        df_to_return['is_invalid'] = False # Should exist from input
+
+    # --- Remove DEBUG START ---
+    # print(f"DEBUG (DI): Before return - Invalid rows in df_to_return: {df_to_return['is_invalid'].sum()}")
+    # if 'is_invalid' in df_to_return.columns and df_to_return['is_invalid'].sum() > 0:
+    #     print(f"DEBUG (DI): Before return - Invalid rows index: {df_to_return[df_to_return['is_invalid']].index.tolist()}")
+    # --- Remove DEBUG END ---
     return di_diagnosis_results, report_str, df_to_return
 
 
