@@ -3,5 +3,6 @@ pandas
 openai
 numpy
 openpyxl
-XlsxWriter 
-scipy 
+XlsxWriter
+scipy
+plotly 
