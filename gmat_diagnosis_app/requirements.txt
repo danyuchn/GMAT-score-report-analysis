@@ -4,3 +4,4 @@ openai
 numpy
 openpyxl
 XlsxWriter 
+scipy 
