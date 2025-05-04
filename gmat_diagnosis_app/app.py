@@ -1077,7 +1077,7 @@ if st.session_state.analysis_run and df_combined_input is not None:
                     # --- Store results in session state --- 
                     st.session_state.report_dict = report_dict
                     st.session_state.processed_df = df_processed # Store the processed dataframe
-                    # --- End Store results --- 
+                    # --- END Store results --- 
                 except Exception as e:
                     st.error(f"診斷過程中發生錯誤: {str(e)}")
                     import traceback
@@ -1260,10 +1260,10 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
                     st.subheader(f"{subject} 科診斷報告")
                     # Display the markdown report for the subject
                     report_md = subject_reports.get(subject, f"未找到 {subject} 科的診斷報告。")
-                    # --- DEBUG PRINT --- 
-                    if subject == 'Q':
-                        print(f"DEBUG: Q Report Markdown content: {report_md[:200]}...") # Print first 200 chars
-                    # --- END DEBUG --- 
+                    # --- BEGIN ADDED DEBUG ---
+                    if subject == 'DI':
+                         print(f"DEBUG (app.py): DI report from session state BEFORE markdown (first 200 chars):\\n'''{report_md[:200]}'''")
+                    # --- END ADDED DEBUG ---
                     st.markdown(report_md)
 
                     st.subheader(f"{subject} 科詳細數據 (含診斷標籤)")

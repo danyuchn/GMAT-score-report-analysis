@@ -521,14 +521,10 @@ def run_di_diagnosis(df_di_raw):
     # Let's update the df in the results dict before generating the report
     di_diagnosis_results['chapter_3']['diagnosed_dataframe'] = diagnosed_df_ch3_ch4.copy()
 
-    di_report_summary = _generate_di_summary_report(di_diagnosis_results)
-    # Optional: Print report summary
-    print(f"      Generated DI Report (first 100 chars): {di_report_summary[:100]}...")
-
     print("  Data Insights Diagnosis Complete.")
 
-    # --- Generate Final Report String ---
-    report_str = _generate_di_summary_report(di_diagnosis_results) # Regenerate with updated df if needed
+    # --- Generate Final Report String --- # Keep this call as its result is returned
+    report_str = _generate_di_summary_report(di_diagnosis_results)
 
     print("DEBUG: <<<<<< Exiting run_di_diagnosis <<<<<<") # DEBUG
 
@@ -1351,10 +1347,13 @@ def _generate_di_summary_report(di_results):
     # 1. 開篇總結 (基於第一章)
     report_lines.append("**1. 開篇總結 (時間策略與有效性)**")
     tp_status_key = ch1.get('time_pressure') # Get boolean or None
-    # Translate boolean to High/Low or Unknown
-    if tp_status_key is True: tp_status = _translate_di('High')
-    elif tp_status_key is False: tp_status = _translate_di('Low')
-    else: tp_status = _translate_di('Unknown')
+    # Translate boolean to High/Low or Unknown (use equality check)
+    if tp_status_key == True: # Use == True
+        tp_status = _translate_di('High')
+    elif tp_status_key == False: # Use == False
+        tp_status = _translate_di('Low')
+    else: # Handles None or other types
+        tp_status = _translate_di('Unknown')
 
     total_time = ch1.get('total_test_time_minutes', 0)
     time_diff = ch1.get('time_difference_minutes', 0)
@@ -1640,6 +1639,4 @@ def _generate_di_summary_report(di_results):
     if not recommendations_made_di:
         report_lines.append("  - 根據當前診斷，暫無特別推薦的輔助工具或 AI 提示。")
 
-
-    # Use double newline for Markdown paragraph breaks
     return "\n\n".join(report_lines)
