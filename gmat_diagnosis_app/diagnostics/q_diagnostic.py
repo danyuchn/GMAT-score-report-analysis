@@ -1078,55 +1078,7 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
     if 'Q_CONCEPT_APPLICATION_ERROR' in triggered_params: qualitative_focus_skills.update(skill for skill, poses in skill_to_positions.items() if any(pos in param_to_positions.get('Q_CONCEPT_APPLICATION_ERROR',[]) for pos in poses))
     if 'Q_PROBLEM_UNDERSTANDING_ERROR' in triggered_params: qualitative_focus_skills.update(skill for skill, poses in skill_to_positions.items() if any(pos in param_to_positions.get('Q_PROBLEM_UNDERSTANDING_ERROR',[]) for pos in poses))
     qualitative_focus_area = f" [`某類問題`，例如涉及{_get_translation('Q_CONCEPT_APPLICATION_ERROR')}的題目]" if qualitative_focus_skills else " [`某類問題`]" # Default if no specific focus
-    report_lines.append(f"  - *建議行動：* 如果您對{qualitative_focus_area} 的錯誤原因仍感困惑，可以嘗試**提供 2-3 題該類型題目的詳細解題流程跟思路範例**（可以是文字記錄或口述錄音），以便與顧問進行更深入的個案分析，共同找到癥結所在。")
-
-
-    report_lines.append("- **輔助工具推薦建議:**") # Changed title to match MD more closely
-    # Align Tool/Prompt Recommendations EXACTLY with MD Ch8.7 list and triggers
-    recommended_tools_list = []
-    recommended_prompts_map = {} # Use map to store prompts and their triggers
-
-    # Tool: Classifier (Trigger: errors, slow-correct, or override)
-    if ch3_errors or ch4_correct_slow or override_skills_list:
-         recommended_tools_list.append("`Dustin's GMAT Q: Question Classifier`")
-
-    # Tool: Real-Context Converter (Trigger: poor_real or slow_real)
-    if ch2_flags.get('poor_real', False) or ch2_flags.get('slow_real', False):
-         recommended_tools_list.append("`Dustin_GMAT_Q_Real-Context_Converter`")
-
-    # AI Prompts - Check each trigger parameter set from MD
-    def add_prompt_recommendation(prompt_name, triggering_params):
-         # Check if ANY of the triggering params were found in this run
-         if any(p in triggered_params for p in triggering_params):
-             # Store the prompt and the specific params that triggered it for potential context (though MD doesn't require showing context)
-             recommended_prompts_map[prompt_name] = recommended_prompts_map.get(prompt_name, set()).union(p for p in triggering_params if p in triggered_params)
-
-    # MD Prompt Triggers:
-    add_prompt_recommendation('Quant-related/01_basic_explanation.md', ['Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE', 'Q_CONCEPT_APPLICATION_ERROR', 'skill_override_triggered']) # Note: skill_override is not in triggered_params directly, check override_skills_list
-    if override_skills_list: recommended_prompts_map.setdefault('Quant-related/01_basic_explanation.md', set()).add('skill_override_triggered') # Manually add trigger if list is not empty
-    add_prompt_recommendation('Quant-related/03_test_math_concepts.md', ['Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE', 'Q_CONCEPT_APPLICATION_ERROR', 'skill_override_triggered'])
-    if override_skills_list: recommended_prompts_map.setdefault('Quant-related/03_test_math_concepts.md', set()).add('skill_override_triggered')
-    add_prompt_recommendation('Quant-related/02_quick_math_tricks.md', ['Q_EFFICIENCY_BOTTLENECK_READING', 'Q_EFFICIENCY_BOTTLENECK_CONCEPT', 'Q_EFFICIENCY_BOTTLENECK_CALCULATION', 'slow_real', 'slow_pure'])
-    add_prompt_recommendation('Quant-related/03_test_math_concepts.md', ['Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_READING_COMPREHENSION_ERROR']) # Already potentially added, set handles duplicates
-    add_prompt_recommendation('Quant-related/01_basic_explanation.md', ['Q_CARELESSNESS_DETAIL_OMISSION', 'Q_BEHAVIOR_CARELESSNESS_ISSUE']) # Already potentially added
-
-    # Always recommend variant and similar questions prompts? MD lists them under "通用練習與鞏固"
-    recommended_prompts_map['Quant-related/05_variant_questions.md'] = recommended_prompts_map.get('Quant-related/05_variant_questions.md', set()).union({'通用練習'})
-    recommended_prompts_map['Quant-related/06_similar_questions.md'] = recommended_prompts_map.get('Quant-related/06_similar_questions.md', set()).union({'通用練習'})
-
-    # Format Tool/Prompt output
-    if recommended_tools_list:
-         report_lines.append("  - *工具推薦:*")
-         for tool in sorted(list(set(recommended_tools_list))): # Ensure uniqueness
-             report_lines.append(f"    - {tool}")
-    if recommended_prompts_map:
-         report_lines.append("  - *AI 提示推薦:*")
-         for prompt in sorted(recommended_prompts_map.keys()):
-             # MD doesn't show trigger context, just lists prompts
-             report_lines.append(f"    - `{prompt}`")
-
-    if not recommended_tools_list and not recommended_prompts_map:
-         report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議)")
+    report_lines.append("  - *建議行動：* 如果您對[`某類問題`，例如涉及{}的題目] 的錯誤原因仍感困惑，可以嘗試**提供 2-3 題該類型題目的詳細解題流程跟思路範例**（可以是文字記錄或口述錄音），以便與顧問進行更深入的個案分析，共同找到癥結所在。".format(qualitative_focus_area))
 
 
     report_lines.append("\n--- 報告結束 ---")

@@ -1433,124 +1433,119 @@ def _generate_v_summary_report(v_diagnosis_results):
         report_lines.append("  - (本次分析未觸發需要進行質化分析的特定問題)")
 
     # Tool Recommendations
-    report_lines.append("- **輔助工具與 AI 提示推薦 (基於本次診斷觸發的標籤):**")
+    # report_lines.append("- **輔助工具與 AI 提示推薦 (基於本次診斷觸發的標籤):**")
     # --- Comprehensive Tool Recommendation Map (Based on MD Ch8.7) ---
-    tool_recommendations_map = {
-        # CR Reasoning & Specific Types
-        frozenset(['CR_REASONING_CHAIN_ERROR', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY']):
-            "可能適用外部工具 `Dustin_GMAT_CR_Core_Issue_Identifier` 或 `Dustin_GMAT_CR_Chain_Argument_Evaluation`；或使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
-        frozenset(['CR_METHOD_TYPE_SPECIFIC_ERROR']):
-            "特定 CR 題型方法錯誤 (如 Boldface, Argument Construction)，可能適用外部工具 `Dustin\'s GMAT CR: Boldface Interactive Tutor` (Boldface) 或 `Dustin_GMAT_CR_Role_Argument_Construction` (Argument Construction)；或使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
-        frozenset(['CR_REASONING_ABSTRACTION_DIFFICULTY']):
-            "CR 抽象邏輯或術語理解困難，可能適用外部工具 `Dustin\'s GMAT Tool: Textbook Explainer`；或使用 AI 提示 `Verbal-related/07_logical_term_explained.md`, `Verbal-related/09_complex_sentence_rewrite.md`。",
-        frozenset(['CR_READING_BASIC_OMISSION']):
-            "CR 基礎理解疏漏，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`。",
-        frozenset(['CR_READING_DIFFICULTY_STEM']):
-            "CR 題幹理解障礙，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/07_logical_term_explained.md`, `Verbal-related/09_complex_sentence_rewrite.md`。",
-        frozenset(['CR_READING_TIME_EXCESSIVE']):
-            "CR 閱讀耗時過長，可使用 AI 提示 `Verbal-related/02_quick_cr_tpa_tricks.md`, `Verbal-related/03_quick_rc_tricks.md`。",
-        frozenset(['CR_QUESTION_UNDERSTANDING_MISINTERPRETATION']):
-            "CR 提問要求把握錯誤，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/07_logical_term_explained.md`。",
-        frozenset(['CR_REASONING_PREDICTION_ERROR']):
-            "CR 預判方向錯誤或缺失，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/05_evaluate_explanation.md`。",
-        frozenset(['CR_REASONING_TIME_EXCESSIVE']):
-            "CR 邏輯思考耗時過長，可使用 AI 提示 `Verbal-related/02_quick_cr_tpa_tricks.md`, `Verbal-related/05_evaluate_explanation.md`。",
-        frozenset(['CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY']):
-            "CR 選項本身理解困難，可使用 AI 提示 `Verbal-related/07_logical_term_explained.md`, `Verbal-related/01_basic_explanation.md`。",
-        frozenset(['CR_AC_ANALYSIS_RELEVANCE_ERROR']):
-            "CR 選項相關性判斷錯誤，可使用 AI 提示 `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
-        frozenset(['CR_AC_ANALYSIS_DISTRACTOR_CONFUSION']):
-            "CR 強干擾選項混淆，可能適用外部工具 `Dustin_GMAT_Verbal_Distractor_Mocker`；或使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/07_logical_term_explained.md`。",
-        frozenset(['CR_AC_ANALYSIS_TIME_EXCESSIVE']):
-            "CR 選項篩選耗時過長，可使用 AI 提示 `Verbal-related/02_quick_cr_tpa_tricks.md`, `Verbal-related/06_boldface_SOP.md`。",
-        frozenset(['CR_METHOD_PROCESS_DEVIATION']):
-            "CR 未遵循標準流程，可使用 AI 提示 `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
+    # tool_recommendations_map = {
+    #     # CR Reasoning & Specific Types
+    #     frozenset(['CR_REASONING_CHAIN_ERROR', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY']):
+    #         "可能適用外部工具 `Dustin_GMAT_CR_Core_Issue_Identifier` 或 `Dustin_GMAT_CR_Chain_Argument_Evaluation`；或使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
+    #     frozenset(['CR_METHOD_TYPE_SPECIFIC_ERROR']):
+    #         "特定 CR 題型方法錯誤 (如 Boldface, Argument Construction)，可能適用外部工具 `Dustin\'s GMAT CR: Boldface Interactive Tutor` (Boldface) 或 `Dustin_GMAT_CR_Role_Argument_Construction` (Argument Construction)；或使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
+    #     frozenset(['CR_REASONING_ABSTRACTION_DIFFICULTY']):
+    #         "CR 抽象邏輯或術語理解困難，可能適用外部工具 `Dustin\'s GMAT Tool: Textbook Explainer`；或使用 AI 提示 `Verbal-related/07_logical_term_explained.md`, `Verbal-related/09_complex_sentence_rewrite.md`。",
+    #     frozenset(['CR_READING_BASIC_OMISSION']):
+    #         "CR 基礎理解疏漏，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`。",
+    #     frozenset(['CR_READING_DIFFICULTY_STEM']):
+    #         "CR 題幹理解障礙，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/07_logical_term_explained.md`, `Verbal-related/09_complex_sentence_rewrite.md`。",
+    #     frozenset(['CR_READING_TIME_EXCESSIVE']):
+    #         "CR 閱讀耗時過長，可使用 AI 提示 `Verbal-related/02_quick_cr_tpa_tricks.md`, `Verbal-related/03_quick_rc_tricks.md`。",
+    #     frozenset(['CR_QUESTION_UNDERSTANDING_MISINTERPRETATION']):
+    #         "CR 提問要求把握錯誤，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/07_logical_term_explained.md`。",
+    #     frozenset(['CR_REASONING_PREDICTION_ERROR']):
+    #         "CR 預判方向錯誤或缺失，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/05_evaluate_explanation.md`。",
+    #     frozenset(['CR_REASONING_TIME_EXCESSIVE']):
+    #         "CR 邏輯思考耗時過長，可使用 AI 提示 `Verbal-related/02_quick_cr_tpa_tricks.md`, `Verbal-related/05_evaluate_explanation.md`。",
+    #     frozenset(['CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY']):
+    #         "CR 選項本身理解困難，可使用 AI 提示 `Verbal-related/07_logical_term_explained.md`, `Verbal-related/01_basic_explanation.md`。",
+    #     frozenset(['CR_AC_ANALYSIS_RELEVANCE_ERROR']):
+    #         "CR 選項相關性判斷錯誤，可使用 AI 提示 `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
+    #     frozenset(['CR_AC_ANALYSIS_DISTRACTOR_CONFUSION']):
+    #         "CR 強干擾選項混淆，可能適用外部工具 `Dustin_GMAT_Verbal_Distractor_Mocker`；或使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/07_logical_term_explained.md`。",
+    #     frozenset(['CR_AC_ANALYSIS_TIME_EXCESSIVE']):
+    #         "CR 選項篩選耗時過長，可使用 AI 提示 `Verbal-related/02_quick_cr_tpa_tricks.md`, `Verbal-related/06_boldface_SOP.md`。",
+    #     frozenset(['CR_METHOD_PROCESS_DEVIATION']):
+    #         "CR 未遵循標準流程，可使用 AI 提示 `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
 
-        # RC Reading Comprehension
-        frozenset(['RC_READING_SPEED_SLOW_FOUNDATIONAL', 'RC_READING_COMPREHENSION_BARRIER']):
-            "RC 基礎閱讀速度慢或存在障礙，可能適用外部工具 `Dustin GMAT: Chunk Reading Coach`；或使用 AI 提示 `Verbal-related/03_quick_rc_tricks.md`。",
-        frozenset(['RC_READING_SPEED_SLOW_FOUNDATIONAL', 'reading_comprehension_barrier_inquiry']): # Example: Combine param with Ch1 flag
-            "RC 基礎閱讀速度慢，可能適用外部工具 `Dustin GMAT: Chunk Reading Coach` 或 AI 提示 `Verbal-related/03_quick_rc_tricks.md`。",
-        frozenset(['RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'RC_READING_DOMAIN_KNOWLEDGE_GAP', 'RC_READING_VOCAB_BOTTLENECK']): # Non-systemic vocab
-            "RC 長難句/領域知識/非系統性詞彙瓶頸，可能適用外部工具 `Dustin's GMAT Terminator: Sentence Cracker` 或相關 AI 提示。",
-        frozenset(['RC_READING_VOCAB_BOTTLENECK']): # Systemic vocab (needs logic to differentiate)
-            "RC 詞彙量瓶頸 (需系統性學習)，可能適用外部工具 `Dustin's GMAT Core: Vocab Master`。",
-        frozenset(['RC_READING_PRECISION_INSUFFICIENT']):
-            "RC 閱讀精度不足，可能適用外部工具 `Dustin GMAT Close Reading Coach` 或 AI 提示。",
-        frozenset(['RC_READING_PASSAGE_STRUCTURE_DIFFICULTY']):
-            "RC 篇章結構把握不清，可能適用外部工具 `Dustin_GMAT_RC_Passage_Analyzer` 或 AI 提示。",
+    #     # RC Reading Comprehension
+    #     frozenset(['RC_READING_SPEED_SLOW_FOUNDATIONAL', 'RC_READING_COMPREHENSION_BARRIER']):
+    #         "RC 基礎閱讀速度慢或存在障礙，可能適用外部工具 `Dustin GMAT: Chunk Reading Coach`；或使用 AI 提示 `Verbal-related/03_quick_rc_tricks.md`。",
+    #     frozenset(['RC_READING_SPEED_SLOW_FOUNDATIONAL', 'reading_comprehension_barrier_inquiry']): # Example: Combine param with Ch1 flag
+    #         "RC 基礎閱讀速度慢，可能適用外部工具 `Dustin GMAT: Chunk Reading Coach` 或 AI 提示 `Verbal-related/03_quick_rc_tricks.md`。",
+    #     frozenset(['RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'RC_READING_DOMAIN_KNOWLEDGE_GAP', 'RC_READING_VOCAB_BOTTLENECK']): # Non-systemic vocab
+    #         "RC 長難句/領域知識/非系統性詞彙瓶頸，可能適用外部工具 `Dustin's GMAT Terminator: Sentence Cracker` 或相關 AI 提示。",
+    #     frozenset(['RC_READING_VOCAB_BOTTLENECK']): # Systemic vocab (needs logic to differentiate)
+    #         "RC 詞彙量瓶頸 (需系統性學習)，可能適用外部工具 `Dustin's GMAT Core: Vocab Master`。",
+    #     frozenset(['RC_READING_PRECISION_INSUFFICIENT']):
+    #         "RC 閱讀精度不足，可能適用外部工具 `Dustin GMAT Close Reading Coach` 或 AI 提示。",
+    #     frozenset(['RC_READING_PASSAGE_STRUCTURE_DIFFICULTY']):
+    #         "RC 篇章結構把握不清，可能適用外部工具 `Dustin_GMAT_RC_Passage_Analyzer` 或 AI 提示。",
 
-        # Distractors/Carelessness
-        frozenset(['CR_AC_ANALYSIS_DISTRACTOR_CONFUSION', 'RC_AC_ANALYSIS_DIFFICULTY', 'BEHAVIOR_CARELESSNESS_ISSUE']):
-            "選項辨析困難或粗心問題，可能適用外部工具 `Dustin_GMAT_Verbal_Distractor_Mocker` 或相關 AI 提示。",
+    #     # Distractors/Carelessness
+    #     frozenset(['CR_AC_ANALYSIS_DISTRACTOR_CONFUSION', 'RC_AC_ANALYSIS_DIFFICULTY', 'BEHAVIOR_CARELESSNESS_ISSUE']):
+    #         "選項辨析困難或粗心問題，可能適用外部工具 `Dustin_GMAT_Verbal_Distractor_Mocker` 或相關 AI 提示。",
 
-        # Foundational Mastery
-        frozenset(['FOUNDATIONAL_MASTERY_INSTABILITY_SFE']):
-            "基礎掌握不穩定 (SFE)，建議優先使用 AI 提示 `Verbal-related/01_basic_explanation.md` 鞏固基礎。",
+    #     # Foundational Mastery
+    #     frozenset(['FOUNDATIONAL_MASTERY_INSTABILITY_SFE']):
+    #         "基礎掌握不穩定 (SFE)，建議優先使用 AI 提示 `Verbal-related/01_basic_explanation.md` 鞏固基礎。",
 
-        # Behavioral
-        frozenset(['BEHAVIOR_EARLY_RUSHING_FLAG_RISK']):
-            "前期作答過快，建議使用 AI 提示 `Verbal-related/05_evaluate_explanation.md` 反思節奏。",
-        frozenset(['BEHAVIOR_GUESSING_HASTY']):
-            "疑似猜題/倉促，建議使用 AI 提示 `Verbal-related/01_basic_explanation.md` 學習完整步驟。",
-    }
+    #     # Behavioral
+    #     frozenset(['BEHAVIOR_EARLY_RUSHING_FLAG_RISK']):
+    #         "前期作答過快，建議使用 AI 提示 `Verbal-related/05_evaluate_explanation.md` 反思節奏。",
+    #     frozenset(['BEHAVIOR_GUESSING_HASTY']):
+    #         "疑似猜題/倉促，建議使用 AI 提示 `Verbal-related/01_basic_explanation.md` 學習完整步驟。",
+    # }
 
     # Generate tool recommendations based on triggered params (Q-like format)
-    processed_for_tools = set()
-    recommendations_made = False
+    # processed_for_tools = set()
+    # recommendations_made = False
     # Split tools and prompts
-    recommended_tools = set() # Use sets to avoid duplicates initially
-    recommended_prompts_map = {} # Keep this as dict to store reasons
+    # recommended_tools = set() # Use sets to avoid duplicates initially
+    # recommended_prompts_map = {} # Keep this as dict to store reasons
 
-    for params_set, tool_desc in tool_recommendations_map.items():
-        if any(p in triggered_params_all for p in params_set) and not params_set.issubset(processed_for_tools):
-            trigger_reasons_translated = [_translate_v(p) for p in params_set if p in triggered_params_all]
-            if trigger_reasons_translated:
-                # Extract tool names and prompt names using precise patterns
-                import re
-                # Step 1: Find all items within backticks
-                all_backticked_items = re.findall(r'`([^`]+?)`', tool_desc)
+    # for params_set, tool_desc in tool_recommendations_map.items():
+    #     if any(p in triggered_params_all for p in params_set) and not params_set.issubset(processed_for_tools):
+    #         trigger_reasons_translated = [_translate_v(p) for p in params_set if p in triggered_params_all]
+    #         if trigger_reasons_translated:
+    #             # Extract tool names and prompt names using precise patterns
+    #             import re
+    #             # Step 1: Find all items within backticks
+    #             all_backticked_items = re.findall(r'`([^`]+?)`', tool_desc)
                 
-                # Step 2: Filter into tools (not ending in .md) and prompts (ending in .md)
-                current_tools = {item for item in all_backticked_items if not item.endswith('.md') and item.strip()}
-                current_prompts = {item for item in all_backticked_items if item.endswith('.md')}
+    #             # Step 2: Filter into tools (not ending in .md) and prompts (ending in .md)
+    #             current_tools = {item for item in all_backticked_items if not item.endswith('.md') and item.strip()}
+    #             current_prompts = {item for item in all_backticked_items if item.endswith('.md')}
                 
-                # # Match `Dustin...` or other potential tool names NOT ending in .md (OLD LOGIC)
-                # tools = re.findall(r'`([^`]+?)(?<!\\.md)`', tool_desc)
-                # # Match patterns like `Verbal-related/... .md` (OLD LOGIC)
-                # prompts = re.findall(r'`((?:Verbal-related/|\\w+/)[^`]+\\.md)`', tool_desc) # Allow other potential paths ending in .md
+    #             if current_tools:
+    #                 recommended_tools.update(current_tools) # Add to set
+    #                 recommendations_made = True
+    #             if current_prompts:
+    #                 for prompt in current_prompts:
+    #                     # Store reasons for each prompt
+    #                     if prompt not in recommended_prompts_map:
+    #                         recommended_prompts_map[prompt] = set()
+    #                     recommended_prompts_map[prompt].update(trigger_reasons_translated)
+    #                 recommendations_made = True
 
-                if current_tools:
-                    recommended_tools.update(current_tools) # Add to set
-                    recommendations_made = True
-                if current_prompts:
-                    for prompt in current_prompts:
-                        # Store reasons for each prompt
-                        if prompt not in recommended_prompts_map:
-                            recommended_prompts_map[prompt] = set()
-                        recommended_prompts_map[prompt].update(trigger_reasons_translated)
-                    recommendations_made = True
-
-                processed_for_tools.update(params_set)
+    #             processed_for_tools.update(params_set)
 
     # Report Tools
-    if recommended_tools:
-         report_lines.append("  - 工具:")
-         # Sort the set before reporting
-         for tool in sorted(list(recommended_tools)):
-             report_lines.append(f"    - `{tool}`")
+    # if recommended_tools:
+    #      report_lines.append("  - 工具:")
+    #      # Sort the set before reporting
+    #      for tool in sorted(list(recommended_tools)):
+    #          report_lines.append(f"    - `{tool}`")
 
     # Report Prompts
-    if recommended_prompts_map:
-        report_lines.append("  - AI提示:")
-        for prompt in sorted(recommended_prompts_map.keys()):
-            # reasons = ", ".join(sorted(list(recommended_prompts_map[prompt])))
-            # report_lines.append(f"    - `{prompt}` (基於: {reasons})") # Option to show reasons
-            report_lines.append(f"    - `{prompt}`")
+    # if recommended_prompts_map:
+    #     report_lines.append("  - AI提示:")
+    #     for prompt in sorted(recommended_prompts_map.keys()):
+    #         # reasons = ", ".join(sorted(list(recommended_prompts_map[prompt])))
+    #         # report_lines.append(f"    - `{prompt}` (基於: {reasons})") # Option to show reasons
+    #         report_lines.append(f"    - `{prompt}`")
 
     # Fallback message
-    if not recommendations_made:
-         report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議)")
+    # if not recommendations_made:
+    #      report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議)")
 
     report_lines.append("\n--- 報告結束 ---")
     print("DEBUG: --- Exiting _generate_v_summary_report ---") # DEBUG

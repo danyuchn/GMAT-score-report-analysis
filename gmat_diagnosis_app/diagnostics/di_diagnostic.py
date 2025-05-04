@@ -1608,53 +1608,53 @@ def _generate_di_summary_report(di_results):
 
 
     # 7.4 Tools and Prompts Recommendation
-    report_lines.append("  **輔助工具與 AI 提示推薦建議:**")
-    recommended_di_tools = set()
-    recommended_di_prompts = set()
-    processed_for_tools_di = set()
-    recommendations_made_di = False
+    # report_lines.append("  **輔助工具與 AI 提示推薦建議:**")
+    # recommended_di_tools = set()
+    # recommended_di_prompts = set()
+    # processed_for_tools_di = set()
+    # recommendations_made_di = False
 
     # Use all_triggered_params calculated at the start of Ch7 generation
-    unique_triggered_params = set(all_triggered_params) # Ensure uniqueness
+    # unique_triggered_params = set(all_triggered_params) # Ensure uniqueness
 
-    for params_set, tool_desc in DI_TOOL_RECOMMENDATIONS_MAP.items():
-        # Check if the required set of params is a subset of triggered params
-        # Or if ANY of the params in the set were triggered (depending on desired logic)
-        # Let's use 'any' for broader matching based on the examples provided
-        trigger_match = any(p in unique_triggered_params for p in params_set)
+    # for params_set, tool_desc in DI_TOOL_RECOMMENDATIONS_MAP.items():
+    #     # Check if the required set of params is a subset of triggered params
+    #     # Or if ANY of the params in the set were triggered (depending on desired logic)
+    #     # Let's use 'any' for broader matching based on the examples provided
+    #     trigger_match = any(p in unique_triggered_params for p in params_set)
 
-        if trigger_match and not params_set.issubset(processed_for_tools_di):
-            import re
-            all_backticked = re.findall(r'`([^`]+?)`', tool_desc)
-            current_tools = {item for item in all_backticked if not item.endswith('.md') and item.strip()}
-            current_prompts = {item for item in all_backticked if item.endswith('.md')}
+    #     if trigger_match and not params_set.issubset(processed_for_tools_di):
+    #         import re
+    #         all_backticked = re.findall(r'`([^`]+?)`', tool_desc)
+    #         current_tools = {item for item in all_backticked if not item.endswith('.md') and item.strip()}
+    #         current_prompts = {item for item in all_backticked if item.endswith('.md')}
 
-            if current_tools:
-                recommended_di_tools.update(current_tools)
-                recommendations_made_di = True
-            if current_prompts:
-                recommended_di_prompts.update(current_prompts)
-                recommendations_made_di = True
+    #         if current_tools:
+    #             recommended_di_tools.update(current_tools)
+    #             recommendations_made_di = True
+    #         if current_prompts:
+    #             recommended_di_prompts.update(current_prompts)
+    #             recommendations_made_di = True
 
-            processed_for_tools_di.update(params_set)
+    #         processed_for_tools_di.update(params_set)
 
     # Output collected tools and prompts
-    tools_were_recommended_di = bool(recommended_di_tools)
-    prompts_were_recommended_di = bool(recommended_di_prompts)
+    # tools_were_recommended_di = bool(recommended_di_tools)
+    # prompts_were_recommended_di = bool(recommended_di_prompts)
 
-    if tools_were_recommended_di:
-        report_lines.append("  - *工具:*" + (" (請根據問題選用)" if len(recommended_di_tools)>1 else ""))
-        for tool in sorted(list(recommended_di_tools)):
-            report_lines.append(f"    - `{tool}`")
+    # if tools_were_recommended_di:
+    #     report_lines.append("  - *工具:*") # + (" (請根據問題選用)" if len(recommended_di_tools)>1 else ""))
+    #     for tool in sorted(list(recommended_di_tools)):
+    #         report_lines.append(f"    - `{tool}`")
 
-    if prompts_were_recommended_di:
-        if tools_were_recommended_di:
-             report_lines.append("")
-        report_lines.append("  - *AI提示:*" + (" (請根據問題選用)" if len(recommended_di_prompts)>1 else ""))
-        for prompt in sorted(list(recommended_di_prompts)):
-            report_lines.append(f"    - `{prompt}`")
+    # if prompts_were_recommended_di:
+    #     if tools_were_recommended_di:
+    #          report_lines.append("")
+    #     report_lines.append("  - *AI提示:*") # + (" (請根據問題選用)" if len(recommended_di_prompts)>1 else ""))
+    #     for prompt in sorted(list(recommended_di_prompts)):
+    #         report_lines.append(f"    - `{prompt}`")
 
-    if not recommendations_made_di:
-        report_lines.append("  - 根據當前診斷，暫無特別推薦的輔助工具或 AI 提示。")
+    # if not recommendations_made_di:
+    #     report_lines.append("  - 根據當前診斷，暫無特別推薦的輔助工具或 AI 提示。")
 
     return "\n\n".join(report_lines)
