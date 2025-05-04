@@ -426,15 +426,10 @@ def summarize_report_with_openai(report_markdown, api_key):
              return report_markdown
 
         client = openai.OpenAI(api_key=api_key) # Initialize client
-        system_prompt = """You are an assistant that reformats GMAT diagnostic reports.
-You will receive a report in Markdown format.
-Your task is to reformat the content into clear Markdown tables where appropriate.
-Fix any minor grammatical errors or awkward phrasing for better readability.
-IMPORTANT: Do NOT add or remove any substantive information or conclusions from the original report. Only reformat and polish the existing text.
-Output the result strictly in Markdown format."""
+        system_prompt = """You are an assistant that reformats GMAT diagnostic reports. Use uniform heading levels: Level-2 headings for all major sections (## Section Title). Level-3 headings for subsections (### Subsection Title). Reformat content into clear Markdown tables where appropriate. Fix minor grammatical errors or awkward phrasing for readability. IMPORTANT: Do NOT add or remove any substantive information or conclusions. Only reformat and polish the existing text. Output strictly in Markdown format, without code blocks.  """
 
         response = client.chat.completions.create(
-            model="o4-mini", # Use the specified model
+            model="gpt-4.1-nano", # Use the specified model
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": report_markdown}
@@ -829,7 +824,8 @@ def process_subject_tab(subject, tab_container, base_rename_map):
 def display_subject_results(subject, tab_container, report_md, df_subject, col_config, excel_map):
     """Displays the diagnosis report, styled DataFrame, and download button for a subject."""
     tab_container.subheader(f"{subject} 科診斷報告")
-    tab_container.markdown(report_md if report_md else f"未找到 {subject} 科的診斷報告。")
+    # This line renders the markdown report with wrapping
+    tab_container.markdown(report_md if report_md else f"未找到 {subject} 科的診斷報告。", unsafe_allow_html=True) # Added unsafe_allow_html=True just in case AI uses basic HTML
 
     tab_container.subheader(f"{subject} 科詳細數據 (含診斷標籤)")
 
@@ -1090,327 +1086,369 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
     st.header("2. 執行 IRT 模擬與診斷")
     analysis_success = True # Flag to track overall success
     df_final_for_diagnosis = None # Initialize
+    total_steps = 5 # Define the total number of major steps for the progress bar
+    current_step = 0
 
-    with st.status("執行分析步驟...", expanded=True) as analysis_status:
+    # Initialize progress bar and status text placeholder
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    status_text.text(f"步驟 {current_step}/{total_steps}: 準備開始分析...")
 
-        # --- 1. Calculate Time Pressure ---
-        time_pressure_map = {}
+    # --- 1. Calculate Time Pressure ---
+    time_pressure_map = {}
+    try:
+        current_step = 1
+        status_text.text(f"步驟 {current_step}/{total_steps}: 計算時間壓力...")
+        # Use helper constants directly by accessing the THRESHOLDS dictionary
+        q_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'Q', 'question_time'], errors='coerce').sum()
+        v_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'V', 'question_time'], errors='coerce').sum()
+        di_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'DI', 'question_time'], errors='coerce').sum()
+
+        # Update pressure logic to use THRESHOLDS
+        time_pressure_q = (THRESHOLDS['Q']['MAX_ALLOWED_TIME'] - q_total_time) <= THRESHOLDS['Q']['TIME_DIFF_PRESSURE'] # Using the defined pressure diff for Q
+        time_pressure_v = (THRESHOLDS['V']['MAX_ALLOWED_TIME'] - v_total_time) < 1.0 # Keep V logic as is for now, might need its own threshold in THRESHOLDS
+        time_pressure_di = (THRESHOLDS['DI']['MAX_ALLOWED_TIME'] - di_total_time) <= THRESHOLDS['DI']['TIME_PRESSURE_DIFF_MIN'] # Using DI pressure diff
+
+        time_pressure_map = {'Q': time_pressure_q, 'V': time_pressure_v, 'DI': time_pressure_di}
+        # st.write(f"時間壓力狀態: {time_pressure_map}") # Removed detailed write
+        progress_bar.progress(current_step / total_steps)
+    except Exception as e:
+        st.error(f"計算時間壓力時出錯: {e}")
+        analysis_success = False
+        status_text.text(f"步驟 {current_step}/{total_steps}: 計算時間壓力時出錯。") # Update status on error
+
+    # --- 2. Calculate Overtime ---
+    df_with_overtime = None
+    if analysis_success:
         try:
-            st.write("計算時間壓力...")
-            # Use helper constants directly by accessing the THRESHOLDS dictionary
-            q_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'Q', 'question_time'], errors='coerce').sum()
-            v_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'V', 'question_time'], errors='coerce').sum()
-            di_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'DI', 'question_time'], errors='coerce').sum()
+            current_step = 2
+            status_text.text(f"步驟 {current_step}/{total_steps}: 計算超時狀態...")
+            # Ensure df_combined_input has necessary columns ('question_time', 'question_type', 'Subject')
+            # These should exist due to validation and standardization steps.
+            df_with_overtime = calculate_overtime(df_combined_input, time_pressure_map)
+            if 'overtime' not in df_with_overtime.columns:
+                st.error("calculate_overtime 未返回 'overtime' 欄位。")
+                analysis_success = False
+                status_text.text(f"步驟 {current_step}/{total_steps}: 計算超時狀態時出錯。")
+            else:
+                 # st.write("超時狀態計算完成。") # Removed detailed write
+                 # Use this dataframe going forward, it includes the user-confirmed 'is_invalid' flag
+                 df_final_input_for_sim = df_with_overtime
+                 progress_bar.progress(current_step / total_steps)
 
-            # Update pressure logic to use THRESHOLDS
-            time_pressure_q = (THRESHOLDS['Q']['MAX_ALLOWED_TIME'] - q_total_time) <= THRESHOLDS['Q']['TIME_DIFF_PRESSURE'] # Using the defined pressure diff for Q
-            time_pressure_v = (THRESHOLDS['V']['MAX_ALLOWED_TIME'] - v_total_time) < 1.0 # Keep V logic as is for now, might need its own threshold in THRESHOLDS
-            time_pressure_di = (THRESHOLDS['DI']['MAX_ALLOWED_TIME'] - di_total_time) <= THRESHOLDS['DI']['TIME_PRESSURE_DIFF_MIN'] # Using DI pressure diff
-
-            time_pressure_map = {'Q': time_pressure_q, 'V': time_pressure_v, 'DI': time_pressure_di}
-            st.write(f"時間壓力狀態: {time_pressure_map}")
         except Exception as e:
-            st.error(f"計算時間壓力時出錯: {e}")
+            st.error(f"計算 overtime 時出錯: {e}")
             analysis_success = False
+            status_text.text(f"步驟 {current_step}/{total_steps}: 計算超時狀態時出錯。") # Update status on error
 
-        # --- 2. Calculate Overtime ---
-        df_with_overtime = None
-        if analysis_success:
-            try:
-                st.write("計算超時狀態...")
-                # Ensure df_combined_input has necessary columns ('question_time', 'question_type', 'Subject')
-                # These should exist due to validation and standardization steps.
-                df_with_overtime = calculate_overtime(df_combined_input, time_pressure_map)
-                if 'overtime' not in df_with_overtime.columns:
-                    st.error("calculate_overtime 未返回 'overtime' 欄位。")
-                    analysis_success = False
-                else:
-                     st.write("超時狀態計算完成。")
-                     # Use this dataframe going forward, it includes the user-confirmed 'is_invalid' flag
-                     df_final_input_for_sim = df_with_overtime
+    # --- 3. IRT Simulation ---
+    all_simulation_histories = {}
+    final_thetas_local = {}
+    all_theta_plots = {} # NEW: Store plots locally first
+    question_banks = {} # Define banks here
+    if analysis_success:
+        # st.write("執行 IRT 模擬...") # Removed detailed write
+        current_step = 3
+        status_text.text(f"步驟 {current_step}/{total_steps}: 執行 IRT 模擬...")
+        try:
+            # Initialize banks
+            # st.write("  初始化模擬題庫...") # Removed detailed write
+            for subject in SUBJECTS:
+                seed = RANDOM_SEED + SUBJECT_SIM_PARAMS[subject]['seed_offset']
+                question_banks[subject] = irt.initialize_question_bank(BANK_SIZE, seed=seed)
+                if question_banks[subject] is None:
+                     raise ValueError(f"Failed to initialize question bank for {subject}")
+            # st.write("  模擬題庫創建完成。") # Removed detailed write
 
-            except Exception as e:
-                st.error(f"計算 overtime 時出錯: {e}")
-                analysis_success = False
+            # Run simulation per subject
+            for subject in SUBJECTS:
+                # st.write(f"  執行 {subject} 科目模擬...") # Removed detailed write
+                params = SUBJECT_SIM_PARAMS[subject]
+                initial_theta = st.session_state[params['initial_theta_key']]
+                bank = question_banks[subject]
 
-        # --- 3. IRT Simulation ---
-        all_simulation_histories = {}
-        final_thetas_local = {}
-        all_theta_plots = {} # NEW: Store plots locally first
-        question_banks = {} # Define banks here
-        if analysis_success:
-            st.write("執行 IRT 模擬...")
-            try:
-                # Initialize banks
-                st.write("  初始化模擬題庫...")
-                for subject in SUBJECTS:
-                    seed = RANDOM_SEED + SUBJECT_SIM_PARAMS[subject]['seed_offset']
-                    question_banks[subject] = irt.initialize_question_bank(BANK_SIZE, seed=seed)
-                    if question_banks[subject] is None:
-                         raise ValueError(f"Failed to initialize question bank for {subject}")
-                st.write("  模擬題庫創建完成。")
+                # Get user data for the subject, sorted by position
+                user_df_subj = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].sort_values(by='question_position')
 
-                # Run simulation per subject
-                for subject in SUBJECTS:
-                    st.write(f"  執行 {subject} 科目模擬...")
-                    params = SUBJECT_SIM_PARAMS[subject]
-                    initial_theta = st.session_state[params['initial_theta_key']]
-                    bank = question_banks[subject]
+                # --- Calculate total questions and wrong positions from user_df_subj --- #
+                if user_df_subj.empty:
+                    st.warning(f"  {subject}: 沒有找到該科目的作答數據，無法執行模擬。", icon="⚠️")
+                    final_thetas_local[subject] = initial_theta
+                    all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
+                    all_simulation_histories[subject].attrs['simulation_skipped'] = True
+                    continue
 
-                    # Get user data for the subject, sorted by position
-                    user_df_subj = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].sort_values(by='question_position')
+                try:
+                    total_questions_attempted = len(user_df_subj) # Correctly use the subject-specific dataframe length
+                    if total_questions_attempted <= 0:
+                        raise ValueError("Number of rows is not positive.")
 
-                    # --- Calculate total questions and wrong positions from user_df_subj --- #
-                    if user_df_subj.empty:
-                        st.warning(f"  {subject}: 沒有找到該科目的作答數據，無法執行模擬。", icon="⚠️")
-                        final_thetas_local[subject] = initial_theta
-                        all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
-                        all_simulation_histories[subject].attrs['simulation_skipped'] = True
-                        continue
+                    # Calculate wrong positions from the subject-specific dataframe
+                    if 'is_correct' not in user_df_subj.columns:
+                        raise ValueError(f"{subject}: 缺少 'is_correct' 欄位。")
+                    user_df_subj['is_correct'] = user_df_subj['is_correct'].astype(bool)
+                    user_df_subj['question_position'] = pd.to_numeric(user_df_subj['question_position'], errors='coerce')
+                    wrong_positions = user_df_subj.loc[(user_df_subj['is_correct'] == False) & user_df_subj['question_position'].notna(), 'question_position'].astype(int).tolist()
 
+                    # st.write(f"    {subject}: 模擬全部 {total_questions_attempted} 個作答題目，其中錯誤位置: {wrong_positions}") # Removed detailed write
+
+                except (KeyError, ValueError, TypeError) as e:
+                     st.error(f"  {subject}: 無法確定總作答題數或錯誤位置: {e}。跳過模擬。", icon="🚨")
+                     final_thetas_local[subject] = initial_theta
+                     all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
+                     all_simulation_histories[subject].attrs['simulation_skipped'] = True
+                     continue # Skip to next subject
+                # --- End Calculation --- #
+
+                # --- Filter valid responses for later difficulty assignment --- #
+                valid_responses = user_df_subj[~user_df_subj['is_invalid']].copy()
+                if valid_responses.empty:
+                    st.warning(f"  {subject}: 所有題目均被標記為無效，Theta 模擬仍基於完整序列。", icon="⚠️")
+                # --- End Filtering --- #
+
+                # --- Run simulation using the calculated total and wrong list --- #
+                history_df = irt.simulate_cat_exam(
+                    question_bank=bank,
+                    wrong_question_positions=wrong_positions,
+                    initial_theta=initial_theta,
+                    total_questions=total_questions_attempted # Pass the correct total number
+                )
+                # --- End Simulation Call --- #
+
+                if history_df is not None and not history_df.empty:
+                    # Store results only if simulation ran
+                    all_simulation_histories[subject] = history_df
+                    final_theta_subj = history_df['theta_est_after_answer'].iloc[-1]
+                    final_thetas_local[subject] = final_theta_subj
+                    # st.write(f"    {subject}: 模擬完成。最後 Theta 估計: {final_theta_subj:.3f}") # Removed detailed write
+
+                    # --- Generate and store plot ---
                     try:
-                        total_questions_attempted = len(user_df_subj) # Correctly use the subject-specific dataframe length
-                        if total_questions_attempted <= 0:
-                            raise ValueError("Number of rows is not positive.")
+                        theta_plot = create_theta_plot(history_df, subject)
+                        if theta_plot:
+                            all_theta_plots[subject] = theta_plot
+                            # st.write(f"    {subject}: Theta 歷史圖表已生成。") # Removed detailed write
+                        else:
+                            st.warning(f"    {subject}: 未能生成 Theta 圖表 (create_theta_plot 返回 None)。", icon="📊") # More specific warning
+                    except Exception as plot_err:
+                        st.warning(f"    {subject}: 生成 Theta 圖表時出錯: {plot_err}", icon="📊")
+                    # --- End plot generation ---
+                elif history_df is not None and history_df.empty: # Succeeded but empty
+                    st.warning(f"  {subject}: 模擬執行但未產生歷史記錄。將使用初始 Theta。")
+                    final_thetas_local[subject] = initial_theta
+                    all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
+                    all_simulation_histories[subject].attrs['simulation_skipped'] = True # Mark skipped
+                else: # Failed (returned None)
+                     raise ValueError(f"IRT simulation failed for subject {subject}")
+            # After loop completes successfully
+            progress_bar.progress(current_step / total_steps)
 
-                        # Calculate wrong positions from the subject-specific dataframe
-                        if 'is_correct' not in user_df_subj.columns:
-                            raise ValueError(f"{subject}: 缺少 'is_correct' 欄位。")
-                        user_df_subj['is_correct'] = user_df_subj['is_correct'].astype(bool)
-                        user_df_subj['question_position'] = pd.to_numeric(user_df_subj['question_position'], errors='coerce')
-                        wrong_positions = user_df_subj.loc[(user_df_subj['is_correct'] == False) & user_df_subj['question_position'].notna(), 'question_position'].astype(int).tolist()
+        except Exception as e:
+            st.error(f"執行 IRT 模擬時出錯: {e}")
+            # st.code(traceback.format_exc()) # Optional debug
+            analysis_success = False
+            status_text.text(f"步驟 {current_step}/{total_steps}: IRT 模擬時出錯。") # Update status on error
 
-                        st.write(f"    {subject}: 模擬全部 {total_questions_attempted} 個作答題目，其中錯誤位置: {wrong_positions}")
+    # --- 4. Prepare Data for Diagnosis ---
+    if analysis_success:
+        # st.write("準備診斷數據...") # Removed detailed write
+        current_step = 4
+        status_text.text(f"步驟 {current_step}/{total_steps}: 準備診斷數據...")
+        df_final_for_diagnosis_list = []
+        try:
+            for subject in SUBJECTS:
+                # st.write(f"  處理 {subject} 科目...") # Removed detailed write
+                user_df_subj = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].copy()
+                sim_history_df = all_simulation_histories.get(subject)
+                final_theta = final_thetas_local.get(subject)
 
-                    except (KeyError, ValueError, TypeError) as e:
-                         st.error(f"  {subject}: 無法確定總作答題數或錯誤位置: {e}。跳過模擬。", icon="🚨")
-                         final_thetas_local[subject] = initial_theta
-                         all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
-                         all_simulation_histories[subject].attrs['simulation_skipped'] = True
-                         continue # Skip to next subject
-                    # --- End Calculation --- #
+                if sim_history_df is None: # Should not happen if simulation ran/skipped correctly
+                    st.error(f"找不到 {subject} 的模擬歷史，無法準備數據。")
+                    analysis_success = False; break
 
-                    # --- Filter valid responses for later difficulty assignment --- #
-                    valid_responses = user_df_subj[~user_df_subj['is_invalid']].copy()
-                    if valid_responses.empty:
-                        st.warning(f"  {subject}: 所有題目均被標記為無效，Theta 模擬仍基於完整序列。", icon="⚠️")
-                    # --- End Filtering --- #
+                # Add final theta estimate to all rows for context
+                user_df_subj['estimated_ability'] = final_theta
 
-                    # --- Run simulation using the calculated total and wrong list --- #
-                    history_df = irt.simulate_cat_exam(
-                        question_bank=bank,
-                        wrong_question_positions=wrong_positions,
-                        initial_theta=initial_theta,
-                        total_questions=total_questions_attempted # Pass the correct total number
-                    )
-                    # --- End Simulation Call --- #
+                # --- Assign Difficulty ---
+                # Sort user data by position *before* filtering invalid
+                user_df_subj_sorted = user_df_subj.sort_values(by='question_position').reset_index(drop=True)
 
-                    if history_df is not None and not history_df.empty:
-                        # Store results only if simulation ran
-                        all_simulation_histories[subject] = history_df
-                        final_theta_subj = history_df['theta_est_after_answer'].iloc[-1]
-                        final_thetas_local[subject] = final_theta_subj
-                        st.write(f"    {subject}: 模擬完成。最後 Theta 估計: {final_theta_subj:.3f}")
+                # Get simulated difficulties IF simulation was not skipped
+                sim_b_values = []
+                if not sim_history_df.attrs.get('simulation_skipped', False):
+                      sim_b_values = sim_history_df['b'].tolist()
 
-                        # --- Generate and store plot ---
-                        try:
-                            theta_plot = create_theta_plot(history_df, subject)
-                            if theta_plot:
-                                all_theta_plots[subject] = theta_plot
-                                st.write(f"    {subject}: Theta 歷史圖表已生成。")
-                            else:
-                                st.warning(f"    {subject}: 未能生成 Theta 圖表 (create_theta_plot 返回 None)。", icon="📊") # More specific warning
-                        except Exception as plot_err:
-                            st.warning(f"    {subject}: 生成 Theta 圖表時出錯: {plot_err}", icon="📊")
-                        # --- End plot generation ---
-                    elif history_df is not None and history_df.empty: # Succeeded but empty
-                        st.warning(f"  {subject}: 模擬執行但未產生歷史記錄。將使用初始 Theta。")
-                        final_thetas_local[subject] = initial_theta
-                        all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
-                        all_simulation_histories[subject].attrs['simulation_skipped'] = True # Mark skipped
-                    else: # Failed (returned None)
-                         raise ValueError(f"IRT simulation failed for subject {subject}")
-
-            except Exception as e:
-                st.error(f"執行 IRT 模擬時出錯: {e}")
-                # st.code(traceback.format_exc()) # Optional debug
-                analysis_success = False
-
-        # --- 4. Prepare Data for Diagnosis ---
-        if analysis_success:
-            st.write("準備診斷數據...")
-            df_final_for_diagnosis_list = []
-            try:
-                for subject in SUBJECTS:
-                    st.write(f"  處理 {subject} 科目...")
-                    user_df_subj = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].copy()
-                    sim_history_df = all_simulation_histories.get(subject)
-                    final_theta = final_thetas_local.get(subject)
-
-                    if sim_history_df is None: # Should not happen if simulation ran/skipped correctly
-                        st.error(f"找不到 {subject} 的模擬歷史，無法準備數據。")
-                        analysis_success = False; break
-
-                    # Add final theta estimate to all rows for context
-                    user_df_subj['estimated_ability'] = final_theta
-
-                    # --- Assign Difficulty ---
-                    # Sort user data by position *before* filtering invalid
-                    user_df_subj_sorted = user_df_subj.sort_values(by='question_position').reset_index(drop=True)
-
-                    # Get simulated difficulties IF simulation was not skipped
-                    sim_b_values = []
-                    if not sim_history_df.attrs.get('simulation_skipped', False):
-                          sim_b_values = sim_history_df['b'].tolist()
-
-                    # Create a mapping from valid question original position to its sim difficulty
-                    valid_indices = user_df_subj_sorted[~user_df_subj_sorted['is_invalid']].index
-                    if len(valid_indices) != len(sim_b_values):
-                         st.warning(f"{subject}: 有效題目數量 ({len(valid_indices)}) 與模擬難度值數量 ({len(sim_b_values)}) 不符。難度可能分配不準確。", icon="⚠️")
-                         # Truncate to minimum? Or assign NaN? Assign NaN for safety.
-                         min_len = min(len(valid_indices), len(sim_b_values))
-                         difficulty_map = {user_df_subj_sorted.loc[idx, 'question_position']: sim_b_values[i]
-                                           for i, idx in enumerate(valid_indices[:min_len])}
-                    else:
-                         difficulty_map = {user_df_subj_sorted.loc[idx, 'question_position']: sim_b_values[i]
-                                           for i, idx in enumerate(valid_indices)}
+                # Create a mapping from valid question original position to its sim difficulty
+                valid_indices = user_df_subj_sorted[~user_df_subj_sorted['is_invalid']].index
+                if len(valid_indices) != len(sim_b_values):
+                     st.warning(f"{subject}: 有效題目數量 ({len(valid_indices)}) 與模擬難度值數量 ({len(sim_b_values)}) 不符。難度可能分配不準確。", icon="⚠️")
+                     # Truncate to minimum? Or assign NaN? Assign NaN for safety.
+                     min_len = min(len(valid_indices), len(sim_b_values))
+                     difficulty_map = {user_df_subj_sorted.loc[idx, 'question_position']: sim_b_values[i]
+                                       for i, idx in enumerate(valid_indices[:min_len])}
+                else:
+                     difficulty_map = {user_df_subj_sorted.loc[idx, 'question_position']: sim_b_values[i]
+                                       for i, idx in enumerate(valid_indices)}
 
 
-                    # Assign difficulty based on the map, assign NaN to invalid or unmapped questions
-                    user_df_subj_sorted['question_difficulty'] = user_df_subj_sorted['question_position'].map(difficulty_map)
+                # Assign difficulty based on the map, assign NaN to invalid or unmapped questions
+                user_df_subj_sorted['question_difficulty'] = user_df_subj_sorted['question_position'].map(difficulty_map)
 
-                    # Fill missing essential columns (content_domain, fundamental_skill) if they don't exist
-                    if 'content_domain' not in user_df_subj_sorted.columns:
-                         user_df_subj_sorted['content_domain'] = 'Unknown Domain'
-                    if 'question_fundamental_skill' not in user_df_subj_sorted.columns:
-                         user_df_subj_sorted['question_fundamental_skill'] = 'Unknown Skill'
+                # Fill missing essential columns (content_domain, fundamental_skill) if they don't exist
+                if 'content_domain' not in user_df_subj_sorted.columns:
+                     user_df_subj_sorted['content_domain'] = 'Unknown Domain'
+                if 'question_fundamental_skill' not in user_df_subj_sorted.columns:
+                     user_df_subj_sorted['question_fundamental_skill'] = 'Unknown Skill'
 
-                    # Select and reorder columns needed for diagnosis functions
-                    cols_to_keep = [col for col in FINAL_DIAGNOSIS_INPUT_COLS if col in user_df_subj_sorted.columns]
-                    df_final_for_diagnosis_list.append(user_df_subj_sorted[cols_to_keep])
+                # Select and reorder columns needed for diagnosis functions
+                cols_to_keep = [col for col in FINAL_DIAGNOSIS_INPUT_COLS if col in user_df_subj_sorted.columns]
+                df_final_for_diagnosis_list.append(user_df_subj_sorted[cols_to_keep])
 
-                if analysis_success and df_final_for_diagnosis_list: # Check again after loop
-                     df_final_for_diagnosis = pd.concat(df_final_for_diagnosis_list, ignore_index=True)
-                     st.write("診斷數據準備完成。")
-                elif analysis_success: # List is empty but no error flagged?
-                     st.warning("未能準備任何科目的診斷數據。")
-                     analysis_success = False # Mark as failure if no data to diagnose
-
-            except Exception as e:
-                st.error(f"準備診斷數據時發生錯誤: {e}")
-                # st.code(traceback.format_exc()) # Optional debug
-                analysis_success = False
-
-        # --- 5. Run Diagnosis ---
-        all_diagnosed_dfs = []
-        if analysis_success and df_final_for_diagnosis is not None:
-            st.write("執行診斷分析...")
-            temp_report_dict = {} # Use temporary dict during run
-            try:
-                 # Pre-calculate V average times if V is present
-                 v_avg_time_per_type = {}
-                 if 'V' in SUBJECTS:
-                     df_v_temp = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == 'V']
-                     if not df_v_temp.empty and 'question_time' in df_v_temp.columns and 'question_type' in df_v_temp.columns:
-                          # Ensure time is numeric for calculation
-                          df_v_temp['question_time'] = pd.to_numeric(df_v_temp['question_time'], errors='coerce')
-                          # Filter out rows where time is NaN after conversion
-                          v_avg_time_per_type = df_v_temp.dropna(subset=['question_time']).groupby('question_type')['question_time'].mean().to_dict()
+            if analysis_success and df_final_for_diagnosis_list: # Check again after loop
+                 df_final_for_diagnosis = pd.concat(df_final_for_diagnosis_list, ignore_index=True)
+                 # st.write("診斷數據準備完成。") # Removed detailed write
+                 progress_bar.progress(current_step / total_steps)
+            elif analysis_success: # List is empty but no error flagged?
+                 st.warning("未能準備任何科目的診斷數據。")
+                 analysis_success = False # Mark as failure if no data to diagnose
+                 status_text.text(f"步驟 {current_step}/{total_steps}: 數據準備完成，但無數據可診斷。")
 
 
-                 for subject in SUBJECTS:
-                     st.write(f"  診斷 {subject} 科...")
-                     df_subj = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == subject].copy()
-                     # Skip diagnosis if dataframe is empty for the subject (e.g., all invalid)
-                     if df_subj.empty:
-                          st.warning(f"  {subject}: 沒有有效數據進行診斷。", icon="⚠️")
-                          # Add a placeholder report?
-                          temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 沒有有效數據可供診斷。*\n"
-                          # Create empty df with expected columns to avoid concat errors later?
-                          # Or handle this during results display. Let's handle in display.
-                          all_diagnosed_dfs.append(None) # Append None to signal skip
-                          continue
+        except Exception as e:
+            st.error(f"準備診斷數據時發生錯誤: {e}")
+            # st.code(traceback.format_exc()) # Optional debug
+            analysis_success = False
+            status_text.text(f"步驟 {current_step}/{total_steps}: 準備診斷數據時出錯。") # Update status on error
 
-                     # Fill NaN difficulties with a default (e.g., average ability) before diagnosis? Or handle in diagnostic funcs.
-                     # Let's assume diagnostic functions can handle potential NaNs in difficulty for invalid items.
-                     # If not, fill here:
-                     # final_theta = final_thetas_local.get(subject, 0) # Get final theta
-                     # df_subj['question_difficulty'].fillna(final_theta, inplace=True)
-
-                     time_pressure = time_pressure_map.get(subject, False)
-                     subj_results, subj_report, df_subj_diagnosed = None, None, None
-
-                     try:
-                         if subject == 'Q':
-                             subj_results, subj_report, df_subj_diagnosed = run_q_diagnosis_processed(df_subj, time_pressure)
-                         elif subject == 'DI':
-                             subj_results, subj_report, df_subj_diagnosed = run_di_diagnosis_processed(df_subj, time_pressure)
-                         elif subject == 'V':
-                             subj_results, subj_report, df_subj_diagnosed = run_v_diagnosis_processed(df_subj, time_pressure, v_avg_time_per_type)
-                     except Exception as diag_err:
-                          st.error(f"  {subject} 科診斷函數執行時出錯: {diag_err}")
-                          subj_report = f"**{subject} 科診斷報告**\n\n* 診斷過程中發生錯誤: {diag_err}*\n"
-                          df_subj_diagnosed = df_subj # Return original data for the subject on error
-                          # Mark report dict and df list to indicate failure? Keep processing others.
+    # --- 5. Run Diagnosis ---
+    all_diagnosed_dfs = []
+    if analysis_success and df_final_for_diagnosis is not None:
+        # st.write("執行診斷分析...") # Removed detailed write
+        current_step = 5
+        status_text.text(f"步驟 {current_step}/{total_steps}: 執行診斷分析...")
+        temp_report_dict = {} # Use temporary dict during run
+        try:
+             # Pre-calculate V average times if V is present
+             v_avg_time_per_type = {}
+             if 'V' in SUBJECTS:
+                 df_v_temp = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == 'V']
+                 if not df_v_temp.empty and 'question_time' in df_v_temp.columns and 'question_type' in df_v_temp.columns:
+                      # Ensure time is numeric for calculation
+                      df_v_temp['question_time'] = pd.to_numeric(df_v_temp['question_time'], errors='coerce')
+                      # Filter out rows where time is NaN after conversion
+                      v_avg_time_per_type = df_v_temp.dropna(subset=['question_time']).groupby('question_type')['question_time'].mean().to_dict()
 
 
-                     if subj_report is not None and df_subj_diagnosed is not None:
-                         # --- Attempt OpenAI Summarization --- #
-                         final_report_for_subject = subj_report # Start with the original
-                         # Retrieve api key (it's loaded near the top)
-                         if st.session_state.openai_api_key and subj_report and "發生錯誤" not in subj_report and "未成功執行" not in subj_report:
-                             st.write(f"    嘗試使用 OpenAI 整理 {subject} 科報告...")
-                             summarized_report = summarize_report_with_openai(subj_report, st.session_state.openai_api_key)
-                             if summarized_report != subj_report: # Check if summarization actually changed something
-                                 st.write(f"      -> {subject} 科報告已由 AI 整理。")
-                                 final_report_for_subject = summarized_report
-                             else:
-                                 # Warning/info might have been shown inside the function if API failed or no change needed
-                                 st.write(f"      -> {subject} 科報告整理失敗或無需整理。")
-                         elif not st.session_state.openai_api_key:
-                              st.info(f"    未提供 OpenAI API Key，跳過 {subject} 科報告整理。")
+             for subject in SUBJECTS:
+                 # st.write(f"  診斷 {subject} 科...") # Removed detailed write
+                 df_subj = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == subject].copy()
+                 # Skip diagnosis if dataframe is empty for the subject (e.g., all invalid)
+                 if df_subj.empty:
+                      st.warning(f"  {subject}: 沒有有效數據進行診斷。", icon="⚠️")
+                      # Add a placeholder report?
+                      temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 沒有有效數據可供診斷。*\n"
+                      # Create empty df with expected columns to avoid concat errors later?
+                      # Or handle this during results display. Let's handle in display.
+                      all_diagnosed_dfs.append(None) # Append None to signal skip
+                      continue
 
-                         temp_report_dict[subject] = final_report_for_subject # Store the final version
-                         all_diagnosed_dfs.append(df_subj_diagnosed) # Append the diagnosed dataframe
-                         st.write(f"    {subject} 科診斷處理完成。") # Updated message
+                 # Fill NaN difficulties with a default (e.g., average ability) before diagnosis? Or handle in diagnostic funcs.
+                 # Let's assume diagnostic functions can handle potential NaNs in difficulty for invalid items.
+                 # If not, fill here:
+                 # final_theta = final_thetas_local.get(subject, 0) # Get final theta
+                 # df_subj['question_difficulty'].fillna(final_theta, inplace=True)
 
-                     else:
-                         st.error(f"  {subject} 科診斷未返回預期結果。")
-                         temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 診斷未成功執行或未返回結果。*\n"
+                 time_pressure = time_pressure_map.get(subject, False)
+                 subj_results, subj_report, df_subj_diagnosed = None, None, None
+
+                 try:
+                     if subject == 'Q':
+                         subj_results, subj_report, df_subj_diagnosed = run_q_diagnosis_processed(df_subj, time_pressure)
+                     elif subject == 'DI':
+                         subj_results, subj_report, df_subj_diagnosed = run_di_diagnosis_processed(df_subj, time_pressure)
+                     elif subject == 'V':
+                         subj_results, subj_report, df_subj_diagnosed = run_v_diagnosis_processed(df_subj, time_pressure, v_avg_time_per_type)
+                 except Exception as diag_err:
+                      st.error(f"  {subject} 科診斷函數執行時出錯: {diag_err}")
+                      subj_report = f"**{subject} 科診斷報告**\n\n* 診斷過程中發生錯誤: {diag_err}*\n"
+                      df_subj_diagnosed = df_subj # Return original data for the subject on error
+                      # Mark report dict and df list to indicate failure? Keep processing others.
 
 
-                 # Combine results *after* loop
-                 valid_diagnosed_dfs = [df for df in all_diagnosed_dfs if df is not None and not df.empty]
-                 if valid_diagnosed_dfs:
-                      st.session_state.processed_df = pd.concat(valid_diagnosed_dfs, ignore_index=True)
-                      st.session_state.report_dict = temp_report_dict
-                      st.session_state.final_thetas = final_thetas_local # Store thetas from sim
-                      st.session_state.theta_plots = all_theta_plots # NEW: Store the plots in session state
-                      st.write("所有科目診斷完成。")
+                 if subj_report is not None and df_subj_diagnosed is not None:
+                     # --- Attempt OpenAI Summarization --- #
+                     final_report_for_subject = subj_report # Start with the original
+                     # Retrieve api key (it's loaded near the top)
+                     if st.session_state.openai_api_key and subj_report and "發生錯誤" not in subj_report and "未成功執行" not in subj_report:
+                         # st.write(f"    嘗試使用 OpenAI 整理 {subject} 科報告...") # Removed detailed write
+                         summarized_report = summarize_report_with_openai(subj_report, st.session_state.openai_api_key)
+                         if summarized_report != subj_report: # Check if summarization actually changed something
+                             # st.write(f"      -> {subject} 科報告已由 AI 整理。") # Removed detailed write
+                             final_report_for_subject = summarized_report
+                         # else: # No need to write anything if no change
+                             # st.write(f"      -> {subject} 科報告整理失敗或無需整理。")
+                     # elif not st.session_state.openai_api_key:
+                          # st.info(f"    未提供 OpenAI API Key，跳過 {subject} 科報告整理。") # Removed, less verbose
+
+                     temp_report_dict[subject] = final_report_for_subject # Store the final version
+                     all_diagnosed_dfs.append(df_subj_diagnosed) # Append the diagnosed dataframe
+                     # st.write(f"    {subject} 科診斷處理完成。") # Removed detailed write
+
                  else:
-                      st.error("所有科目均未能成功診斷或無數據。")
-                      st.session_state.processed_df = None # Ensure no stale data
-                      st.session_state.report_dict = temp_report_dict # Still show error reports
-                      st.session_state.theta_plots = {} # Clear plots
-                      analysis_success = False
+                     st.error(f"  {subject} 科診斷未返回預期結果。")
+                     temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 診斷未成功執行或未返回結果。*\n"
 
 
-            except Exception as e:
-                st.error(f"診斷過程中發生未預期錯誤: {e}")
-                # st.code(traceback.format_exc()) # Optional debug
-                analysis_success = False
+             # Combine results *after* loop
+             valid_diagnosed_dfs = [df for df in all_diagnosed_dfs if df is not None and not df.empty]
+             if valid_diagnosed_dfs:
+                  st.session_state.processed_df = pd.concat(valid_diagnosed_dfs, ignore_index=True)
+                  st.session_state.report_dict = temp_report_dict
+                  st.session_state.final_thetas = final_thetas_local # Store thetas from sim
+                  st.session_state.theta_plots = all_theta_plots # NEW: Store the plots in session state
+                  # st.write("所有科目診斷完成。") # Removed detailed write
+                  progress_bar.progress(current_step / total_steps) # Mark final step complete
+             else:
+                  st.error("所有科目均未能成功診斷或無數據。")
+                  st.session_state.processed_df = None # Ensure no stale data
+                  st.session_state.report_dict = temp_report_dict # Still show error reports
+                  st.session_state.theta_plots = {} # Clear plots
+                  analysis_success = False
+                  status_text.text(f"步驟 {current_step}/{total_steps}: 診斷完成，但無有效結果。")
 
-        # --- Final Status Update ---
-        if analysis_success and st.session_state.processed_df is not None:
-             analysis_status.update(label="分析成功完成！", state="complete", expanded=False)
-             st.session_state.diagnosis_complete = True # Mark diagnosis as done
-             st.session_state.error_message = None
-             st.balloons() # Celebrate success
-        else:
-             analysis_status.update(label="分析過程中斷或失敗。", state="error", expanded=True)
-             st.session_state.diagnosis_complete = False # Ensure it's False on error
-             st.session_state.error_message = "分析未能成功完成，請檢查上方錯誤訊息。"
-             st.session_state.theta_plots = {} # Clear plots on error
+
+        except Exception as e:
+            st.error(f"診斷過程中發生未預期錯誤: {e}")
+            # st.code(traceback.format_exc()) # Optional debug
+            analysis_success = False
+            status_text.text(f"步驟 {current_step}/{total_steps}: 執行診斷時出錯。") # Update status on error
+
+    # --- Final Status Update ---
+    # Use st.session_state.processed_df existence check directly
+    if analysis_success and st.session_state.processed_df is not None:
+         # analysis_status.update(label="分析成功完成！", state="complete", expanded=False) # Removed status block update
+         status_text.text("分析成功完成！") # Update final status text
+         st.session_state.diagnosis_complete = True # Mark diagnosis as done
+         st.session_state.error_message = None
+         st.balloons() # Celebrate success
+    else:
+         # analysis_status.update(label="分析過程中斷或失敗。", state="error", expanded=True) # Removed status block update
+         # Error message already set in status_text during the step failure
+         if analysis_success and st.session_state.processed_df is None:
+             # Handle the case where analysis technically succeeded but produced no df
+             status_text.error("分析完成但未產生有效數據，請檢查輸入或診斷邏輯。")
+         elif not analysis_success:
+              # If analysis failed earlier, the status_text should already reflect the error step
+              # Optionally add a generic error message if it's still the default text
+              if "準備開始分析" in status_text.text("") : # Check if it's still initial text
+                  status_text.error("分析過程中斷或失敗，請檢查上方錯誤訊息。")
+
+         st.session_state.diagnosis_complete = False # Ensure it's False on error
+         st.session_state.error_message = "分析未能成功完成，請檢查上方錯誤訊息。"
+         st.session_state.theta_plots = {} # Clear plots on error
+
+    # Explicitly clear the progress bar maybe? Or leave it at 100% / error state.
+    # Leaving it might be fine.
 
 
 # --- Display Results Section ---
