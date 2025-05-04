@@ -1026,9 +1026,10 @@ st.divider() # Add a visual separator
 any_validation_errors = bool(validation_errors_q) or bool(validation_errors_v) or bool(validation_errors_di)
 
 # Display the button differently based on whether data is ready AND valid
-if df_combined_input is not None and not any_validation_errors:
-    # Case 1: Data is combined and NO validation errors exist - Enable button
-    if st.button("🔍 開始分析", type="primary", key="analyze_button"):
+# --- UPDATED Condition: Check if ALL three dfs are valid AND no errors ---
+if df_q is not None and df_v is not None and df_di is not None and not any_validation_errors:
+    # Case 1: All three subjects are loaded, valid, and ready - Enable button
+    if st.button("🔍 開始分析", type="primary", key="analyze_button_ready"):
         st.session_state.analysis_run = True
         # Reset previous results when starting new analysis
         st.session_state.report_dict = {}
@@ -1036,21 +1037,29 @@ if df_combined_input is not None and not any_validation_errors:
         st.session_state.final_thetas = {}
     else:
         # If button not clicked in this run, keep analysis_run as False unless it was already True
-        # This prevents analysis from running just on widget interaction after first run
-        # st.session_state.analysis_run = st.session_state.get('analysis_run', False) # Keep existing state if button not clicked
         pass # No need to explicitly set to false, just don't set to true
 
-elif any_data_attempted:
-    # Case 2: Data was attempted, but either failed combination OR had validation errors
-    st.error("數據驗證失敗或無法合併，請修正上方標示的錯誤後再試。")
-    st.button("🔍 開始分析", type="primary", disabled=True, key="analyze_button_disabled_invalid") # Disable button
+elif any_validation_errors:
+    # Case 2: Data was loaded/attempted, but validation errors exist
+    st.error("部分科目數據驗證失敗，請修正上方標示的錯誤後再試。")
+    st.button("🔍 開始分析", type="primary", disabled=True, key="analyze_button_disabled_validation_error") # Disable button
 
-else: # Case 3: No data was ever loaded or pasted
-    st.info("請在上方分頁中為至少一個科目上傳或貼上資料。")
-    st.button("🔍 開始分析", type="primary", disabled=True, key="analyze_button_disabled_no_data") # Disable button
+else: # Case 3: No data was ever loaded OR not all subjects have valid data
+    # Display a more specific message if some data was attempted but not all are ready
+    subjects_loaded = [subj for subj, df in [('Q', df_q), ('V', df_v), ('DI', df_di)] if df is not None]
+    if any_data_attempted: # Some data was loaded/pasted, but not all three are valid
+        st.warning(f"請確保已為 Q, V, DI 三個科目都上傳或貼上**有效**的資料。目前已加載科目: {subjects_loaded}", icon="⚠️")
+    else: # No data was ever loaded/pasted
+        st.info("請在上方分頁中為 Q, V, DI 三個科目上傳或貼上資料。")
+    st.button("🔍 開始分析", type="primary", disabled=True, key="analyze_button_disabled_incomplete_data") # Disable button
 
-# --- Simulation, Processing, Diagnosis, and Output Tabs (Conditional Execution) ---
+# --- END Analysis Trigger Button Logic ---
+
+
+# --- Run Analysis Block ---
 if st.session_state.analysis_run and df_combined_input is not None:
+    # Reset error message at the start of analysis
+    st.session_state.error_message = None
 
     st.header("2. 執行 IRT 模擬與診斷") # Combine headers
     all_simulation_histories = {} # Store histories per subject
