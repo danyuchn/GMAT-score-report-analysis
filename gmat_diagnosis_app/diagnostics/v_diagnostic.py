@@ -461,10 +461,11 @@ def _calculate_first_third_averages(df):
 
     return first_third_avg_time
 
-# --- Main V Diagnosis Runner ---
+# --- Main V Diagnosis Entry Point ---
 
 def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
     """
+    DEPRECATED - Logic moved to run_v_diagnosis_processed.
     Runs the diagnostic analysis specifically for the Verbal section.
     PRIORITIZES the 'is_manually_invalid' flag.
 
@@ -478,14 +479,41 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
         str: Summary report string for V.
         pd.DataFrame: Processed V DataFrame with diagnostic columns.
     """
+    # This function's core logic is now in run_v_diagnosis_processed
+    # It should ideally not be called directly anymore.
+    print("WARNING: Calling deprecated run_v_diagnosis. Preprocessing should happen upstream.")
+
+    # Simulate the preprocessing step here for compatibility, although it shouldn't be needed
+    time_pressure_status_map = {'V': v_time_pressure_status} # Use passed-in pressure
+    from gmat_diagnosis_app.preprocess_helpers import suggest_invalid_questions
+    df_v_preprocessed = suggest_invalid_questions(df_v_raw, time_pressure_status_map)
+
+    return run_v_diagnosis_processed(df_v_preprocessed, v_time_pressure_status, v_avg_time_per_type)
+
+
+def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time_per_type):
+    """
+    Runs the diagnostic analysis for Verbal using a preprocessed DataFrame.
+    Assumes 'is_invalid' column reflects the final status after user review.
+
+    Args:
+        df_v_processed (pd.DataFrame): DataFrame with Verbal responses, preprocessed with 'is_invalid'.
+        v_time_pressure_status (bool): Time pressure status for V.
+        v_avg_time_per_type (dict): Average times per type calculated by the main module.
+
+    Returns:
+        dict: Dictionary containing V diagnosis results.
+        str: Summary report string for V.
+        pd.DataFrame: Processed V DataFrame with diagnostic columns.
+    """
     print("  Running Verbal Diagnosis...")
     v_diagnosis_results = {}
 
-    if df_v_raw.empty:
+    if df_v_processed.empty:
         print("    No V data provided. Skipping V diagnosis.")
         return {}, "Verbal (V) 部分無數據可供診斷。", pd.DataFrame()
 
-    df_v = df_v_raw.copy()
+    df_v = df_v_processed.copy() # Use the processed dataframe
 
     # --- Initialize/Prepare Columns ---
     # Ensure necessary columns exist
@@ -504,16 +532,11 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
         print("    Warning (V Diagnosis): 'is_correct' column missing.")
         df_v['is_correct'] = True # Assume correct if missing?
 
-    # --- START: Apply Manual Invalid Flag First ---
-    if 'is_manually_invalid' in df_v.columns:
-        # Initialize 'is_invalid' directly from the manual flag
-        df_v['is_invalid'] = df_v['is_manually_invalid'].fillna(False).astype(bool)
-        print(f"    Initialized 'is_invalid' based on manual flags. Count: {df_v['is_invalid'].sum()}")
-    else:
-        # If manual flag column doesn't exist, initialize is_invalid to False
-        print("    Warning (V Diagnosis): 'is_manually_invalid' column not found. Initializing 'is_invalid' to False.")
-        df_v['is_invalid'] = False
-    # --- END: Apply Manual Invalid Flag First ---
+    # --- Manual Invalid Flag is handled in preprocessing ---
+    # Ensure 'is_invalid' exists from preprocessing
+    if 'is_invalid' not in df_v.columns:
+        print("ERROR: 'is_invalid' column missing in df_v_processed!")
+        df_v['is_invalid'] = False # Add default if missing
 
     # --- Initialize other diagnostic columns ---
     # Ensure diagnostic_params is initialized correctly as list of lists
@@ -523,35 +546,22 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
         # Ensure existing values are lists
         df_v['diagnostic_params'] = df_v['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, tuple, set)) else ([] if pd.isna(x) else [x]))
         
+    # Initialize required columns if they might be missing after preprocessing
     if 'overtime' not in df_v.columns: df_v['overtime'] = False
     if 'suspiciously_fast' not in df_v.columns: df_v['suspiciously_fast'] = False
     if 'is_sfe' not in df_v.columns: df_v['is_sfe'] = False
     if 'time_performance_category' not in df_v.columns: df_v['time_performance_category'] = ''
+    # Ensure is_relatively_fast is initialized for Ch5
     if 'is_relatively_fast' not in df_v.columns: df_v['is_relatively_fast'] = False # Initialize needed for Ch5 check
 
-    # --- Apply Automatic Invalid Rules (Hasty/Abandoned) ONLY where not manually invalid ---
-    # Define the mask for rows where automatic rules *can* be applied
-    eligible_for_auto_rules_mask = ~df_v['is_invalid']
+    # --- REMOVED: Automatic invalid rule application is done in preprocessing ---
 
-    # Apply V-Doc Ch1 automatic invalid rules (time < 1.0 min)
-    # Combines hasty and abandoned logic as per doc's primary rule illustration
-    auto_invalid_time_mask = (
-        df_v['question_time'].notna() &
-        (df_v['question_time'] < V_INVALID_TIME_HASTY_MIN) &
-        eligible_for_auto_rules_mask # Apply only where not manually invalid
-    )
-
-    num_auto_invalid = auto_invalid_time_mask.sum()
-    if num_auto_invalid > 0:
-        print(f"    Marking {num_auto_invalid} additional V questions as invalid based on automatic time rules (< {V_INVALID_TIME_HASTY_MIN} min).")
-        df_v.loc[auto_invalid_time_mask, 'is_invalid'] = True
-
-    # --- Add tag to ALL rows finally marked as invalid (manual or auto) ---
-    final_invalid_mask = df_v['is_invalid']
-    if final_invalid_mask.any():
-        print(f"    Adding/Ensuring '{INVALID_DATA_TAG_V}' tag for {final_invalid_mask.sum()} invalid rows.")
+    # --- Add Tag based on FINAL 'is_invalid' status --- 
+    final_invalid_mask_v = df_v['is_invalid']
+    if final_invalid_mask_v.any(): # Use the calculated final mask
+        print(f"    Adding/Ensuring '{INVALID_DATA_TAG_V}' tag for {final_invalid_mask_v.sum()} invalid V rows.")
         # Use .loc for safe access and modification
-        for idx in df_v.index[final_invalid_mask]:
+        for idx in df_v.index[final_invalid_mask_v]:
             current_list = df_v.loc[idx, 'diagnostic_params']
             # Ensure it's a list
             if not isinstance(current_list, list):
@@ -562,22 +572,22 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
             # Assign back using .loc
             df_v.loc[idx, 'diagnostic_params'] = current_list
             
-    num_invalid_v_total = df_v['is_invalid'].sum()
+    num_invalid_v_total = df_v['is_invalid'].sum() # Count from the final column
     print(f"    Finished V invalid marking. Total invalid count: {num_invalid_v_total}")
     v_diagnosis_results['invalid_count'] = num_invalid_v_total # Store invalid count
 
-    # --- Filter out invalid data for subsequent analysis (Chapters 2-7) ---
+    # --- Filter out invalid data for subsequent analysis (Chapters 2-7) --- 
     # Store the full dataframe before filtering for final return
     df_v_processed_full = df_v.copy()
     df_v_valid = df_v[~df_v['is_invalid']].copy() # More robust filtering using boolean indexing
-
+    
     if df_v_valid.empty:
         print("    No V data remaining after excluding invalid entries. Skipping further V diagnosis.")
         # Generate minimal report
         minimal_report = _generate_v_summary_report(v_diagnosis_results) # Function should handle empty results
         return v_diagnosis_results, minimal_report, df_v_processed_full
 
-    # --- Chapter 1: Calculate Prerequisites for Invalid Data Marking ---
+    # --- Chapter 1: Calculate Prerequisites for Overtime Logic --- 
     total_number_of_questions = 0
     if 'question_position' in df_v.columns and not df_v['question_position'].empty:
          # Use max() safely, handle potential non-numeric or all-NaN cases
@@ -588,12 +598,12 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
 
     print(f"DEBUG: Total number of V questions based on position: {total_number_of_questions}")
 
-    first_third_avg_time_per_type = _calculate_first_third_averages(df_v) # Needs pos, type, time
+    # --- REMOVED: first_third_avg calculation (not needed for simple V rule) ---
 
-    # Calculate RC group info needed for hasty check and later overtime checks
+    # Calculate RC group info needed for overtime checks
     df_v = _identify_rc_groups(df_v) # Needs pos, type. Adds 'rc_group_id'
     # Add group size after identifying groups
-    if 'rc_group_id' in df_v.columns:
+    if 'rc_group_id' in df_v.columns and df_v['rc_group_id'].notna().any(): # Check if not all NaN
         group_sizes_map = df_v.dropna(subset=['rc_group_id']).groupby('rc_group_id').size()
         df_v['rc_group_size'] = df_v['rc_group_id'].map(group_sizes_map)
     else:
@@ -601,102 +611,18 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
 
     df_v = _calculate_rc_times(df_v) # Needs group_id, pos, time. Adds 'rc_group_total_time', 'rc_reading_time'
 
-    # --- Chapter 1: Implement Invalid Data Marking Logic ---
-    # Initialize 'is_invalid' column if it doesn't exist
-    if 'is_invalid' not in df_v.columns:
-        df_v['is_invalid'] = False
-    else:
-        # Ensure it's boolean if it exists
-        df_v['is_invalid'] = df_v['is_invalid'].fillna(False).astype(bool)
-
-    num_invalid_v_questions = 0 # Initialize counter
-
-    if total_number_of_questions > 0 and v_time_pressure_status: # Only mark invalid if time pressure is TRUE
-        last_third_start_pos = math.ceil(total_number_of_questions * 2 / 3) + 1 # Start of the last third
-        print(f"DEBUG: Checking for invalid questions from position {last_third_start_pos} onwards (Time Pressure is TRUE).")
-
-        # Create masks for conditions within the last third
-        last_third_mask = df_v['question_position'] >= last_third_start_pos
-
-        # Abandoned condition
-        abandoned_mask = (df_v['question_time'] < V_INVALID_TIME_ABANDONED) & last_third_mask
-
-        # Hasty condition 1: time < 1.0 min
-        hasty_time_mask = (df_v['question_time'] < V_INVALID_TIME_HASTY_MIN) & last_third_mask
-
-        # Hasty condition 2 (CR): time < 0.5 * first_third_avg
-        hasty_cr_mask = pd.Series(False, index=df_v.index) # Initialize with False
-        first_third_cr_avg = first_third_avg_time_per_type.get('CR', None)
-        if first_third_cr_avg is not None and first_third_cr_avg > 0:
-            hasty_cr_mask = (
-                (df_v['question_type'] == 'CR') & \
-                (df_v['question_time'] < first_third_cr_avg * 0.5) & \
-                last_third_mask
-            )
-        else:
-            print("DEBUG: First third CR average time not available or zero, skipping hasty CR check.")
-
-
-        # Hasty condition 3 (RC): group_time < 0.5 * (first_third_avg * group_size)
-        hasty_rc_mask = pd.Series(False, index=df_v.index) # Initialize with False
-        first_third_rc_avg = first_third_avg_time_per_type.get('RC', None)
-        if (first_third_rc_avg is not None and
-            first_third_rc_avg > 0 and
-            'rc_group_total_time' in df_v.columns and
-            'rc_group_size' in df_v.columns):
-            # Apply only where rc_group_total_time and rc_group_size are valid
-            # Create mask for valid RC group data
-            valid_rc_check_mask = (
-                df_v['rc_group_total_time'].notna() &
-                df_v['rc_group_size'].notna() &
-                (df_v['rc_group_size'] > 0)
-            )
-
-            # Create mask for hasty RC questions
-            hasty_rc_mask = (
-                (df_v['question_type'] == 'RC') & \
-                (df_v['rc_group_total_time'] < (first_third_rc_avg * df_v['rc_group_size'] * 0.5)) & \
-                valid_rc_check_mask & \
-                last_third_mask
-            )
-        else:
-            print("DEBUG: First third RC average time, group time, or group size not available/valid, skipping hasty RC check.")
-
-        # Combine Hasty conditions
-        hasty_combined_mask = hasty_time_mask | hasty_cr_mask | hasty_rc_mask
-
-        # Final Invalid Mask: (Abandoned OR Hasty) AND in last third AND time pressure is True
-        invalid_mask = (abandoned_mask | hasty_combined_mask) & last_third_mask
-
-        # Apply the mask to set 'is_invalid' column
-        df_v.loc[invalid_mask, 'is_invalid'] = True
-
-        # Count the number of invalid questions marked
-        num_invalid_v_questions = df_v['is_invalid'].sum()
-        if num_invalid_v_questions > 0:
-             print(f"    Marked {num_invalid_v_questions} questions as invalid due to haste/abandonment under time pressure.")
-             # Optional: Print indices of invalid questions for debugging
-             # print(f"    Invalid question indices: {df_v[df_v['is_invalid']].index.tolist()}")
-    elif not v_time_pressure_status:
-        print("DEBUG: Time pressure is FALSE, skipping invalid data marking based on haste/abandonment.")
-    else: # total_number_of_questions is 0
-        print("DEBUG: Total number of questions is 0, skipping invalid data marking.")
-
-
-    # --- Chapter 1 Logic Adjustments: CR Overtime & RC flags (Continue after invalid marking) ---
-    # RC group info and times already calculated above
-
+    # --- Chapter 1 Logic Adjustments: CR Overtime & RC flags --- 
     # Initialize/Reset 'overtime' column
     df_v['overtime'] = False
     df_v['rc_reading_overtime'] = False # Initialize RC flags
-    df_v['rc_single_q_overtime'] = False
+    if 'rc_single_q_overtime' not in df_v.columns: df_v['rc_single_q_overtime'] = False # Ensure column exists
     df_v['reading_comprehension_barrier_inquiry'] = False # Initialize Barrier flag
 
     # Determine CR Overtime Threshold based on pressure
     cr_overtime_threshold = CR_OVERTIME_THRESHOLDS[v_time_pressure_status]
     print(f"DEBUG: CR Overtime Threshold set to {cr_overtime_threshold} min based on pressure={v_time_pressure_status}")
 
-    # Apply Overtime Logic (CR and RC)
+    # Apply Overtime Logic (CR and RC) - Apply to the *full* df but skip invalid rows
     rc_target_times = RC_GROUP_TARGET_TIMES[v_time_pressure_status]
     if 'rc_group_id' in df_v.columns: # Ensure column exists
         for index, row in df_v.iterrows():
@@ -771,25 +697,29 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
         print("Warning: 'rc_group_id' not found or other RC prerequisite missing, cannot calculate detailed RC overtime.")
 
     # --- Chapter 1 Global Rule: Mark Suspiciously Fast --- 
-    df_v['suspiciously_fast'] = False # Initialize column
+    if 'suspiciously_fast' not in df_v.columns: df_v['suspiciously_fast'] = False # Ensure column exists
     print(f"DEBUG: Calculating 'suspiciously_fast' flag using overall avg times: {v_avg_time_per_type}")
     for q_type, avg_time in v_avg_time_per_type.items():
         if avg_time is not None and avg_time > 0 and 'question_time' in df_v.columns:
-             # Ensure we only compare valid, non-NaN question times
+             # Ensure we only compare valid, non-NaN question times (also exclude invalid)
              valid_time_mask = df_v['question_time'].notna()
+             # Ensure we only mark valid questions as suspiciously fast
+             not_invalid_mask = ~df_v['is_invalid'] 
              suspicious_mask = (df_v['question_type'] == q_type) & \
                                (df_v['question_time'] < (avg_time * 0.5)) & \
-                               valid_time_mask
+                               valid_time_mask & \
+                               not_invalid_mask # Add this condition
              df_v.loc[suspicious_mask, 'suspiciously_fast'] = True
              # Debug print count for this type
              # print(f"DEBUG: Marked {suspicious_mask.sum()} questions as suspiciously_fast for type {q_type} (Threshold < {avg_time * 0.5:.2f})")
         else:
              print(f"DEBUG: Skipping suspiciously_fast calculation for type {q_type} due to missing/invalid avg_time ({avg_time}) or missing 'question_time' column.")
 
-    # --- Apply Chapter 3 Diagnostic Rules (Uses calculated 'overtime') ---
+    # --- Apply Chapter 3 Diagnostic Rules (Uses calculated 'overtime' AND 'is_invalid') ---
     # Calculate max correct difficulty per skill (needed for SFE check)
     # IMPORTANT: Use only VALID data for calculating max correct difficulty
-    df_correct_v = df_v[(df_v['is_correct'] == True) & (df_v['is_invalid'] == False)].copy()
+    # Use df_v_valid which is already filtered
+    df_correct_v = df_v_valid[df_v_valid['is_correct'] == True].copy()
     max_correct_difficulty_per_skill_v = {}
     if not df_correct_v.empty and 'question_fundamental_skill' in df_correct_v.columns and 'question_difficulty' in df_correct_v.columns:
         # Ensure difficulty column is numeric before grouping
@@ -809,7 +739,7 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
     # --- END DEBUG ---
 
     # Apply the rules - this function modifies df_v in place
-    df_v = _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill_v, v_avg_time_per_type)
+    df_v = _apply_ch3_diagnostic_rules(df_v_processed_full, max_correct_difficulty_per_skill_v, v_avg_time_per_type) # Apply to the full df
 
     # --- DEBUG: Print columns AFTER applying rules ---
     print("DEBUG (run_v_diagnosis): Columns in df_v AFTER _apply_ch3_diagnostic_rules:")
@@ -876,14 +806,9 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
     # --- Populate Chapter 1 Results ---
     v_diagnosis_results['chapter_1'] = {
         'time_pressure_status': v_time_pressure_status,
-        'invalid_questions_excluded': num_invalid_v_questions
+        'invalid_questions_excluded': num_invalid_v_total
         # Add other relevant Ch1 metrics if calculated (e.g., total time, avg time)
     }
-
-    # NO LONGER USE v_invalid_count from parameters
-    # if v_invalid_count > num_invalid_v_questions: # <--- 確認這行是註解狀態
-    #     print(f"    Using provided invalid question count ({v_invalid_count}) for reporting instead of calculated value ({num_invalid_v_questions}).") # <--- 確認這行是註解狀態
-    #     v_diagnosis_results['chapter_1']['invalid_questions_excluded'] = v_invalid_count # <--- 確認這行是註解狀態
 
     print("  Populated Chapter 1 V results.")
 

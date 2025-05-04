@@ -16,9 +16,22 @@ if project_root not in sys.path:
 import streamlit as st
 from io import StringIO # Use io.StringIO directly
 from gmat_diagnosis_app import irt_module as irt # Import using absolute path
-from gmat_diagnosis_app.diagnosis_module import run_diagnosis # Import using absolute path
+# from gmat_diagnosis_app.diagnosis_module import run_diagnosis # Remove old import
 import os # For environment variables
 import openai # Import OpenAI library
+from gmat_diagnosis_app.preprocess_helpers import suggest_invalid_questions # Import new preprocessor
+# Import preprocessing constants
+from gmat_diagnosis_app.preprocess_helpers import (
+    MAX_ALLOWED_TIME_Q, TOTAL_QUESTIONS_Q, Q_FAST_END_THRESHOLD_MINUTES, 
+    Q_TIME_DIFF_PRESSURE_THRESHOLD, LAST_THIRD_FRACTION_Q,
+    MAX_ALLOWED_TIME_DI, TOTAL_QUESTIONS_DI, DI_TIME_PRESSURE_THRESHOLD_MINUTES,
+    DI_INVALID_TIME_THRESHOLD_MINUTES, LAST_THIRD_FRACTION_DI,
+    V_INVALID_TIME_HASTY_MIN, TOTAL_QUESTIONS_V
+)
+# Import the updated diagnostic functions
+from gmat_diagnosis_app.diagnostics.v_diagnostic import run_v_diagnosis_processed
+from gmat_diagnosis_app.diagnostics.di_diagnostic import run_di_diagnosis_processed
+from gmat_diagnosis_app.diagnostics.q_diagnostic import run_q_diagnosis_processed
 
 # --- Validation Rules and Messages ---
 # Based on provided testset CSVs, case and space sensitive
@@ -413,6 +426,45 @@ with tab_q:
                     # Define desired column order, putting manual invalid first
                     q_column_order = ['is_manually_invalid'] + [col for col in temp_df_q.columns if col != 'is_manually_invalid']
                     
+                    # --- Apply preprocessing to detect invalid responses ---
+                    # Calculate time pressure for Q section
+                    if 'question_time' in temp_df_q.columns:
+                        # Simple time pressure check for preview (can be adjusted based on your specific logic)
+                        q_time_values = pd.to_numeric(temp_df_q['question_time'], errors='coerce')
+                        time_pressure_q = (q_time_values.max() - q_time_values.min() > Q_TIME_DIFF_PRESSURE_THRESHOLD) if len(q_time_values) > 0 else False
+                    else:
+                        time_pressure_q = False
+                    
+                    # Create time pressure map for suggest_invalid_questions
+                    temp_time_pressure_map = {'Q': time_pressure_q}
+                    
+                    # Add Subject column for preprocessing
+                    temp_df_q['Subject'] = 'Q'
+                    
+                    # Rename necessary columns for preprocessing
+                    temp_rename_map = {}
+                    if 'Response Time (Minutes)' in temp_df_q.columns:
+                        temp_rename_map['Response Time (Minutes)'] = 'question_time'
+                    if 'Question' in temp_df_q.columns:
+                        temp_rename_map['Question'] = 'question_position'
+                    elif '\ufeffQuestion' in temp_df_q.columns:
+                        temp_rename_map['\ufeffQuestion'] = 'question_position'
+                    
+                    # Apply temporary rename for preprocessing
+                    temp_preprocessing_df = temp_df_q.copy()
+                    if temp_rename_map:
+                        temp_preprocessing_df.rename(columns=temp_rename_map, inplace=True)
+                    
+                    # Apply suggestion logic
+                    try:
+                        processed_df_q = suggest_invalid_questions(temp_preprocessing_df, temp_time_pressure_map)
+                        # Update is_manually_invalid to match auto-suggested values
+                        if 'is_auto_suggested_invalid' in processed_df_q.columns:
+                            temp_df_q['is_manually_invalid'] = processed_df_q['is_auto_suggested_invalid']
+                    except Exception as preprocess_err:
+                        st.warning(f"自動檢測無效題目時出錯，將使用預設值: {preprocess_err}")
+                    # --- End preprocessing ---
+                    
                     # Use data_editor for viewing all data and allowing edits
                     edited_temp_df_q = st.data_editor(
                         temp_df_q,
@@ -423,8 +475,8 @@ with tab_q:
                         # --- Add column config for the new checkbox ---
                         column_config={
                             "is_manually_invalid": st.column_config.CheckboxColumn(
-                                "手動標記無效?",
-                                help="勾選此框將此題標記為因倉促/慌亂而無效，將優先於自動規則。",
+                                "是否草率做題？ (手動標記)",
+                                help="勾選此框表示您手動判斷此題為無效（例如因倉促/慌亂）。此標記將優先於系統自動建議。",
                                 default=False,
                             )
                         }
@@ -571,6 +623,37 @@ with tab_v:
                     # Define desired column order, putting manual invalid first
                     v_column_order = ['is_manually_invalid'] + [col for col in temp_df_v.columns if col != 'is_manually_invalid']
                     
+                    # --- Apply preprocessing to detect invalid responses ---
+                    # Add Subject column for preprocessing
+                    temp_df_v['Subject'] = 'V'
+                    
+                    # Rename necessary columns for preprocessing
+                    temp_rename_map = {}
+                    if 'Response Time (Minutes)' in temp_df_v.columns:
+                        temp_rename_map['Response Time (Minutes)'] = 'question_time'
+                    if 'Question' in temp_df_v.columns:
+                        temp_rename_map['Question'] = 'question_position'
+                    elif '\ufeffQuestion' in temp_df_v.columns:
+                        temp_rename_map['\ufeffQuestion'] = 'question_position'
+                    
+                    # Apply temporary rename for preprocessing
+                    temp_preprocessing_df = temp_df_v.copy()
+                    if temp_rename_map:
+                        temp_preprocessing_df.rename(columns=temp_rename_map, inplace=True)
+                    
+                    # Create an empty time pressure map (V uses simpler logic)
+                    temp_time_pressure_map = {'V': False}  # V检测简单规则不依赖于时间压力状态
+                    
+                    # Apply suggestion logic
+                    try:
+                        processed_df_v = suggest_invalid_questions(temp_preprocessing_df, temp_time_pressure_map)
+                        # Update is_manually_invalid to match auto-suggested values
+                        if 'is_auto_suggested_invalid' in processed_df_v.columns:
+                            temp_df_v['is_manually_invalid'] = processed_df_v['is_auto_suggested_invalid']
+                    except Exception as preprocess_err:
+                        st.warning(f"自動檢測無效題目時出錯，將使用預設值: {preprocess_err}")
+                    # --- End preprocessing ---
+                    
                     edited_temp_df_v = st.data_editor(
                         temp_df_v,
                         key="editor_v",
@@ -580,8 +663,8 @@ with tab_v:
                         # --- Add column config for the new checkbox ---
                         column_config={
                             "is_manually_invalid": st.column_config.CheckboxColumn(
-                                "手動標記無效?",
-                                help="勾選此框將此題標記為因倉促/慌亂而無效，將優先於自動規則。",
+                                "是否草率做題？ (手動標記)",
+                                help="勾選此框表示您手動判斷此題為無效（例如因倉促/慌亂）。此標記將優先於系統自動建議。",
                                 default=False,
                             )
                         }
@@ -720,6 +803,45 @@ with tab_di:
                      # Define desired column order, putting manual invalid first
                      di_column_order = ['is_manually_invalid'] + [col for col in temp_df_di.columns if col != 'is_manually_invalid']
                      
+                     # --- Apply preprocessing to detect invalid responses ---
+                     # Add Subject column for preprocessing
+                     temp_df_di['Subject'] = 'DI'
+                     
+                     # Calculate time pressure for DI section
+                     if 'Response Time (Minutes)' in temp_df_di.columns:
+                         # Simple time pressure check for preview
+                         di_time_values = pd.to_numeric(temp_df_di['Response Time (Minutes)'], errors='coerce')
+                         time_pressure_di = (di_time_values.max() - di_time_values.min() > DI_TIME_PRESSURE_THRESHOLD_MINUTES) if len(di_time_values) > 0 else False
+                     else:
+                         time_pressure_di = False
+                     
+                     # Create time pressure map for suggest_invalid_questions
+                     temp_time_pressure_map = {'DI': time_pressure_di}
+                     
+                     # Rename necessary columns for preprocessing
+                     temp_rename_map = {}
+                     if 'Response Time (Minutes)' in temp_df_di.columns:
+                         temp_rename_map['Response Time (Minutes)'] = 'question_time'
+                     if 'Question' in temp_df_di.columns:
+                         temp_rename_map['Question'] = 'question_position'
+                     elif '\ufeffQuestion' in temp_df_di.columns:
+                         temp_rename_map['\ufeffQuestion'] = 'question_position'
+                     
+                     # Apply temporary rename for preprocessing
+                     temp_preprocessing_df = temp_df_di.copy()
+                     if temp_rename_map:
+                         temp_preprocessing_df.rename(columns=temp_rename_map, inplace=True)
+                     
+                     # Apply suggestion logic
+                     try:
+                         processed_df_di = suggest_invalid_questions(temp_preprocessing_df, temp_time_pressure_map)
+                         # Update is_manually_invalid to match auto-suggested values
+                         if 'is_auto_suggested_invalid' in processed_df_di.columns:
+                             temp_df_di['is_manually_invalid'] = processed_df_di['is_auto_suggested_invalid']
+                     except Exception as preprocess_err:
+                         st.warning(f"自動檢測無效題目時出錯，將使用預設值: {preprocess_err}")
+                     # --- End preprocessing ---
+                     
                      edited_temp_df_di = st.data_editor(
                          temp_df_di,
                          key="editor_di",
@@ -729,8 +851,8 @@ with tab_di:
                          # --- Add column config for the new checkbox ---
                         column_config={
                             "is_manually_invalid": st.column_config.CheckboxColumn(
-                                "手動標記無效?",
-                                help="勾選此框將此題標記為因倉促/慌亂而無效，將優先於自動規則。",
+                                "是否草率做題？ (手動標記)",
+                                help="勾選此框表示您手動判斷此題為無效（例如因倉促/慌亂）。此標記將優先於系統自動建議。",
                                 default=False,
                             )
                         }
@@ -877,10 +999,40 @@ if st.session_state.analysis_run and df_combined_input is not None:
 
     st.header("2. 執行 IRT 模擬與診斷") # Combine headers
     all_simulation_histories = {} # Store histories per subject
-    final_thetas = {}           # Store final theta per subject locally for this run
+    final_thetas_local = {}     # Store final theta per subject locally for this run
     df_final_for_diagnosis = None # Initialize
+    df_processed_after_suggestion = None # Initialize df after preprocessing
 
-    # --- IRT Simulation ---
+    # --- Calculate Time Pressure (using combined validated input data) ---
+    time_pressure_map = {}
+    try:
+        # Your existing time pressure calculation logic should go here
+        # Example placeholder:
+        st.write("Calculating Time Pressure...") # Placeholder
+        time_pressure_q = False # Replace with actual calculation for Q
+        time_pressure_v = False # Replace with actual calculation for V
+        time_pressure_di = False # Replace with actual calculation for DI
+        time_pressure_map = {'Q': time_pressure_q, 'V': time_pressure_v, 'DI': time_pressure_di}
+        st.write(f"Time Pressure Map: {time_pressure_map}") # Placeholder
+    except Exception as e:
+        st.error(f"計算時間壓力時發生錯誤: {e}")
+        st.session_state.analysis_run = False # Stop analysis
+        st.stop()
+
+    # --- Apply Preprocessing to Suggest Invalid Questions --- 
+    try:
+        st.write("應用預處理規則以建議無效題目...")
+        df_processed_after_suggestion = suggest_invalid_questions(df_combined_input, time_pressure_map)
+        st.write("預處理完成。建議的無效狀態已合併到 'is_invalid' 欄位。")
+        # Optional: Display a preview of the suggestions if helpful for debugging
+        # st.write("預處理後數據預覽 (前5行):")
+        # st.dataframe(df_processed_after_suggestion.head())
+    except Exception as e:
+        st.error(f"預處理建議無效題目時發生錯誤: {e}")
+        st.session_state.analysis_run = False # Stop analysis
+        st.stop()
+
+    # --- IRT Simulation --- 
     simulation_success = True
     # with st.spinner("正在執行 IRT 模擬..."): # Replace with st.status
     with st.status("執行 IRT 模擬...", expanded=True) as status:
@@ -928,7 +1080,9 @@ if st.session_state.analysis_run and df_combined_input is not None:
                     # Filter using the final column name 'is_correct'
                     # --- CORRECTED LOGIC HERE ---
                     # Directly get the 'question_position' values of incorrect answers
-                    wrong_positions = user_df_subj_sorted[user_df_subj_sorted['is_correct'] == False]['question_position'].tolist()
+                    # Use the dataframe AFTER preprocessing suggestion for simulation input
+                    user_df_subj_processed = df_processed_after_suggestion[df_processed_after_suggestion['Subject'] == subject].sort_values(by='question_position')
+                    wrong_positions = user_df_subj_processed[user_df_subj_processed['is_correct'] == False]['question_position'].tolist()
                     wrong_indices = wrong_positions # Assign to the variable expected by the simulation function
                     # --- END CORRECTION ---
                     st.write(f"  {subject}: 從用戶數據提取 {len(wrong_indices)} 個錯誤題目位置: {wrong_indices}")
@@ -948,8 +1102,8 @@ if st.session_state.analysis_run and df_combined_input is not None:
                     if history_df is not None and not history_df.empty:
                         all_simulation_histories[subject] = history_df
                         # Store final theta locally first
-                        final_theta_subj = history_df['theta_est_after_answer'].iloc[-1]
-                        final_thetas[subject] = final_theta_subj
+                        final_theta_subj = history_df['theta_est_after_answer'].iloc[-1] # Corrected variable name
+                        final_thetas_local[subject] = final_theta_subj # Corrected variable name
                         st.write(f"  {subject}: 模擬完成。最後 Theta 估計: {final_theta_subj:.3f}")
                     elif history_df is not None and history_df.empty:
                         st.warning(f"  {subject}: 模擬執行了，但未產生歷史記錄。")
@@ -965,7 +1119,7 @@ if st.session_state.analysis_run and df_combined_input is not None:
 
         if simulation_success and all_simulation_histories:
             status.update(label="IRT 模擬完成！", state="complete", expanded=False)
-            st.session_state.final_thetas = final_thetas # Store final thetas in session state
+            st.session_state.final_thetas = final_thetas_local # Store final thetas in session state
         elif simulation_success: # Banks created, but simulation failed for some reason
              status.update(label="IRT 模擬部分失敗或未產生結果", state="error", expanded=True)
              simulation_success = False # Ensure it's false
@@ -973,16 +1127,17 @@ if st.session_state.analysis_run and df_combined_input is not None:
 
     # --- Prepare Data for Diagnosis ---
     # st.header("2. 準備診斷數據 (結合用戶數據與模擬難度)") # Combined into header 2
-    if simulation_success:
+    if simulation_success and df_processed_after_suggestion is not None:
         # with st.spinner("準備診斷數據中..."): # Replace with st.status
         with st.status("準備診斷數據...", expanded=True) as status_prep:
             df_final_for_diagnosis_list = []
             processing_error = False
             for subject in loaded_subjects:
                 st.write(f"處理 {subject} 科目...")
-                user_df_subj = df_combined_input[df_combined_input['Subject'] == subject].copy()
+                # Use the dataframe that went through invalid suggestion
+                user_df_subj_processed = df_processed_after_suggestion[df_processed_after_suggestion['Subject'] == subject].copy()
                 sim_history_df = all_simulation_histories.get(subject)
-                final_theta = final_thetas.get(subject)
+                final_theta = final_thetas_local.get(subject)
 
                 if sim_history_df is None or sim_history_df.empty:
                     st.error(f"找不到 {subject} 科目的有效模擬結果，無法繼續。")
@@ -992,7 +1147,7 @@ if st.session_state.analysis_run and df_combined_input is not None:
                 sim_b_values = sim_history_df['b'].tolist()
                 
                 # Sort user data by position
-                user_df_subj_sorted = user_df_subj.sort_values(by='question_position')
+                user_df_subj_sorted = user_df_subj_processed.sort_values(by='question_position')
                 num_user_questions = len(user_df_subj_sorted)
                 num_sim_b = len(sim_b_values)
 
@@ -1022,6 +1177,12 @@ if st.session_state.analysis_run and df_combined_input is not None:
             if not processing_error and df_final_for_diagnosis_list:
                 df_final_for_diagnosis = pd.concat(df_final_for_diagnosis_list, ignore_index=True)
                 
+                # Add required columns if they were missing before diagnosis, using defaults
+                if 'question_fundamental_skill' not in df_final_for_diagnosis.columns:
+                    df_final_for_diagnosis['question_fundamental_skill'] = 'Unknown Skill'
+                if 'content_domain' not in df_final_for_diagnosis.columns:
+                    df_final_for_diagnosis['content_domain'] = 'Unknown Domain'
+
                 # st.subheader("診斷用數據預覽 (含模擬難度)") # Optional: Move preview here?
                 # st.dataframe(df_final_for_diagnosis.head())
                 st.write("所有科目數據準備完成。")
@@ -1034,10 +1195,13 @@ if st.session_state.analysis_run and df_combined_input is not None:
     # --- Diagnosis Section --- (Now uses df_final_for_diagnosis)
     diagnosis_expander = st.expander('診斷過程', expanded=False)
     
-    if df_final_for_diagnosis is not None: # Check if data prep was successful
+    if simulation_success and df_final_for_diagnosis is not None:
         # Define required columns immediately after confirming df_final_for_diagnosis exists
-        required_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'Subject']
-
+        # Ensure 'overtime' and 'is_invalid' might be needed by diagnosis functions
+        required_cols = ['question_position', 'is_correct', 'question_difficulty', 
+                         'question_time', 'question_type', 'question_fundamental_skill', 
+                         'Subject', 'is_invalid', 'overtime'] # Add overtime, is_invalid
+ 
         with diagnosis_expander:
             st.write("開始進行診斷分析...")
             progress_bar = st.progress(0, text="初始化診斷過程...")
@@ -1059,25 +1223,71 @@ if st.session_state.analysis_run and df_combined_input is not None:
             if missing_cols:
                 st.error(f"缺少必須的欄位: {', '.join(missing_cols)}")
                 st.info("請確保您的資料包含所有必要欄位。")
+                st.session_state.diagnosis_complete = False
             else:
                 # Run diagnosis if all required columns are present
-                progress_bar.progress(25, text="正在執行診斷分析...")
                 try:
-                    # Update this line to handle the tuple return value
-                    report_dict, df_processed = run_diagnosis(df_final_for_diagnosis) # Expect a tuple now
-                    
-                    # Update df_final_for_diagnosis with processed data containing new diagnostic fields
-                    df_final_for_diagnosis = df_processed
-                    
-                    progress_bar.progress(100, text="診斷分析完成！")
-                    # Store the report_dict in session state for later use
-                    st.session_state.report_dict = report_dict
-                    st.session_state.diagnosis_complete = True
-                    st.success("診斷分析成功完成。請選擇下方選項卡查看結果或原始資料。")
-                    # --- Store results in session state --- 
-                    st.session_state.report_dict = report_dict
-                    st.session_state.processed_df = df_processed # Store the processed dataframe
-                    # --- END Store results --- 
+                    # --- Run Diagnosis per Subject ---
+                    st.session_state.report_dict = {} # Reset results
+                    all_diagnosed_dfs = []
+                    diagnosis_success = True
+                    progress_bar.progress(25, text="開始分科診斷...") # Update progress
+
+                    # Calculate avg time per type needed for V diagnosis
+                    v_avg_time_per_type = {}
+                    if 'V' in loaded_subjects:
+                        df_v_temp = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == 'V']
+                        if not df_v_temp.empty and 'question_time' in df_v_temp.columns:
+                            v_avg_time_per_type = df_v_temp.groupby('question_type')['question_time'].mean().to_dict()
+
+                    # Calculate progress increment
+                    progress_increment = 70 / len(loaded_subjects) if loaded_subjects else 0
+                    current_progress = 25
+
+                    for subject in loaded_subjects:
+                        st.write(f"  執行 {subject} 科診斷...")
+                        progress_bar.progress(int(current_progress), text=f"正在診斷 {subject} 科...")
+                        df_subj = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == subject].copy()
+                        time_pressure = time_pressure_map.get(subject, False)
+
+                        subj_results, subj_report, df_subj_diagnosed = None, None, None
+
+                        if subject == 'Q':
+                            subj_results, subj_report, df_subj_diagnosed = run_q_diagnosis_processed(df_subj, time_pressure)
+                        elif subject == 'DI':
+                            subj_results, subj_report, df_subj_diagnosed = run_di_diagnosis_processed(df_subj, time_pressure)
+                        elif subject == 'V':
+                            subj_results, subj_report, df_subj_diagnosed = run_v_diagnosis_processed(df_subj, time_pressure, v_avg_time_per_type)
+
+                        if subj_results is not None and subj_report is not None and df_subj_diagnosed is not None:
+                            st.session_state.report_dict[subject] = subj_report
+                            all_diagnosed_dfs.append(df_subj_diagnosed)
+                            st.write(f"    {subject} 科診斷完成。")
+                        else:
+                            st.error(f"    {subject} 科診斷失敗或未返回預期結果。")
+                            diagnosis_success = False
+                            break # Stop if one subject fails
+                        current_progress += progress_increment
+
+
+                    if diagnosis_success and all_diagnosed_dfs:
+                        # Combine all diagnosed dataframes
+                        df_processed = pd.concat(all_diagnosed_dfs, ignore_index=True)
+                        st.session_state.processed_df = df_processed # Store combined processed df
+                    else:
+                        st.error("部分或全部科目診斷失敗。")
+                        diagnosis_success = False
+
+                    # --- End Run Diagnosis per Subject ---
+
+                    if diagnosis_success:
+                        progress_bar.progress(100, text="診斷分析完成！")
+                        st.session_state.diagnosis_complete = True
+                        st.success("診斷分析成功完成。請選擇下方選項卡查看結果或原始資料。")
+                    else:
+                         progress_bar.progress(100, text="診斷分析包含錯誤。")
+                         st.session_state.diagnosis_complete = False # Mark as incomplete due to errors
+
                 except Exception as e:
                     st.error(f"診斷過程中發生錯誤: {str(e)}")
                     import traceback
@@ -1202,7 +1412,7 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
         "question_time": st.column_config.NumberColumn("用時(分)", format="%.2f"),
         "estimated_ability": st.column_config.NumberColumn("能力估計(Theta)", format="%.2f"),
         "time_performance_category": st.column_config.TextColumn("時間表現分類"),
-        "is_sfe": st.column_config.CheckboxColumn("SFE?", help="是否為Special Focus Error"),
+        "is_sfe": st.column_config.CheckboxColumn("SFE?", help="是否為Special Focus Error (在已掌握技能範圍內做錯)"),
         "diagnostic_params_list": st.column_config.ListColumn("診斷標籤", help="初步診斷標籤列表"),
         # Include columns needed for styling/logic even if not always displayed prominently
         "overtime": None, # Keep overtime for styling logic, hide later
