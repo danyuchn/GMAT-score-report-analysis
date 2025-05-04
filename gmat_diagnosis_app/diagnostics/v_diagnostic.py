@@ -515,6 +515,15 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
 
     df_v = df_v_processed.copy() # Use the processed dataframe
 
+    # --- DEBUG: Check incoming overtime status ---
+    if 'overtime' in df_v.columns:
+        print(f"  DEBUG V Diag: Incoming df_v overtime counts:\n{df_v['overtime'].value_counts()}")
+    else:
+        print("  DEBUG V Diag: Incoming df_v MISSING 'overtime' column!")
+    if 'is_invalid' in df_v.columns:
+         print(f"  DEBUG V Diag: Incoming df_v is_invalid counts:\n{df_v['is_invalid'].value_counts()}")
+    # --- END DEBUG ---
+
     # --- Initialize/Prepare Columns ---
     # Ensure necessary columns exist
     required_cols = ['question_position', 'question_time', 'is_correct', 'question_type', 'question_fundamental_skill']
@@ -581,120 +590,18 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
     df_v_processed_full = df_v.copy()
     df_v_valid = df_v[~df_v['is_invalid']].copy() # More robust filtering using boolean indexing
     
+    # --- DEBUG: Check overtime status after filtering invalid ---
+    if 'overtime' in df_v_valid.columns:
+        print(f"  DEBUG V Diag: df_v_valid (valid data) overtime counts:\n{df_v_valid['overtime'].value_counts()}")
+    else:
+        print("  DEBUG V Diag: df_v_valid MISSING 'overtime' column after filtering!")
+    # --- END DEBUG ---
+    
     if df_v_valid.empty:
         print("    No V data remaining after excluding invalid entries. Skipping further V diagnosis.")
         # Generate minimal report
         minimal_report = _generate_v_summary_report(v_diagnosis_results) # Function should handle empty results
         return v_diagnosis_results, minimal_report, df_v_processed_full
-
-    # --- Chapter 1: Calculate Prerequisites for Overtime Logic --- 
-    total_number_of_questions = 0
-    if 'question_position' in df_v.columns and not df_v['question_position'].empty:
-         # Use max() safely, handle potential non-numeric or all-NaN cases
-         if pd.api.types.is_numeric_dtype(df_v['question_position']) and df_v['question_position'].notna().any():
-             total_number_of_questions = df_v['question_position'].max()
-         else:
-             print("    Warning: 'question_position' column contains non-numeric or all NaN values. Cannot determine total question count accurately.")
-
-    print(f"DEBUG: Total number of V questions based on position: {total_number_of_questions}")
-
-    # --- REMOVED: first_third_avg calculation (not needed for simple V rule) ---
-
-    # Calculate RC group info needed for overtime checks
-    df_v = _identify_rc_groups(df_v) # Needs pos, type. Adds 'rc_group_id'
-    # Add group size after identifying groups
-    if 'rc_group_id' in df_v.columns and df_v['rc_group_id'].notna().any(): # Check if not all NaN
-        group_sizes_map = df_v.dropna(subset=['rc_group_id']).groupby('rc_group_id').size()
-        df_v['rc_group_size'] = df_v['rc_group_id'].map(group_sizes_map)
-    else:
-        df_v['rc_group_size'] = np.nan
-
-    df_v = _calculate_rc_times(df_v) # Needs group_id, pos, time. Adds 'rc_group_total_time', 'rc_reading_time'
-
-    # --- Chapter 1 Logic Adjustments: CR Overtime & RC flags --- 
-    # Initialize/Reset 'overtime' column
-    df_v['overtime'] = False
-    df_v['rc_reading_overtime'] = False # Initialize RC flags
-    if 'rc_single_q_overtime' not in df_v.columns: df_v['rc_single_q_overtime'] = False # Ensure column exists
-    df_v['reading_comprehension_barrier_inquiry'] = False # Initialize Barrier flag
-
-    # Determine CR Overtime Threshold based on pressure
-    cr_overtime_threshold = CR_OVERTIME_THRESHOLDS[v_time_pressure_status]
-    print(f"DEBUG: CR Overtime Threshold set to {cr_overtime_threshold} min based on pressure={v_time_pressure_status}")
-
-    # Apply Overtime Logic (CR and RC) - Apply to the *full* df but skip invalid rows
-    rc_target_times = RC_GROUP_TARGET_TIMES[v_time_pressure_status]
-    if 'rc_group_id' in df_v.columns: # Ensure column exists
-        for index, row in df_v.iterrows():
-            # Skip overtime calculation for invalid rows
-            if row['is_invalid']:
-                continue
-
-            q_type = row['question_type']
-            q_time = row.get('question_time', None)
-
-            if q_type == 'Critical Reasoning':
-                if q_time is not None and q_time > cr_overtime_threshold:
-                    df_v.loc[index, 'overtime'] = True
-            elif q_type == 'Reading Comprehension':
-                group_size = row.get('rc_group_size')
-                # Ensure group_size is valid before using it as key
-                if pd.isna(group_size) or group_size not in rc_target_times:
-                    # print(f"DEBUG RC OT Skip: Index {index}, Invalid group size: {group_size}")
-                    continue # Skip RC OT calculation if group size is invalid
-
-                target_group_time = rc_target_times.get(group_size)
-
-                # Check Group Overtime
-                group_total_time = row.get('rc_group_total_time')
-                is_group_ot = False
-                # Ensure target_group_time is valid before comparison
-                if target_group_time is not None and pd.notna(group_total_time) and group_total_time > (target_group_time + RC_GROUP_TARGET_TIME_ADJUSTMENT):
-                     is_group_ot = True
-                     # print(f"DEBUG RC Group OT: Index {index}, Group {row.get('rc_group_id')}, Total {group_total_time:.2f} > Target {target_group_time:.1f}")
-
-                # Check Reading Overtime (reading_time vs threshold)
-                reading_time = row.get('rc_reading_time')
-                reading_threshold = RC_READING_TIME_THRESHOLD_3Q if group_size == 3 else RC_READING_TIME_THRESHOLD_4Q
-                is_reading_ot = pd.notna(reading_time) and reading_time > reading_threshold
-                df_v.loc[index, 'rc_reading_overtime'] = is_reading_ot # Store flag
-                # if is_reading_ot: print(f"DEBUG RC Reading OT: Index {index}, Time {reading_time:.2f} > Threshold {reading_threshold:.1f}")
-
-                # Check Reading Comprehension Barrier Inquiry flag (MD Ch1)
-                if is_reading_ot:
-                    df_v.loc[index, 'reading_comprehension_barrier_inquiry'] = True
-                    # print(f"      Ch1 Barrier Flag Triggered: RC Q {row['question_position']} (Reading time {reading_time:.2f} > {reading_threshold:.1f})")
-
-                # Check Single Question Overtime (adjusted_rc_time > 2.0 min - MD Ch1)
-                adjusted_rc_time = q_time # Default for non-first q or if reading time is missing
-                # Determine if it's the first question in its group
-                is_first_rc_q = False
-                if pd.notna(row['rc_group_id']):
-                    group_min_pos = df_v[df_v['rc_group_id'] == row['rc_group_id']]['question_position'].min()
-                    is_first_rc_q = row['question_position'] == group_min_pos
-
-                if is_first_rc_q and pd.notna(reading_time) and pd.notna(q_time):
-                    # Calculate adjusted time only for the first question if reading time is valid
-                     adjusted_rc_time = q_time - reading_time
-                elif not is_first_rc_q:
-                     # For non-first questions, adjusted_rc_time is just q_time
-                     pass # Already set by default
-                else: # First question but reading time invalid, or q_time invalid
-                     adjusted_rc_time = None # Cannot calculate adjusted time reliably
-
-                is_individual_ot = False
-                if pd.notna(adjusted_rc_time):
-                    is_individual_ot = adjusted_rc_time > RC_INDIVIDUAL_Q_THRESHOLD_MINUTES
-
-                df_v.loc[index, 'rc_single_q_overtime'] = is_individual_ot # Store flag (This corresponds to individual_overtime)
-                # if is_individual_ot: print(f"DEBUG RC Individual OT: Index {index}, Adj Time {adjusted_rc_time:.2f} > Threshold {RC_INDIVIDUAL_Q_THRESHOLD_MINUTES:.1f}")
-
-                # Final RC Overtime (Per V-Doc Ch1 "用於第三章 Slow 分類"): Group OT OR Individual OT
-                if is_group_ot or is_individual_ot:
-                    df_v.loc[index, 'overtime'] = True # Set the main 'overtime' flag for RC
-
-    else:
-        print("Warning: 'rc_group_id' not found or other RC prerequisite missing, cannot calculate detailed RC overtime.")
 
     # --- Chapter 1 Global Rule: Mark Suspiciously Fast --- 
     if 'suspiciously_fast' not in df_v.columns: df_v['suspiciously_fast'] = False # Ensure column exists
@@ -1114,6 +1021,11 @@ def _generate_v_summary_report(v_diagnosis_results):
     cr_metrics = v_metrics_by_type.get('Critical Reasoning', v_metrics_by_type.get('CR', {}))
     rc_metrics = v_metrics_by_type.get('Reading Comprehension', v_metrics_by_type.get('RC', {}))
     # --- End Corrected Metrics Retrieval ---
+
+    # --- DEBUG: Print metrics before validity check ---
+    print(f"DEBUG (_generate_v_summary_report): Retrieved cr_metrics = {cr_metrics}")
+    print(f"DEBUG (_generate_v_summary_report): Retrieved rc_metrics = {rc_metrics}")
+    # --- END DEBUG ---
 
     # Check if metrics exist and contain necessary rates
     cr_error_rate = cr_metrics.get('error_rate')
@@ -1848,75 +1760,6 @@ def _generate_v_recommendations(v_diagnosis_results, exempted_skills):
     # print("DEBUG: --- Exiting _generate_v_recommendations ---\") # REMOVED DEBUG
     return final_recommendations # Returns the list
 
-# --- RC Helper Functions (for Chapter 1 logic) ---
-
-def _identify_rc_groups(df_v):
-    """Identifies RC passages groups based on consecutive question positions."""
-    if 'question_type' not in df_v.columns or 'question_position' not in df_v.columns:
-        return df_v
-
-    df_v = df_v.sort_values('question_position').copy()
-    df_v['rc_group_id'] = np.nan
-
-    rc_indices = df_v[df_v['question_type'] == 'RC'].index
-    if not rc_indices.any():
-        return df_v # No RC questions
-
-    group_counter = 0
-    current_group_id = np.nan
-    last_pos = -2
-
-    for idx in df_v.index:
-        row = df_v.loc[idx]
-        if row['question_type'] == 'RC':
-            if row['question_position'] != last_pos + 1:
-                # Start of a new group
-                group_counter += 1
-                current_group_id = f"RC_Group_{group_counter}"
-            df_v.loc[idx, 'rc_group_id'] = current_group_id
-            last_pos = row['question_position']
-        else:
-            # Reset group logic if non-RC question encountered
-            current_group_id = np.nan
-            last_pos = -2
-
-    # Validate group sizes (Warn if > 4)
-    if 'rc_group_id' in df_v.columns:
-        group_sizes = df_v.dropna(subset=['rc_group_id']).groupby('rc_group_id').size()
-        oversized_groups = group_sizes[group_sizes > 4].index.tolist()
-        if oversized_groups:
-             print(f"    Warning: RC groups detected with > 4 questions, manual check recommended: {oversized_groups}")
-
-    return df_v
-
-def _calculate_rc_times(df_v):
-    """Calculates RC group total time and estimated reading time."""
-    if 'rc_group_id' not in df_v.columns or df_v['rc_group_id'].isnull().all():
-        df_v['rc_group_total_time'] = np.nan
-        df_v['rc_reading_time'] = np.nan
-        return df_v
-
-    # Calculate group total time
-    group_times = df_v[df_v['question_type'] == 'RC'].groupby('rc_group_id')['question_time'].sum()
-    df_v['rc_group_total_time'] = df_v['rc_group_id'].map(group_times)
-
-    # Calculate reading time (first q time - avg time of others)
-    df_v['rc_reading_time'] = np.nan
-    df_rc_only = df_v[df_v['question_type'] == 'RC'].copy()
-
-    for group_id, group_df in df_rc_only.groupby('rc_group_id'):
-        group_df_sorted = group_df.sort_values('question_position')
-        first_q_index = group_df_sorted.index[0]
-        if len(group_df_sorted) > 1:
-            first_q_time = group_df_sorted['question_time'].iloc[0]
-            other_q_times_avg = group_df_sorted['question_time'].iloc[1:].mean()
-            reading_time = first_q_time - other_q_times_avg
-            # Assign reading time only to the first question of the group
-            df_v.loc[first_q_index, 'rc_reading_time'] = reading_time
-        # If only 1 question in group, reading_time remains NaN
-
-    return df_v
-
 # --- Helper for Applying Chapter 3 Rules ---
 
 def _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_per_type):
@@ -2195,6 +2038,10 @@ def _calculate_metrics_for_group(group):
     avg_difficulty = group['question_difficulty'].mean() if 'question_difficulty' in group.columns else None
     overtime_count = group['overtime'].eq(True).sum() if 'overtime' in group.columns else 0
     overtime_rate = overtime_count / total if total > 0 else 0.0
+
+    # --- DEBUG: Print overtime rate calculation details ---
+    print(f"    DEBUG V Metric Calc: Group Shape={group.shape}, Overtime Count={overtime_count}, Total Valid={total}, Calculated OT Rate={overtime_rate:.3f}")
+    # --- END DEBUG ---
 
     return {
         'total_questions': total,

@@ -19,14 +19,24 @@ from gmat_diagnosis_app import irt_module as irt # Import using absolute path
 # from gmat_diagnosis_app.diagnosis_module import run_diagnosis # Remove old import
 import os # For environment variables
 import openai # Import OpenAI library
-from gmat_diagnosis_app.preprocess_helpers import suggest_invalid_questions # Import new preprocessor
+# Import preprocessing functions
+from gmat_diagnosis_app.preprocess_helpers import suggest_invalid_questions, calculate_overtime
 # Import preprocessing constants
 from gmat_diagnosis_app.preprocess_helpers import (
     MAX_ALLOWED_TIME_Q, TOTAL_QUESTIONS_Q, Q_FAST_END_THRESHOLD_MINUTES, 
     Q_TIME_DIFF_PRESSURE_THRESHOLD, LAST_THIRD_FRACTION_Q,
+    Q_OVERTIME_THRESHOLD_PRESSURE, Q_OVERTIME_THRESHOLD_NO_PRESSURE, # Q Overtime
     MAX_ALLOWED_TIME_DI, TOTAL_QUESTIONS_DI, DI_TIME_PRESSURE_THRESHOLD_MINUTES,
     DI_INVALID_TIME_THRESHOLD_MINUTES, LAST_THIRD_FRACTION_DI,
-    V_INVALID_TIME_HASTY_MIN, TOTAL_QUESTIONS_V
+    DI_OVERTIME_THRESHOLD_TPA_PRESSURE, DI_OVERTIME_THRESHOLD_TPA_NO_PRESSURE, # DI Overtime
+    DI_OVERTIME_THRESHOLD_GT_PRESSURE, DI_OVERTIME_THRESHOLD_GT_NO_PRESSURE,
+    DI_OVERTIME_THRESHOLD_DS_PRESSURE, DI_OVERTIME_THRESHOLD_DS_NO_PRESSURE,
+    DI_MSR_TARGET_TIME_PRESSURE, DI_MSR_TARGET_TIME_NO_PRESSURE, 
+    MAX_ALLOWED_TIME_V, TOTAL_QUESTIONS_V, V_INVALID_TIME_HASTY_MIN, # V Basics
+    V_OVERTIME_THRESHOLD_CR_PRESSURE, V_OVERTIME_THRESHOLD_CR_NO_PRESSURE, # V Overtime
+    V_RC_TARGET_TIME_3Q_PRESSURE, V_RC_TARGET_TIME_4Q_PRESSURE,
+    V_RC_TARGET_TIME_3Q_NO_PRESSURE, V_RC_TARGET_TIME_4Q_NO_PRESSURE,
+    V_RC_INDIVIDUAL_Q_THRESHOLD
 )
 # Import the updated diagnostic functions
 from gmat_diagnosis_app.diagnostics.v_diagnostic import run_v_diagnosis_processed
@@ -552,6 +562,21 @@ with tab_q:
                         # Ensure it's integer type after validation
                         temp_df_q['question_position'] = pd.to_numeric(temp_df_q['question_position'], errors='coerce').astype('Int64')
                     # --- End Ensure --- 
+
+                    # --- BEGIN FIX ---
+                    # Ensure 'is_manually_invalid' exists and is boolean after edits
+                    if 'is_manually_invalid' in temp_df_q.columns:
+                        temp_df_q['is_manually_invalid'] = temp_df_q['is_manually_invalid'].fillna(False).astype(bool)
+                    else:
+                        # This case should ideally not happen if editor worked correctly
+                        st.warning("Q: 'is_manually_invalid' column missing after edits. Assuming False.", icon="⚠️")
+                        temp_df_q['is_manually_invalid'] = False
+                    # Update the 'is_invalid' column to match the final user selection from the editor.
+                    # The 'is_invalid' flag should now solely reflect the user's final decision in 'is_manually_invalid'.
+                    temp_df_q['is_invalid'] = temp_df_q['is_manually_invalid']
+                    print("DEBUG Q: Final 'is_invalid' column updated based on user's manual selection.")
+                    # --- END FIX ---
+
                     df_q = temp_df_q # Assign the fully processed df to df_q
 
             # Reset df_q if temp_df_q ended up being None after standardization/validation
@@ -641,7 +666,7 @@ with tab_v:
                     if temp_rename_map:
                         temp_preprocessing_df.rename(columns=temp_rename_map, inplace=True)
                     
-                    # Create an empty time pressure map (V uses simpler logic)
+                    # Create an empty time pressure map (V uses simpler logic not depending on time pressure status)
                     temp_time_pressure_map = {'V': False}  # V检测简单规则不依赖于时间压力状态
                     
                     # Apply suggestion logic
@@ -732,6 +757,21 @@ with tab_v:
                     else:
                         temp_df_v['question_position'] = pd.to_numeric(temp_df_v['question_position'], errors='coerce').astype('Int64')
                     # --- End Ensure --- 
+
+                    # --- BEGIN FIX ---
+                    # Ensure 'is_manually_invalid' exists and is boolean after edits
+                    if 'is_manually_invalid' in temp_df_v.columns:
+                        temp_df_v['is_manually_invalid'] = temp_df_v['is_manually_invalid'].fillna(False).astype(bool)
+                    else:
+                        # This case should ideally not happen if editor worked correctly
+                        st.warning("V: 'is_manually_invalid' column missing after edits. Assuming False.", icon="⚠️")
+                        temp_df_v['is_manually_invalid'] = False
+                    # Update the 'is_invalid' column to match the final user selection from the editor.
+                    # The 'is_invalid' flag should now solely reflect the user's final decision in 'is_manually_invalid'.
+                    temp_df_v['is_invalid'] = temp_df_v['is_manually_invalid']
+                    print("DEBUG V: Final 'is_invalid' column updated based on user's manual selection.")
+                    # --- END FIX ---
+
                     df_v = temp_df_v
 
             # Reset df_v if temp_df_v ended up being None after standardization/validation
@@ -920,6 +960,21 @@ with tab_di:
                     else:
                         temp_df_di['question_position'] = pd.to_numeric(temp_df_di['question_position'], errors='coerce').astype('Int64')
                     # --- End Ensure --- 
+
+                    # --- BEGIN FIX ---
+                    # Ensure 'is_manually_invalid' exists and is boolean after edits
+                    if 'is_manually_invalid' in temp_df_di.columns:
+                        temp_df_di['is_manually_invalid'] = temp_df_di['is_manually_invalid'].fillna(False).astype(bool)
+                    else:
+                        # This case should ideally not happen if editor worked correctly
+                        st.warning("DI: 'is_manually_invalid' column missing after edits. Assuming False.", icon="⚠️")
+                        temp_df_di['is_manually_invalid'] = False
+                    # Update the 'is_invalid' column to match the final user selection from the editor.
+                    # The 'is_invalid' flag should now solely reflect the user's final decision in 'is_manually_invalid'.
+                    temp_df_di['is_invalid'] = temp_df_di['is_manually_invalid']
+                    print("DEBUG DI: Final 'is_invalid' column updated based on user's manual selection.")
+                    # --- END FIX ---
+
                     df_di = temp_df_di
 
             # Reset df_di if temp_df_di ended up being None after standardization/validation
@@ -1007,11 +1062,39 @@ if st.session_state.analysis_run and df_combined_input is not None:
     time_pressure_map = {}
     try:
         # Your existing time pressure calculation logic should go here
-        # Example placeholder:
-        st.write("Calculating Time Pressure...") # Placeholder
-        time_pressure_q = False # Replace with actual calculation for Q
-        time_pressure_v = False # Replace with actual calculation for V
-        time_pressure_di = False # Replace with actual calculation for DI
+        # Placeholder implementation - REPLACE WITH ACTUAL LOGIC
+        st.write("Calculating Time Pressure...")
+        time_pressure_q = False
+        time_pressure_v = False
+        time_pressure_di = False
+        if 'Q' in loaded_subjects:
+             # Example: Calculate Q time pressure based on df_combined_input
+             df_q_subset = df_combined_input[df_combined_input['Subject'] == 'Q']
+             if not df_q_subset.empty and 'question_time' in df_q_subset.columns:
+                 q_time_numeric = pd.to_numeric(df_q_subset['question_time'], errors='coerce')
+                 total_time_q = q_time_numeric.sum()
+                 time_diff_q = MAX_ALLOWED_TIME_Q - total_time_q
+                 # Q pressure check: time_diff <= 3 AND fast end questions exist
+                 # Placeholder for fast_end check: just use time_diff for now
+                 if time_diff_q <= 3.0: # Simplified placeholder
+                     time_pressure_q = True
+        if 'V' in loaded_subjects:
+            df_v_subset = df_combined_input[df_combined_input['Subject'] == 'V']
+            if not df_v_subset.empty and 'question_time' in df_v_subset.columns:
+                v_time_numeric = pd.to_numeric(df_v_subset['question_time'], errors='coerce')
+                total_time_v = v_time_numeric.sum()
+                time_diff_v = MAX_ALLOWED_TIME_V - total_time_v # Assumes MAX_ALLOWED_TIME_V is defined
+                if time_diff_v < 1.0: # V pressure check from V doc
+                    time_pressure_v = True
+        if 'DI' in loaded_subjects:
+            df_di_subset = df_combined_input[df_combined_input['Subject'] == 'DI']
+            if not df_di_subset.empty and 'question_time' in df_di_subset.columns:
+                di_time_numeric = pd.to_numeric(df_di_subset['question_time'], errors='coerce')
+                total_time_di = di_time_numeric.sum()
+                time_diff_di = MAX_ALLOWED_TIME_DI - total_time_di
+                if time_diff_di <= DI_TIME_PRESSURE_THRESHOLD_MINUTES: # DI pressure check
+                    time_pressure_di = True
+
         time_pressure_map = {'Q': time_pressure_q, 'V': time_pressure_v, 'DI': time_pressure_di}
         st.write(f"Time Pressure Map: {time_pressure_map}") # Placeholder
     except Exception as e:
@@ -1019,20 +1102,38 @@ if st.session_state.analysis_run and df_combined_input is not None:
         st.session_state.analysis_run = False # Stop analysis
         st.stop()
 
-    # --- Apply Preprocessing to Suggest Invalid Questions --- 
+    # --- Calculate Overtime (BEFORE suggest_invalid_questions) ---
     try:
-        st.write("應用預處理規則以建議無效題目...")
-        df_processed_after_suggestion = suggest_invalid_questions(df_combined_input, time_pressure_map)
-        st.write("預處理完成。建議的無效狀態已合併到 'is_invalid' 欄位。")
-        # Optional: Display a preview of the suggestions if helpful for debugging
-        # st.write("預處理後數據預覽 (前5行):")
-        # st.dataframe(df_processed_after_suggestion.head())
+        st.write("Calculating Overtime Status...")
+        df_with_overtime = calculate_overtime(df_combined_input, time_pressure_map)
+        # Verify 'overtime' column exists
+        if 'overtime' not in df_with_overtime.columns:
+             st.error("calculate_overtime 函數未返回 'overtime' 欄位。中止分析。")
+             st.stop()
     except Exception as e:
-        st.error(f"預處理建議無效題目時發生錯誤: {e}")
-        st.session_state.analysis_run = False # Stop analysis
-        st.stop()
+         st.error(f"計算 overtime 時發生錯誤: {e}")
+         st.session_state.analysis_run = False
+         st.stop()
 
-    # --- IRT Simulation --- 
+    # --- Apply Preprocessing to Suggest Invalid Questions ---
+    # --- REMOVED: Second call to suggest_invalid_questions is removed ---
+    # --- The final 'is_invalid' status is determined by user edits in the tabs ---
+    # try:
+    #     st.write("應用預處理規則以建議無效題目...")
+    #     # Pass the dataframe that now includes the 'overtime' column
+    #     df_processed_after_suggestion = suggest_invalid_questions(df_with_overtime, time_pressure_map) # <<< THIS IS THE SECOND CALL TO REMOVE
+    #     st.write("預處理完成。建議的無效狀態已合併到 'is_invalid' 欄位。")
+    #     # Optional: Display a preview of the suggestions if helpful for debugging
+    #     # st.write("預處理後數據預覽 (前5行):")
+    #     # st.dataframe(df_processed_after_suggestion.head())
+    # except Exception as e:
+    #     st.error(f"預處理建議無效題目時發生錯誤: {e}")
+    #     st.session_state.analysis_run = False # Stop analysis
+    #     st.stop()
+    # --- Use df_with_overtime directly as it contains the user-confirmed is_invalid status ---
+    df_final_input_for_sim = df_with_overtime # Use the df before the removed block
+
+    # --- IRT Simulation ---
     simulation_success = True
     # with st.spinner("正在執行 IRT 模擬..."): # Replace with st.status
     with st.status("執行 IRT 模擬...", expanded=True) as status:
@@ -1081,7 +1182,7 @@ if st.session_state.analysis_run and df_combined_input is not None:
                     # --- CORRECTED LOGIC HERE ---
                     # Directly get the 'question_position' values of incorrect answers
                     # Use the dataframe AFTER preprocessing suggestion for simulation input
-                    user_df_subj_processed = df_processed_after_suggestion[df_processed_after_suggestion['Subject'] == subject].sort_values(by='question_position')
+                    user_df_subj_processed = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].sort_values(by='question_position')
                     wrong_positions = user_df_subj_processed[user_df_subj_processed['is_correct'] == False]['question_position'].tolist()
                     wrong_indices = wrong_positions # Assign to the variable expected by the simulation function
                     # --- END CORRECTION ---
@@ -1127,7 +1228,7 @@ if st.session_state.analysis_run and df_combined_input is not None:
 
     # --- Prepare Data for Diagnosis ---
     # st.header("2. 準備診斷數據 (結合用戶數據與模擬難度)") # Combined into header 2
-    if simulation_success and df_processed_after_suggestion is not None:
+    if simulation_success and df_final_input_for_sim is not None:
         # with st.spinner("準備診斷數據中..."): # Replace with st.status
         with st.status("準備診斷數據...", expanded=True) as status_prep:
             df_final_for_diagnosis_list = []
@@ -1135,7 +1236,9 @@ if st.session_state.analysis_run and df_combined_input is not None:
             for subject in loaded_subjects:
                 st.write(f"處理 {subject} 科目...")
                 # Use the dataframe that went through invalid suggestion
-                user_df_subj_processed = df_processed_after_suggestion[df_processed_after_suggestion['Subject'] == subject].copy()
+                # --- UPDATED: Use df_final_input_for_sim --- #
+                user_df_subj_processed = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].copy()
+                # --- END UPDATE --- #
                 sim_history_df = all_simulation_histories.get(subject)
                 final_theta = final_thetas_local.get(subject)
 
@@ -1404,13 +1507,13 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
     COLUMN_DISPLAY_CONFIG = {
         "question_position": st.column_config.NumberColumn("題號", help="原始報告中的題目順序"),
         "is_manually_invalid": st.column_config.CheckboxColumn("手動標記無效?", help="勾選此框將此題標記為手動無效"),
-        "Subject": st.column_config.TextColumn("科目"),
+        # "Subject": st.column_config.TextColumn("科目"), # REMOVED
         "question_type": st.column_config.TextColumn("題型"),
         "question_fundamental_skill": st.column_config.TextColumn("考察能力(小分類)"),
         "is_correct": st.column_config.CheckboxColumn("答對?", help="題目是否回答正確"),
-        "question_difficulty": st.column_config.NumberColumn("難度(模擬)", help="系統模擬的題目難度"),
+        "question_difficulty": st.column_config.NumberColumn("難度(模擬)", help="系統模擬的題目難度", format="%.2f"), # FORMATTED TO 2 DECIMALS
         "question_time": st.column_config.NumberColumn("用時(分)", format="%.2f"),
-        "estimated_ability": st.column_config.NumberColumn("能力估計(Theta)", format="%.2f"),
+        # "estimated_ability": st.column_config.NumberColumn("能力估計(Theta)", format="%.2f"), # REMOVED
         "time_performance_category": st.column_config.TextColumn("時間表現分類"),
         "is_sfe": st.column_config.CheckboxColumn("SFE?", help="是否為Special Focus Error (在已掌握技能範圍內做錯)"),
         "diagnostic_params_list": st.column_config.ListColumn("診斷標籤", help="初步診斷標籤列表"),
@@ -1423,14 +1526,13 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
     # Create a simple mapping from internal name to display name for Excel export
     EXCEL_COLUMN_MAP = {
         "question_position": "題號",
-        # "is_manually_invalid": "手動標記無效?", # Maybe don't include this in final download? Or keep it? Let's keep it for now.
-        "Subject": "科目",
+        # "Subject": "科目", # REMOVED
         "question_type": "題型",
         "question_fundamental_skill": "考察能力(小分類)",
         "is_correct": "答對?", # Keep the boolean representation for formula
-        "question_difficulty": "難度(模擬)",
+        "question_difficulty": "難度(模擬)", # Format applied in to_excel if needed, or assume df passed is formatted
         "question_time": "用時(分)",
-        "estimated_ability": "能力估計(Theta)",
+        # "estimated_ability": "能力估計(Theta)", # REMOVED
         "time_performance_category": "時間表現分類",
         "is_sfe": "SFE?",
         "diagnostic_params_list": "診斷標籤",
@@ -1439,6 +1541,7 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
     }
 
     # --- Display Final Thetas if available ---
+    # This section remains unchanged as it shows subject-level theta, not per-question theta
     if st.session_state.final_thetas:
         st.subheader("最終能力估計 (Final Thetas)")
         theta_data = {"科目": list(st.session_state.final_thetas.keys()), "能力估計值 (Theta)": list(st.session_state.final_thetas.values())}
@@ -1448,13 +1551,10 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
     # Check if results exist in session state
     if st.session_state.report_dict and st.session_state.processed_df is not None:
         subject_reports = st.session_state.report_dict # Use report_dict
-        df_processed_display = st.session_state.processed_df # Use the stored df
+        df_processed_for_tabs = st.session_state.processed_df # Use the stored df
 
         # Determine which subjects have data
-        subjects_with_data = df_processed_display['Subject'].unique()
-        # --- DEBUG PRINT --- 
-        print(f"DEBUG: Subjects found in processed_df: {subjects_with_data}")
-        # --- END DEBUG --- 
+        subjects_with_data = df_processed_for_tabs['Subject'].unique()
 
         if not subjects_with_data.any():
              st.warning("診斷已執行，但未找到任何科目的有效處理數據。")
@@ -1463,67 +1563,62 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
             subject_tabs = st.tabs([f"{subj} 科診斷報告與數據" for subj in subjects_with_data])
 
             for i, subject in enumerate(subjects_with_data):
-                # --- DEBUG PRINT --- 
-                print(f"DEBUG: Processing tab for subject: {subject}")
-                # --- END DEBUG --- 
                 with subject_tabs[i]:
                     st.subheader(f"{subject} 科診斷報告")
                     # Display the markdown report for the subject
                     report_md = subject_reports.get(subject, f"未找到 {subject} 科的診斷報告。")
-                    # --- BEGIN ADDED DEBUG ---
-                    if subject == 'DI':
-                         print(f"DEBUG (app.py): DI report from session state BEFORE markdown (first 200 chars):\\n'''{report_md[:200]}'''")
-                    # --- END ADDED DEBUG ---
                     st.markdown(report_md)
 
                     st.subheader(f"{subject} 科詳細數據 (含診斷標籤)")
                     # Filter DataFrame for the current subject
-                    df_to_display = df_processed_display[df_processed_display['Subject'] == subject].copy()
-                    # --- DEBUG PRINT --- 
-                    if subject == 'Q':
-                        print(f"DEBUG: Q df_to_display is empty: {df_to_display.empty}")
-                        if not df_to_display.empty:
-                            print(f"DEBUG: Q df_to_display columns: {df_to_display.columns.tolist()}")
-                    # --- END DEBUG --- 
+                    df_subject_specific = df_processed_for_tabs[df_processed_for_tabs['Subject'] == subject].copy()
 
-                    # Prepare the list of columns to display based on COLUMN_DISPLAY_CONFIG keys
-                    # Filter out keys with None values unless they are needed internally (like 'overtime')
-                    columns_for_display = [k for k, v in COLUMN_DISPLAY_CONFIG.items() if v is not None and k in df_to_display.columns]
+                    # --- Prepare DataFrame for Display (using updated config) ---
+                    # 1. Select columns based on the keys in COLUMN_DISPLAY_CONFIG that exist in this subject's data
+                    cols_available = [k for k in COLUMN_DISPLAY_CONFIG.keys() if k in df_subject_specific.columns]
+                    df_to_display = df_subject_specific[cols_available].copy()
 
+                    # 2. Apply formatting for difficulty (already handled by column_config for st.dataframe)
+                    # If formatting is needed *before* styling or for Excel, apply it here:
+                    # if 'question_difficulty' in df_to_display.columns:
+                    #     df_to_display['question_difficulty'] = df_to_display['question_difficulty'].map('{:.2f}'.format)
+
+                    # 3. Define column order for st.dataframe (excluding internal columns like 'overtime')
+                    columns_for_st_display_order = [k for k in cols_available if COLUMN_DISPLAY_CONFIG[k] is not None]
 
                     if not df_to_display.empty:
-                         # Apply styling (assuming apply_styles function exists and is correct)
+                         # Apply styling
                          try:
-                             # Ensure 'overtime' column exists for styling function
-                             if 'overtime' not in df_to_display.columns:
-                                 df_to_display['overtime'] = False # Add dummy if missing, though it should come from diagnosis_module
-                                 print(f"Warning: 'overtime' column added artificially for {subject} display.")
-                             if 'is_correct' not in df_to_display.columns:
-                                 df_to_display['is_correct'] = True # Add dummy if missing
-                                 print(f"Warning: 'is_correct' column added artificially for {subject} display.")
+                             # Ensure necessary columns for styling exist
+                             if 'overtime' not in df_to_display.columns: df_to_display['overtime'] = False
+                             if 'is_correct' not in df_to_display.columns: df_to_display['is_correct'] = True
 
-
-                             # Apply styling step-by-step to avoid parenthesis issues
                              styler = df_to_display.style
                              styler = styler.set_properties(**{'text-align': 'left'})
                              styler = styler.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
                              styled_df = styler.apply(apply_styles, axis=1) # Apply custom styling
-                             
+
                              st.dataframe(
                                  styled_df,
-                                 column_config=COLUMN_DISPLAY_CONFIG, # Use the central config
-                                 column_order=columns_for_display, # Control display order
+                                 column_config=COLUMN_DISPLAY_CONFIG, # Use the central config (already updated)
+                                 column_order=columns_for_st_display_order, # Use the filtered list
                                  hide_index=True,
                                  use_container_width=True
                              )
                          except Exception as e:
                               st.error(f"無法應用樣式或顯示 {subject} 科數據: {e}")
-                              st.dataframe(df_to_display, hide_index=True, use_container_width=True) # Fallback to unstyled
+                              st.dataframe(df_to_display[columns_for_st_display_order], column_config=COLUMN_DISPLAY_CONFIG, hide_index=True, use_container_width=True) # Fallback, only show configured cols
 
-                         # --- Download Button (Modified) ---
+                         # --- Download Button (using updated map) ---
                          try:
-                             # Convert the *original* df_to_display to Excel bytes using the modified helper
-                             excel_bytes = to_excel(df_to_display, EXCEL_COLUMN_MAP)
+                             # Prepare a copy for Excel, selecting based on the updated EXCEL_COLUMN_MAP
+                             df_for_excel = df_subject_specific[[k for k in EXCEL_COLUMN_MAP.keys() if k in df_subject_specific.columns]].copy()
+                             
+                             # Apply formatting for difficulty specifically for Excel if needed
+                             if 'question_difficulty' in df_for_excel.columns:
+                                 df_for_excel['question_difficulty'] = pd.to_numeric(df_for_excel['question_difficulty'], errors='coerce').map('{:.2f}'.format)
+                             
+                             excel_bytes = to_excel(df_for_excel, EXCEL_COLUMN_MAP) # Pass the df with selected cols and the map
                              st.download_button(
                                 label=f"下載 {subject} 科詳細數據 (Excel)",
                                 data=excel_bytes,
