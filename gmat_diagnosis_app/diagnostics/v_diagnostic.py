@@ -74,6 +74,70 @@ CARELESSNESS_SKILLS = {
     'V_CARELESSNESS_OPTION_MISREAD'
 }
 
+# --- 參數類別順序定義 ---
+V_PARAM_CATEGORY_ORDER = [
+    'SFE',                  # 基礎掌握
+    'Reading',              # 閱讀理解
+    'Reasoning',            # 邏輯推理
+    'Timing',               # 時間管理
+    'Process',              # 流程方法
+    'AC_Analysis',          # 選項分析
+    'Question_Understanding', # 問題理解
+    'Behavioral',           # 行為模式
+    'Unknown'               # 未分類
+]
+
+# --- 參數到類別的映射 ---
+V_PARAM_TO_CATEGORY = {
+    # SFE
+    'FOUNDATIONAL_MASTERY_INSTABILITY_SFE': 'SFE',
+    
+    # Reading
+    'CR_READING_BASIC_OMISSION': 'Reading',
+    'CR_READING_DIFFICULTY_STEM': 'Reading',
+    'CR_READING_TIME_EXCESSIVE': 'Reading',
+    'RC_READING_SPEED_SLOW_FOUNDATIONAL': 'Reading',
+    'RC_READING_COMPREHENSION_BARRIER': 'Reading',
+    'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY': 'Reading',
+    'RC_READING_DOMAIN_KNOWLEDGE_GAP': 'Reading',
+    'RC_READING_VOCAB_BOTTLENECK': 'Reading',
+    'RC_READING_PRECISION_INSUFFICIENT': 'Reading',
+    'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY': 'Reading',
+    
+    # Reasoning
+    'CR_REASONING_CHAIN_ERROR': 'Reasoning',
+    'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY': 'Reasoning',
+    'CR_REASONING_ABSTRACTION_DIFFICULTY': 'Reasoning',
+    'CR_REASONING_PREDICTION_ERROR': 'Reasoning',
+    'CR_REASONING_TIME_EXCESSIVE': 'Reasoning',
+    'RC_REASONING_INFERENCE_WEAKNESS': 'Reasoning',
+    
+    # Timing
+    'CR_READING_TIME_EXCESSIVE': 'Timing',
+    'CR_REASONING_TIME_EXCESSIVE': 'Timing',
+    'CR_AC_ANALYSIS_TIME_EXCESSIVE': 'Timing',
+    'RC_READING_SPEED_SLOW_FOUNDATIONAL': 'Timing',
+    
+    # Process
+    'CR_METHOD_TYPE_SPECIFIC_ERROR': 'Process',
+    'CR_METHOD_PROCESS_DEVIATION': 'Process',
+    
+    # AC_Analysis (Answer Choice Analysis)
+    'CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY': 'AC_Analysis',
+    'CR_AC_ANALYSIS_RELEVANCE_ERROR': 'AC_Analysis',
+    'CR_AC_ANALYSIS_DISTRACTOR_CONFUSION': 'AC_Analysis',
+    'CR_AC_ANALYSIS_TIME_EXCESSIVE': 'AC_Analysis',
+    'RC_AC_ANALYSIS_DIFFICULTY': 'AC_Analysis',
+    
+    # Question_Understanding
+    'CR_QUESTION_UNDERSTANDING_MISINTERPRETATION': 'Question_Understanding',
+    
+    # Behavioral
+    'BEHAVIOR_CARELESSNESS_ISSUE': 'Behavioral',
+    'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': 'Behavioral',
+    'BEHAVIOR_GUESSING_HASTY': 'Behavioral'
+}
+
 # --- V-Specific Helper Functions (if any needed in future) ---
 # ...
 
@@ -900,67 +964,102 @@ APPENDIX_A_TRANSLATION_V = {
     'Normal Time & Correct': "正常時間 & 對",
 }
 
-# --- Parameter Categories for Report Grouping ---
-V_PARAM_CATEGORY_ORDER = [
-    'SFE',
-    'CR Reading', 'CR Question Understanding', 'CR Reasoning', 'CR AC Analysis', 'CR Method',
-    'RC Reading', 'RC Question Understanding', 'RC Location', 'RC Reasoning', 'RC AC Analysis', 'RC Method',
-    'Efficiency',
-    'Behavioral',
-    'Unknown' # Catch-all for unmapped params
-]
-
-V_PARAM_TO_CATEGORY = {
-    # SFE
-    'FOUNDATIONAL_MASTERY_INSTABILITY_SFE': 'SFE',
-    # CR
-    'CR_READING_BASIC_OMISSION': 'CR Reading',
-    'CR_READING_DIFFICULTY_STEM': 'CR Reading',
-    'CR_READING_TIME_EXCESSIVE': 'Efficiency',
-    'CR_QUESTION_UNDERSTANDING_MISINTERPRETATION': 'CR Question Understanding',
-    'CR_REASONING_CHAIN_ERROR': 'CR Reasoning',
-    'CR_REASONING_ABSTRACTION_DIFFICULTY': 'CR Reasoning',
-    'CR_REASONING_PREDICTION_ERROR': 'CR Reasoning',
-    'CR_REASONING_TIME_EXCESSIVE': 'Efficiency',
-    'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY': 'CR Reasoning',
-    'CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY': 'CR AC Analysis',
-    'CR_AC_ANALYSIS_RELEVANCE_ERROR': 'CR AC Analysis',
-    'CR_AC_ANALYSIS_DISTRACTOR_CONFUSION': 'CR AC Analysis',
-    'CR_AC_ANALYSIS_TIME_EXCESSIVE': 'Efficiency',
-    'CR_METHOD_PROCESS_DEVIATION': 'CR Method',
-    'CR_METHOD_TYPE_SPECIFIC_ERROR': 'CR Method',
-    # RC
-    'RC_READING_INFO_LOCATION_ERROR': 'RC Reading',
-    'RC_READING_KEYWORD_LOGIC_OMISSION': 'RC Reading',
-    'RC_READING_VOCAB_BOTTLENECK': 'RC Reading',
-    'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY': 'RC Reading',
-    'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY': 'RC Reading',
-    'RC_READING_DOMAIN_KNOWLEDGE_GAP': 'RC Reading',
-    'RC_READING_SPEED_SLOW_FOUNDATIONAL': 'Efficiency',
-    'RC_READING_PRECISION_INSUFFICIENT': 'RC Reading',
-    'RC_READING_COMPREHENSION_BARRIER': 'RC Reading',
-    'RC_METHOD_INEFFICIENT_READING': 'RC Method',
-    'RC_QUESTION_UNDERSTANDING_MISINTERPRETATION': 'RC Question Understanding',
-    'RC_LOCATION_ERROR_INEFFICIENCY': 'RC Location',
-    'RC_LOCATION_TIME_EXCESSIVE': 'Efficiency',
-    'RC_REASONING_INFERENCE_WEAKNESS': 'RC Reasoning',
-    'RC_REASONING_TIME_EXCESSIVE': 'Efficiency',
-    'RC_AC_ANALYSIS_DIFFICULTY': 'RC AC Analysis',
-    'RC_AC_ANALYSIS_TIME_EXCESSIVE': 'Efficiency',
-    # Efficiency (explicit)
-    'EFFICIENCY_BOTTLENECK_READING': 'Efficiency',
-    'EFFICIENCY_BOTTLENECK_REASONING': 'Efficiency',
-    'EFFICIENCY_BOTTLENECK_LOCATION': 'Efficiency',
-    'EFFICIENCY_BOTTLENECK_AC_ANALYSIS': 'Efficiency',
-    # Behavioral
-    'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': 'Behavioral',
-    'BEHAVIOR_CARELESSNESS_ISSUE': 'Behavioral',
-    'BEHAVIOR_GUESSING_HASTY': 'Behavioral',
-}
-
 def _translate_v(param):
-    """Translates an internal V param/skill name using APPENDIX_A_TRANSLATION_V."""
-    return APPENDIX_A_TRANSLATION_V.get(param, param)
+    """Translates an internal V param/skill name to a Mandarin display string."""
+    if param is None:
+        return "未知參數"
+    if not isinstance(param, str):
+        if isinstance(param, list):
+            return [_translate_v(p) for p in param]
+        return str(param)
+
+    translation_map = {
+        # Time Performance Categories (these will be directly used, not needing lookup)
+        'Fast & Wrong': "快錯",
+        'Slow & Wrong': "慢錯",
+        'Normal Time & Wrong': "正常時間 & 錯",
+        'Slow & Correct': "慢對",
+        'Fast & Correct': "快對",
+        'Normal Time & Correct': "正常時間 & 對",
+        
+        # 添加類別名稱的翻譯
+        'SFE': '基礎掌握',
+        'Reading': '閱讀理解',
+        'Reasoning': '邏輯推理',
+        'Timing': '時間管理',
+        'Process': '流程方法',
+        'AC_Analysis': '選項分析',
+        'Question_Understanding': '問題理解',
+        'Behavioral': '行為模式',
+        'Unknown': '未分類',
+
+        # Parameter translations here
+        'FOUNDATIONAL_MASTERY_INSTABILITY_SFE': '基礎掌握：掌握不穩定（SFE）',
+        # CR Reading
+        'CR_READING_BASIC_OMISSION': 'CR 閱讀：基礎理解疏漏',
+        'CR_READING_DIFFICULTY_STEM': 'CR 閱讀：題幹理解障礙',
+        'CR_READING_TIME_EXCESSIVE': 'CR 閱讀：耗時過長',
+        # CR Question
+        'CR_QUESTION_UNDERSTANDING_MISINTERPRETATION': 'CR 問題理解：提問要求把握錯誤',
+        # CR Reasoning
+        'CR_REASONING_CHAIN_ERROR': 'CR 推理：論證鏈理解錯誤',
+        'CR_REASONING_ABSTRACTION_DIFFICULTY': 'CR 推理：抽象邏輯/術語理解困難',
+        'CR_REASONING_PREDICTION_ERROR': 'CR 推理：預判方向錯誤/缺失',
+        'CR_REASONING_TIME_EXCESSIVE': 'CR 推理：邏輯思考耗時過長',
+        'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY': 'CR 推理：核心問題識別困難',
+        # CR Answer Choice Analysis
+        'CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY': 'CR 選項分析：選項本身理解困難',
+        'CR_AC_ANALYSIS_RELEVANCE_ERROR': 'CR 選項分析：相關性判斷錯誤',
+        'CR_AC_ANALYSIS_DISTRACTOR_CONFUSION': 'CR 選項分析：強干擾選項混淆',
+        'CR_AC_ANALYSIS_TIME_EXCESSIVE': 'CR 選項分析：篩選耗時過長',
+        # CR Method
+        'CR_METHOD_PROCESS_DEVIATION': 'CR 方法：未遵循標準流程',
+        'CR_METHOD_TYPE_SPECIFIC_ERROR': 'CR 方法：特定題型方法錯誤（如Boldface,Argument Construction）',
+        # RC Reading
+        'RC_READING_INFO_LOCATION_ERROR': 'RC 閱讀：信息定位錯誤',
+        'RC_READING_KEYWORD_LOGIC_OMISSION': 'RC 閱讀：關鍵詞/邏輯標記忽略',
+        'RC_READING_VOCAB_BOTTLENECK': 'RC 閱讀：詞彙量瓶頸',
+        'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY': 'RC 閱讀：複雜句結構理解困難',
+        'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY': 'RC 閱讀：篇章結構把握不清',
+        'RC_READING_DOMAIN_KNOWLEDGE_GAP': 'RC 閱讀：領域知識缺口',
+        'RC_READING_SPEED_SLOW_FOUNDATIONAL': 'RC 閱讀：基礎閱讀速度慢',
+        'RC_READING_PRECISION_INSUFFICIENT': 'RC 閱讀：閱讀精度不足',
+        'RC_READING_COMPREHENSION_BARRIER': 'RC 閱讀：理解障礙',
+        # RC Method
+        'RC_METHOD_INEFFICIENT_READING': 'RC 方法：閱讀策略低效',
+        # RC Question
+        'RC_QUESTION_UNDERSTANDING_MISINTERPRETATION': 'RC 問題理解：提問要求把握錯誤',
+        # RC Location
+        'RC_LOCATION_ERROR_INEFFICIENCY': 'RC 定位：回查/定位錯誤',
+        'RC_LOCATION_TIME_EXCESSIVE': 'RC 定位：回查耗時過長',
+        # RC Reasoning
+        'RC_REASONING_INFERENCE_WEAKNESS': 'RC 推理：推斷能力不足',
+        'RC_REASONING_TIME_EXCESSIVE': 'RC 推理：思考耗時過長',
+        # RC Answer Choice Analysis
+        'RC_AC_ANALYSIS_DIFFICULTY': 'RC 選項分析：選項辨析困難',
+        'RC_AC_ANALYSIS_TIME_EXCESSIVE': 'RC 選項分析：篩選耗時過長',
+        # Efficiency (explicit)
+        'EFFICIENCY_BOTTLENECK_READING': '效率瓶頸：閱讀',
+        'EFFICIENCY_BOTTLENECK_REASONING': '效率瓶頸：推理',
+        'EFFICIENCY_BOTTLENECK_LOCATION': '效率瓶頸：定位',
+        'EFFICIENCY_BOTTLENECK_AC_ANALYSIS': '效率瓶頸：選項分析',
+        # Behavioral
+        'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': '行為：測驗前期作答過快風險',
+        'BEHAVIOR_CARELESSNESS_ISSUE': '行為：粗心問題',
+        'BEHAVIOR_GUESSING_HASTY': '行為：疑似猜題/倉促',
+        # Carelessness
+        'CR_CARELESSNESS_DETAIL_OMISSION': 'CR 粗心：細節忽略/看錯',
+        'RC_CARELESSNESS_DETAIL_OMISSION': 'RC 粗心：細節忽略/看錯',
+        'V_CARELESSNESS_DETAIL_OMISSION': 'V 粗心：細節忽略/看錯',
+        'V_CARELESSNESS_OPTION_MISREAD': 'V 粗心：選項誤讀',
+        # SFE
+        'CR_SFE': 'CR 基礎掌握不穩定',
+        'RC_SFE': 'RC 基礎掌握不穩定',
+        # Invalid data
+        INVALID_DATA_TAG_V: INVALID_DATA_TAG_V
+    }
+
+    return translation_map.get(param, param)
 
 # --- V Summary Report Generation Helper ---
 
@@ -1260,360 +1359,257 @@ def _generate_v_summary_report(v_diagnosis_results):
 
     # --- Section 8: 後續行動指引 --- #
     report_lines.append("**8. 後續行動指引**")
-    param_to_positions = {}
-    skill_to_positions = {}
-    performance_to_skills = {
-        'Fast & Wrong': set(), 'Slow & Wrong': set(),
-        'Normal Time & Wrong': set(), 'Slow & Correct': set()
-    }
-    
-    # --- 重要修改: 直接使用 diagnosed_df 中的 'diagnostic_params' (英文標籤) ---
-    # 這確保 param_to_positions 的鍵是英文參數，與 triggered_params_all 能夠正確匹配
-    if diagnosed_df is not None and not diagnosed_df.empty and 'diagnostic_params' in diagnosed_df.columns:
-        for index, row in diagnosed_df.iterrows():
-            pos = row.get('question_position')
-            # 使用英文參數列表填充 param_to_positions
-            params_en = row.get('diagnostic_params', [])
-            if isinstance(params_en, list) and pos is not None and pos != 'N/A':
-                for p in params_en:
-                    param_to_positions.setdefault(p, set()).add(pos)
-    # --- 修改結束 ---
-    
-    if all_problem_items:
-        for item in all_problem_items:
-            pos = item.get('position')
-            skill = item.get('skill')
-            performance = item.get('performance')
-            if pos is not None and pos != 'N/A':
-                if skill and skill != 'Unknown Skill':
-                    skill_to_positions.setdefault(skill, set()).add(pos)
-                if performance in performance_to_skills and skill and skill != 'Unknown Skill':
-                    performance_to_skills[performance].add(skill)
-    
-    for param in param_to_positions: param_to_positions[param] = sorted(list(param_to_positions[param]))
-    for skill in skill_to_positions: skill_to_positions[skill] = sorted(list(skill_to_positions[skill]))
 
-    # Guide Reflection
+    # --- Prepare data for reflection mapping (requires ENGLISH param codes) ---
+    # Note: Ensure triggered_params_all (English codes) and mapping dictionaries are correctly populated earlier.
+    # Placeholder for dictionaries - these should be populated before this point
+    param_to_positions_v = {} # Maps English param code -> set of question positions
+    skill_to_positions_v = {} # Maps English skill -> set of question positions
+    chinese_label_to_english_code_v = {} # Maps Chinese label -> English code
+    v_translation_dict = {} # Maps English code -> Chinese label (ensure fetched/available)
+    
+    # Assuming triggered_params_all (set of English codes) and diagnosed_df are available from earlier
+    if diagnosed_df is not None and not diagnosed_df.empty:
+         param_col_eng = 'diagnostic_params' # Assuming English codes are here
+         params_col_zh = 'diagnostic_params_list' # Assuming Chinese list is here
+         if param_col_eng in diagnosed_df.columns and params_col_zh in diagnosed_df.columns:
+             # Populate reverse mapping
+             for eng_code, zh_label in v_translation_dict.items():
+                 if isinstance(zh_label, str) and zh_label != eng_code:
+                     chinese_label_to_english_code_v[zh_label] = eng_code
+             # Populate position mappings
+             for index, row in diagnosed_df.iterrows():
+                 pos = row.get('question_position')
+                 skill = row.get('question_fundamental_skill', 'Unknown Skill')
+                 eng_params = row.get(param_col_eng, [])
+                 if not isinstance(eng_params, list): eng_params = []
+
+                 if pos is not None and pos != 'N/A':
+                     if skill != 'Unknown Skill':
+                         skill_to_positions_v.setdefault(skill, set()).add(pos)
+                     for p in eng_params:
+                         if isinstance(p, str):
+                             param_to_positions_v.setdefault(p, set()).add(pos)
+             # Convert sets to sorted lists
+             for param in param_to_positions_v: param_to_positions_v[param] = sorted(list(param_to_positions_v[param]))
+             for skill in skill_to_positions_v: skill_to_positions_v[skill] = sorted(list(skill_to_positions_v[skill]))
+         else:
+             print("Warning (_generate_v_summary_report): Missing param columns for detailed mapping.")
+    # --- End Data Preparation for Mapping ---
+
+
+    # 8.1 Reflection Prompts (Refactored)
     report_lines.append("- **引導反思:**")
-    reflection_prompts = []
+    reflection_prompts_v = []
 
-    # --- Helper Function to Get Relevant Skills ---
-    def get_relevant_skills(param_keys, param_to_positions_map, skill_to_positions_map):
-        # Find all positions related to the given parameters
-        relevant_positions = set()
+    # Define Helper Functions Locally for Verbal
+    def get_pos_context_v(param_keys):
+        """Gets formatted question position context string for Verbal."""
+        positions = set()
         for key in param_keys:
-            relevant_positions.update(param_to_positions_map.get(key, set()))
-
-        # Find skills associated with these positions
-        relevant_skills_set = set()
-        for skill, positions in skill_to_positions_map.items():
-            if not relevant_positions.isdisjoint(positions): # Check if any position matches
-                if skill != 'Unknown Skill': # Exclude 'Unknown Skill'
-                    relevant_skills_set.add(skill)
-
-        # Return sorted list of English skill names
-        return sorted(list(relevant_skills_set))
-    # --- End Helper Function ---
-
-    def get_pos_context(param_keys): # Keep existing helper
-        positions = set().union(*(param_to_positions.get(key, set()) for key in param_keys))
+            if isinstance(key, str) and key in param_to_positions_v:
+                positions.update(param_to_positions_v.get(key, set()))
         return f" (涉及題號: {sorted(list(positions))})" if positions else ""
 
-    # --- Define Parameter Groups (Use English Codes) ---
-    # These groups should correspond to the specific reflection prompts
-    logic_params_v = [
-        'CR_REASONING_CHAIN_ERROR', 'CR_REASONING_ABSTRACTION_DIFFICULTY',
-        'CR_REASONING_PREDICTION_ERROR', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY',
-        'CR_AC_ANALYSIS_RELEVANCE_ERROR', 'CR_AC_ANALYSIS_DISTRACTOR_CONFUSION',
-        'RC_REASONING_INFERENCE_WEAKNESS', 'RC_AC_ANALYSIS_DIFFICULTY',
-        'CR_METHOD_TYPE_SPECIFIC_ERROR', # Added based on V-Doc Ch3
-        'RC_METHOD_TYPE_SPECIFIC_ERROR'  # Added based on V-Doc Ch3
-    ]
-    reading_params_v = [
-        'CR_READING_BASIC_OMISSION', 'CR_READING_DIFFICULTY_STEM',
-        'CR_QUESTION_UNDERSTANDING_MISINTERPRETATION',
-        'RC_READING_INFO_LOCATION_ERROR', 'RC_READING_KEYWORD_LOGIC_OMISSION',
-        'RC_READING_VOCAB_BOTTLENECK', 'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY',
-        'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY', 'RC_READING_DOMAIN_KNOWLEDGE_GAP',
-        'RC_READING_PRECISION_INSUFFICIENT', 'RC_QUESTION_UNDERSTANDING_MISINTERPRETATION',
-        'RC_LOCATION_ERROR_INEFFICIENCY', 'RC_READING_COMPREHENSION_BARRIER',
-        'CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY'
-    ]
-    efficiency_params_v = [
-        'CR_READING_TIME_EXCESSIVE', 'CR_REASONING_TIME_EXCESSIVE', 'CR_AC_ANALYSIS_TIME_EXCESSIVE',
-        'RC_READING_SPEED_SLOW_FOUNDATIONAL', 'RC_METHOD_INEFFICIENT_READING',
-        'RC_LOCATION_TIME_EXCESSIVE', 'RC_REASONING_TIME_EXCESSIVE', 'RC_AC_ANALYSIS_TIME_EXCESSIVE',
-        'EFFICIENCY_BOTTLENECK_READING', 'EFFICIENCY_BOTTLENECK_REASONING',
-        'EFFICIENCY_BOTTLENECK_LOCATION', 'EFFICIENCY_BOTTLENECK_AC_ANALYSIS'
-    ]
-    carelessness_params_v = [
-        'BEHAVIOR_CARELESSNESS_ISSUE'
-        # Add V-specific carelessness params if defined, e.g., from App A
-        # 'V_CARELESSNESS_DETAIL_OMISSION',
-        # 'V_CARELESSNESS_OPTION_MISREAD'
-    ]
+    def get_relevant_skills_v(param_keys):
+        """Gets relevant skills associated with triggered Verbal parameters."""
+        relevant_positions = set()
+        for key in param_keys:
+            if isinstance(key, str) and key in param_to_positions_v:
+                 relevant_positions.update(param_to_positions_v.get(key, set()))
 
-    # Logic Prompt Check
-    logic_trigger_check = any(p in triggered_params_all for p in logic_params_v)
-    if logic_trigger_check:
-        skills_involved = get_relevant_skills(logic_params_v, param_to_positions, skill_to_positions)
-        skill_context = f" [`{', '.join(skills_involved)}`] " if skills_involved else " "
-        reflection_prompts.append(f"  - 回想一下，在做錯/慢的{skill_context}題目時，具體是卡在哪个推理步驟、邏輯關係或選項辨析上？是完全沒思路，還是思路有偏差？" + get_pos_context(logic_params_v))
+        relevant_skills_set = set()
+        for skill, positions in skill_to_positions_v.items():
+            if not relevant_positions.isdisjoint(positions):
+                relevant_skills_set.add(skill) # Keep skill names in English for context
 
-    # Reading Prompt Check
-    reading_trigger_check = any(p in triggered_params_all for p in reading_params_v)
-    if reading_trigger_check:
-        skills_involved = get_relevant_skills(reading_params_v, param_to_positions, skill_to_positions)
-        skill_context = f" [`{', '.join(skills_involved)}`] " if skills_involved else " "
-        reflection_prompts.append(f"  - 對於做錯/慢的{skill_context}題目，是文章/題幹的關鍵信息沒讀懂、讀漏，還是題目要求理解錯誤？定位信息是否存在困難？" + get_pos_context(reading_params_v))
+        return sorted(list(relevant_skills_set))
+    # End Helper Functions
 
-    # Efficiency Prompt Check
-    efficiency_trigger_check = any(p in triggered_params_all for p in efficiency_params_v)
-    if efficiency_trigger_check:
-        skills_involved = get_relevant_skills(efficiency_params_v, param_to_positions, skill_to_positions)
-        skill_context = f" [`{', '.join(skills_involved)}`] " if skills_involved else " "
-        reflection_prompts.append(f"  - 回想耗時過長的{skill_context}題目，是閱讀花了太長時間，邏輯分析卡住，還是選項比較難以排除？" + get_pos_context(efficiency_params_v))
+    # Parameter Groups for Verbal Prompts (Using English Codes)
+    cr_reading_params = ['CR_READING_BASIC_OMISSION', 'CR_READING_DIFFICULTY_STEM', 'CR_READING_TIME_EXCESSIVE']
+    cr_reasoning_params = ['CR_REASONING_CHAIN_ERROR', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY', 'CR_REASONING_ABSTRACTION_DIFFICULTY', 'CR_REASONING_PREDICTION_ERROR', 'CR_REASONING_TIME_EXCESSIVE']
+    cr_ac_params = ['CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY', 'CR_AC_ANALYSIS_RELEVANCE_ERROR', 'CR_AC_ANALYSIS_DISTRACTOR_CONFUSION', 'CR_AC_ANALYSIS_TIME_EXCESSIVE']
+    cr_method_params = ['CR_METHOD_TYPE_SPECIFIC_ERROR', 'CR_METHOD_PROCESS_DEVIATION']
+    rc_reading_params = ['RC_READING_SPEED_SLOW_FOUNDATIONAL', 'RC_READING_COMPREHENSION_BARRIER', 'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'RC_READING_DOMAIN_KNOWLEDGE_GAP', 'RC_READING_VOCAB_BOTTLENECK', 'RC_READING_PRECISION_INSUFFICIENT', 'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY']
+    rc_reasoning_params = ['RC_REASONING_INFERENCE_WEAKNESS']
+    rc_ac_params = ['RC_AC_ANALYSIS_DIFFICULTY']
+    behavioral_params = ['BEHAVIOR_CARELESSNESS_ISSUE', 'BEHAVIOR_EARLY_RUSHING_FLAG_RISK', 'BEHAVIOR_GUESSING_HASTY']
 
-    # Carelessness Prompt Check
-    carelessness_trigger_check = any(p in triggered_params_all for p in carelessness_params_v) # Use list defined above
-    if carelessness_trigger_check: # Check the specific list, not just the one flag 'BEHAVIOR_CARELESSNESS_ISSUE'
-        careless_positions = param_to_positions.get('BEHAVIOR_CARELESSNESS_ISSUE', set())
-        # If the main flag has no direct positions, maybe find positions linked to other detail omission params?
-        # For now, stick to the main flag's linked positions if any.
-        careless_context = f" (例如題號: {sorted(list(careless_positions))})" if careless_positions else ""
-        reflection_prompts.append("  - 回想一下，是否存在因為看錯字、忽略細節或誤解選項導致的失誤？" + careless_context)
+    # Generate Prompts
+    if any(p in triggered_params_all for p in cr_reading_params):
+        skills = get_relevant_skills_v(cr_reading_params)
+        skill_context = f" [`{', '.join(skills)}`] " if skills else " "
+        reflection_prompts_v.append(f"  - 回想 CR 題幹閱讀時，是耗時過長，還是對句子/詞彙理解有偏差？{skill_context}" + get_pos_context_v(cr_reading_params))
+    if any(p in triggered_params_all for p in cr_reasoning_params):
+        skills = get_relevant_skills_v(cr_reasoning_params)
+        skill_context = f" [`{', '.join(skills)}`] " if skills else " "
+        reflection_prompts_v.append(f"  - 在 CR 邏輯推理時，是難以識別核心問題、理清論證鏈，還是預判方向錯誤？{skill_context}" + get_pos_context_v(cr_reasoning_params))
+    if any(p in triggered_params_all for p in cr_ac_params):
+        reflection_prompts_v.append(f"  - 分析 CR 選項時，是難以理解選項本身，判斷相關性失誤，還是容易被強干擾項混淆？" + get_pos_context_v(cr_ac_params))
+    if any(p in triggered_params_all for p in cr_method_params):
+        reflection_prompts_v.append(f"  - 做 CR 題時，是否遵循了標準流程？對於特定題型（如BF、Assumption）的方法是否清晰？" + get_pos_context_v(cr_method_params))
+    if any(p in triggered_params_all for p in rc_reading_params):
+        skills = get_relevant_skills_v(rc_reading_params)
+        skill_context = f" [`{', '.join(skills)}`] " if skills else " "
+        reflection_prompts_v.append(f"  - 閱讀 RC 文章時，是基礎速度慢、詞彙/長難句障礙，還是對篇章結構把握不清？{skill_context}" + get_pos_context_v(rc_reading_params))
+    if any(p in triggered_params_all for p in rc_reasoning_params + rc_ac_params): # Combine RC reasoning/AC
+        skills = get_relevant_skills_v(rc_reasoning_params + rc_ac_params)
+        skill_context = f" [`{', '.join(skills)}`] " if skills else " "
+        reflection_prompts_v.append(f"  - 回答 RC 問題時，是定位耗時/錯誤，推理能力不足，還是選項辨析困難？{skill_context}" + get_pos_context_v(rc_reasoning_params + rc_ac_params))
+    if sfe_triggered_overall: # Check SFE flag from earlier
+        skills = get_relevant_skills_v(['FOUNDATIONAL_MASTERY_INSTABILITY_SFE'])
+        skill_context = f" [`{', '.join(skills)}`] " if skills else " "
+        reflection_prompts_v.append(f"  - 對於 SFE 問題{skill_context}，回想一下是哪個基礎知識點掌握不牢固導致的失誤？" + get_pos_context_v(['FOUNDATIONAL_MASTERY_INSTABILITY_SFE']))
+    if any(p in triggered_params_all for p in behavioral_params):
+        reflection_prompts_v.append(f"  - 是否存在因為倉促猜題、開頭搶時間或普遍粗心導致的失誤？" + get_pos_context_v(behavioral_params))
 
-    if not reflection_prompts:
-        reflection_prompts.append("  - (本次分析未觸發典型的反思問題，建議結合練習計劃進行)")
-    report_lines.extend(reflection_prompts)
+    if not reflection_prompts_v:
+        reflection_prompts_v.append("  - (本次分析未觸發典型的反思問題，建議結合練習計劃進行)")
+    report_lines.extend(reflection_prompts_v)
 
-    # Secondary Evidence Suggestion
+    # 8.2 Second Evidence Suggestion (Reformatted)
+    # --- Re-introduce variable preparation for this section ---
+    df_problem = pd.DataFrame() # Initialize empty df
+    if diagnosed_df is not None and not diagnosed_df.empty: # Use diagnosed_df (which has diagnostic columns)
+        filter_cols = ['is_correct', 'overtime']
+        if all(col in diagnosed_df.columns for col in filter_cols):
+            df_problem = diagnosed_df[ (diagnosed_df['is_correct'] == False) | (diagnosed_df.get('overtime', False) == True) ].copy()
+    # --- End variable preparation ---
+
     report_lines.append("- **二級證據參考建議:**")
-    review_prompt = ""
-    if secondary_evidence_trigger:
-        review_prompt = "  - 本次分析識別出部分問題可能需要您查看近期的練習記錄以深入了解。當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。"
-        
+    if not df_problem.empty: # Check if df_problem has rows
+        report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
+
         # --- START NEW LOGIC: Group by time_performance_category ---
         details_added_2nd_ev = False
-        
-        diagnosed_df = ch3.get('diagnosed_dataframe') # Re-get df
-        if diagnosed_df is not None and not diagnosed_df.empty and 'time_performance_category' in diagnosed_df.columns:
-            # Filter for problems (incorrect or overtime)
-            df_problem = diagnosed_df[(diagnosed_df['is_correct'] == False) | (diagnosed_df.get('overtime', False) == True)].copy()
-            
-            if not df_problem.empty:
-                # Define the desired order for performance categories
-                performance_order_en = [
-                    'Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 
-                    'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct',
-                    'Unknown' # Include Unknown as a fallback
-                ]
-                
-                grouped_by_performance = df_problem.groupby('time_performance_category')
-                
-                # Iterate in the desired order
-                for perf_en in performance_order_en:
-                    if perf_en in grouped_by_performance.groups: # Check if this group exists
-                        # --- ADD SKIP LOGIC for 'Fast & Correct' ---
-                        if perf_en == 'Fast & Correct':
-                            print(f"DEBUG (v_report): Skipping category '{perf_en}' as requested.") # DEBUG
-                            continue # Skip to the next category
-                        # --- END SKIP LOGIC ---
+        if 'time_performance_category' in df_problem.columns:
+            performance_order_en = [
+                'Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong',
+                'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct',
+                'Unknown' # Include Unknown as a fallback
+            ]
+
+            grouped_by_performance = df_problem.groupby('time_performance_category')
+
+            for perf_en in performance_order_en:
+                if perf_en in grouped_by_performance.groups:
+                    if perf_en == 'Fast & Correct':
+                        print(f"DEBUG (v_report): Skipping category '{perf_en}' as requested.")
+                        continue
+
+                    group_df = grouped_by_performance.get_group(perf_en)
+                    if not group_df.empty:
+                        # Basic Info
+                        perf_zh_map = {
+                            'Fast & Wrong': "快錯", 'Slow & Wrong': "慢錯", 'Normal Time & Wrong': "正常時間錯",
+                            'Slow & Correct': "慢對", 'Fast & Correct': "快對", 'Normal Time & Correct': "正常時間對",
+                            'Unknown': "未知時間表現"
+                        }
+                        perf_zh = perf_zh_map.get(perf_en, perf_en)
+                        types_in_group = group_df['question_type'].dropna().unique()
+                        skills_in_group = group_df['question_fundamental_skill'].dropna().unique()
+                        types_zh = sorted([t for t in types_in_group])
+                        skills_zh = sorted([_translate_v(s) for s in skills_in_group]) # Translate skills
+
+                        # Parameter Categorization (REVISED LOGIC)
+                        all_eng_codes_in_group = set()
+                        param_eng_col = 'diagnostic_params' # Assume English codes are here
+                        if param_eng_col in group_df.columns:
+                            for labels_list in group_df[param_eng_col]:
+                                if isinstance(labels_list, list):
+                                    all_eng_codes_in_group.update(p for p in labels_list if isinstance(p, str) and p != INVALID_DATA_TAG_V)
+                        else:
+                             print(f"Warning (_generate_v_summary_report): Column '{param_eng_col}' not found in group_df. Cannot categorize by English code.")
+
+                        labels_by_category = {category: [] for category in V_PARAM_CATEGORY_ORDER}
+                        uncategorized_codes = []
                         
-                        group_df = grouped_by_performance.get_group(perf_en)
-                        if not group_df.empty:
-                            perf_zh = perf_en  # Default if translation not available
-                            # Translate performance category if needed
-                            if perf_en == 'Fast & Wrong': perf_zh = "快錯"
-                            elif perf_en == 'Slow & Wrong': perf_zh = "慢錯"
-                            elif perf_en == 'Normal Time & Wrong': perf_zh = "正常時間錯"
-                            elif perf_en == 'Slow & Correct': perf_zh = "慢對"
-                            elif perf_en == 'Fast & Correct': perf_zh = "快對"
-                            elif perf_en == 'Normal Time & Correct': perf_zh = "正常時間對"
-                            
-                            # Extract unique types and skills from this group
-                            types_in_group = group_df['question_type'].dropna().unique()
-                            skills_in_group = group_df['question_fundamental_skill'].dropna().unique()
-                            
-                            types_zh = sorted([t for t in types_in_group])
-                            # Keep skill names in English
-                            skills_en = sorted([s for s in skills_in_group])
+                        # Categorize using English codes
+                        for code_en in all_eng_codes_in_group:
+                            category = V_PARAM_TO_CATEGORY.get(code_en, 'Unknown')
+                            labels_by_category[category].append(code_en) # Store English code under category
+                            if category == 'Unknown':
+                                uncategorized_codes.append(code_en)
+                        
+                        # Translate codes to Chinese labels *after* categorization
+                        label_parts_data = []
+                        for category in V_PARAM_CATEGORY_ORDER: # Iterate in defined order
+                            category_eng_codes = labels_by_category.get(category, [])
+                            if category_eng_codes:
+                                # Translate category name itself
+                                category_zh_map = {
+                                    'SFE': '基礎掌握', 'Reading': '閱讀理解', 'Reasoning': '邏輯推理',
+                                    'Timing': '時間管理', 'Process': '流程方法', 'AC_Analysis': '選項分析',
+                                    'Question_Understanding': '問題理解', 'Behavioral': '行為模式', 'Unknown': '未分類'
+                                }
+                                category_zh = category_zh_map.get(category, category)
+                                # Translate the English codes in this category to Chinese labels
+                                category_labels_zh = sorted([_translate_v(code) for code in category_eng_codes])
+                                label_parts_data.append((category_zh, category_labels_zh))
+                        
+                        # Handle uncategorized codes specifically if needed (optional)
+                        # if uncategorized_codes:
+                        #     print(f"Warning: Uncategorized English codes found: {uncategorized_codes}")
+                        #     # You could potentially add them to the 'Unknown' category's display if desired
 
-                            # --- Extract Unique Labels ---
-                            all_labels_in_group = set()
-                            target_label_col = None
-                            
-                            # Check if the diagnostic_params column exists
-                            if 'diagnostic_params' in group_df.columns:
-                                target_label_col = 'diagnostic_params'
-                                print(f"DEBUG (v_report): Found 'diagnostic_params' column, will translate internally.")
-                            else:
-                                print(f"DEBUG (v_report): No diagnostic params column found for this group!")
-
-                            if target_label_col:
-                                print(f"DEBUG (v_report): Processing labels from column: {target_label_col}")
-                                
-                                for labels_list in group_df[target_label_col]:
-                                    if isinstance(labels_list, list): # Check if it's a list
-                                        translated_list = [_translate_v(p) for p in labels_list]
-                                        all_labels_in_group.update(translated_list)
-                            
-                            sorted_labels_zh = sorted(list(all_labels_in_group))
-                            
-                            # --- Modify Report Line ---
-                            report_line = f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及技能：【{', '.join(skills_en)}】。"
-                            if sorted_labels_zh:
-                                report_line += f" 注意相關問題點：【{', '.join(sorted_labels_zh)}】。"
-                            review_prompt += f"\n{report_line}"
-                            # --- End Modify Report Line ---
-                            
-                            details_added_2nd_ev = True
-                
-                if not details_added_2nd_ev:
-                    review_prompt += " (本次分析未聚焦到特定的問題類型或技能) "
-            else:
-                review_prompt += " (本次分析未發現需要分析的問題) "
+                        # Modify Report Lines using Markdown List Structure
+                        report_lines.append(f"  - **{perf_zh}:** 需關注題型：【{', '.join(types_zh)}】；涉及技能：【{', '.join(skills_zh)}】。")
+                        
+                        if label_parts_data:
+                            report_lines.append("    注意相關問題點：")
+                            for category_zh, sorted_labels_zh in label_parts_data:
+                                # Ensure final output uses dunhao comma
+                                report_lines.append(f"      - 【{category_zh}: {'、'.join(sorted_labels_zh)}】")
+                        # --- End Modify Report Lines ---
+                        
+                        details_added_2nd_ev = True
         else:
-            review_prompt += " (缺少必要診斷數據) "
-        # --- END NEW LOGIC ---
-            
-        review_prompt += " 歸納是哪些知識點或題型（參考報告中的描述）導致問題。 如果樣本不足，請在接下來的做題中注意收集。"
-    else:
-        review_prompt = "  - (本次分析未觸發需要參考二級證據的特定問題模式)"
-    report_lines.append(review_prompt)
+            report_lines.append("  - (警告：缺少 \'time_performance_category\' 欄位，無法按時間表現分類。)")
 
-    # Qualitative Analysis Suggestion
+        # --- Report core issues summary (using English codes from triggered_params_all) ---
+        core_issue_codes_to_report = set()
+        if sfe_triggered_overall: core_issue_codes_to_report.add('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+        # Find top 2 non-SFE params from triggered_params_all
+        param_counts_v = {}
+        if diagnosed_df is not None and 'diagnostic_params' in diagnosed_df.columns: # Use English codes
+             all_param_lists_eng = [p for sublist in diagnosed_df['diagnostic_params'] if isinstance(sublist, list) for p in sublist if isinstance(p, str)]
+             param_counts_v = pd.Series(all_param_lists_eng).value_counts()
+
+        top_other_params_codes_v = []
+        if not param_counts_v.empty:
+            top_other_params_codes_v = param_counts_v[param_counts_v.index != 'FOUNDATIONAL_MASTERY_INSTABILITY_SFE'].head(2).index.tolist()
+        core_issue_codes_to_report.update(top_other_params_codes_v)
+
+        if core_issue_codes_to_report:
+             # Translate the final set of codes for the summary
+             translated_core_issues = [_translate_v(code) for code in core_issue_codes_to_report if code and _translate_v(code) != INVALID_DATA_TAG_V]
+             if translated_core_issues:
+                 report_lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題：【{', '.join(sorted(translated_core_issues))}】。")
+             details_added_2nd_ev = True # Mark details added if core issues shown
+
+        if not details_added_2nd_ev:
+             report_lines.append("  - (本次分析未聚焦到特定的問題類型或技能)")
+
+        report_lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
+    else:
+        report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
+    # --- End Second Evidence Section (Reformatted) ---
+
+    # 8.3 Qualitative Analysis Suggestion
     report_lines.append("- **質化分析建議:**")
-    qual_trigger_text = ""
-    if qualitative_analysis_trigger:
-        qual_triggers = []
-        logic_params_for_qual = ['CR_REASONING_CHAIN_ERROR', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY', 'RC_REASONING_INFERENCE_WEAKNESS']
-        reading_params_for_qual = ['RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY']
-        if any(p in triggered_params_all for p in logic_params_for_qual): qual_triggers.append("複雜邏輯推理")
-        if any(p in triggered_params_all for p in reading_params_for_qual): qual_triggers.append("複雜閱讀理解")
-        if qual_triggers: qual_trigger_text = f"(特別是涉及{ ' 或 '.join(qual_triggers)}過程時) "
-        report_lines.append(f"  - 如果您對診斷報告指出的錯誤原因感到困惑，{qual_trigger_text}或者當您無法準確回憶錯誤原因且二級證據幫助有限時，可以嘗試提供 2-3 題相關類型題目的詳細解題流程跟思路範例（可以是文字記錄或口述錄音），以便與顧問進行更深入的個案分析，共同找到癥結所在。")
+    if qualitative_analysis_trigger: # Use flag set earlier
+         report_lines.append("  - *觸發時機：* 當您對診斷報告指出的錯誤原因感到困惑，或者上述方法仍無法幫您釐清根本問題時（尤其針對耗時過長或涉及複雜推理的題目）。")
+         report_lines.append("  - *建議行動：* 可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**（可以是文字記錄或口述錄音），以便與顧問進行更深入的個案分析，共同找到癥結所在。")
     else:
-        report_lines.append("  - (本次分析未觸發需要進行質化分析的特定問題)")
+         report_lines.append("  - (本次分析未觸發深入質化分析的特定建議，但若對任何問題點感到困惑，仍可採用此方法。)")
 
-    # Tool Recommendations
-    # report_lines.append("- **輔助工具與 AI 提示推薦 (基於本次診斷觸發的標籤):**")
-    # --- Comprehensive Tool Recommendation Map (Based on MD Ch8.7) ---
-    # tool_recommendations_map = {
-    #     # CR Reasoning & Specific Types
-    #     frozenset(['CR_REASONING_CHAIN_ERROR', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY']):
-    #         "可能適用外部工具 `Dustin_GMAT_CR_Core_Issue_Identifier` 或 `Dustin_GMAT_CR_Chain_Argument_Evaluation`；或使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
-    #     frozenset(['CR_METHOD_TYPE_SPECIFIC_ERROR']):
-    #         "特定 CR 題型方法錯誤 (如 Boldface, Argument Construction)，可能適用外部工具 `Dustin\'s GMAT CR: Boldface Interactive Tutor` (Boldface) 或 `Dustin_GMAT_CR_Role_Argument_Construction` (Argument Construction)；或使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
-    #     frozenset(['CR_REASONING_ABSTRACTION_DIFFICULTY']):
-    #         "CR 抽象邏輯或術語理解困難，可能適用外部工具 `Dustin\'s GMAT Tool: Textbook Explainer`；或使用 AI 提示 `Verbal-related/07_logical_term_explained.md`, `Verbal-related/09_complex_sentence_rewrite.md`。",
-    #     frozenset(['CR_READING_BASIC_OMISSION']):
-    #         "CR 基礎理解疏漏，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`。",
-    #     frozenset(['CR_READING_DIFFICULTY_STEM']):
-    #         "CR 題幹理解障礙，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/07_logical_term_explained.md`, `Verbal-related/09_complex_sentence_rewrite.md`。",
-    #     frozenset(['CR_READING_TIME_EXCESSIVE']):
-    #         "CR 閱讀耗時過長，可使用 AI 提示 `Verbal-related/02_quick_cr_tpa_tricks.md`, `Verbal-related/03_quick_rc_tricks.md`。",
-    #     frozenset(['CR_QUESTION_UNDERSTANDING_MISINTERPRETATION']):
-    #         "CR 提問要求把握錯誤，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/07_logical_term_explained.md`。",
-    #     frozenset(['CR_REASONING_PREDICTION_ERROR']):
-    #         "CR 預判方向錯誤或缺失，可使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/05_evaluate_explanation.md`。",
-    #     frozenset(['CR_REASONING_TIME_EXCESSIVE']):
-    #         "CR 邏輯思考耗時過長，可使用 AI 提示 `Verbal-related/02_quick_cr_tpa_tricks.md`, `Verbal-related/05_evaluate_explanation.md`。",
-    #     frozenset(['CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY']):
-    #         "CR 選項本身理解困難，可使用 AI 提示 `Verbal-related/07_logical_term_explained.md`, `Verbal-related/01_basic_explanation.md`。",
-    #     frozenset(['CR_AC_ANALYSIS_RELEVANCE_ERROR']):
-    #         "CR 選項相關性判斷錯誤，可使用 AI 提示 `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
-    #     frozenset(['CR_AC_ANALYSIS_DISTRACTOR_CONFUSION']):
-    #         "CR 強干擾選項混淆，可能適用外部工具 `Dustin_GMAT_Verbal_Distractor_Mocker`；或使用 AI 提示 `Verbal-related/01_basic_explanation.md`, `Verbal-related/07_logical_term_explained.md`。",
-    #     frozenset(['CR_AC_ANALYSIS_TIME_EXCESSIVE']):
-    #         "CR 選項篩選耗時過長，可使用 AI 提示 `Verbal-related/02_quick_cr_tpa_tricks.md`, `Verbal-related/06_boldface_SOP.md`。",
-    #     frozenset(['CR_METHOD_PROCESS_DEVIATION']):
-    #         "CR 未遵循標準流程，可使用 AI 提示 `Verbal-related/05_evaluate_explanation.md`, `Verbal-related/06_boldface_SOP.md`。",
-
-    #     # RC Reading Comprehension
-    #     frozenset(['RC_READING_SPEED_SLOW_FOUNDATIONAL', 'RC_READING_COMPREHENSION_BARRIER']):
-    #         "RC 基礎閱讀速度慢或存在障礙，可能適用外部工具 `Dustin GMAT: Chunk Reading Coach`；或使用 AI 提示 `Verbal-related/03_quick_rc_tricks.md`。",
-    #     frozenset(['RC_READING_SPEED_SLOW_FOUNDATIONAL', 'reading_comprehension_barrier_inquiry']): # Example: Combine param with Ch1 flag
-    #         "RC 基礎閱讀速度慢，可能適用外部工具 `Dustin GMAT: Chunk Reading Coach` 或 AI 提示 `Verbal-related/03_quick_rc_tricks.md`。",
-    #     frozenset(['RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'RC_READING_DOMAIN_KNOWLEDGE_GAP', 'RC_READING_VOCAB_BOTTLENECK']): # Non-systemic vocab
-    #         "RC 長難句/領域知識/非系統性詞彙瓶頸，可能適用外部工具 `Dustin's GMAT Terminator: Sentence Cracker` 或相關 AI 提示。",
-    #     frozenset(['RC_READING_VOCAB_BOTTLENECK']): # Systemic vocab (needs logic to differentiate)
-    #         "RC 詞彙量瓶頸 (需系統性學習)，可能適用外部工具 `Dustin's GMAT Core: Vocab Master`。",
-    #     frozenset(['RC_READING_PRECISION_INSUFFICIENT']):
-    #         "RC 閱讀精度不足，可能適用外部工具 `Dustin GMAT Close Reading Coach` 或 AI 提示。",
-    #     frozenset(['RC_READING_PASSAGE_STRUCTURE_DIFFICULTY']):
-    #         "RC 篇章結構把握不清，可能適用外部工具 `Dustin_GMAT_RC_Passage_Analyzer` 或 AI 提示。",
-
-    #     # Distractors/Carelessness
-    #     frozenset(['CR_AC_ANALYSIS_DISTRACTOR_CONFUSION', 'RC_AC_ANALYSIS_DIFFICULTY', 'BEHAVIOR_CARELESSNESS_ISSUE']):
-    #         "選項辨析困難或粗心問題，可能適用外部工具 `Dustin_GMAT_Verbal_Distractor_Mocker` 或相關 AI 提示。",
-
-    #     # Foundational Mastery
-    #     frozenset(['FOUNDATIONAL_MASTERY_INSTABILITY_SFE']):
-    #         "基礎掌握不穩定 (SFE)，建議優先使用 AI 提示 `Verbal-related/01_basic_explanation.md` 鞏固基礎。",
-
-    #     # Behavioral
-    #     frozenset(['BEHAVIOR_EARLY_RUSHING_FLAG_RISK']):
-    #         "前期作答過快，建議使用 AI 提示 `Verbal-related/05_evaluate_explanation.md` 反思節奏。",
-    #     frozenset(['BEHAVIOR_GUESSING_HASTY']):
-    #         "疑似猜題/倉促，建議使用 AI 提示 `Verbal-related/01_basic_explanation.md` 學習完整步驟。",
-    # }
-
-    # Generate tool recommendations based on triggered params (Q-like format)
-    # processed_for_tools = set()
-    # recommendations_made = False
-    # Split tools and prompts
-    # recommended_tools = set() # Use sets to avoid duplicates initially
-    # recommended_prompts_map = {} # Keep this as dict to store reasons
-
-    # for params_set, tool_desc in tool_recommendations_map.items():
-    #     if any(p in triggered_params_all for p in params_set) and not params_set.issubset(processed_for_tools):
-    #         trigger_reasons_translated = [_translate_v(p) for p in params_set if p in triggered_params_all]
-    #         if trigger_reasons_translated:
-    #             # Extract tool names and prompt names using precise patterns
-    #             import re
-    #             # Step 1: Find all items within backticks
-    #             all_backticked_items = re.findall(r'`([^`]+?)`', tool_desc)
-                
-    #             # Step 2: Filter into tools (not ending in .md) and prompts (ending in .md)
-    #             current_tools = {item for item in all_backticked_items if not item.endswith('.md') and item.strip()}
-    #             current_prompts = {item for item in all_backticked_items if item.endswith('.md')}
-                
-    #             if current_tools:
-    #                 recommended_tools.update(current_tools) # Add to set
-    #                 recommendations_made = True
-    #             if current_prompts:
-    #                 for prompt in current_prompts:
-    #                     # Store reasons for each prompt
-    #                     if prompt not in recommended_prompts_map:
-    #                         recommended_prompts_map[prompt] = set()
-    #                     recommended_prompts_map[prompt].update(trigger_reasons_translated)
-    #                 recommendations_made = True
-
-    #             processed_for_tools.update(params_set)
-
-    # Report Tools
-    # if recommended_tools:
-    #      report_lines.append("  - 工具:")
-    #      # Sort the set before reporting
-    #      for tool in sorted(list(recommended_tools)):
-    #          report_lines.append(f"    - `{tool}`")
-
-    # Report Prompts
-    # if recommended_prompts_map:
-    #     report_lines.append("  - AI提示:")
-    #     for prompt in sorted(recommended_prompts_map.keys()):
-    #         # reasons = ", ".join(sorted(list(recommended_prompts_map[prompt])))
-    #         # report_lines.append(f"    - `{prompt}` (基於: {reasons})") # Option to show reasons
-    #         report_lines.append(f"    - `{prompt}`")
-
-    # Fallback message
-    # if not recommendations_made:
-    #      report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議)")
+    # 8.4 Tool/Prompt Recommendation (Placeholder/Example)
+    # report_lines.append("- **輔助工具與 AI 提示推薦建議:**")
+    # ... (Add logic similar to DI if needed, using triggered_params_all (English) and a V-specific tool map)
+    # report_lines.append("  - (根據當前診斷，暫無特別推薦。)")
 
     report_lines.append("\n--- 報告結束 ---")
-    print("DEBUG: --- Exiting _generate_v_summary_report ---") # DEBUG
-    # Use double newline for Markdown paragraph breaks
     return "\n\n".join(report_lines)
 
 # --- V Recommendation Generation Helper ---
