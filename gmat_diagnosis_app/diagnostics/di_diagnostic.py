@@ -1349,7 +1349,6 @@ def _generate_di_summary_report(di_results):
     """Generates the summary report string for the Data Insights section."""
     report_lines = []
     # Keep only the more descriptive title
-    report_lines.append("## GMAT 數據洞察（Data Insights）診斷報告")
     report_lines.append("---（基於用戶數據與模擬難度分析）---")
     report_lines.append("")
 

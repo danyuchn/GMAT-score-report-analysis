@@ -95,47 +95,64 @@ V_PARAM_TO_CATEGORY = {
     # Reading
     'CR_READING_BASIC_OMISSION': 'Reading',
     'CR_READING_DIFFICULTY_STEM': 'Reading',
-    'CR_READING_TIME_EXCESSIVE': 'Reading',
-    'RC_READING_SPEED_SLOW_FOUNDATIONAL': 'Reading',
+    'CR_READING_TIME_EXCESSIVE': 'Reading', # Also Timing
+    'RC_READING_SPEED_SLOW_FOUNDATIONAL': 'Reading', # Also Timing
     'RC_READING_COMPREHENSION_BARRIER': 'Reading',
     'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY': 'Reading',
     'RC_READING_DOMAIN_KNOWLEDGE_GAP': 'Reading',
     'RC_READING_VOCAB_BOTTLENECK': 'Reading',
     'RC_READING_PRECISION_INSUFFICIENT': 'Reading',
     'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY': 'Reading',
+    'RC_READING_INFO_LOCATION_ERROR': 'Reading', # ADDED
+    'RC_READING_KEYWORD_LOGIC_OMISSION': 'Reading', # ADDED
     
     # Reasoning
     'CR_REASONING_CHAIN_ERROR': 'Reasoning',
     'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY': 'Reasoning',
     'CR_REASONING_ABSTRACTION_DIFFICULTY': 'Reasoning',
     'CR_REASONING_PREDICTION_ERROR': 'Reasoning',
-    'CR_REASONING_TIME_EXCESSIVE': 'Reasoning',
+    'CR_REASONING_TIME_EXCESSIVE': 'Reasoning', # Also Timing
     'RC_REASONING_INFERENCE_WEAKNESS': 'Reasoning',
+    'RC_REASONING_TIME_EXCESSIVE': 'Reasoning', # Also Timing - ADDED
     
     # Timing
-    'CR_READING_TIME_EXCESSIVE': 'Timing',
-    'CR_REASONING_TIME_EXCESSIVE': 'Timing',
-    'CR_AC_ANALYSIS_TIME_EXCESSIVE': 'Timing',
-    'RC_READING_SPEED_SLOW_FOUNDATIONAL': 'Timing',
+    'CR_READING_TIME_EXCESSIVE': 'Timing', # Also Reading
+    'CR_REASONING_TIME_EXCESSIVE': 'Timing', # Also Reasoning
+    'CR_AC_ANALYSIS_TIME_EXCESSIVE': 'Timing', # Also AC_Analysis
+    'RC_READING_SPEED_SLOW_FOUNDATIONAL': 'Timing', # Also Reading
+    'RC_LOCATION_TIME_EXCESSIVE': 'Timing', # ADDED
+    'RC_REASONING_TIME_EXCESSIVE': 'Timing', # Also Reasoning - ADDED
+    'RC_AC_ANALYSIS_TIME_EXCESSIVE': 'Timing', # Also AC_Analysis - ADDED
+    'EFFICIENCY_BOTTLENECK_READING': 'Timing', # ADDED
+    'EFFICIENCY_BOTTLENECK_REASONING': 'Timing', # ADDED
+    'EFFICIENCY_BOTTLENECK_LOCATION': 'Timing', # ADDED
+    'EFFICIENCY_BOTTLENECK_AC_ANALYSIS': 'Timing', # ADDED
     
     # Process
     'CR_METHOD_TYPE_SPECIFIC_ERROR': 'Process',
     'CR_METHOD_PROCESS_DEVIATION': 'Process',
+    'RC_METHOD_INEFFICIENT_READING': 'Process', # ADDED
+    'RC_LOCATION_ERROR_INEFFICIENCY': 'Process', # ADDED
+    'RC_METHOD_TYPE_SPECIFIC_ERROR': 'Process', # ADDED
     
     # AC_Analysis (Answer Choice Analysis)
     'CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY': 'AC_Analysis',
     'CR_AC_ANALYSIS_RELEVANCE_ERROR': 'AC_Analysis',
     'CR_AC_ANALYSIS_DISTRACTOR_CONFUSION': 'AC_Analysis',
-    'CR_AC_ANALYSIS_TIME_EXCESSIVE': 'AC_Analysis',
+    'CR_AC_ANALYSIS_TIME_EXCESSIVE': 'AC_Analysis', # Also Timing
     'RC_AC_ANALYSIS_DIFFICULTY': 'AC_Analysis',
+    'RC_AC_ANALYSIS_TIME_EXCESSIVE': 'AC_Analysis', # Also Timing - ADDED
     
     # Question_Understanding
     'CR_QUESTION_UNDERSTANDING_MISINTERPRETATION': 'Question_Understanding',
+    'RC_QUESTION_UNDERSTANDING_MISINTERPRETATION': 'Question_Understanding', # ADDED
     
     # Behavioral
     'BEHAVIOR_CARELESSNESS_ISSUE': 'Behavioral',
     'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': 'Behavioral',
     'BEHAVIOR_GUESSING_HASTY': 'Behavioral'
+    # Note: The code logic in _generate_v_summary_report currently handles missing keys by assigning 'Unknown'.
+    # This dictionary primarily drives the categorization logic within that function.
 }
 
 # --- V-Specific Helper Functions (if any needed in future) ---
@@ -907,6 +924,8 @@ APPENDIX_A_TRANSLATION_V = {
     # RC - Answer Choice Analysis
     'RC_AC_ANALYSIS_DIFFICULTY': "RC 選項辨析: 選項理解/辨析困難 (含義/對應)",
     'RC_AC_ANALYSIS_TIME_EXCESSIVE': "RC 選項辨析: 選項篩選耗時過長",
+    # Added missing RC Method type specific error for full coverage
+    'RC_METHOD_TYPE_SPECIFIC_ERROR': "RC方法：特定題型（需回憶或二級證據釐清）",
     # Foundational Mastery (CR & RC)
     'FOUNDATIONAL_MASTERY_INSTABILITY_SFE': "基礎掌握: 應用不穩定 (Special Focus Error)",
     # Efficiency Issues (CR & RC)
@@ -1038,6 +1057,8 @@ def _translate_v(param):
         # RC Answer Choice Analysis
         'RC_AC_ANALYSIS_DIFFICULTY': 'RC 選項分析：選項辨析困難',
         'RC_AC_ANALYSIS_TIME_EXCESSIVE': 'RC 選項分析：篩選耗時過長',
+        # Add the specific RC method error translation here
+        'RC_METHOD_TYPE_SPECIFIC_ERROR': "RC方法：特定題型（需回憶或二級證據釐清）",
         # Efficiency (explicit)
         'EFFICIENCY_BOTTLENECK_READING': '效率瓶頸：閱讀',
         'EFFICIENCY_BOTTLENECK_REASONING': '效率瓶頸：推理',
@@ -1074,7 +1095,6 @@ def _generate_v_summary_report(v_diagnosis_results):
     """Generates the summary report string for the Verbal section."""
     report_lines = []
     # Keep only the more descriptive title
-    report_lines.append("## GMAT 語文（Verbal）診斷報告")
     report_lines.append("---（基於用戶數據與模擬難度分析）---")
     report_lines.append("")
 
