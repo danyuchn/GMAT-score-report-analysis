@@ -576,47 +576,32 @@ USER QUESTION:
             previous_response_id=previous_response_id,
             # Add other parameters if needed, e.g., temperature, max_tokens based on API docs
             # max_output_tokens=500, # Example: limit output tokens
+            temperature=0.5 # Example: make response more focused
         )
         logging.info(f"OpenAI response received. Status: {response.status}")
 
         if response.status == 'completed' and response.output:
             # Extract text from the first output message content
             response_text = ""
-            # Iterate through the output list to find the message block
-            message_block = None
-            for item in response.output:
-                if hasattr(item, 'type') and item.type == 'message':
-                    message_block = item
-                    break # Found the message block
-            
-            if message_block and hasattr(message_block, 'content') and message_block.content:
-                for content_block in message_block.content:
-                    # Ensure the content_block itself has a type attribute before checking
-                    if hasattr(content_block, 'type') and content_block.type == 'output_text':
+            if response.output[0].type == 'message' and response.output[0].content:
+                for content_block in response.output[0].content:
+                    if content_block.type == 'output_text':
                         response_text += content_block.text
             
             if not response_text:
-                 # --- Log the output structure before raising error ---
-                 logging.error(f"OpenAI response completed but no text found after iterating. Response output structure: {response.output}")
-                 # --- End Log ---
-                 raise ValueError("OpenAI response completed but contained no text output after iterating.")
+                 raise ValueError("OpenAI response completed but contained no text output.")
                  
             return response_text.strip(), response.id
         elif response.status == 'error':
              error_details = response.error if response.error else "Unknown error"
              raise Exception(f"OpenAI API error: {error_details}")
         else:
-             # --- Log the output structure before raising error ---
-             logging.error(f"OpenAI response status not completed or output empty. Status: {response.status}. Response output structure: {response.output}")
-             # --- End Log ---
              raise Exception(f"OpenAI response status was not 'completed' or output was empty. Status: {response.status}")
 
     except Exception as e:
         logging.error(f"Error calling OpenAI responses API: {e}", exc_info=True)
         # Re-raise the exception to be caught by the sidebar UI
         raise e
-# Place this function near the other helper functions
-# ... existing code ...
 
 # --- Refactored Data Input Tab Function ---
 def process_subject_tab(subject, tab_container, base_rename_map):
@@ -957,14 +942,15 @@ def reset_session_for_new_upload():
     st.session_state.show_chat = False
     st.session_state.chat_history = []
 
-# --- Sidebar Settings --- (Remove Chat Interface part) ---
+# --- Sidebar Settings ---
+# 側邊欄設定部分保留 API Key 輸入
 st.sidebar.subheader("OpenAI 設定 (選用)")
 api_key_input = st.sidebar.text_input(
     "輸入您的 OpenAI API Key 啟用 AI 問答：",
     type="password",
     key="openai_api_key_input", # Use a dedicated key
     value=st.session_state.get('openai_api_key', ''), # Load from state if exists
-    help="輸入有效金鑰並成功完成分析後，下方將出現 AI 對話框。"
+    help="輸入有效金鑰並成功完成分析後，底部將出現 AI 對話功能。"
 )
 
 # Update session state when input changes
@@ -976,15 +962,62 @@ else:
     st.session_state.show_chat = False # Hide chat if key is removed
     st.session_state.chat_history = [] # Clear history if key is removed
 
-# --- Activate Chat Logic (place this logically after analysis completion check) ---
-# This check should ideally happen within the main app logic where diagnosis_complete is set
-# Moved the activation logic to where diagnosis_complete is set
+# --- Activate Chat Logic ---
+if st.session_state.openai_api_key and st.session_state.diagnosis_complete:
+    st.session_state.show_chat = True
+else:
+    st.session_state.show_chat = False
+    # Don't clear history here, only when key is removed or new analysis starts
 
-# --- (Removed Chat Display from Sidebar) ---
+# --- Display Chat Interface in Sidebar ---
+if st.session_state.show_chat:
+    st.sidebar.divider()
+    st.sidebar.subheader("與 AI 對話 (基於本次報告)")
 
-st.sidebar.divider() # Keep divider maybe?
+    # Display chat history
+    for message in st.session_state.chat_history:
+        with st.sidebar.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-# --- IRT Simulation Settings --- 
+    # Chat input at the bottom of the sidebar
+    if prompt := st.sidebar.chat_input("針對報告和數據提問..."):
+        # Add user message to history and display
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        with st.sidebar.chat_message("user"):
+            st.markdown(prompt)
+
+        # Prepare context and call OpenAI
+        with st.sidebar.chat_message("assistant"):
+            message_placeholder = st.empty() # Placeholder for streaming or waiting message
+            message_placeholder.markdown("思考中...")
+            try:
+                # --- Prepare Context --- 
+                report_context = _get_combined_report_context() 
+                dataframe_context = _get_dataframe_context()
+                # --- Call OpenAI --- 
+                ai_response_text, response_id = _get_openai_response(
+                    st.session_state.chat_history, 
+                    report_context, 
+                    dataframe_context
+                )
+                
+                # Display AI response and add to history with response_id
+                message_placeholder.markdown(ai_response_text)
+                st.session_state.chat_history.append({
+                    "role": "assistant", 
+                    "content": ai_response_text,
+                    "response_id": response_id # Store the ID for the next turn
+                })
+
+            except Exception as e:
+                error_message = f"呼叫 AI 時出錯: {e}"
+                message_placeholder.error(error_message)
+                # Add error message to history, without a response_id
+                st.session_state.chat_history.append({"role": "assistant", "content": error_message}) 
+
+st.sidebar.divider()
+
+# --- IRT Simulation Settings --- (Moved below chat interface)
 st.sidebar.subheader("IRT 模擬設定")
 # Store initial thetas in session state to persist them
 if 'initial_theta_q' not in st.session_state: st.session_state.initial_theta_q = 0.0
@@ -1506,32 +1539,181 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
 
                     display_subject_results(subject, subject_tab, report_md, df_subject, subject_col_config, subject_excel_map)
 
-# --- AI Chat Interface (Moved to Main Page Bottom) ---
-st.divider()
+# --- Sidebar for Language --- #
+# ... (Sidebar code) ...
 
-# Check conditions to show chat
+# --- Helper functions for AI Chat ---
+def _get_combined_report_context():
+    """Combines markdown reports from all subjects."""
+    full_report = ""
+    if st.session_state.report_dict:
+        for subject in SUBJECTS:
+            report = st.session_state.report_dict.get(subject)
+            if report:
+                full_report += f"\n\n## {subject} 科診斷報告\n\n{report}"
+    return full_report.strip()
+
+def _get_dataframe_context(max_rows=50):
+    """Converts the processed dataframe to a string format (markdown) for context."""
+    if st.session_state.processed_df is not None and not st.session_state.processed_df.empty:
+        df_context = st.session_state.processed_df.copy()
+        # Optionally select/rename columns for clarity in context
+        # For now, let's convert a sample to markdown
+        try:
+            # Convert boolean columns to Yes/No for better readability for the LLM
+            bool_cols = df_context.select_dtypes(include=bool).columns
+            for col in bool_cols:
+                df_context[col] = df_context[col].map({True: 'Yes', False: 'No'})
+                
+            # Convert list column to string
+            if 'diagnostic_params_list' in df_context.columns:
+                df_context['diagnostic_params_list'] = df_context['diagnostic_params_list'].apply(
+                    lambda x: ', '.join(map(str, x)) if isinstance(x, list) else str(x)
+                )
+                
+            # Limit rows to avoid excessive context length
+            if len(df_context) > max_rows:
+                df_context_str = df_context.head(max_rows).to_markdown(index=False)
+                df_context_str += f"\n... (只顯示前 {max_rows} 行)"
+            else:
+                df_context_str = df_context.to_markdown(index=False)
+            return df_context_str
+        except Exception as e:
+            logging.error(f"Error converting dataframe to markdown context: {e}")
+            return "(無法轉換詳細數據表格)"
+    return "(無詳細數據表格)"
+
+# --- Add OpenAI response function ---
+def _get_openai_response(current_chat_history, report_context, dataframe_context):
+    """Gets response from OpenAI using the responses endpoint and handles conversation history.
+    
+    Args:
+        current_chat_history (list): The current chat history list.
+        report_context (str): The combined markdown report context.
+        dataframe_context (str): The dataframe context string.
+
+    Returns:
+        tuple: (ai_response_text, response_id) or raises an exception.
+    """
+    if not st.session_state.openai_api_key:
+        raise ValueError("OpenAI API Key is missing.")
+        
+    client = openai.OpenAI(api_key=st.session_state.openai_api_key)
+    
+    # Find the last user prompt
+    last_user_prompt = ""
+    if current_chat_history and current_chat_history[-1]["role"] == "user":
+        last_user_prompt = current_chat_history[-1]["content"]
+    else:
+        raise ValueError("Could not find the last user prompt in history.")
+        
+    # Find the previous response ID from the last assistant message
+    previous_response_id = None
+    if len(current_chat_history) > 1:
+        for i in range(len(current_chat_history) - 2, -1, -1):
+            if current_chat_history[i]["role"] == "assistant":
+                previous_response_id = current_chat_history[i].get("response_id")
+                break
+                
+    # Construct the input for the API using standard multi-line string and .format()
+    input_template = '''You are a GMAT diagnostic assistant. Analyze the provided report summary and detailed data table (excerpt) to answer the user's question accurately and concisely. If the information is not present in the provided context, say so.
+
+REPORT SUMMARY:
+{report}
+
+DETAILED DATA EXCERPT:
+{data}
+
+USER QUESTION:
+{prompt}
+'''
+    api_input = input_template.format(
+        report=report_context,
+        data=dataframe_context,
+        prompt=last_user_prompt
+    )
+    
+    try:
+        logging.info(f"Calling OpenAI responses.create with model gpt-4.1-mini. Previous ID: {previous_response_id}")
+        response = client.responses.create(
+            model="o4-mini", # Using the model from user's example
+            input=api_input,
+            previous_response_id=previous_response_id,
+            # Add other parameters if needed, e.g., temperature, max_tokens based on API docs
+            # max_output_tokens=500, # Example: limit output tokens
+            temperature=0.5 # Example: make response more focused
+        )
+        logging.info(f"OpenAI response received. Status: {response.status}")
+
+        if response.status == 'completed' and response.output:
+            # Extract text from the first output message content
+            response_text = ""
+            if response.output[0].type == 'message' and response.output[0].content:
+                for content_block in response.output[0].content:
+                    if content_block.type == 'output_text':
+                        response_text += content_block.text
+            
+            if not response_text:
+                 raise ValueError("OpenAI response completed but contained no text output.")
+                 
+            return response_text.strip(), response.id
+        elif response.status == 'error':
+             error_details = response.error if response.error else "Unknown error"
+             raise Exception(f"OpenAI API error: {error_details}")
+        else:
+             raise Exception(f"OpenAI response status was not 'completed' or output was empty. Status: {response.status}")
+
+    except Exception as e:
+        logging.error(f"Error calling OpenAI responses API: {e}", exc_info=True)
+        # Re-raise the exception to be caught by the sidebar UI
+        raise e
+
+# --- 移除側邊欄對話框代碼 ---
+# 側邊欄設定部分保留 API Key 輸入
+st.sidebar.subheader("OpenAI 設定 (選用)")
+api_key_input = st.sidebar.text_input(
+    "輸入您的 OpenAI API Key 啟用 AI 問答：",
+    type="password",
+    key="openai_api_key_input", # Use a dedicated key
+    value=st.session_state.get('openai_api_key', ''), # Load from state if exists
+    help="輸入有效金鑰並成功完成分析後，底部將出現 AI 對話功能。"
+)
+
+# Update session state when input changes
+if api_key_input:
+    st.session_state.openai_api_key = api_key_input
+else:
+    # Optionally clear the key if the input is cleared
+    st.session_state.openai_api_key = None
+    st.session_state.show_chat = False # Hide chat if key is removed
+    st.session_state.chat_history = [] # Clear history if key is removed
+
+# --- Activate Chat Logic ---
 if st.session_state.openai_api_key and st.session_state.diagnosis_complete:
     st.session_state.show_chat = True
 else:
     st.session_state.show_chat = False
-    
+    # Don't clear history here, only when key is removed or new analysis starts
+
+# --- Display Chat Interface in Sidebar ---
 if st.session_state.show_chat:
-    st.header("💬 與 AI 對話 (基於本次報告)")
+    st.sidebar.divider()
+    st.sidebar.subheader("與 AI 對話 (基於本次報告)")
 
     # Display chat history
     for message in st.session_state.chat_history:
-        with st.chat_message(message["role"]):
+        with st.sidebar.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Chat input at the bottom of the main page
-    if prompt := st.chat_input("針對報告和數據提問..."):
+    # Chat input at the bottom of the sidebar
+    if prompt := st.sidebar.chat_input("針對報告和數據提問..."):
         # Add user message to history and display
         st.session_state.chat_history.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
+        with st.sidebar.chat_message("user"):
             st.markdown(prompt)
 
         # Prepare context and call OpenAI
-        with st.chat_message("assistant"):
+        with st.sidebar.chat_message("assistant"):
             message_placeholder = st.empty() # Placeholder for streaming or waiting message
             message_placeholder.markdown("思考中...")
             try:
@@ -1557,7 +1739,826 @@ if st.session_state.show_chat:
                 error_message = f"呼叫 AI 時出錯: {e}"
                 message_placeholder.error(error_message)
                 # Add error message to history, without a response_id
-                st.session_state.chat_history.append({"role": "assistant", "content": error_message})
+                st.session_state.chat_history.append({"role": "assistant", "content": error_message}) 
 
-# --- End of Main Page --- 
-# (Add any final footers or elements after the chat interface if needed)
+st.sidebar.divider()
+
+# --- IRT Simulation Settings --- (Moved below chat interface)
+st.sidebar.subheader("IRT 模擬設定")
+# Store initial thetas in session state to persist them
+if 'initial_theta_q' not in st.session_state: st.session_state.initial_theta_q = 0.0
+if 'initial_theta_v' not in st.session_state: st.session_state.initial_theta_v = 0.0
+if 'initial_theta_di' not in st.session_state: st.session_state.initial_theta_di = 0.0
+
+st.session_state.initial_theta_q = st.sidebar.number_input("Q 科目初始 Theta 估計", value=st.session_state.initial_theta_q, step=0.1, key="theta_q_input")
+st.session_state.initial_theta_v = st.sidebar.number_input("V 科目初始 Theta 估計", value=st.session_state.initial_theta_v, step=0.1, key="theta_v_input")
+st.session_state.initial_theta_di = st.sidebar.number_input("DI 科目初始 Theta 估計", value=st.session_state.initial_theta_di, step=0.1, key="theta_di_input")
+
+
+# --- Main Page ---
+st.title('GMAT 成績診斷平台')
+
+# --- Data Input Section (Using Tabs and Refactored Function) ---
+st.header("1. 上傳或貼上各科成績單")
+st.info(f"提示：上傳的 CSV 檔案大小請勿超過 {MAX_FILE_SIZE_MB}MB。貼上的資料沒有此限制。")
+
+tab_q, tab_v, tab_di = st.tabs(["Quantitative (Q)", "Verbal (V)", "Data Insights (DI)"])
+tabs = {'Q': tab_q, 'V': tab_v, 'DI': tab_di}
+
+# Process each subject tab using the refactored function
+for subject in SUBJECTS:
+    tab_container = tabs[subject]
+    with tab_container:
+        processed_df, source_type, warnings = process_subject_tab(subject, tab_container, BASE_RENAME_MAP)
+        # Store results in session state immediately after processing each tab
+        st.session_state.input_dfs[subject] = processed_df # Will be None if error/no data
+        st.session_state.validation_errors[subject] = warnings
+        if source_type:
+             st.session_state.data_source_types[subject] = source_type
+
+
+# --- Combine Input Data (After Tabs) ---
+# Retrieve potentially updated DFs and errors from session state
+input_dfs = st.session_state.input_dfs
+validation_errors = st.session_state.validation_errors
+
+# Filter out subjects where df is None (error, no data, or validation failed)
+valid_input_dfs = {subj: df for subj, df in input_dfs.items() if df is not None}
+loaded_subjects = list(valid_input_dfs.keys()) # Subjects with valid dataframes
+
+df_combined_input = None
+if len(valid_input_dfs) == len(SUBJECTS): # Only combine if ALL subjects are valid
+    try:
+        df_list = [valid_input_dfs[subj] for subj in SUBJECTS] # Ensure consistent order if needed
+        df_combined_input = pd.concat(df_list, ignore_index=True)
+        # Basic check after concat
+        if df_combined_input.empty or 'question_position' not in df_combined_input.columns or df_combined_input['question_position'].isnull().any():
+             st.error("合併後的資料為空或缺少有效的 'question_position'，無法繼續。")
+             df_combined_input = None # Invalidate combination
+    except Exception as e:
+        st.error(f"合併已驗證的輸入資料時發生錯誤: {e}")
+        df_combined_input = None
+
+# --- Analysis Trigger Button ---
+st.divider()
+
+# Check if *any* validation errors occurred across all tabs
+any_validation_errors = any(bool(warnings) for warnings in validation_errors.values())
+all_subjects_loaded_and_valid = (len(valid_input_dfs) == len(SUBJECTS)) and (df_combined_input is not None)
+
+# Determine button state
+button_disabled = True
+button_message = ""
+
+if all_subjects_loaded_and_valid:
+    button_disabled = False # Enable button
+elif any_validation_errors:
+    button_message = "部分科目數據驗證失敗，請修正上方標示的錯誤後再試。"
+    st.error(button_message)
+else: # Not all subjects loaded or combined DF failed
+    subjects_actually_loaded = [subj for subj, df in input_dfs.items() if df is not None]
+    missing_subjects = [subj for subj in SUBJECTS if subj not in subjects_actually_loaded]
+    if missing_subjects:
+         button_message = f"請確保已為 {'、'.join(missing_subjects)} 科目提供有效數據。"
+         st.warning(button_message, icon="⚠️")
+    elif not input_dfs: # No data attempted at all
+         button_message = "請在上方分頁中為 Q, V, DI 三個科目上傳或貼上資料。"
+         st.info(button_message)
+    else: # All attempted, but maybe combination failed or validation error cleared?
+         button_message = "請檢查所有科目的數據是否已成功加載且無誤。"
+         st.warning(button_message, icon="⚠️")
+
+
+# Display the button
+if st.button("🔍 開始分析", type="primary", disabled=button_disabled, key="analyze_button"):
+    if not button_disabled: # Extra check
+        st.session_state.analysis_run = True
+        # Reset previous analysis outputs
+        st.session_state.diagnosis_complete = False
+        st.session_state.report_dict = {}
+        st.session_state.ai_summary = None
+        st.session_state.final_thetas = {}
+        st.session_state.processed_df = None # Clear previous processed data
+        st.session_state.error_message = None
+        st.rerun() # Rerun to enter the analysis block immediately
+    # No 'else' needed, button is disabled if conditions aren't met
+
+# --- Analysis Execution Block ---
+# Use df_combined_input which is only non-None if all subjects were valid and combined successfully
+if st.session_state.analysis_run and df_combined_input is not None and not st.session_state.diagnosis_complete:
+    st.header("2. 執行 IRT 模擬與診斷")
+    analysis_success = True # Flag to track overall success
+    df_final_for_diagnosis = None # Initialize
+
+    with st.status("執行分析步驟...", expanded=True) as analysis_status:
+
+        # --- 1. Calculate Time Pressure ---
+        time_pressure_map = {}
+        try:
+            st.write("計算時間壓力...")
+            # Use helper constants directly by accessing the THRESHOLDS dictionary
+            q_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'Q', 'question_time'], errors='coerce').sum()
+            v_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'V', 'question_time'], errors='coerce').sum()
+            di_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'DI', 'question_time'], errors='coerce').sum()
+
+            # Update pressure logic to use THRESHOLDS
+            time_pressure_q = (THRESHOLDS['Q']['MAX_ALLOWED_TIME'] - q_total_time) <= THRESHOLDS['Q']['TIME_DIFF_PRESSURE'] # Using the defined pressure diff for Q
+            time_pressure_v = (THRESHOLDS['V']['MAX_ALLOWED_TIME'] - v_total_time) < 1.0 # Keep V logic as is for now, might need its own threshold in THRESHOLDS
+            time_pressure_di = (THRESHOLDS['DI']['MAX_ALLOWED_TIME'] - di_total_time) <= THRESHOLDS['DI']['TIME_PRESSURE_DIFF_MIN'] # Using DI pressure diff
+
+            time_pressure_map = {'Q': time_pressure_q, 'V': time_pressure_v, 'DI': time_pressure_di}
+            st.write(f"時間壓力狀態: {time_pressure_map}")
+        except Exception as e:
+            st.error(f"計算時間壓力時出錯: {e}")
+            analysis_success = False
+
+        # --- 2. Calculate Overtime ---
+        df_with_overtime = None
+        if analysis_success:
+            try:
+                st.write("計算超時狀態...")
+                # Ensure df_combined_input has necessary columns ('question_time', 'question_type', 'Subject')
+                # These should exist due to validation and standardization steps.
+                df_with_overtime = calculate_overtime(df_combined_input, time_pressure_map)
+                if 'overtime' not in df_with_overtime.columns:
+                    st.error("calculate_overtime 未返回 'overtime' 欄位。")
+                    analysis_success = False
+                else:
+                     st.write("超時狀態計算完成。")
+                     # Use this dataframe going forward, it includes the user-confirmed 'is_invalid' flag
+                     df_final_input_for_sim = df_with_overtime
+
+            except Exception as e:
+                st.error(f"計算 overtime 時出錯: {e}")
+                analysis_success = False
+
+        # --- 3. IRT Simulation ---
+        all_simulation_histories = {}
+        final_thetas_local = {}
+        all_theta_plots = {} # NEW: Store plots locally first
+        question_banks = {} # Define banks here
+        if analysis_success:
+            st.write("執行 IRT 模擬...")
+            try:
+                # Initialize banks
+                st.write("  初始化模擬題庫...")
+                for subject in SUBJECTS:
+                    seed = RANDOM_SEED + SUBJECT_SIM_PARAMS[subject]['seed_offset']
+                    question_banks[subject] = irt.initialize_question_bank(BANK_SIZE, seed=seed)
+                    if question_banks[subject] is None:
+                         raise ValueError(f"Failed to initialize question bank for {subject}")
+                st.write("  模擬題庫創建完成。")
+
+                # Run simulation per subject
+                for subject in SUBJECTS:
+                    st.write(f"  執行 {subject} 科目模擬...")
+                    params = SUBJECT_SIM_PARAMS[subject]
+                    initial_theta = st.session_state[params['initial_theta_key']]
+                    bank = question_banks[subject]
+
+                    # Get user data for the subject, sorted by position
+                    user_df_subj = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].sort_values(by='question_position')
+
+                    # --- Calculate total questions and wrong positions from user_df_subj --- #
+                    if user_df_subj.empty:
+                        st.warning(f"  {subject}: 沒有找到該科目的作答數據，無法執行模擬。", icon="⚠️")
+                        final_thetas_local[subject] = initial_theta
+                        all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
+                        all_simulation_histories[subject].attrs['simulation_skipped'] = True
+                        continue
+
+                    try:
+                        total_questions_attempted = len(user_df_subj) # Correctly use the subject-specific dataframe length
+                        if total_questions_attempted <= 0:
+                            raise ValueError("Number of rows is not positive.")
+
+                        # Calculate wrong positions from the subject-specific dataframe
+                        if 'is_correct' not in user_df_subj.columns:
+                            raise ValueError(f"{subject}: 缺少 'is_correct' 欄位。")
+                        user_df_subj['is_correct'] = user_df_subj['is_correct'].astype(bool)
+                        user_df_subj['question_position'] = pd.to_numeric(user_df_subj['question_position'], errors='coerce')
+                        wrong_positions = user_df_subj.loc[(user_df_subj['is_correct'] == False) & user_df_subj['question_position'].notna(), 'question_position'].astype(int).tolist()
+
+                        st.write(f"    {subject}: 模擬全部 {total_questions_attempted} 個作答題目，其中錯誤位置: {wrong_positions}")
+
+                    except (KeyError, ValueError, TypeError) as e:
+                         st.error(f"  {subject}: 無法確定總作答題數或錯誤位置: {e}。跳過模擬。", icon="🚨")
+                         final_thetas_local[subject] = initial_theta
+                         all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
+                         all_simulation_histories[subject].attrs['simulation_skipped'] = True
+                         continue # Skip to next subject
+                    # --- End Calculation --- #
+
+                    # --- Filter valid responses for later difficulty assignment --- #
+                    valid_responses = user_df_subj[~user_df_subj['is_invalid']].copy()
+                    if valid_responses.empty:
+                        st.warning(f"  {subject}: 所有題目均被標記為無效，Theta 模擬仍基於完整序列。", icon="⚠️")
+                    # --- End Filtering --- #
+
+                    # --- Run simulation using the calculated total and wrong list --- #
+                    history_df = irt.simulate_cat_exam(
+                        question_bank=bank,
+                        wrong_question_positions=wrong_positions,
+                        initial_theta=initial_theta,
+                        total_questions=total_questions_attempted # Pass the correct total number
+                    )
+                    # --- End Simulation Call --- #
+
+                    if history_df is not None and not history_df.empty:
+                        # Store results only if simulation ran
+                        all_simulation_histories[subject] = history_df
+                        final_theta_subj = history_df['theta_est_after_answer'].iloc[-1]
+                        final_thetas_local[subject] = final_theta_subj
+                        st.write(f"    {subject}: 模擬完成。最後 Theta 估計: {final_theta_subj:.3f}")
+
+                        # --- Generate and store plot ---
+                        try:
+                            theta_plot = create_theta_plot(history_df, subject)
+                            if theta_plot:
+                                all_theta_plots[subject] = theta_plot
+                                st.write(f"    {subject}: Theta 歷史圖表已生成。")
+                            else:
+                                st.warning(f"    {subject}: 未能生成 Theta 圖表 (create_theta_plot 返回 None)。", icon="📊") # More specific warning
+                        except Exception as plot_err:
+                            st.warning(f"    {subject}: 生成 Theta 圖表時出錯: {plot_err}", icon="📊")
+                        # --- End plot generation ---
+                    elif history_df is not None and history_df.empty: # Succeeded but empty
+                        st.warning(f"  {subject}: 模擬執行但未產生歷史記錄。將使用初始 Theta。")
+                        final_thetas_local[subject] = initial_theta
+                        all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
+                        all_simulation_histories[subject].attrs['simulation_skipped'] = True # Mark skipped
+                    else: # Failed (returned None)
+                         raise ValueError(f"IRT simulation failed for subject {subject}")
+
+            except Exception as e:
+                st.error(f"執行 IRT 模擬時出錯: {e}")
+                # st.code(traceback.format_exc()) # Optional debug
+                analysis_success = False
+
+        # --- 4. Prepare Data for Diagnosis ---
+        if analysis_success:
+            st.write("準備診斷數據...")
+            df_final_for_diagnosis_list = []
+            try:
+                for subject in SUBJECTS:
+                    st.write(f"  處理 {subject} 科目...")
+                    user_df_subj = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].copy()
+                    sim_history_df = all_simulation_histories.get(subject)
+                    final_theta = final_thetas_local.get(subject)
+
+                    if sim_history_df is None: # Should not happen if simulation ran/skipped correctly
+                        st.error(f"找不到 {subject} 的模擬歷史，無法準備數據。")
+                        analysis_success = False; break
+
+                    # Add final theta estimate to all rows for context
+                    user_df_subj['estimated_ability'] = final_theta
+
+                    # --- Assign Difficulty ---
+                    # Sort user data by position *before* filtering invalid
+                    user_df_subj_sorted = user_df_subj.sort_values(by='question_position').reset_index(drop=True)
+
+                    # Get simulated difficulties IF simulation was not skipped
+                    sim_b_values = []
+                    if not sim_history_df.attrs.get('simulation_skipped', False):
+                          sim_b_values = sim_history_df['b'].tolist()
+
+                    # Create a mapping from valid question original position to its sim difficulty
+                    valid_indices = user_df_subj_sorted[~user_df_subj_sorted['is_invalid']].index
+                    if len(valid_indices) != len(sim_b_values):
+                         st.warning(f"{subject}: 有效題目數量 ({len(valid_indices)}) 與模擬難度值數量 ({len(sim_b_values)}) 不符。難度可能分配不準確。", icon="⚠️")
+                         # Truncate to minimum? Or assign NaN? Assign NaN for safety.
+                         min_len = min(len(valid_indices), len(sim_b_values))
+                         difficulty_map = {user_df_subj_sorted.loc[idx, 'question_position']: sim_b_values[i]
+                                           for i, idx in enumerate(valid_indices[:min_len])}
+                    else:
+                         difficulty_map = {user_df_subj_sorted.loc[idx, 'question_position']: sim_b_values[i]
+                                           for i, idx in enumerate(valid_indices)}
+
+
+                    # Assign difficulty based on the map, assign NaN to invalid or unmapped questions
+                    user_df_subj_sorted['question_difficulty'] = user_df_subj_sorted['question_position'].map(difficulty_map)
+
+                    # Fill missing essential columns (content_domain, fundamental_skill) if they don't exist
+                    if 'content_domain' not in user_df_subj_sorted.columns:
+                         user_df_subj_sorted['content_domain'] = 'Unknown Domain'
+                    if 'question_fundamental_skill' not in user_df_subj_sorted.columns:
+                         user_df_subj_sorted['question_fundamental_skill'] = 'Unknown Skill'
+
+                    # Select and reorder columns needed for diagnosis functions
+                    cols_to_keep = [col for col in FINAL_DIAGNOSIS_INPUT_COLS if col in user_df_subj_sorted.columns]
+                    df_final_for_diagnosis_list.append(user_df_subj_sorted[cols_to_keep])
+
+                if analysis_success and df_final_for_diagnosis_list: # Check again after loop
+                     df_final_for_diagnosis = pd.concat(df_final_for_diagnosis_list, ignore_index=True)
+                     st.write("診斷數據準備完成。")
+                elif analysis_success: # List is empty but no error flagged?
+                     st.warning("未能準備任何科目的診斷數據。")
+                     analysis_success = False # Mark as failure if no data to diagnose
+
+            except Exception as e:
+                st.error(f"準備診斷數據時發生錯誤: {e}")
+                # st.code(traceback.format_exc()) # Optional debug
+                analysis_success = False
+
+        # --- 5. Run Diagnosis ---
+        all_diagnosed_dfs = []
+        if analysis_success and df_final_for_diagnosis is not None:
+            st.write("執行診斷分析...")
+            temp_report_dict = {} # Use temporary dict during run
+            try:
+                 # Pre-calculate V average times if V is present
+                 v_avg_time_per_type = {}
+                 if 'V' in SUBJECTS:
+                     df_v_temp = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == 'V']
+                     if not df_v_temp.empty and 'question_time' in df_v_temp.columns and 'question_type' in df_v_temp.columns:
+                          # Ensure time is numeric for calculation
+                          df_v_temp['question_time'] = pd.to_numeric(df_v_temp['question_time'], errors='coerce')
+                          # Filter out rows where time is NaN after conversion
+                          v_avg_time_per_type = df_v_temp.dropna(subset=['question_time']).groupby('question_type')['question_time'].mean().to_dict()
+
+
+                 for subject in SUBJECTS:
+                     st.write(f"  診斷 {subject} 科...")
+                     df_subj = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == subject].copy()
+                     # Skip diagnosis if dataframe is empty for the subject (e.g., all invalid)
+                     if df_subj.empty:
+                          st.warning(f"  {subject}: 沒有有效數據進行診斷。", icon="⚠️")
+                          # Add a placeholder report?
+                          temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 沒有有效數據可供診斷。*\n"
+                          # Create empty df with expected columns to avoid concat errors later?
+                          # Or handle this during results display. Let's handle in display.
+                          all_diagnosed_dfs.append(None) # Append None to signal skip
+                          continue
+
+                     # Fill NaN difficulties with a default (e.g., average ability) before diagnosis? Or handle in diagnostic funcs.
+                     # Let's assume diagnostic functions can handle potential NaNs in difficulty for invalid items.
+                     # If not, fill here:
+                     # final_theta = final_thetas_local.get(subject, 0) # Get final theta
+                     # df_subj['question_difficulty'].fillna(final_theta, inplace=True)
+
+                     time_pressure = time_pressure_map.get(subject, False)
+                     subj_results, subj_report, df_subj_diagnosed = None, None, None
+
+                     try:
+                         if subject == 'Q':
+                             subj_results, subj_report, df_subj_diagnosed = run_q_diagnosis_processed(df_subj, time_pressure)
+                         elif subject == 'DI':
+                             subj_results, subj_report, df_subj_diagnosed = run_di_diagnosis_processed(df_subj, time_pressure)
+                         elif subject == 'V':
+                             subj_results, subj_report, df_subj_diagnosed = run_v_diagnosis_processed(df_subj, time_pressure, v_avg_time_per_type)
+                     except Exception as diag_err:
+                          st.error(f"  {subject} 科診斷函數執行時出錯: {diag_err}")
+                          subj_report = f"**{subject} 科診斷報告**\n\n* 診斷過程中發生錯誤: {diag_err}*\n"
+                          df_subj_diagnosed = df_subj # Return original data for the subject on error
+                          # Mark report dict and df list to indicate failure? Keep processing others.
+
+
+                     if subj_report is not None and df_subj_diagnosed is not None:
+                         # --- Attempt OpenAI Summarization --- #
+                         final_report_for_subject = subj_report # Start with the original
+                         # Retrieve api key (it's loaded near the top)
+                         if st.session_state.openai_api_key and subj_report and "發生錯誤" not in subj_report and "未成功執行" not in subj_report:
+                             st.write(f"    嘗試使用 OpenAI 整理 {subject} 科報告...")
+                             summarized_report = summarize_report_with_openai(subj_report, st.session_state.openai_api_key)
+                             if summarized_report != subj_report: # Check if summarization actually changed something
+                                 st.write(f"      -> {subject} 科報告已由 AI 整理。")
+                                 final_report_for_subject = summarized_report
+                             else:
+                                 # Warning/info might have been shown inside the function if API failed or no change needed
+                                 st.write(f"      -> {subject} 科報告整理失敗或無需整理。")
+                         elif not st.session_state.openai_api_key:
+                              st.info(f"    未提供 OpenAI API Key，跳過 {subject} 科報告整理。")
+
+                         temp_report_dict[subject] = final_report_for_subject # Store the final version
+                         all_diagnosed_dfs.append(df_subj_diagnosed) # Append the diagnosed dataframe
+                         st.write(f"    {subject} 科診斷處理完成。") # Updated message
+
+                     else:
+                         st.error(f"  {subject} 科診斷未返回預期結果。")
+                         temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 診斷未成功執行或未返回結果。*\n"
+
+
+                 # Combine results *after* loop
+                 valid_diagnosed_dfs = [df for df in all_diagnosed_dfs if df is not None and not df.empty]
+                 if valid_diagnosed_dfs:
+                      st.session_state.processed_df = pd.concat(valid_diagnosed_dfs, ignore_index=True)
+                      st.session_state.report_dict = temp_report_dict
+                      st.session_state.final_thetas = final_thetas_local # Store thetas from sim
+                      st.session_state.theta_plots = all_theta_plots # NEW: Store the plots in session state
+                      st.write("所有科目診斷完成。")
+                 else:
+                      st.error("所有科目均未能成功診斷或無數據。")
+                      st.session_state.processed_df = None # Ensure no stale data
+                      st.session_state.report_dict = temp_report_dict # Still show error reports
+                      st.session_state.theta_plots = {} # Clear plots
+                      analysis_success = False
+
+
+            except Exception as e:
+                st.error(f"診斷過程中發生未預期錯誤: {e}")
+                # st.code(traceback.format_exc()) # Optional debug
+                analysis_success = False
+
+        # --- Final Status Update ---
+        if analysis_success and st.session_state.processed_df is not None:
+             analysis_status.update(label="分析成功完成！", state="complete", expanded=False)
+             st.session_state.diagnosis_complete = True # Mark diagnosis as done
+             st.session_state.error_message = None
+             st.balloons() # Celebrate success
+        else:
+             analysis_status.update(label="分析過程中斷或失敗。", state="error", expanded=True)
+             st.session_state.diagnosis_complete = False # Ensure it's False on error
+             st.session_state.error_message = "分析未能成功完成，請檢查上方錯誤訊息。"
+             st.session_state.theta_plots = {} # Clear plots on error
+
+
+# --- Display Results Section ---
+st.divider()
+if st.session_state.analysis_run: # Only show results area if analysis was at least started
+    st.header("📊 診斷結果")
+
+    # --- Define Column Configuration and Excel Map ---
+    # (Moved near the top as constants/config)
+    COLUMN_DISPLAY_CONFIG = {
+        "question_position": st.column_config.NumberColumn("題號", help="題目順序"),
+        # "Subject": st.column_config.TextColumn("科目"), # Usually known from tab context
+        "question_type": st.column_config.TextColumn("題型"),
+        "content_domain": st.column_config.TextColumn("內容領域"), # Added back
+        "question_fundamental_skill": st.column_config.TextColumn("考察能力"),
+        "is_correct": st.column_config.CheckboxColumn("答對?", help="是否回答正確"),
+        "question_difficulty": st.column_config.NumberColumn("難度(模擬)", help="系統模擬的題目難度 (有效題目)", format="%.2f", width="small"),
+        # "estimated_ability": st.column_config.NumberColumn("能力估計", help="本科目最終能力估計值", format="%.2f", width="small"), # Add overall ability back (Removed)
+        "question_time": st.column_config.NumberColumn("用時(分)", format="%.2f", width="small"),
+        "time_performance_category": st.column_config.TextColumn("時間表現"),
+        "is_sfe": st.column_config.CheckboxColumn("SFE?", help="是否為Special Focus Error", width="small"),
+        "diagnostic_params_list": st.column_config.ListColumn("診斷標籤", help="初步診斷標籤", width="medium"),
+        "is_invalid": st.column_config.CheckboxColumn("標記無效?", help="此題是否被標記為無效 (手動優先)", width="small"), # Show the final invalid flag
+        # Internal columns for styling, set config to None to hide in st.dataframe
+        "overtime": None,
+        "is_manually_invalid": None, # Hide the intermediate manual flag
+    }
+
+    EXCEL_COLUMN_MAP = {
+        "question_position": "題號",
+        "Subject": "科目", # Keep subject in Excel export
+        "question_type": "題型",
+        "content_domain": "內容領域",
+        "question_fundamental_skill": "考察能力",
+        "is_correct": "答對", # Use text TRUE/FALSE (converted in display_subject_results)
+        "question_difficulty": "難度(模擬)",
+        # "estimated_ability": "能力估計", # Removed as per user request
+        "question_time": "用時(分)",
+        "time_performance_category": "時間表現",
+        "is_sfe": "SFE", # Use text TRUE/FALSE
+        "diagnostic_params_list": "診斷標籤",
+        "is_invalid": "是否無效", # Use text TRUE/FALSE
+        "overtime": "overtime_flag", # Internal flag for Excel styling, will be hidden by to_excel
+    }
+
+    if st.session_state.analysis_error:
+        st.error(st.session_state.error_message)
+    elif not st.session_state.diagnosis_complete:
+        st.info("分析正在進行中或尚未完成。")
+    elif st.session_state.processed_df is None or st.session_state.processed_df.empty:
+        st.warning("診斷完成，但沒有可顯示的數據。")
+        # Display any report messages even if df is empty (e.g., all invalid)
+        if st.session_state.report_dict:
+            st.subheader("診斷摘要")
+            for subject, report_md in st.session_state.report_dict.items():
+                st.markdown(f"### {subject} 科:")
+                st.markdown(report_md, unsafe_allow_html=True)
+    else:
+        st.success("診斷分析已完成！")
+        # --- Results Display Tabs --- #
+        subjects_with_data = [subj for subj in SUBJECTS if subj in st.session_state.processed_df['Subject'].unique()]
+        if not subjects_with_data:
+            st.warning("處理後的數據中未找到任何有效科目。")
+        else:
+            # Create tabs for each subject with data
+            result_tabs = st.tabs([f"{subj} 科結果" for subj in subjects_with_data])
+
+            for i, subject in enumerate(subjects_with_data):
+                subject_tab = result_tabs[i]
+                with subject_tab:
+                    df_subject = st.session_state.processed_df[st.session_state.processed_df['Subject'] == subject]
+                    report_md = st.session_state.report_dict.get(subject, f"*未找到 {subject} 科的報告。*")
+                    subject_excel_map = EXCEL_COLUMN_MAP
+                    subject_col_config = COLUMN_DISPLAY_CONFIG
+
+                    # --- 添加日誌調試 ---
+                    # Removed logging block here
+                    # --- 結束日誌調試 ---
+
+                    # --- NEW: Display Theta Plot --- #
+                    st.subheader(f"{subject} 科能力估計 (Theta) 走勢")
+                    theta_plot = st.session_state.theta_plots.get(subject)
+                    if theta_plot:
+                        st.plotly_chart(theta_plot, use_container_width=True)
+                    else:
+                        # Access the original simulation history from run_analysis output if needed
+                        # This might require passing all_simulation_histories to session state too,
+                        # or recalculating the skipped status here.
+                        # For simplicity, let's just check if the plot exists.
+                        st.info(f"{subject} 科目的 Theta 估計圖表不可用。")
+                    st.divider() # Add a separator
+                    # --- End NEW --- #
+
+                    display_subject_results(subject, subject_tab, report_md, df_subject, subject_col_config, subject_excel_map)
+
+# --- Sidebar for Language --- #
+# ... (Sidebar code) ...
+
+# --- Helper functions for AI Chat ---
+def _get_combined_report_context():
+    """Combines markdown reports from all subjects."""
+    full_report = ""
+    if st.session_state.report_dict:
+        for subject in SUBJECTS:
+            report = st.session_state.report_dict.get(subject)
+            if report:
+                full_report += f"\n\n## {subject} 科診斷報告\n\n{report}"
+    return full_report.strip()
+
+def _get_dataframe_context(max_rows=50):
+    """Converts the processed dataframe to a string format (markdown) for context."""
+    if st.session_state.processed_df is not None and not st.session_state.processed_df.empty:
+        df_context = st.session_state.processed_df.copy()
+        # Optionally select/rename columns for clarity in context
+        # For now, let's convert a sample to markdown
+        try:
+            # Convert boolean columns to Yes/No for better readability for the LLM
+            bool_cols = df_context.select_dtypes(include=bool).columns
+            for col in bool_cols:
+                df_context[col] = df_context[col].map({True: 'Yes', False: 'No'})
+                
+            # Convert list column to string
+            if 'diagnostic_params_list' in df_context.columns:
+                df_context['diagnostic_params_list'] = df_context['diagnostic_params_list'].apply(
+                    lambda x: ', '.join(map(str, x)) if isinstance(x, list) else str(x)
+                )
+                
+            # Limit rows to avoid excessive context length
+            if len(df_context) > max_rows:
+                df_context_str = df_context.head(max_rows).to_markdown(index=False)
+                df_context_str += f"\n... (只顯示前 {max_rows} 行)"
+            else:
+                df_context_str = df_context.to_markdown(index=False)
+            return df_context_str
+        except Exception as e:
+            logging.error(f"Error converting dataframe to markdown context: {e}")
+            return "(無法轉換詳細數據表格)"
+    return "(無詳細數據表格)"
+
+# --- Add OpenAI response function ---
+def _get_openai_response(current_chat_history, report_context, dataframe_context):
+    """Gets response from OpenAI using the responses endpoint and handles conversation history.
+    
+    Args:
+        current_chat_history (list): The current chat history list.
+        report_context (str): The combined markdown report context.
+        dataframe_context (str): The dataframe context string.
+
+    Returns:
+        tuple: (ai_response_text, response_id) or raises an exception.
+    """
+    if not st.session_state.openai_api_key:
+        raise ValueError("OpenAI API Key is missing.")
+        
+    client = openai.OpenAI(api_key=st.session_state.openai_api_key)
+    
+    # Find the last user prompt
+    last_user_prompt = ""
+    if current_chat_history and current_chat_history[-1]["role"] == "user":
+        last_user_prompt = current_chat_history[-1]["content"]
+    else:
+        raise ValueError("Could not find the last user prompt in history.")
+        
+    # Find the previous response ID from the last assistant message
+    previous_response_id = None
+    if len(current_chat_history) > 1:
+        for i in range(len(current_chat_history) - 2, -1, -1):
+            if current_chat_history[i]["role"] == "assistant":
+                previous_response_id = current_chat_history[i].get("response_id")
+                break
+                
+    # Construct the input for the API using standard multi-line string and .format()
+    input_template = '''You are a GMAT diagnostic assistant. Analyze the provided report summary and detailed data table (excerpt) to answer the user's question accurately and concisely. If the information is not present in the provided context, say so.
+
+REPORT SUMMARY:
+{report}
+
+DETAILED DATA EXCERPT:
+{data}
+
+USER QUESTION:
+{prompt}
+'''
+    api_input = input_template.format(
+        report=report_context,
+        data=dataframe_context,
+        prompt=last_user_prompt
+    )
+    
+    try:
+        logging.info(f"Calling OpenAI responses.create with model gpt-4.1-mini. Previous ID: {previous_response_id}")
+        response = client.responses.create(
+            model="o4-mini", # Using the model from user's example
+            input=api_input,
+            previous_response_id=previous_response_id,
+            # Add other parameters if needed, e.g., temperature, max_tokens based on API docs
+            # max_output_tokens=500, # Example: limit output tokens
+            temperature=0.5 # Example: make response more focused
+        )
+        logging.info(f"OpenAI response received. Status: {response.status}")
+
+        if response.status == 'completed' and response.output:
+            # Extract text from the first output message content
+            response_text = ""
+            if response.output[0].type == 'message' and response.output[0].content:
+                for content_block in response.output[0].content:
+                    if content_block.type == 'output_text':
+                        response_text += content_block.text
+            
+            if not response_text:
+                 raise ValueError("OpenAI response completed but contained no text output.")
+                 
+            return response_text.strip(), response.id
+        elif response.status == 'error':
+             error_details = response.error if response.error else "Unknown error"
+             raise Exception(f"OpenAI API error: {error_details}")
+        else:
+             raise Exception(f"OpenAI response status was not 'completed' or output was empty. Status: {response.status}")
+
+    except Exception as e:
+        logging.error(f"Error calling OpenAI responses API: {e}", exc_info=True)
+        # Re-raise the exception to be caught by the sidebar UI
+        raise e
+
+# --- 更新 OpenAI 回應函數以獲取更詳細的診斷資料 ---
+def _get_subject_dataframe_context(subject, max_rows=20):
+    """為特定科目創建數據表格上下文"""
+    if st.session_state.processed_df is not None and not st.session_state.processed_df.empty:
+        df_subject = st.session_state.processed_df[st.session_state.processed_df['Subject'] == subject].copy()
+        if df_subject.empty:
+            return f"({subject} 科無數據)"
+            
+        # 轉換布爾列為 Yes/No
+        bool_cols = df_subject.select_dtypes(include=bool).columns
+        for col in bool_cols:
+            df_subject[col] = df_subject[col].map({True: 'Yes', False: 'No'})
+            
+        # 轉換列表列為字符串
+        if 'diagnostic_params_list' in df_subject.columns:
+            df_subject['diagnostic_params_list'] = df_subject['diagnostic_params_list'].apply(
+                lambda x: ', '.join(map(str, x)) if isinstance(x, list) else str(x)
+            )
+            
+        # 限制行數
+        if len(df_subject) > max_rows:
+            df_context_str = df_subject.head(max_rows).to_markdown(index=False)
+            df_context_str += f"\n... (只顯示前 {max_rows} 行)"
+        else:
+            df_context_str = df_subject.to_markdown(index=False)
+        return df_context_str
+    return f"({subject} 科無數據)"
+
+def _get_openai_response(current_chat_history, report_context, dataframe_context):
+    """使用 OpenAI responses API 獲取回應，提供更詳細的診斷資料"""
+    if not st.session_state.openai_api_key:
+        raise ValueError("OpenAI API Key is missing.")
+        
+    client = openai.OpenAI(api_key=st.session_state.openai_api_key)
+    
+    # 獲取最後的用戶提問
+    last_user_prompt = ""
+    if current_chat_history and current_chat_history[-1]["role"] == "user":
+        last_user_prompt = current_chat_history[-1]["content"]
+    else:
+        raise ValueError("Could not find the last user prompt in history.")
+        
+    # 獲取上一個回應 ID
+    previous_response_id = None
+    if len(current_chat_history) > 1:
+        for i in range(len(current_chat_history) - 2, -1, -1):
+            if current_chat_history[i]["role"] == "assistant":
+                previous_response_id = current_chat_history[i].get("response_id")
+                break
+                
+    # 為每個科目獲取詳細數據
+    q_data = _get_subject_dataframe_context('Q')
+    v_data = _get_subject_dataframe_context('V')
+    di_data = _get_subject_dataframe_context('DI')
+    
+    # 構建 API 輸入，包含所有三個科目的詳細資料
+    input_template = '''你是 GMAT 診斷助手。分析提供的報告摘要和詳細數據表，準確簡潔地回答用戶問題。如果提供的上下文中沒有相關信息，請說明。
+
+完整診斷報告:
+{report}
+
+Q 科詳細數據:
+{q_data}
+
+V 科詳細數據:
+{v_data}
+
+DI 科詳細數據:
+{di_data}
+
+用戶問題:
+{prompt}
+'''
+    api_input = input_template.format(
+        report=report_context,
+        q_data=q_data,
+        v_data=v_data,
+        di_data=di_data,
+        prompt=last_user_prompt
+    )
+    
+    try:
+        logging.info(f"調用 OpenAI responses.create，使用模型 o4-mini。上一個 ID: {previous_response_id}")
+        response = client.responses.create(
+            model="o4-mini", # 根據要求使用 o4-mini 模型
+            input=api_input,
+            previous_response_id=previous_response_id,
+            temperature=0.5
+        )
+        logging.info(f"OpenAI 回應已接收。狀態: {response.status}")
+
+        if response.status == 'completed' and response.output:
+            # 提取回應文本
+            response_text = ""
+            if response.output[0].type == 'message' and response.output[0].content:
+                for content_block in response.output[0].content:
+                    if content_block.type == 'output_text':
+                        response_text += content_block.text
+            
+            if not response_text:
+                 raise ValueError("OpenAI 回應完成但未包含文本輸出。")
+                 
+            return response_text.strip(), response.id
+        elif response.status == 'error':
+             error_details = response.error if response.error else "未知錯誤"
+             raise Exception(f"OpenAI API 錯誤: {error_details}")
+        else:
+             raise Exception(f"OpenAI 回應狀態不是 'completed' 或輸出為空。狀態: {response.status}")
+
+    except Exception as e:
+        logging.error(f"調用 OpenAI responses API 時出錯: {e}", exc_info=True)
+        raise e
+
+# --- 將聊天界面添加到主頁面底部 ---
+# 在結果部分後添加聊天界面
+
+# 將這段代碼放在文檔最後部分，所有其他部分之後
+# 在顯示結果部分之後添加聊天界面
+if st.session_state.diagnosis_complete:
+    st.divider()
+    st.header("💬 與 AI 助手對話")
+    
+    if st.session_state.show_chat:
+        # 顯示聊天歷史
+        for message in st.session_state.chat_history:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+        # 底部的聊天輸入
+        if prompt := st.chat_input("針對診斷報告和數據提問..."):
+            # 添加用戶訊息到歷史並顯示
+            st.session_state.chat_history.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            # 準備上下文並調用 OpenAI
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()  # 用於顯示等待消息的佔位符
+                message_placeholder.markdown("思考中...")
+                try:
+                    # 準備上下文
+                    report_context = _get_combined_report_context()
+                    dataframe_context = _get_dataframe_context()
+                    # 調用 OpenAI
+                    ai_response_text, response_id = _get_openai_response(
+                        st.session_state.chat_history,
+                        report_context,
+                        dataframe_context
+                    )
+
+                    # 顯示 AI 回應並添加到歷史
+                    message_placeholder.markdown(ai_response_text)
+                    st.session_state.chat_history.append({
+                        "role": "assistant",
+                        "content": ai_response_text,
+                        "response_id": response_id  # 存儲 ID 用於下一輪對話
+                    })
+
+                except Exception as e:
+                    error_message = f"呼叫 AI 時出錯: {e}"
+                    message_placeholder.error(error_message)
+                    # 添加錯誤消息到歷史，不含 response_id
+                    st.session_state.chat_history.append({"role": "assistant", "content": error_message})
+    else:
+        if not st.session_state.openai_api_key:
+            st.info("請在側邊欄輸入 OpenAI API Key 以啟用 AI 對話功能。")
+        else:
+            st.info("分析完成後將啟用 AI 對話功能。")
