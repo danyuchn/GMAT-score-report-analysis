@@ -842,7 +842,7 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                     # Run simulation using only valid responses
                     history_df = irt.simulate_cat_exam(
                         question_bank=bank,
-                        wrong_question_indices=wrong_positions, # Pass positions relative to the *valid* set if needed by IRT module
+                        wrong_question_positions=wrong_positions, # Corrected parameter name
                         # NOTE: Ensure irt.simulate_cat_exam handles wrong_question_indices correctly based on the number of valid questions (actual_sim_questions)
                         # If it expects indices relative to the full set, adjust logic here. Assuming it expects indices within the simulated sequence.
                         initial_theta=initial_theta,
