@@ -88,7 +88,6 @@ def run_diagnosis(df):
     # --- 1. Overall Time Strategy & Data Validity (Chapter 1 Logic - Applied Per Subject) ---
     print("Starting Chapter 1: Time Strategy & Validity Analysis...")
     subjects_present = df_processed['Subject'].unique()
-    all_invalid_indices = []
     subject_time_pressure_status = {} # Dictionary to store time pressure status per subject
     subject_avg_time_per_type = {} # Store avg times for suspiciously_fast calc
 
@@ -168,55 +167,14 @@ def run_diagnosis(df):
              subject_avg_time_per_type[subject] = {}
              print("      Warning: 'question_type' column missing, cannot calculate average times.")
 
+        # Invalid marking logic for V and Q is moved to their respective submodules.
+        # DI invalid logic is already handled in di_diagnostic.py.
 
-        # Identify invalid indices (only if time pressure is true)
-        if time_pressure:
-            invalid_indices_subj = []
-            
-            if subject == 'V':
-                last_third_start_position = np.ceil(total_number_of_questions * 2 / 3)
-                last_third_df = df_subj[df_subj['question_position'] >= last_third_start_position]
-                
-                avg_times = subject_avg_time_per_type.get(subject, {})
-                
-                for index, row in last_third_df.iterrows():
-                    q_time = row['question_time']
-                    q_type = row['question_type']
-                    
-                    # Check for Abandoned
-                    is_abandoned = q_time < V_INVALID_TIME_ABANDONED
-                    
-                    # Check for Hasty (V-doc logic needs avg times and RC group logic)
-                    is_hasty = q_time < V_INVALID_TIME_HASTY_MIN
-                    # Placeholder for more complex hasty check from V-doc (requires avg time and RC group handling)
-                    # avg_time_for_type = avg_times.get(q_type)
-                    # if avg_time_for_type is not None:
-                    #     # Need first_third_average_time for comparison
-                    #     # Need RC group logic here too
-                    #     # Example placeholder for CR hasty check:
-                    #     # if q_type == 'CR' and q_time < first_third_avg_time_cr * 0.5: is_hasty = True
-                    #     pass # Implement full hasty logic when avg times and RC groups are handled
-                    
-                    if is_abandoned or is_hasty:
-                        invalid_indices_subj.append(index)
-            elif subject == 'DI':
-                # DI invalid logic handled within di_diagnostic.py
-                pass # Do nothing here for DI invalid marking
-            else:  # 預設邏輯 (目前用於 Q)
-                last_third_start_position = np.ceil(total_number_of_questions * 2 / 3)
-                last_third_df = df_subj[df_subj['question_position'] >= last_third_start_position]
-                invalid_mask = last_third_df['question_time'] < 1.0
-                invalid_indices_subj = last_third_df[invalid_mask].index.tolist()
-
-            if invalid_indices_subj:
-                all_invalid_indices.extend(invalid_indices_subj)
-                print(f"    Subject {subject}: Marked {len(invalid_indices_subj)} question(s) in last third as invalid due to time pressure and being hasty/abandoned.")
-
-    # --- Global Rule Application: Mark Invalid, Overtime (CR only here), Suspiciously Fast ---
-    if all_invalid_indices:
-        df_processed.loc[all_invalid_indices, 'is_invalid'] = True
-        print(f"Marked a total of {len(all_invalid_indices)} questions as invalid across all subjects.")
-
+    # --- Global Rule Application: Overtime (CR only here), Suspiciously Fast ---
+    # Note: Invalid marking is now done within subject-specific modules.
+    # We apply Overtime and Suspiciously Fast flags here *before* passing to submodules.
+    # Submodules might later overwrite/ignore these flags based on their own invalid logic.
+    
     # Mark overtime for Q rows based on Q subject's pressure
     if 'Q' in subject_time_pressure_status:
         q_pressure = subject_time_pressure_status['Q']
@@ -293,34 +251,23 @@ def run_diagnosis(df):
 
     # Run Q Diagnosis if data exists
     if not df_q.empty:
-        q_invalid_count = df_processed[(df_processed['Subject'] == 'Q') & (df_processed['is_invalid'])].shape[0]
-        # Call updated function and capture all return values
-        q_results, q_report, df_q_processed = run_q_diagnosis(df_q, subject_time_pressure_status.get('Q', False), q_invalid_count)
+        # Pass only df and pressure status. Invalid count is determined within q_diagnostic.
+        q_results, q_report, df_q_processed = run_q_diagnosis(df_q, subject_time_pressure_status.get('Q', False))
         subject_report_dict['Q'] = q_report # Store Q report in the dictionary
         if df_q_processed is not None and not df_q_processed.empty: # Check if df returned is valid
              processed_dfs_list.append(df_q_processed) # Append processed Q df
-        else:
-             print("WARNING: run_q_diagnosis returned an empty or None DataFrame.")
-             # Optionally append original df_q as fallback? Or nothing?
-             # Let's append nothing to avoid potential column mismatches later
-             # processed_dfs_list.append(df_q)
     else:
         print("No Q data found.")
         subject_report_dict['Q'] = "量化 (Quantitative) 部分無有效數據。" # Store message in dict
 
     # Run V Diagnosis if data exists
     if not df_v.empty:
-        v_invalid_count = df_processed[(df_processed['Subject'] == 'V') & (df_processed['is_invalid'])].shape[0]
         v_avg_times = subject_avg_time_per_type.get('V', {})
-        # Call updated function and capture all return values
-        v_results, v_report, df_v_processed = run_v_diagnosis(df_v, subject_time_pressure_status.get('V', False), v_avg_times, v_invalid_count)
+        # Pass df, pressure status, avg times. Invalid count is determined within v_diagnostic.
+        v_results, v_report, df_v_processed = run_v_diagnosis(df_v, subject_time_pressure_status.get('V', False), v_avg_times)
         subject_report_dict['V'] = v_report # Store V report in the dictionary
         if df_v_processed is not None and not df_v_processed.empty: # Check if df returned is valid
              processed_dfs_list.append(df_v_processed) # Append processed V df
-        else:
-             print("WARNING: run_v_diagnosis returned an empty or None DataFrame.")
-             # Append nothing for consistency
-             # processed_dfs_list.append(df_v)
     else:
         print("No V data found.")
         subject_report_dict['V'] = "語文 (Verbal) 部分無有效數據。" # Store message in dict
@@ -427,13 +374,24 @@ def run_diagnosis(df):
         print("No processed dataframes were collected from subject modules. Cannot create final dataframe.")
         df_final_for_diagnosis = pd.DataFrame() # Ensure it's an empty DataFrame
 
-    # --- Calculate correct total invalid and valid counts AFTER all diagnoses ---
-    q_invalid_count = df_processed[(df_processed['Subject'] == 'Q') & (df_processed['is_invalid'])].shape[0]
-    v_invalid_count = df_processed[(df_processed['Subject'] == 'V') & (df_processed['is_invalid'])].shape[0]
+    # --- Calculate correct total invalid and valid counts AFTER all diagnoses --- 
+    # Fetch invalid counts from the results returned by each submodule
+    q_invalid_count = 0
+    if 'q_results' in locals() and isinstance(q_results, dict):
+        # Assuming q_results dictionary will contain an 'invalid_count' key
+        q_invalid_count = q_results.get('invalid_count', 0) # Adapt key name if needed
+
+    v_invalid_count = 0
+    if 'v_results' in locals() and isinstance(v_results, dict):
+        # Assuming v_results dictionary will contain an 'invalid_count' key
+        v_invalid_count = v_results.get('invalid_count', 0) # Adapt key name if needed
+
     # Extract DI invalid count from results (handle potential absence)
     di_invalid_count = 0
     if 'di_results' in locals() and isinstance(di_results, dict):
-        di_invalid_count = di_results.get('chapter_1', {}).get('invalid_questions_excluded', 0)
+        # Assuming di_results dictionary will contain an 'invalid_count' key directly or nested
+        # Using the previous structure as a guess, adapt if needed
+        di_invalid_count = di_results.get('chapter_1', {}).get('invalid_questions_excluded', di_results.get('invalid_count', 0)) # Check both possibilities
     
     correct_total_invalid = q_invalid_count + v_invalid_count + di_invalid_count
     correct_total_valid = len(df_processed) - correct_total_invalid
