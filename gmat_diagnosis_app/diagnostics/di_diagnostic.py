@@ -149,7 +149,7 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
         str: A string containing the summary report for the DI section.
         pd.DataFrame: The processed DI DataFrame with added diagnostic columns.
     """
-    logging.info("開始DI診斷處理...")
+    # logging.info("開始DI診斷處理...") # Removed
     di_diagnosis_results = {}
 
     if df_di_processed.empty:
@@ -360,13 +360,7 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     di_diagnosis_results['chapter_5'] = override_analysis
 
     # --- 記錄 Ch4/Ch5 後 df_for_ch4 (即將成為 diagnosed_df_ch4_ch5) 的狀態 ---
-    if 'time_performance_category' in df_for_ch4.columns:
-        ch4_unique_vals = df_for_ch4['time_performance_category'].unique()
-        ch4_value_counts = df_for_ch4['time_performance_category'].value_counts().to_dict()
-        logging.info(f"DI DEBUG: After Ch4/5 - df_for_ch4 time_perf unique: {ch4_unique_vals}")
-        logging.info(f"DI DEBUG: After Ch4/5 - df_for_ch4 time_perf counts: {ch4_value_counts}")
-    else:
-        logging.warning("DI DEBUG: After Ch4/5 - df_for_ch4 MISSING time_performance_category!")
+    # Removed logging block here
     # --- 結束記錄 ---
 
     # --- Chapter 6: Practice Planning & Recommendations ---
@@ -397,9 +391,9 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     if diagnostic_cols_to_merge:
         # Merge diagnostic columns from the filtered/diagnosed df back to the base df
         # Merge on index, keep all rows from the base df ('left' merge)
-        logging.info(f"DI DEBUG: Before merge - df_base columns: {df_base.columns.tolist()}")
-        logging.info(f"DI DEBUG: Before merge - diagnosed_df_ch4_ch5 columns: {diagnosed_df_ch4_ch5.columns.tolist()}")
-        logging.info(f"DI DEBUG: Before merge - Columns to merge: {diagnostic_cols_to_merge}")
+        # logging.info(f"DI DEBUG: Before merge - df_base columns: {df_base.columns.tolist()}") # Removed
+        # logging.info(f"DI DEBUG: Before merge - diagnosed_df_ch4_ch5 columns: {diagnosed_df_ch4_ch5.columns.tolist()}") # Removed
+        # logging.info(f"DI DEBUG: Before merge - Columns to merge: {diagnostic_cols_to_merge}") # Removed
         df_merged = pd.merge(
             df_base,
             diagnosed_df_ch4_ch5[diagnostic_cols_to_merge], # Only select the columns to merge
@@ -416,20 +410,16 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
                 # Use the merged value (_diag), potentially overwriting original or filling NaNs
                 df_merged[col] = df_merged[diag_col]
                 df_merged.drop(columns=[diag_col], inplace=True)
-                logging.info(f"Prioritized merged column '{col}' from '{diag_col}'.")
+                # logging.info(f"Prioritized merged column '{col}' from '{diag_col}'.") # Removed
 
         df_to_return = df_merged # Use the merged result
-        logging.info(f"Merged diagnostic columns: {diagnostic_cols_to_merge}")
-        if 'time_performance_category' in df_to_return.columns:
-             logging.info(f"DI DEBUG: After merge - df_to_return time_perf unique: {df_to_return['time_performance_category'].unique()}")
-             logging.info(f"DI DEBUG: After merge - df_to_return time_perf counts: {df_to_return['time_performance_category'].value_counts(dropna=False).to_dict()}") # include NaN counts
-        else:
-             logging.warning("DI DEBUG: After merge - df_to_return MISSING time_performance_category!")
+        # logging.info(f"Merged diagnostic columns: {diagnostic_cols_to_merge}") # Removed
+        # Removed logging block for time_perf after merge
 
     else:
         # If no diagnostic columns were calculated (e.g., filtered df was empty)
         df_to_return = df_base
-        logging.warning("No diagnostic columns found to merge back.")
+        # logging.warning("No diagnostic columns found to merge back.") # Removed
 
     # Translate params (now operating on the potentially merged df_to_return)
     if 'diagnostic_params' in df_to_return.columns:
@@ -451,19 +441,19 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     # 1. Ensure the time_performance_category column exists, default to 'Unknown'
     if 'time_performance_category' not in df_to_return.columns:
         df_to_return['time_performance_category'] = 'Unknown'
-        logging.info("Initialized 'time_performance_category' column as 'Unknown'.")
+        # logging.info("Initialized 'time_performance_category' column as 'Unknown'.") # Removed
     
     # 2. Fill NaNs potentially introduced by the merge (for rows NOT diagnosed) with 'Unknown'
     # Also ensure empty strings are treated as 'Unknown'
     df_to_return['time_performance_category'] = df_to_return['time_performance_category'].fillna('Unknown').replace('', 'Unknown')
-    logging.info(f"After fillna/replace('Unknown'): unique values: {df_to_return['time_performance_category'].unique()}")
+    # logging.info(f"After fillna/replace('Unknown'): unique values: {df_to_return['time_performance_category'].unique()}") # Removed
 
     # 3. Specifically set 'Invalid/Excluded' for rows marked as invalid
     if 'is_invalid' in df_to_return.columns:
         invalid_mask = df_to_return['is_invalid'] == True
         if invalid_mask.any():
             df_to_return.loc[invalid_mask, 'time_performance_category'] = 'Invalid/Excluded'
-            logging.info(f"Set 'Invalid/Excluded' for {invalid_mask.sum()} rows. Final unique values: {df_to_return['time_performance_category'].unique()}")
+            # logging.info(f"Set 'Invalid/Excluded' for {invalid_mask.sum()} rows. Final unique values: {df_to_return['time_performance_category'].unique()}") # Removed
 
     # Handle potential NaNs in 'is_sfe' after merge
     if 'is_sfe' in df_to_return.columns:
@@ -502,15 +492,8 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     # --- Remove DEBUG END ---
 
     # 在return前最後記錄狀態
-    if 'time_performance_category' in df_to_return.columns:
-        unique_values = df_to_return['time_performance_category'].unique()
-        value_counts = df_to_return['time_performance_category'].value_counts().to_dict()
-        logging.info(f"最終time_performance_category唯一值: {unique_values}")
-        logging.info(f"最終time_performance_category計數: {value_counts}")
-    else:
-        logging.warning("最終df_to_return中缺少time_performance_category列!")
-    
-    logging.info("DI診斷處理完成。")
+    # Removed logging block before return
+    # logging.info("DI診斷處理完成。") # Removed
     return di_diagnosis_results, report_str, df_to_return
 
 
