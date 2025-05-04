@@ -2,6 +2,7 @@ import sys
 import os
 import re # Import regex module
 import io # Ensure io is imported
+import pandas as pd # Ensure pandas is imported
 
 # Get the directory containing app.py
 app_dir = os.path.dirname(os.path.abspath(__file__))
@@ -13,7 +14,6 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import streamlit as st
-import pandas as pd
 from io import StringIO # Use io.StringIO directly
 from gmat_diagnosis_app import irt_module as irt # Import using absolute path
 from gmat_diagnosis_app.diagnosis_module import run_diagnosis # Import using absolute path
@@ -320,6 +320,8 @@ if 'report_dict' not in st.session_state:
     st.session_state.report_dict = {}
 if 'df_processed' not in st.session_state:
     st.session_state.df_processed = None
+if 'error_message' not in st.session_state: # Add initialization for error_message
+    st.session_state.error_message = None
 if 'pasted_q' not in st.session_state: st.session_state.pasted_q = ""
 if 'pasted_v' not in st.session_state: st.session_state.pasted_v = ""
 if 'pasted_di' not in st.session_state: st.session_state.pasted_di = ""
@@ -1072,6 +1074,10 @@ if st.session_state.analysis_run and df_combined_input is not None:
                     st.session_state.report_dict = report_dict
                     st.session_state.diagnosis_complete = True
                     st.success("診斷分析成功完成。請選擇下方選項卡查看結果或原始資料。")
+                    # --- Store results in session state --- 
+                    st.session_state.report_dict = report_dict
+                    st.session_state.processed_df = df_processed # Store the processed dataframe
+                    # --- End Store results --- 
                 except Exception as e:
                     st.error(f"診斷過程中發生錯誤: {str(e)}")
                     import traceback
@@ -1083,245 +1089,246 @@ st.divider()
 if st.session_state.analysis_run: # Only show results area if analysis was attempted
     st.header("診斷結果")
 
-    # --- Helper function to convert DataFrame to Excel bytes ---
-    def to_excel(df):
+    # --- Constants for Styling ---
+    # Define colors matching the apply_styles function (or close approximations)
+    ERROR_FONT_COLOR = '#D32F2F' # Red for errors
+    OVERTIME_FILL_COLOR = '#FFCDD2' # Light red fill for overtime rows/cells
+
+    # --- Helper function to convert DataFrame to styled Excel bytes ---
+    # Modified to accept df and a column name mapping dictionary
+    def to_excel(df, column_map):
         output = io.BytesIO()
-        # Use pandas ExcelWriter to save into the BytesIO object
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Sheet1')
-        # It's important to get the value *after* the writer context manager is closed
+        df_copy = df.copy()
+
+        # Select only columns present in the map keys and rename them
+        columns_to_keep = [col for col in column_map.keys() if col in df_copy.columns]
+        df_renamed = df_copy[columns_to_keep].rename(columns=column_map)
+
+        # Use pandas ExcelWriter with XlsxWriter engine
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_renamed.to_excel(writer, index=False, sheet_name='Sheet1')
+
+            # Get XlsxWriter objects
+            workbook = writer.book
+            worksheet = writer.sheets['Sheet1']
+
+            # --- Define formats ---
+            error_format = workbook.add_format({'font_color': ERROR_FONT_COLOR})
+            overtime_format = workbook.add_format({'bg_color': OVERTIME_FILL_COLOR})
+
+            # --- Get column indices (0-based) AFTER renaming ---
+            # Find the indices based on the DISPLAYED (renamed) headers
+            header_list = list(df_renamed.columns)
+            try:
+                # Use display names from the map's values
+                correct_col_name = column_map.get('is_correct', 'is_correct') # Get the display name
+                time_col_name = column_map.get('question_time', 'question_time')
+                overtime_col_name = column_map.get('overtime', 'overtime') # Need this for the condition
+
+                correct_col_idx = header_list.index(correct_col_name)
+                time_col_idx = header_list.index(time_col_name)
+                overtime_col_idx = header_list.index(overtime_col_name)
+
+                # Convert 0-based index to Excel column letters for formulas
+                correct_col_letter = chr(ord('A') + correct_col_idx)
+                time_col_letter = chr(ord('A') + time_col_idx)
+                overtime_col_letter = chr(ord('A') + overtime_col_idx)
+
+                # Define data range (assuming header is row 1, data starts row 2)
+                # Adjust max_row if necessary, or use a large number
+                max_row = len(df_renamed) + 1
+                data_range = f'A2:{chr(ord("A") + len(header_list)-1)}{max_row}' # Apply error format to all columns
+                time_col_range = f'{time_col_letter}2:{time_col_letter}{max_row}'
+
+                # --- Apply conditional formatting ---
+                # 1. Red text for incorrect answers (apply to whole row)
+                # Formula checks the 'is_correct' column (using its letter) for FALSE
+                worksheet.conditional_format(data_range, {'type': 'formula',
+                                                           'criteria': f'=${correct_col_letter}2=FALSE', # Check the correct column's value
+                                                           'format': error_format})
+
+                # 2. Red background for overtime time cells
+                # Formula checks the (hidden) 'overtime' column for TRUE
+                worksheet.conditional_format(time_col_range, {'type': 'formula',
+                                                              'criteria': f'=${overtime_col_letter}2=TRUE', # Check the overtime column's value
+                                                              'format': overtime_format})
+
+                # 3. Hide the 'overtime' column
+                worksheet.set_column(overtime_col_idx, overtime_col_idx, None, None, {'hidden': True})
+
+            except (ValueError, IndexError) as e:
+                print(f"Warning: Could not find columns for styling in Excel export: {e}")
+                # Handle cases where expected columns are missing gracefully
+                pass # Continue without styling if columns aren't found
+
         processed_data = output.getvalue()
         return processed_data
     # --- End Helper ---
 
-    # Display Final Thetas if available
+    # --- Styling Helper Function (for st.dataframe) ---
+    def apply_styles(row):
+        # Default styles (no special styling)
+        styles = [''] * len(row)
+        # Apply red text to entire row if incorrect
+        if 'is_correct' in row.index and not row['is_correct']:
+            styles = [f'color: {ERROR_FONT_COLOR}'] * len(row)
+        
+        # Apply red background to time cell if overtime
+        if 'overtime' in row.index and 'question_time' in row.index:
+            if row['overtime']:
+                try:
+                    # Attempt to get the index of the 'question_time' column
+                    time_col_idx = row.index.get_loc('question_time')
+                    # Apply light red background
+                    styles[time_col_idx] += f'; background-color: {OVERTIME_FILL_COLOR}' # Use += to combine with potential font color
+                    styles[time_col_idx] = styles[time_col_idx].lstrip('; ') # Clean up if it starts with ;
+                except (KeyError, IndexError):
+                    pass # Column not found or index issue, do nothing
+        
+        return styles
+    # --- End Styling Helper ---
+
+    # --- Centralized Column Configuration and Mapping ---
+    # Define the desired display names and configurations once
+    # This should match the column_config used in st.dataframe
+    COLUMN_DISPLAY_CONFIG = {
+        "question_position": st.column_config.NumberColumn("題號", help="原始報告中的題目順序"),
+        "is_manually_invalid": st.column_config.CheckboxColumn("手動標記無效?", help="勾選此框將此題標記為手動無效"),
+        "Subject": st.column_config.TextColumn("科目"),
+        "question_type": st.column_config.TextColumn("題型"),
+        "question_fundamental_skill": st.column_config.TextColumn("考察能力(小分類)"),
+        "is_correct": st.column_config.CheckboxColumn("答對?", help="題目是否回答正確"),
+        "question_difficulty": st.column_config.NumberColumn("難度(模擬)", help="系統模擬的題目難度"),
+        "question_time": st.column_config.NumberColumn("用時(分)", format="%.2f"),
+        "estimated_ability": st.column_config.NumberColumn("能力估計(Theta)", format="%.2f"),
+        "time_performance_category": st.column_config.TextColumn("時間表現分類"),
+        "is_sfe": st.column_config.CheckboxColumn("SFE?", help="是否為Special Focus Error"),
+        "diagnostic_params_list": st.column_config.ListColumn("診斷標籤", help="初步診斷標籤列表"),
+        # Include columns needed for styling/logic even if not always displayed prominently
+        "overtime": None, # Keep overtime for styling logic, hide later
+        "is_invalid": None # Keep is_invalid for context? Maybe hide too.
+        # "suspiciously_fast": None # Add if needed
+    }
+
+    # Create a simple mapping from internal name to display name for Excel export
+    EXCEL_COLUMN_MAP = {
+        "question_position": "題號",
+        # "is_manually_invalid": "手動標記無效?", # Maybe don't include this in final download? Or keep it? Let's keep it for now.
+        "Subject": "科目",
+        "question_type": "題型",
+        "question_fundamental_skill": "考察能力(小分類)",
+        "is_correct": "答對?", # Keep the boolean representation for formula
+        "question_difficulty": "難度(模擬)",
+        "question_time": "用時(分)",
+        "estimated_ability": "能力估計(Theta)",
+        "time_performance_category": "時間表現分類",
+        "is_sfe": "SFE?",
+        "diagnostic_params_list": "診斷標籤",
+        "overtime": "overtime_flag", # Give it a name for Excel, will be hidden
+        "is_invalid": "is_invalid_flag" # Keep for context, maybe hide
+    }
+
+    # --- Display Final Thetas if available ---
     if st.session_state.final_thetas:
-         theta_items = [f"{subj}: {theta:.3f}" for subj, theta in st.session_state.final_thetas.items()]
-         st.success(f"最終能力估計 (Theta): {', '.join(theta_items)}")
+        st.subheader("最終能力估計 (Final Thetas)")
+        theta_data = {"科目": list(st.session_state.final_thetas.keys()), "能力估計值 (Theta)": list(st.session_state.final_thetas.values())}
+        st.dataframe(pd.DataFrame(theta_data), hide_index=True)
 
-    # Check if the report dictionary exists AND is actually a dictionary
-    if isinstance(st.session_state.report_dict, dict):
-        if st.session_state.report_dict: # Check if the dictionary is not None and not empty
-            # Dynamically create tabs based on available reports and AI summary possibility
-            report_subjects = sorted(st.session_state.report_dict.keys()) # Get subjects with reports (e.g., ['DI', 'Q', 'V'])
-            tab_names = report_subjects # Start with subject tabs
-            
-            # Check if AI summary should be a tab
-            ai_summary_available = st.session_state.ai_summary is not None
-            should_show_ai_tab = ai_summary_available or openai_api_key # Show tab if summary exists or could be generated
+    # --- Display Subject Reports and DataFrames ---
+    # Check if results exist in session state
+    if st.session_state.report_dict and st.session_state.processed_df is not None:
+        subject_reports = st.session_state.report_dict # Use report_dict
+        df_processed_display = st.session_state.processed_df # Use the stored df
 
-            if should_show_ai_tab:
-                tab_names.append("AI 文字摘要")
+        # Determine which subjects have data
+        subjects_with_data = df_processed_display['Subject'].unique()
+        # --- DEBUG PRINT --- 
+        print(f"DEBUG: Subjects found in processed_df: {subjects_with_data}")
+        # --- END DEBUG --- 
 
-            if not tab_names:
-                st.warning("沒有可顯示的診斷報告分頁。") # Should not happen if report_dict check passed, but for safety
-            else:
-                tabs = st.tabs(tab_names)
-                
-                # Create a dictionary to map tab names to tabs for easier access
-                tab_map = dict(zip(tab_names, tabs))
+        if not subjects_with_data.any():
+             st.warning("診斷已執行，但未找到任何科目的有效處理數據。")
+        else:
+            # Create tabs for each subject with data
+            subject_tabs = st.tabs([f"{subj} 科診斷報告與數據" for subj in subjects_with_data])
 
-                # Display subject reports in their respective tabs
-                for subject in report_subjects:
-                    if subject in tab_map: # Check if tab was created
-                        with tab_map[subject]:
-                            st.subheader(f"{subject} 科目詳細診斷報告") # Add subheader for clarity
+            for i, subject in enumerate(subjects_with_data):
+                # --- DEBUG PRINT --- 
+                print(f"DEBUG: Processing tab for subject: {subject}")
+                # --- END DEBUG --- 
+                with subject_tabs[i]:
+                    st.subheader(f"{subject} 科診斷報告")
+                    # Display the markdown report for the subject
+                    report_md = subject_reports.get(subject, f"未找到 {subject} 科的診斷報告。")
+                    # --- DEBUG PRINT --- 
+                    if subject == 'Q':
+                        print(f"DEBUG: Q Report Markdown content: {report_md[:200]}...") # Print first 200 chars
+                    # --- END DEBUG --- 
+                    st.markdown(report_md)
 
-                            # --- Display Input Data Table (using df_final_for_diagnosis) ---
-                            df_to_display = None
-                            # Check if the main diagnosis dataframe exists
-                            if 'df_final_for_diagnosis' in locals() and df_final_for_diagnosis is not None:
-                                try:
-                                     # Filter the final diagnosis df for the current subject
-                                     df_to_display = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == subject].copy()
-                                     # Optional: Select or reorder columns for display if needed
-                                     # display_cols = ['question_position', 'is_correct', 'question_time', 'question_difficulty', 'question_type', 'content_domain', 'question_fundamental_skill']
-                                     # existing_display_cols = [col for col in display_cols if col in df_to_display.columns]
-                                     # df_to_display = df_to_display[existing_display_cols]
-                                except KeyError:
-                                      st.warning(f"無法在最終數據中找到 {subject} 科目的 'Subject' 欄位進行過濾。")
-                                      df_to_display = None # Reset if filtering fails
-                                except Exception as filter_e:
-                                      st.warning(f"過濾 {subject} 科目數據以供顯示時出錯: {filter_e}")
-                                      df_to_display = None
+                    st.subheader(f"{subject} 科詳細數據 (含診斷標籤)")
+                    # Filter DataFrame for the current subject
+                    df_to_display = df_processed_display[df_processed_display['Subject'] == subject].copy()
+                    # --- DEBUG PRINT --- 
+                    if subject == 'Q':
+                        print(f"DEBUG: Q df_to_display is empty: {df_to_display.empty}")
+                        if not df_to_display.empty:
+                            print(f"DEBUG: Q df_to_display columns: {df_to_display.columns.tolist()}")
+                    # --- END DEBUG --- 
 
-                            # Display the filtered dataframe if it's valid and not empty
-                            if df_to_display is not None and not df_to_display.empty:
-                                st.subheader("診斷用數據 (含模擬難度)") # Changed subheader
-                                # Define column configurations, assuming new columns exist from backend
-                                column_config = {
-                                    "question_position": st.column_config.NumberColumn("題號", format="%d", width="small"),
-                                    "is_correct": st.column_config.CheckboxColumn("答對?", width="small"),
-                                    "question_time": st.column_config.NumberColumn("用時(分)", format="%.1f", width="small"),
-                                    "question_difficulty": st.column_config.NumberColumn("模擬難度(b)", format="%.2f", width="medium"),
-                                    "question_type": st.column_config.TextColumn("題型", width="small"),
-                                    "content_domain": st.column_config.TextColumn("內容領域", width="medium"),
-                                    "question_fundamental_skill": st.column_config.TextColumn("核心技能", width="medium"),
-                                    # --- New Columns Config --- 
-                                    "time_performance_category": st.column_config.TextColumn(
-                                        "時間表現分類", 
-                                        help="綜合答題時間與正確性的分類 (快對/慢錯等)",
-                                        width="medium"
-                                    ),
-                                    "is_sfe": st.column_config.CheckboxColumn(
-                                        "基礎不穩(SFE)?", 
-                                        help="是否為特殊關注錯誤 (Special Focus Error) - 在已掌握技能範圍內題目失誤",
-                                        width="small"
-                                    ),
-                                     "diagnostic_params_list": st.column_config.ListColumn(
-                                        "診斷標籤列表",
-                                        help="該題目觸發的具體診斷標籤",
-                                        width="large", # Adjust width as needed
-                                    ),
-                                     # Hide columns not typically needed for direct user view?
-                                     "estimated_ability": None, # Hide estimated_ability
-                                     "Subject": None, # Hide Subject column
-                                } 
-                                
-                                # Filter config for columns that actually exist in the dataframe
-                                existing_columns = df_to_display.columns
-                                
-                                # --- Start Subject-Specific Column Filtering ---
-                                di_display_columns = ['question_position', 'question_time', 'content_domain', 'question_type', 'question_difficulty', 'time_performance_category', 'diagnostic_params_list', 'overtime']
-                                q_display_columns = ['question_position', 'question_time', 'content_domain', 'question_type', 'question_fundamental_skill', 'question_difficulty', 'time_performance_category', 'diagnostic_params_list', 'overtime']
-                                v_display_columns = ['question_position', 'question_time', 'question_type', 'question_fundamental_skill', 'question_difficulty', 'time_performance_category', 'diagnostic_params_list', 'overtime']
-                                filtered_column_config = {}
+                    # Prepare the list of columns to display based on COLUMN_DISPLAY_CONFIG keys
+                    # Filter out keys with None values unless they are needed internally (like 'overtime')
+                    columns_for_display = [k for k, v in COLUMN_DISPLAY_CONFIG.items() if v is not None and k in df_to_display.columns]
 
-                                if subject == 'DI':
-                                    for col in existing_columns:
-                                        if col in di_display_columns:
-                                            # Get the config from base, default to simple text if not defined (though it should be)
-                                            config_setting = column_config.get(col, st.column_config.TextColumn(col))
-                                            # Do not add if the base config explicitly set it to None (hidden)
-                                            if config_setting is not None:
-                                                 filtered_column_config[col] = config_setting
-                                        else:
-                                            # Explicitly hide columns not in the desired list for DI
-                                            filtered_column_config[col] = None
-                                elif subject == 'Q':
-                                     for col in existing_columns:
-                                        if col in q_display_columns:
-                                            config_setting = column_config.get(col, st.column_config.TextColumn(col))
-                                            if config_setting is not None:
-                                                 filtered_column_config[col] = config_setting
-                                        else:
-                                            filtered_column_config[col] = None
-                                elif subject == 'V':
-                                     for col in existing_columns:
-                                        if col in v_display_columns:
-                                            config_setting = column_config.get(col, st.column_config.TextColumn(col))
-                                            if config_setting is not None:
-                                                 filtered_column_config[col] = config_setting
-                                        else:
-                                            filtered_column_config[col] = None
-                                else:
-                                    # For non-DI subjects, use the original filtering logic
-                                    filtered_column_config = {
-                                        k: v for k, v in column_config.items() if k in existing_columns or v is None # Keep explicit None config
-                                    }
-                                # --- End Subject-Specific Column Filtering ---
 
-                                # --- START APPLYING STYLES ---
-                                # Define the style function inside the loop to access df_to_display columns
-                                def apply_styles(row):
-                                    # Default styles (no special styling)
-                                    styles = [''] * len(row)
-                                    # Apply red text to entire row if incorrect
-                                    if 'is_correct' in row.index and not row['is_correct']:
-                                        styles = ['color: #D32F2F'] * len(row) # Darker red text
-                                    
-                                    # Apply red background to time cell if overtime
-                                    if 'overtime' in row.index:
-                                        # 為除錯增加日誌輸出
-                                        if row['overtime'] and 'question_time' in row.index:
-                                            try:
-                                                # Attempt to get the index of the 'question_time' column
-                                                time_col_idx = row.index.get_loc('question_time')
-                                                # Apply darker red background (ensure alpha isn't too strong)
-                                                styles[time_col_idx] = 'background-color: rgba(244, 67, 54, 0.4)' # Darker red with transparency
-                                            except KeyError:
-                                                pass # Column not found, do nothing
-                                            except IndexError:
-                                                pass # Index out of bounds, do nothing
-                                    
-                                    return styles
+                    if not df_to_display.empty:
+                         # Apply styling (assuming apply_styles function exists and is correct)
+                         try:
+                             # Ensure 'overtime' column exists for styling function
+                             if 'overtime' not in df_to_display.columns:
+                                 df_to_display['overtime'] = False # Add dummy if missing, though it should come from diagnosis_module
+                                 print(f"Warning: 'overtime' column added artificially for {subject} display.")
+                             if 'is_correct' not in df_to_display.columns:
+                                 df_to_display['is_correct'] = True # Add dummy if missing
+                                 print(f"Warning: 'is_correct' column added artificially for {subject} display.")
 
-                                # Check if necessary columns exist before applying styles
-                                required_style_cols = ['is_correct', 'overtime']
-                                if all(col in df_to_display.columns for col in required_style_cols):
-                                     # Apply the styling function row-wise
-                                     styler = df_to_display.style.apply(apply_styles, axis=1)
-                                     # Display the styled DataFrame
-                                     st.dataframe(
-                                         styler, 
-                                         use_container_width=True,
-                                         column_config=filtered_column_config, # Use the filtered config
-                                         hide_index=True 
-                                     )
-                                else:
-                                     # Display the original DataFrame if styling columns are missing
-                                     missing_style_cols = [col for col in required_style_cols if col not in df_to_display.columns]
-                                     st.warning(f"部分樣式欄位缺失: {', '.join(missing_style_cols)}。無法應用樣式。")
-                                     st.dataframe(
-                                         df_to_display, 
-                                         use_container_width=True,
-                                         column_config=filtered_column_config, 
-                                         hide_index=True 
-                                     )
-                                # --- END APPLYING STYLES --- 
 
-                                st.divider() # Add separator before the text report
+                             # Apply styling step-by-step to avoid parenthesis issues
+                             styler = df_to_display.style
+                             styler = styler.set_properties(**{'text-align': 'left'})
+                             styler = styler.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+                             styled_df = styler.apply(apply_styles, axis=1) # Apply custom styling
+                             
+                             st.dataframe(
+                                 styled_df,
+                                 column_config=COLUMN_DISPLAY_CONFIG, # Use the central config
+                                 column_order=columns_for_display, # Control display order
+                                 hide_index=True,
+                                 use_container_width=True
+                             )
+                         except Exception as e:
+                              st.error(f"無法應用樣式或顯示 {subject} 科數據: {e}")
+                              st.dataframe(df_to_display, hide_index=True, use_container_width=True) # Fallback to unstyled
 
-                                # --- START ADD DOWNLOAD BUTTON ---
-                                excel_data = to_excel(df_to_display)
-                                st.download_button(
-                                    label=f"📥 下載 {subject} 科目 Excel 報告",
-                                    data=excel_data,
-                                    file_name=f"gmat_diagnostic_report_{subject}.xlsx",
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    key=f"download_excel_{subject}" # Add a unique key per button
-                                )
-                                # --- END ADD DOWNLOAD BUTTON ---
+                         # --- Download Button (Modified) ---
+                         try:
+                             # Convert the *original* df_to_display to Excel bytes using the modified helper
+                             excel_bytes = to_excel(df_to_display, EXCEL_COLUMN_MAP)
+                             st.download_button(
+                                label=f"下載 {subject} 科詳細數據 (Excel)",
+                                data=excel_bytes,
+                                file_name=f"gmat_diag_{subject}_detailed_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"download_excel_{subject}"
+                             )
+                         except Exception as e:
+                              st.error(f"無法生成 {subject} 科的 Excel 下載文件: {e}")
 
-                            else:
-                                # Show only if analysis was run but df is missing/empty for this subject
-                                if st.session_state.analysis_run: 
-                                    st.caption(f"未能加載用於顯示的 {subject} 科目診斷數據表格。") # Fallback message
-                            # --- End Display Input Data Table ---
+                    else:
+                        st.write(f"沒有找到 {subject} 科的詳細數據可供顯示。")
+    elif st.session_state.error_message:
+         st.error(f"診斷過程中發生錯誤: {st.session_state.error_message}")
+    else:
+        st.info('請先上傳數據並點擊"開始診斷"按鈕。')
 
-                            # Ensure the report content itself is a string before displaying
-                            report_content = st.session_state.report_dict.get(subject, "")
-                            if report_content: # Only display markdown if there is content
-                                if isinstance(report_content, str):
-                                    # --- START Replace Chapter 3 Content ---
-                                    placeholder = "（請參考診斷表單中的標記）"
-                                    # Regex pattern to find Chapter 3 title and content until Chapter 4 or end
-                                    pattern = re.compile(r"(^\*\*3\.[^\n]*\*\*)(.*?)(?=^\*\*4\.|\Z)", re.DOTALL | re.MULTILINE)
-                                    # Replacement function to keep the title (Group 1) and replace content
-                                    replacement = rf'\1\n\n{placeholder}\n\n'
-                                    modified_report_content = pattern.sub(replacement, report_content)
-                                    # --- END Replace Chapter 3 Content ---
-
-                                    # Display the modified content
-                                    st.markdown(modified_report_content)
-                                else:
-                                    st.warning(f"{subject} 科目的報告內容不是有效的文字格式，無法顯示。")
-                            elif st.session_state.analysis_run:
-                                st.info(f"{subject} 科目沒有生成文字診斷報告。")
-
-                # Display AI summary tab content
-                if "AI 文字摘要" in tab_map:
-                    with tab_map["AI 文字摘要"]:
-                        st.subheader("AI 文字摘要")
-                        if st.session_state.ai_summary:
-                            st.markdown(st.session_state.ai_summary)
-                        elif openai_api_key:
-                            st.info("AI 摘要尚未生成或生成失敗。請檢查上方狀態。")
-                        else:
-                            st.info("請在側邊欄輸入 OpenAI API Key 並重新運行分析以生成 AI 文字摘要。")
-
-    elif st.session_state.analysis_run:
-        if not isinstance(st.session_state.report_dict, dict):
-            st.error(f"診斷分析返回的結果類型錯誤。預期為字典 (dict)，但收到了類型：{type(st.session_state.report_dict).__name__}。請檢查 `diagnosis_module.run_diagnosis` 的返回值。")
-        elif not st.session_state.report_dict:
-            st.error("分析過程未成功生成診斷報告字典，或字典為空。請檢查上方的狀態信息和錯誤提示，並確認 `diagnosis_module.run_diagnosis` 是否返回了預期的字典格式且包含內容。")
+# --- Footer or other UI elements ---
