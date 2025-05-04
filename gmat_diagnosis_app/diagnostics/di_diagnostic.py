@@ -8,6 +8,7 @@ TOTAL_QUESTIONS_DI = 20
 TIME_PRESSURE_THRESHOLD_DI = 3.0  # minutes difference
 INVALID_TIME_THRESHOLD_MINUTES = 1.0  # 1.0 minute
 LAST_THIRD_FRACTION = 2/3
+INVALID_DATA_TAG_DI = "數據無效：用時過短（受時間壓力影響）" # Added invalid tag
 
 # Overtime thresholds (minutes) based on time pressure
 OVERTIME_THRESHOLDS = {
@@ -158,32 +159,52 @@ def _diagnose_gt(df_gt):
 
 # --- Main DI Diagnosis Runner ---
 
-def run_di_diagnosis(df_di):
+def run_di_diagnosis(df_di_raw):
     """
     Runs the diagnostic analysis specifically for the Data Insights section.
+    PRIORITIZES the 'is_manually_invalid' flag.
 
     Args:
-        df_di (pd.DataFrame): DataFrame containing only DI response data.
+        df_di_raw (pd.DataFrame): DataFrame containing only DI response data.
                               Needs columns like 'question_time', 'is_correct', 'question_type',
                               'question_position' (acts as identifier), 'msr_group_id' (if MSR exists), etc.
                               'question_difficulty' (simulated) is expected.
+                              May contain 'is_manually_invalid'.
 
     Returns:
         dict: A dictionary containing the results of the DI diagnosis, structured by chapter.
         str: A string containing the summary report for the DI section.
+        pd.DataFrame: The processed DI DataFrame with added diagnostic columns.
     """
     print("DEBUG: >>>>>> Entering run_di_diagnosis >>>>>>") # DEBUG
     print("  Running Data Insights Diagnosis...")
     di_diagnosis_results = {}
 
-    if df_di.empty:
+    if df_di_raw.empty:
         print("    No DI data provided. Skipping DI diagnosis.")
-        return {}, "Data Insights (DI) 部分無數據可供診斷。"
+        # Return empty df with expected columns for downstream consistency
+        empty_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type',
+                      'question_fundamental_skill', 'content_domain', 'Subject', 'is_invalid',
+                      'overtime', 'suspiciously_fast', 'msr_group_id', 'msr_group_total_time',
+                      'msr_reading_time', 'is_first_msr_q', 'is_sfe',
+                      'time_performance_category', 'diagnostic_params_list']
+        return {}, "Data Insights (DI) 部分無數據可供診斷。", pd.DataFrame(columns=empty_cols)
 
-    # --- Chapter 0: Derivative Data Calculation ---
-    print("    Chapter 0: Calculating Derivative Metrics (MSR Times & Flags)...") # Updated print
+    df_di = df_di_raw.copy()
+
+    # --- Chapter 0: Derivative Data Calculation & Basic Prep ---
+    print("    Chapter 0: Calculating Derivative Metrics & Basic Prep...")
     # Ensure 'question_time' is numeric (minutes)
     df_di['question_time'] = pd.to_numeric(df_di['question_time'], errors='coerce')
+    # Ensure other critical columns exist and have basic types
+    if 'question_position' not in df_di.columns: df_di['question_position'] = range(len(df_di))
+    else: df_di['question_position'] = pd.to_numeric(df_di['question_position'], errors='coerce')
+    if 'is_correct' not in df_di.columns: df_di['is_correct'] = True # Default if missing
+    else: df_di['is_correct'] = df_di['is_correct'].astype(bool)
+    if 'question_type' not in df_di.columns: df_di['question_type'] = 'Unknown Type'
+    # Initialize potential MSR group id if missing
+    if 'msr_group_id' not in df_di.columns: df_di['msr_group_id'] = np.nan
+
     df_di = _calculate_msr_metrics(df_di) # Now adds 'is_first_msr_q'
 
     # --- Chapter 1: Time Strategy & Validity ---
@@ -193,25 +214,54 @@ def run_di_diagnosis(df_di):
     time_pressure = time_diff <= TIME_PRESSURE_THRESHOLD_DI
     print(f"      DI Total Time: {total_test_time_di:.2f} min, Allowed: {MAX_ALLOWED_TIME_DI:.1f} min, Diff: {time_diff:.2f} min, Pressure: {time_pressure}")
 
-    # Set thresholds based on pressure
-    thresholds = OVERTIME_THRESHOLDS[time_pressure]
+    # --- START: Apply Manual Invalid Flag First ---
+    if 'is_manually_invalid' in df_di.columns:
+        df_di['is_invalid'] = df_di['is_manually_invalid'].fillna(False).astype(bool)
+        print(f"      Initialized 'is_invalid' based on manual flags. Count: {df_di['is_invalid'].sum()}")
+    else:
+        print("      Warning (DI Ch1): 'is_manually_invalid' column not found. Initializing 'is_invalid' to False.")
+        df_di['is_invalid'] = False
+    # --- END: Apply Manual Invalid Flag First ---
 
-    # Identify invalid questions (only if time_pressure is True)
-    df_di['is_invalid'] = False
-    num_invalid_questions = 0
+    # --- Apply Automatic Invalid Rules ONLY if time pressure AND not manually invalid ---
+    num_auto_invalid = 0
     if time_pressure:
+        eligible_for_auto_rules_mask = ~df_di['is_invalid'] # Rows not manually marked invalid
         last_third_pos_start = TOTAL_QUESTIONS_DI * LAST_THIRD_FRACTION
-        invalid_mask = (
+        auto_invalid_mask = (
+            eligible_for_auto_rules_mask &
             (df_di['question_position'] > last_third_pos_start) &
             (df_di['question_time'] < INVALID_TIME_THRESHOLD_MINUTES)
         )
-        df_di.loc[invalid_mask, 'is_invalid'] = True
-        num_invalid_questions = invalid_mask.sum()
-        print(f"      Identified {num_invalid_questions} potentially invalid questions due to high pressure & fast time in last third.")
+        num_auto_invalid = auto_invalid_mask.sum()
+        if num_auto_invalid > 0:
+            print(f"      Marking {num_auto_invalid} additional DI questions as invalid based on automatic Chapter 1 rules (Pressure & Fast End).")
+            df_di.loc[auto_invalid_mask, 'is_invalid'] = True
+
+    num_invalid_questions_total = df_di['is_invalid'].sum()
+    di_diagnosis_results['invalid_count'] = num_invalid_questions_total
+    print(f"      Finished DI invalid marking. Total invalid count: {num_invalid_questions_total}")
+
+    # --- Initialize diagnostic_params and add tag --- 
+    if 'diagnostic_params' not in df_di.columns:
+        df_di['diagnostic_params'] = [[] for _ in range(len(df_di))]
+    else:
+        df_di['diagnostic_params'] = df_di['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, set, tuple)) else [])
+
+    final_invalid_mask_di = df_di['is_invalid']
+    if final_invalid_mask_di.any():
+        print(f"      Adding/Ensuring '{INVALID_DATA_TAG_DI}' tag for {final_invalid_mask_di.sum()} invalid DI rows.")
+        for idx in df_di.index[final_invalid_mask_di]:
+            current_list = df_di.loc[idx, 'diagnostic_params']
+            if not isinstance(current_list, list): current_list = []
+            if INVALID_DATA_TAG_DI not in current_list:
+                current_list.append(INVALID_DATA_TAG_DI)
+            df_di.loc[idx, 'diagnostic_params'] = current_list
+    # --- End Add Tag --- 
 
     # Mark Overtime (on non-invalid data)
     df_di['overtime'] = False
-    # df_di['msr_group_overtime'] = False # Removed this flag as 'overtime' now handles MSR group OT
+    thresholds = OVERTIME_THRESHOLDS[time_pressure]
 
     print("DEBUG (di_diagnostic.py): 開始標記超時 - DI數據包含以下題型:")
     print(df_di['question_type'].value_counts())
@@ -310,7 +360,7 @@ def run_di_diagnosis(df_di):
         'total_test_time_minutes': total_test_time_di,
         'time_difference_minutes': time_diff,
         'time_pressure': time_pressure,
-        'invalid_questions_excluded': num_invalid_questions,
+        'invalid_questions_excluded': num_invalid_questions_total,
         'overtime_thresholds_minutes': thresholds
     }
 

@@ -1,6 +1,7 @@
 import sys
 import os
 import re # Import regex module
+import io # Ensure io is imported
 
 # Get the directory containing app.py
 app_dir = os.path.dirname(os.path.abspath(__file__))
@@ -310,6 +311,30 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024 # Calculate size in bytes
 
 st.title('GMAT 成績診斷平台')
 
+# --- Initialize session state variables ---
+if 'data_loaded_q' not in st.session_state:
+    st.session_state.data_loaded_q = False
+if 'analysis_run' not in st.session_state:
+    st.session_state.analysis_run = False
+if 'report_dict' not in st.session_state:
+    st.session_state.report_dict = {}
+if 'df_processed' not in st.session_state:
+    st.session_state.df_processed = None
+if 'pasted_q' not in st.session_state: st.session_state.pasted_q = ""
+if 'pasted_v' not in st.session_state: st.session_state.pasted_v = ""
+if 'pasted_di' not in st.session_state: st.session_state.pasted_di = ""
+# Add initializations for edited dataframes if they are used before assigned in tabs
+if 'edited_df_q' not in st.session_state: st.session_state.edited_df_q = None
+if 'edited_df_v' not in st.session_state: st.session_state.edited_df_v = None
+if 'edited_df_di' not in st.session_state: st.session_state.edited_df_di = None
+
+
+# --- Initialize validation error lists ---
+validation_errors_q = []
+validation_errors_v = []
+validation_errors_di = []
+
+
 # --- Data Input Section (Using Tabs) ---
 st.header("1. 上傳或貼上各科成績單")
 
@@ -373,17 +398,35 @@ with tab_q:
                  st.caption(f"已自動移除 {initial_rows_q - cleaned_rows_q} 個空行和 {initial_cols_q - cleaned_cols_q} 個空列。")
             # --- End Initial Cleaning ---
 
+            # --- Add Manual Invalid Column BEFORE editor ---
+            if not temp_df_q.empty:
+                temp_df_q['is_manually_invalid'] = False
+            # --- End Add ---
+
             # --- Editable Preview --- 
             validation_errors_q = [] # Initialize error list for Q
             if not temp_df_q.empty:
                 st.write("預覽與編輯資料 (修改後請確保欄位符合下方要求)：")
                 try:
+                    # Define desired column order, putting manual invalid first
+                    q_column_order = ['is_manually_invalid'] + [col for col in temp_df_q.columns if col != 'is_manually_invalid']
+                    
                     # Use data_editor for viewing all data and allowing edits
                     edited_temp_df_q = st.data_editor(
                         temp_df_q,
                         key="editor_q",
                         num_rows="dynamic", # Allow adding/deleting rows
-                        use_container_width=True
+                        use_container_width=True,
+                        column_order=q_column_order, # Set the column order here
+                        # --- Add column config for the new checkbox ---
+                        column_config={
+                            "is_manually_invalid": st.column_config.CheckboxColumn(
+                                "手動標記無效?",
+                                help="勾選此框將此題標記為因倉促/慌亂而無效，將優先於自動規則。",
+                                default=False,
+                            )
+                        }
+                        # --- End config ---
                     )
                     # --- START VALIDATION ---
                     validation_errors_q = validate_dataframe(edited_temp_df_q, 'Q')
@@ -513,16 +556,34 @@ with tab_v:
                  st.caption(f"已自動移除 {initial_rows_v - cleaned_rows_v} 個空行和 {initial_cols_v - cleaned_cols_v} 個空列。")
             # --- End Initial Cleaning ---
 
+            # --- Add Manual Invalid Column BEFORE editor ---
+            if not temp_df_v.empty:
+                temp_df_v['is_manually_invalid'] = False
+            # --- End Add ---
+
             # --- Editable Preview --- 
             validation_errors_v = [] # Initialize error list for V
             if not temp_df_v.empty:
                  st.write("預覽與編輯資料 (修改後請確保欄位符合下方要求)：")
                  try:
+                    # Define desired column order, putting manual invalid first
+                    v_column_order = ['is_manually_invalid'] + [col for col in temp_df_v.columns if col != 'is_manually_invalid']
+                    
                     edited_temp_df_v = st.data_editor(
-                        temp_df_v, 
-                        key="editor_v", 
+                        temp_df_v,
+                        key="editor_v",
                         num_rows="dynamic",
-                        use_container_width=True
+                        use_container_width=True,
+                        column_order=v_column_order, # Set the column order here
+                        # --- Add column config for the new checkbox ---
+                        column_config={
+                            "is_manually_invalid": st.column_config.CheckboxColumn(
+                                "手動標記無效?",
+                                help="勾選此框將此題標記為因倉促/慌亂而無效，將優先於自動規則。",
+                                default=False,
+                            )
+                        }
+                        # --- End config ---
                     )
                     # --- START VALIDATION --- 
                     validation_errors_v = validate_dataframe(edited_temp_df_v, 'V')
@@ -644,16 +705,34 @@ with tab_di:
                  st.caption(f"已自動移除 {initial_rows_di - cleaned_rows_di} 個空行和 {initial_cols_di - cleaned_cols_di} 個空列。")
             # --- End Initial Cleaning ---
 
+            # --- Add Manual Invalid Column BEFORE editor ---
+            if not temp_df_di.empty:
+                temp_df_di['is_manually_invalid'] = False
+            # --- End Add ---
+
             # --- Editable Preview --- 
             validation_errors_di = [] # Initialize error list for DI
             if not temp_df_di.empty:
                  st.write("預覽與編輯資料 (修改後請確保欄位符合下方要求)：")
                  try:
+                     # Define desired column order, putting manual invalid first
+                     di_column_order = ['is_manually_invalid'] + [col for col in temp_df_di.columns if col != 'is_manually_invalid']
+                     
                      edited_temp_df_di = st.data_editor(
-                         temp_df_di, 
-                         key="editor_di", 
+                         temp_df_di,
+                         key="editor_di",
                          num_rows="dynamic",
-                         use_container_width=True
+                         use_container_width=True,
+                         column_order=di_column_order, # Set the column order here
+                         # --- Add column config for the new checkbox ---
+                        column_config={
+                            "is_manually_invalid": st.column_config.CheckboxColumn(
+                                "手動標記無效?",
+                                help="勾選此框將此題標記為因倉促/慌亂而無效，將優先於自動規則。",
+                                default=False,
+                            )
+                        }
+                        # --- End config ---
                      )
                      # --- START VALIDATION --- 
                      validation_errors_di = validate_dataframe(edited_temp_df_di, 'DI')
@@ -1004,6 +1083,17 @@ st.divider()
 if st.session_state.analysis_run: # Only show results area if analysis was attempted
     st.header("診斷結果")
 
+    # --- Helper function to convert DataFrame to Excel bytes ---
+    def to_excel(df):
+        output = io.BytesIO()
+        # Use pandas ExcelWriter to save into the BytesIO object
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Sheet1')
+        # It's important to get the value *after* the writer context manager is closed
+        processed_data = output.getvalue()
+        return processed_data
+    # --- End Helper ---
+
     # Display Final Thetas if available
     if st.session_state.final_thetas:
          theta_items = [f"{subj}: {theta:.3f}" for subj, theta in st.session_state.final_thetas.items()]
@@ -1181,6 +1271,18 @@ if st.session_state.analysis_run: # Only show results area if analysis was attem
                                 # --- END APPLYING STYLES --- 
 
                                 st.divider() # Add separator before the text report
+
+                                # --- START ADD DOWNLOAD BUTTON ---
+                                excel_data = to_excel(df_to_display)
+                                st.download_button(
+                                    label=f"📥 下載 {subject} 科目 Excel 報告",
+                                    data=excel_data,
+                                    file_name=f"gmat_diagnostic_report_{subject}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    key=f"download_excel_{subject}" # Add a unique key per button
+                                )
+                                # --- END ADD DOWNLOAD BUTTON ---
+
                             else:
                                 # Show only if analysis was run but df is missing/empty for this subject
                                 if st.session_state.analysis_run: 

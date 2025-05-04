@@ -8,6 +8,8 @@ MAX_ALLOWED_TIME_Q = 45.0 # minutes
 FAST_END_THRESHOLD_MINUTES = 1.0
 # Define time diff threshold for pressure as per MD Ch1
 TIME_DIFF_PRESSURE_THRESHOLD = 3.0
+# Tag for invalid data
+INVALID_DATA_TAG_Q = "數據無效：用時過短（受時間壓力影響）"
 
 APPENDIX_A_TRANSLATION = {
     # Quant - Reading & Understanding
@@ -102,13 +104,14 @@ def _diagnose_q_root_causes(df, avg_times, max_diffs):
         q_time = row.get('question_time', None)
         is_correct = bool(row.get('is_correct', True))
         is_overtime = bool(row.get('overtime', False))
+        is_invalid = bool(row.get('is_invalid', False)) # Get invalid status
 
         current_params = []
         current_is_sfe = False
         current_time_performance_category = 'Unknown'
 
-        # 1. Check SFE (only if incorrect)
-        if not is_correct and q_diff is not None and not pd.isna(q_diff):
+        # 1. Check SFE (only if incorrect AND NOT invalid)
+        if not is_correct and not is_invalid and q_diff is not None and not pd.isna(q_diff):
             max_correct_diff = max_diff_dict.get(q_skill, -np.inf)
             if q_diff < max_correct_diff:
                 current_is_sfe = True
@@ -161,6 +164,12 @@ def _diagnose_q_root_causes(df, avg_times, max_diffs):
         if 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in unique_params:
              unique_params.remove('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
              unique_params.insert(0, 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+
+        # Append the invalid tag if the row is marked as invalid
+        if is_invalid:
+            # Check if tag already exists to avoid duplicates if run multiple times
+            if INVALID_DATA_TAG_Q not in unique_params:
+                 unique_params.append(INVALID_DATA_TAG_Q)
 
         all_diagnostic_params.append(unique_params)
         all_is_sfe.append(current_is_sfe)
@@ -1126,24 +1135,23 @@ def _generate_q_summary_report(q_diagnosis_results, q_recommendations, subject_t
 
 # --- Main Q Diagnosis Entry Point ---
 
-def run_q_diagnosis(df_raw_q, q_time_pressure_status=False, q_invalid_count=0):
+def run_q_diagnosis(df_raw_q, q_time_pressure_status=False):
     """
     Runs the diagnostic analysis specifically for the Quantitative section.
-    Applies Chapter 1 logic internally.
+    Applies Chapter 1 logic internally to determine invalid data.
 
     Args:
         df_raw_q (pd.DataFrame): Raw DataFrame with all Q responses.
                                  Requires columns: 'question_position', 'question_time', 
                                  'is_correct', 'question_type', 'question_difficulty', 
                                  'question_fundamental_skill'.
-        q_time_pressure_status (bool): Whether time pressure was detected for Q.
-        q_invalid_count (int): Number of invalid Q questions already identified.
+        q_time_pressure_status (bool): Whether time pressure was detected for Q by the main module.
 
     Returns:
-        dict: Dictionary containing Q diagnosis results by chapter.
+        dict: Dictionary containing Q diagnosis results by chapter, including invalid_count.
         str: A string containing the summary report for the Q section.
         pd.DataFrame: The processed Q DataFrame with added diagnostic columns 
-                      (diagnostic_params_list, is_sfe, time_performance_category).
+                      (diagnostic_params_list, is_sfe, time_performance_category, is_invalid).
     """
     print("  Running Quantitative Diagnosis...")
     q_diagnosis_results = {}
@@ -1154,74 +1162,73 @@ def run_q_diagnosis(df_raw_q, q_time_pressure_status=False, q_invalid_count=0):
 
     # --- Apply Chapter 1 Rules --- 
     # This function now handles filtering and overtime marking
-    df_q_valid, time_pressure_status_q, num_invalid_q, overtime_threshold_q = _apply_ch1_rules(df_raw_q)
-    
-    # If q_time_pressure_status is provided, use it instead of calculated value
-    if q_time_pressure_status is not None:
-        print(f"    Overriding calculated time pressure status ({time_pressure_status_q}) with provided value ({q_time_pressure_status}).")
-        time_pressure_status_q = q_time_pressure_status
-    
-    # If q_invalid_count is provided, use it for reporting
-    if q_invalid_count > 0:
-        print(f"    Using provided invalid question count ({q_invalid_count}) for reporting.")
-        num_invalid_q = q_invalid_count
-    
-    # Store Chapter 1 results for reporting
+    # It calculates its own time pressure but we use the passed one
+    # We need to call this to get the overtime threshold and mark invalid
+    df_q_processed, calculated_time_pressure, num_invalid_q, overtime_threshold_q = _apply_ch1_rules_internal(df_raw_q, q_time_pressure_status)
+
+    # Chapter 1 results for reporting
     chapter1_results = {
-        'time_pressure_status': time_pressure_status_q,
+        'time_pressure_status': q_time_pressure_status, # Use the status passed from main module
         'invalid_questions_excluded': num_invalid_q,
         'overtime_threshold_used': overtime_threshold_q
     }
-    
-    if df_q_valid.empty:
-        print("    No valid Q data remaining after Chapter 1 filtering. Skipping further Q diagnosis.")
+
+    # Store the invalid count in the main results dictionary
+    q_diagnosis_results['invalid_count'] = num_invalid_q
+    q_diagnosis_results['chapter1_results'] = chapter1_results # Also store detailed ch1 results
+
+    # Exclude invalid data from further analysis (Ch2-6)?
+    # Let's keep invalid data in the df, but internal functions should filter based on is_invalid
+    df_q_for_analysis = df_q_processed.copy()
+
+    if df_q_for_analysis.empty:
+        print("    No Q data remaining (possibly all invalid). Skipping further Q diagnosis.")
         # Generate a minimal report indicating no valid data
         minimal_report = _generate_q_summary_report(
-             {"chapter1_results": chapter1_results}, # Pass Ch1 results
-             ["無有效題目可供分析。"], 
-             time_pressure_status_q, 
+             q_diagnosis_results, # Pass results containing invalid count
+             ["無有效題目可供分析。"],
+             q_time_pressure_status,
              num_invalid_q,
-             None  # No diagnosed DataFrame available
+             None
         )
-        return {"chapter1_results": chapter1_results}, minimal_report, pd.DataFrame()
-
-    # Make a copy to avoid modifying the valid slice further upstream implicitly
-    # This df_q_valid is the one used for Ch2-6 logic
-    df_q_valid = df_q_valid.copy()
+        # Return the df *before* filtering for the frontend display
+        return q_diagnosis_results, minimal_report, df_q_processed
 
     # --- Run Internal Diagnosis (Chapters 2-6) --- 
-    # Calculate prerequisites needed for root cause analysis (using VALID data)
-    avg_time_per_type_q = {} 
-    if pd.api.types.is_numeric_dtype(df_q_valid['question_time']):
-        avg_time_per_type_q = df_q_valid.groupby('question_type')['question_time'].mean().to_dict()
+    # Calculate prerequisites needed for root cause analysis (use df_q_for_analysis which includes is_invalid)
+    # Ensure filtering happens where needed, e.g., average time only on valid?
+    df_valid_for_avg = df_q_for_analysis[df_q_for_analysis['is_invalid'] == False]
+    avg_time_per_type_q = {}
+    if not df_valid_for_avg.empty and pd.api.types.is_numeric_dtype(df_valid_for_avg['question_time']):
+        avg_time_per_type_q = df_valid_for_avg.groupby('question_type')['question_time'].mean().to_dict()
     else:
         avg_time_per_type_q = {'REAL': 2.0, 'PURE': 2.0} # Default
 
     max_correct_difficulty_per_skill_q = {}
-    df_correct_q = df_q_valid[df_q_valid['is_correct'] == True]
-    if not df_correct_q.empty and 'question_fundamental_skill' in df_correct_q.columns and 'question_difficulty' in df_correct_q.columns:
-        if pd.api.types.is_numeric_dtype(df_correct_q['question_difficulty']):
-            max_correct_difficulty_per_skill_q = df_correct_q.groupby('question_fundamental_skill')['question_difficulty'].max().to_dict()
+    # Calculate max difficulty based on correct AND valid questions
+    df_correct_valid_q = df_q_for_analysis[(df_q_for_analysis['is_correct'] == True) & (df_q_for_analysis['is_invalid'] == False)]
+    if not df_correct_valid_q.empty and 'question_fundamental_skill' in df_correct_valid_q.columns and 'question_difficulty' in df_correct_valid_q.columns:
+        if pd.api.types.is_numeric_dtype(df_correct_valid_q['question_difficulty']):
+            max_correct_difficulty_per_skill_q = df_correct_valid_q.groupby('question_fundamental_skill')['question_difficulty'].max().to_dict()
 
-    # Apply root cause diagnosis (adds diagnostic_params, is_sfe, time_performance_category)
-    # Pass the VALID and overtime-marked dataframe here
-    df_q_diagnosed = _diagnose_q_root_causes(df_q_valid, avg_time_per_type_q, max_correct_difficulty_per_skill_q)
+    # Apply root cause diagnosis (adds diagnostic_params_list, is_sfe, time_performance_category)
+    # Pass the dataframe containing BOTH valid and invalid rows
+    df_q_diagnosed = _diagnose_q_root_causes(df_q_for_analysis, avg_time_per_type_q, max_correct_difficulty_per_skill_q)
 
     # --- Execute Chapters 2-6 Logic --- 
     print("  Executing Internal Q Diagnosis (Chapters 2-6)...")
-    # Use the dataframe that has root causes diagnosed and is already filtered/marked
-    q_internal_results = _diagnose_q_internal(df_q_diagnosed) 
+    # Internal logic needs to handle the is_invalid flag where appropriate
+    # For example, Ch2 Real/Pure comparison might exclude invalid
+    q_internal_results = _diagnose_q_internal(df_q_diagnosed) # Pass the full diagnosed df
     print("    Finished Internal Q Diagnosis.")
-    
+
     # Combine Chapter 1 results with results from Chapters 2-6
-    q_diagnosis_results = {
-        "chapter1_results": chapter1_results, 
-        **q_internal_results # Unpack results from _diagnose_q_internal
-    }
+    # q_diagnosis_results already contains chapter1_results and invalid_count
+    q_diagnosis_results.update(q_internal_results) # Add results from Ch 2-6
 
     # --- Translate diagnostic codes --- 
     # Ensure the diagnosed dataframe is used for translation
-    if 'diagnostic_params' in df_q_diagnosed.columns:
+    if 'diagnostic_params_list' in df_q_diagnosed.columns:
         print("DEBUG (q_diagnostic.py): Translating 'diagnostic_params' to Chinese...")
         def translate_q_list(params_list):
             return [_get_translation(p) for p in params_list] if isinstance(params_list, list) else []
@@ -1260,7 +1267,7 @@ def run_q_diagnosis(df_raw_q, q_time_pressure_status=False, q_invalid_count=0):
     report_str = _generate_q_summary_report(
         q_diagnosis_results, 
         q_recommendations, 
-        time_pressure_status_q, # Pass the status from Ch1 results
+        q_time_pressure_status, # Pass the status from Ch1 results
         num_invalid_q,          # Pass the count from Ch1 results
         df_q_diagnosed          # Pass the diagnosed DataFrame for time_performance_category grouping
     )
@@ -1292,97 +1299,91 @@ def run_q_diagnosis(df_raw_q, q_time_pressure_status=False, q_invalid_count=0):
 
 # --- Chapter 1 Logic Implementation ---
 
-def _apply_ch1_rules(df_raw_q):
-    """Applies Chapter 1 rules: calculates time pressure, identifies invalid data,
-       filters invalid data, and marks overtime on the valid data.
+def _apply_ch1_rules_internal(df_raw_q, time_pressure_from_main):
+    """Applies Chapter 1 time validity rules internally for Q.
+       Marks invalid rows and adds the tag.
+       PRIORITIZES the 'is_manually_invalid' flag if present.
 
     Args:
-        df_raw_q (pd.DataFrame): The raw DataFrame with all Q responses,
-                                 requiring columns: 'question_position', 'question_time'.
+        df_raw_q (pd.DataFrame): The raw Q DataFrame.
+        time_pressure_from_main (bool): Whether time pressure was detected globally.
 
     Returns:
-        tuple: containing:
-            - pd.DataFrame: Filtered DataFrame with only valid questions, 
-                            and added 'overtime' and 'is_invalid' columns.
-            - bool: time_pressure status.
-            - int: Number of invalid questions removed.
-            - float: Overtime threshold used.
+        pd.DataFrame: DataFrame with 'is_invalid' column updated and potentially 'diagnostic_params' added/updated.
     """
-    print("    Executing Q - Chapter 1: Time Strategy & Validity...")
     df = df_raw_q.copy()
 
-    # Ensure required columns exist
-    if not all(col in df.columns for col in ['question_position', 'question_time']):
-        print("      ERROR: Missing required columns ('question_position', 'question_time') for Chapter 1 analysis. Skipping.")
-        df['is_invalid'] = False # Assume all valid if columns missing
-        df['overtime'] = False
-        return df, False, 0, 3.0 # Return defaults
+    # --- Ensure required columns exist and initialize ---
+    if 'question_time' not in df.columns or 'question_position' not in df.columns:
+        print("    Warning (Q Ch1 Internal): Missing time or position columns. Skipping invalid data check.")
+        if 'is_invalid' not in df.columns: df['is_invalid'] = False # Ensure column exists
+        if 'diagnostic_params' not in df.columns: df['diagnostic_params'] = [[] for _ in range(len(df))]
+        return df
 
-    # Calculate total time and total questions from the raw data
-    total_test_time = df['question_time'].sum()
-    total_number_of_questions = df['question_position'].max() # Assumes positions are 1-based and max represents count
-    max_allowed_time = MAX_ALLOWED_TIME_Q
-
-    print(f"      Ch1 Inputs: Total Time={total_test_time:.2f} min, Total Qs={total_number_of_questions}, Max Allowed={max_allowed_time} min")
-
-    # 1. Calculate time_diff
-    time_diff = max_allowed_time - total_test_time
-    print(f"      Calculated time_diff: {time_diff:.2f} min")
-
-    # 2. Determine time_pressure
-    time_pressure = False
-    # Ensure columns are numeric before calculations
-    if pd.api.types.is_numeric_dtype(df['question_position']) and pd.api.types.is_numeric_dtype(df['question_time']):
-        last_third_start_pos = total_number_of_questions * (2/3)
-        last_third_questions = df[df['question_position'] > last_third_start_pos]
-        # Filter out NaNs in question_time before comparison
-        fast_end_questions = last_third_questions[last_third_questions['question_time'].notna() & 
-                                                  (last_third_questions['question_time'] < FAST_END_THRESHOLD_MINUTES)]
-        
-        print(f"      Checking time pressure: time_diff ({time_diff:.2f}) <= {TIME_DIFF_PRESSURE_THRESHOLD} AND {len(fast_end_questions)} fast end questions > 0")
-        if time_diff <= TIME_DIFF_PRESSURE_THRESHOLD and not fast_end_questions.empty:
-            time_pressure = True
-            print("      Time Pressure DETECTED.")
-        else:
-             print("      Time Pressure NOT detected.")
-             
-        # User Override (Not implemented here, assumes no override)
-
+    # --- START: Prioritize Manual Invalid Flag ---
+    if 'is_manually_invalid' in df.columns:
+        # Initialize 'is_invalid' directly from the manual flag
+        df['is_invalid'] = df['is_manually_invalid'].fillna(False).astype(bool)
+        # Corrected f-string syntax
+        print(f"    Initialized 'is_invalid' based on manual flags. Count: {df['is_invalid'].sum()}")
     else:
-         print("      Warning: Cannot determine time pressure due to non-numeric position or time data.")
+        # If manual flag column doesn't exist, initialize is_invalid to False
+        print("    Warning (Q Ch1 Internal): 'is_manually_invalid' column not found. Initializing 'is_invalid' to False.")
+        df['is_invalid'] = False
+    # --- END: Prioritize Manual Invalid Flag ---
 
-    # 3. Set overtime_threshold
-    overtime_threshold = 2.5 if time_pressure else 3.0
-    print(f"      Overtime threshold set to: {overtime_threshold} min")
-
-    # 4. Identify invalid data
-    invalid_question_positions = []
-    df['is_invalid'] = False
-    if time_pressure:
-        # Use index from fast_end_questions identified earlier
-        invalid_indices = fast_end_questions.index
-        if not invalid_indices.empty:
-             # Get positions corresponding to these indices
-             invalid_positions_series = df.loc[invalid_indices, 'question_position']
-             invalid_question_positions = invalid_positions_series.tolist()
-             df.loc[invalid_indices, 'is_invalid'] = True
-             print(f"      Marked {len(invalid_question_positions)} questions as invalid due to time pressure & fast end time: {invalid_question_positions}")
-
-    num_invalid_questions = len(invalid_question_positions)
-
-    # --- Apply Global Rule: Filter invalid, then mark overtime --- 
-    # 1. Create filtered dataset
-    df_filtered = df[df['is_invalid'] == False].copy()
-    print(f"      Filtered out {num_invalid_questions} invalid questions. Remaining valid questions: {len(df_filtered)}")
-
-    # 2. Mark overtime on the filtered dataset
-    df_filtered['overtime'] = False
-    if 'question_time' in df_filtered.columns and pd.api.types.is_numeric_dtype(df_filtered['question_time']):
-         # Mark overtime where time > threshold (ignore NaNs during comparison)
-         overtime_mask = df_filtered['question_time'].notna() & (df_filtered['question_time'] > overtime_threshold)
-         df_filtered.loc[overtime_mask, 'overtime'] = True
-         print(f"      Marked {overtime_mask.sum()} valid questions as overtime.")
+    # --- Initialize diagnostic_params if it doesn't exist ---
+    if 'diagnostic_params' not in df.columns:
+         # Initialize with empty lists
+        df['diagnostic_params'] = [[] for _ in range(len(df))]
     else:
-        print("      Warning: Cannot mark overtime due to missing or non-numeric 'question_time' column in filtered data.")
+        # Ensure existing values are lists (handle potential issues)
+        df['diagnostic_params'] = df['diagnostic_params'].apply(lambda x: x if isinstance(x, list) else [])
 
-    return df_filtered, time_pressure, num_invalid_questions, overtime_threshold
+    # --- Apply Automatic Rules ONLY where not manually marked invalid ---
+    # Define the mask for rows where automatic rules *can* be applied
+    eligible_for_auto_rules_mask = ~df['is_invalid']
+
+    # Calculate conditions for automatic invalidation
+    # Ensure len(df) > 0 to avoid issues with empty dataframes in ceil
+    if len(df) > 0:
+        last_third_start_position = np.ceil(len(df) * 2 / 3)
+    else:
+        last_third_start_position = 0 # Or handle empty df case appropriately
+
+    is_last_third = df['question_position'] >= last_third_start_position
+    is_fast_end = df['question_time'] < FAST_END_THRESHOLD_MINUTES
+
+    # Determine which rows meet the automatic invalid criteria
+    # Apply only to rows eligible for auto rules
+    auto_invalid_mask = (
+        time_pressure_from_main &
+        is_last_third &
+        is_fast_end &
+        eligible_for_auto_rules_mask # Apply only where not manually invalid
+    )
+
+    num_auto_invalid = auto_invalid_mask.sum()
+    if num_auto_invalid > 0:
+        print(f"    Marking {num_auto_invalid} additional Q questions as invalid based on automatic Chapter 1 rules.")
+        # Update the 'is_invalid' column for these rows
+        df.loc[auto_invalid_mask, 'is_invalid'] = True
+
+    # --- Add tag to ALL rows finally marked as invalid (manual or auto) ---
+    final_invalid_mask = df['is_invalid']
+    if final_invalid_mask.any():
+        print(f"    Adding/Ensuring '{INVALID_DATA_TAG_Q}' tag for {final_invalid_mask.sum()} invalid rows.")
+        for idx in df[final_invalid_mask].index:
+            # Ensure the cell contains a list before appending
+            current_list = df.loc[idx, 'diagnostic_params']
+            if not isinstance(current_list, list):
+                current_list = [] # Initialize as list if not
+
+            if INVALID_DATA_TAG_Q not in current_list:
+                current_list.append(INVALID_DATA_TAG_Q)
+
+            # Assign the potentially modified list back
+            df.loc[idx, 'diagnostic_params'] = current_list
+
+    print(f"    Finished Q Chapter 1 Internal Rules. Total invalid count: {df['is_invalid'].sum()}")
+    return df
