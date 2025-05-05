@@ -473,6 +473,122 @@ def summarize_report_with_openai(report_markdown, api_key):
         return report_markdown
 # --- End OpenAI Summarization Helper ---
 
+# --- NEW Consolidated Report Generation Helper ---
+def generate_ai_consolidated_report(report_dict, api_key):
+    """Generates a consolidated report of suggestions and next steps using OpenAI o4-mini.
+
+    Args:
+        report_dict (dict): Dictionary containing the diagnostic reports for each subject (Q, V, DI).
+        api_key (str): OpenAI API key.
+
+    Returns:
+        str: The generated consolidated report in Markdown, or None if an error occurs.
+    """
+    if not api_key:
+        logging.warning("OpenAI API key missing. Skipping consolidated report generation.")
+        return None
+    if not report_dict:
+        logging.warning("Report dictionary is empty. Skipping consolidated report generation.")
+        return None
+
+    client = openai.OpenAI(api_key=api_key)
+
+    # Construct the full input text from individual reports
+    full_report_text = ""
+    for subject, report in report_dict.items():
+        if report:
+            full_report_text += f"## {subject} Report:\n\n{report}\n\n---\n\n"
+
+    if not full_report_text.strip():
+        logging.warning("No valid reports found in the dictionary. Skipping consolidated report generation.")
+        return None
+
+    # Define the system prompt emphasizing strict extraction and formatting
+    system_prompt = """You are an assistant that extracts specific sections from GMAT diagnostic reports and consolidates them into a single, structured document.
+Your task is to identify and extract ONLY the sections related to '練習建議' (Practice Suggestions) and '後續行動' (Next Steps, including reflection and secondary evidence gathering) for each subject (Q, V, DI) from the provided text.
+
+**CRITICAL INSTRUCTIONS:**
+1.  **Strict Extraction:** Only extract text explicitly under '練習建議' or '後續行動' headings or clearly discussing these topics.
+2.  **Subject Separation:** Keep the extracted information strictly separated under standardized headings for each subject: `## Q 科目建議與行動`, `## V 科目建議與行動`, `## DI 科目建議與行動`.
+3.  **Complete Information:** Transfer ALL original text, data, details, parenthetical notes, specific question numbers, difficulty codes, time limits, percentages, scores, etc., accurately and completely. DO NOT SUMMARIZE OR OMIT ANY DETAILS.
+4.  **Standardized Formatting:** Use Markdown format. Use Level-2 headings (##) for each subject as specified above. Use bullet points or numbered lists within each subject section as they appear in the original text, or to improve readability if appropriate, but maintain all original content.
+5.  **No Additions:** Do not add any information, interpretation, or introductory/concluding text not present in the extracted sections.
+6.  **Output Format:** Output only the consolidated Markdown report. Do not include any other text or commentary.
+"""
+
+    try:
+        logging.info("Calling OpenAI responses.create with model o4-mini for consolidated report.")
+        response = client.responses.create(
+            model="o4-mini",
+            input=f"""
+System: {system_prompt}
+
+User: 從以下 GMAT 診斷報告中提取練習建議和後續行動部分，按科目分類並整理成統一格式：
+
+{full_report_text}
+""",
+            # No prompt parameter - incorporate system instructions into input instead
+            # No previous_response_id needed for this one-off task
+            # max_output_tokens=1000 # Optional: Set a limit if needed
+        )
+        logging.info(f"OpenAI consolidated report response received. Status: {response.status}")
+
+        if response.status == 'completed' and response.output:
+            response_text = ""
+            message_block = None
+            for item in response.output:
+                if hasattr(item, 'type') and item.type == 'message':
+                    message_block = item
+                    break
+
+            if message_block and hasattr(message_block, 'content') and message_block.content:
+                for content_block in message_block.content:
+                    if hasattr(content_block, 'type') and content_block.type == 'output_text':
+                        response_text += content_block.text
+
+            if not response_text:
+                logging.error("OpenAI consolidated report response completed but no text found.")
+                st.warning("AI 無法生成匯總報告（返回空內容）。", icon="⚠️")
+                return None
+            else:
+                logging.info("Successfully generated consolidated report.")
+                return response_text.strip()
+        elif response.status == 'error':
+            error_details = response.error if response.error else "Unknown error"
+            logging.error(f"OpenAI API error (consolidated report): {error_details}")
+            st.warning(f"AI 生成匯總報告時出錯：{error_details}", icon="❗")
+            return None
+        else:
+            logging.error(f"OpenAI consolidated report status not completed or output empty. Status: {response.status}")
+            st.warning(f"AI 未能成功生成匯總報告（狀態：{response.status}）。", icon="⚠️")
+            return None
+
+    except openai.AuthenticationError:
+        st.warning("OpenAI API Key 無效或權限不足，無法生成匯總報告。", icon="🔑")
+        logging.error("OpenAI AuthenticationError (consolidated report).")
+        return None
+    except openai.RateLimitError:
+        st.warning("OpenAI API 請求頻率過高，無法生成匯總報告。", icon="⏳")
+        logging.error("OpenAI RateLimitError (consolidated report).")
+        return None
+    except openai.APIConnectionError as e:
+        st.warning(f"無法連接至 OpenAI API ({e})，無法生成匯總報告。", icon="🌐")
+        logging.error(f"OpenAI APIConnectionError (consolidated report): {e}")
+        return None
+    except openai.APITimeoutError:
+         st.warning("OpenAI API 請求超時，無法生成匯總報告。", icon="⏱️")
+         logging.error("OpenAI APITimeoutError (consolidated report).")
+         return None
+    except openai.BadRequestError as e:
+         st.warning(f"OpenAI API 請求無效 ({e})，無法生成匯總報告。", icon="❗")
+         logging.error(f"OpenAI BadRequestError (consolidated report): {e}")
+         return None
+    except Exception as e:
+        st.warning(f"生成 AI 匯總建議時發生未知錯誤：{e}", icon="⚠️")
+        logging.error(f"Unknown error during consolidated report generation: {e}", exc_info=True)
+        return None
+# --- End Consolidated Report Generation Helper ---
+
 # --- Helper functions for AI Chat ---
 def _get_combined_report_context():
     """Combines markdown reports from all subjects."""
@@ -920,6 +1036,7 @@ def init_session_state():
         'diagnosis_complete': False, # Track if diagnosis step finished
         'report_dict': {},
         # 'ai_summary': None, # Removing old AI summary state if not used elsewhere
+        'ai_consolidated_report': None, # NEW: For consolidated AI report
         'final_thetas': {},
         'processed_df': None, # Store the final DataFrame after processing+diagnosis
         'error_message': None,
@@ -945,6 +1062,7 @@ def reset_session_for_new_upload():
     st.session_state.diagnosis_complete = False
     st.session_state.report_dict = {}
     # st.session_state.ai_summary = None # Removed
+    st.session_state.ai_consolidated_report = None
     st.session_state.final_thetas = {}
     st.session_state.processed_df = None
     st.session_state.error_message = None
@@ -1077,7 +1195,7 @@ if st.button("🔍 開始分析", type="primary", disabled=button_disabled, key=
         # Reset previous analysis outputs
         st.session_state.diagnosis_complete = False
         st.session_state.report_dict = {}
-        st.session_state.ai_summary = None
+        st.session_state.ai_consolidated_report = None
         st.session_state.final_thetas = {}
         st.session_state.processed_df = None # Clear previous processed data
         st.session_state.error_message = None
@@ -1453,6 +1571,30 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                   st.session_state.theta_plots = all_theta_plots # NEW: Store the plots in session state
                   # st.write("所有科目診斷完成。") # Removed detailed write
                   progress_bar.progress(current_step / total_steps) # Mark final step complete
+
+                  # --- NEW: Generate Consolidated AI Report --- #
+                  if st.session_state.openai_api_key and st.session_state.report_dict:
+                      status_text.text(f"步驟 {current_step}/{total_steps}: 生成 AI 匯總建議...") # Update status
+                      try:
+                          consolidated_report = generate_ai_consolidated_report(
+                              st.session_state.report_dict,
+                              st.session_state.openai_api_key
+                          )
+                          st.session_state.ai_consolidated_report = consolidated_report
+                          if consolidated_report:
+                              logging.info("AI consolidated report generated successfully.")
+                              # status_text.text(f"步驟 {current_step}/{total_steps}: AI 匯總建議生成完成。") # Optional: Final update
+                          else:
+                              logging.warning("AI consolidated report generation returned None or empty.")
+                              # Warning message should be shown by the helper function
+                      except Exception as ai_gen_err:
+                          st.warning(f"生成 AI 匯總建議時發生錯誤: {ai_gen_err}", icon="⚠️")
+                          logging.error(f"Error calling generate_ai_consolidated_report: {ai_gen_err}", exc_info=True)
+                          st.session_state.ai_consolidated_report = None # Ensure it's None on error
+                  else:
+                      st.session_state.ai_consolidated_report = None # Ensure None if no key/report
+                  # --- End NEW --- #
+
              else:
                   st.error("所有科目均未能成功診斷或無數據。")
                   st.session_state.processed_df = None # Ensure no stale data
@@ -1559,8 +1701,21 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
             st.warning("處理後的數據中未找到任何有效科目。")
         else:
             # Create tabs for each subject with data
-            result_tabs = st.tabs([f"{subj} 科結果" for subj in subjects_with_data])
+            tab_titles = [f"{subj} 科結果" for subj in subjects_with_data]
 
+            # --- NEW: Add AI Consolidated Report Tab if applicable --- #
+            show_ai_consolidated_tab = (
+                st.session_state.openai_api_key and
+                st.session_state.diagnosis_complete and
+                st.session_state.ai_consolidated_report
+            )
+            if show_ai_consolidated_tab:
+                tab_titles.append("✨ AI 匯總建議") # Add the new tab title
+            # --- End NEW --- #
+
+            result_tabs = st.tabs(tab_titles)
+
+            # Display subject-specific results
             for i, subject in enumerate(subjects_with_data):
                 subject_tab = result_tabs[i]
                 with subject_tab:
@@ -1569,25 +1724,27 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
                     subject_excel_map = EXCEL_COLUMN_MAP
                     subject_col_config = COLUMN_DISPLAY_CONFIG
 
-                    # --- 添加日誌調試 ---
-                    # Removed logging block here
-                    # --- 結束日誌調試 ---
-
                     # --- NEW: Display Theta Plot --- #
                     st.subheader(f"{subject} 科能力估計 (Theta) 走勢")
                     theta_plot = st.session_state.theta_plots.get(subject)
                     if theta_plot:
                         st.plotly_chart(theta_plot, use_container_width=True)
                     else:
-                        # Access the original simulation history from run_analysis output if needed
-                        # This might require passing all_simulation_histories to session state too,
-                        # or recalculating the skipped status here.
-                        # For simplicity, let's just check if the plot exists.
                         st.info(f"{subject} 科目的 Theta 估計圖表不可用。")
                     st.divider() # Add a separator
                     # --- End NEW --- #
 
                     display_subject_results(subject, subject_tab, report_md, df_subject, subject_col_config, subject_excel_map)
+
+            # --- NEW: Display AI Consolidated Report in its Tab --- #
+            if show_ai_consolidated_tab:
+                ai_tab_index = len(subjects_with_data) # It's the last tab
+                ai_consolidated_tab = result_tabs[ai_tab_index]
+                with ai_consolidated_tab:
+                    st.subheader("AI 匯總練習建議與後續行動")
+                    st.markdown(st.session_state.ai_consolidated_report)
+                    st.caption("此內容由 OpenAI (o4-mini) 模型根據各科報告中的相關部分生成。請務必結合原始報告進行核對。")
+            # --- End NEW --- #
 
 # --- AI Chat Interface (Moved to Main Page Bottom) ---
 st.divider()
