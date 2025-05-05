@@ -1,7 +1,11 @@
 import pandas as pd
 import numpy as np
 import logging # Ensure logging is imported
-# Removed: import math
+import sys # Add this if not already imported
+
+# Add this line VERY EARLY in your script execution, before other logging setup
+# Force basic config to stderr at INFO level for debugging
+logging.basicConfig(level=logging.INFO, stream=sys.stderr, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- V-Specific Constants ---
 # CR Overtime Thresholds (minutes) based on pressure
@@ -293,6 +297,10 @@ def _observe_patterns(df_v, v_time_pressure_status):
 
 def _analyze_correct_slow(df_correct, question_type):
     """Analyzes correct but slow questions for Chapter 4."""
+    # === DEBUG START - _analyze_correct_slow Entry ===
+    logging.info("[_analyze_correct_slow - %s] Entry. Input df_correct shape: %s. Overtime counts:\n%s",
+                 question_type, df_correct.shape, df_correct['overtime'].value_counts().to_string() if 'overtime' in df_correct else "Overtime col missing")
+    # === DEBUG END ===
     analysis = {
         'total_correct': 0,
         'correct_slow_count': 0,
@@ -314,6 +322,11 @@ def _analyze_correct_slow(df_correct, question_type):
     slow_correct_df = df_correct[df_correct['overtime'] == True].copy()
     correct_slow_count = len(slow_correct_df)
     analysis['correct_slow_count'] = correct_slow_count
+    # === DEBUG START - _analyze_correct_slow Count ===
+    logging.info("[_analyze_correct_slow - %s] Filtered slow_correct_df shape: %s. Calculated correct_slow_count: %s",
+                 question_type, slow_correct_df.shape, correct_slow_count)
+    print(f"DEBUG PRINT: [_analyze_correct_slow - {question_type}] Correct slow count: {correct_slow_count}")
+    # === DEBUG END ===
 
     if total_correct > 0:
         analysis['correct_slow_rate'] = correct_slow_count / total_correct
@@ -355,6 +368,9 @@ def _analyze_correct_slow(df_correct, question_type):
         else:
             analysis['dominant_bottleneck_type'] = 'Skill data missing'
 
+    # === DEBUG START - _analyze_correct_slow Return ===
+    logging.info("[_analyze_correct_slow - %s] Returning analysis: %s", question_type, analysis)
+    # === DEBUG END ===
     return analysis
 
 # Note: Kept unused function as requested in previous prompt refinement.
@@ -613,9 +629,25 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
     # Use valid data derived from the df *after* Ch3 processing
     df_valid_v_post_ch3 = df_v[~df_v['is_invalid']].copy()
     df_correct_v = df_valid_v_post_ch3[df_valid_v_post_ch3['is_correct'] == True].copy() # Use valid data post Ch3
+    # === DEBUG START - CH4 Input ===
+    logging.info("[V Diag - Ch4] Input df_correct_v for _analyze_correct_slow (shape: %s). Overtime counts:\n%s",
+                 df_correct_v.shape, df_correct_v['overtime'].value_counts().to_string() if 'overtime' in df_correct_v else "Overtime col missing")
+    # === ADDED DEBUG - Check Question Types in df_correct_v ===
+    if not df_correct_v.empty and 'question_type' in df_correct_v:
+        logging.info("[V Diag - Ch4] Question types present in df_correct_v:\n%s", df_correct_v['question_type'].value_counts().to_string())
+    # === DEBUG END ===
+    # === DEBUG END ===
+    # === MODIFICATION: Use full question type names for filtering ===
+    cr_correct_slow_result = _analyze_correct_slow(df_correct_v[df_correct_v['question_type'] == 'Critical Reasoning'], 'CR')
+    rc_correct_slow_result = _analyze_correct_slow(df_correct_v[df_correct_v['question_type'] == 'Reading Comprehension'], 'RC')
+    # === END MODIFICATION ===
+    # === DEBUG START - CH4 Results ===
+    logging.info("[V Diag - Ch4] Result from _analyze_correct_slow(CR): %s", cr_correct_slow_result)
+    logging.info("[V Diag - Ch4] Result from _analyze_correct_slow(RC): %s", rc_correct_slow_result)
+    # === DEBUG END ===
     v_diagnosis_results['chapter_4'] = {
-        'cr_correct_slow': _analyze_correct_slow(df_correct_v[df_correct_v['question_type'] == 'CR'], 'CR'),
-        'rc_correct_slow': _analyze_correct_slow(df_correct_v[df_correct_v['question_type'] == 'RC'], 'RC')
+        'cr_correct_slow': cr_correct_slow_result,
+        'rc_correct_slow': rc_correct_slow_result
     }
     print("    Finished Chapter 4 V correct slow analysis.")
 
@@ -640,6 +672,9 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
     v_diagnosis_results['chapter_7'] = v_recommendations
 
     # Generate report using results containing the df with both param columns
+    # === DEBUG START - Report Input ===
+    logging.info("[V Diag - Report Gen] Input v_diagnosis_results['chapter_4'] for report:\n%s", v_diagnosis_results.get('chapter_4'))
+    # === DEBUG END ===
     v_report_content = _generate_v_summary_report(v_diagnosis_results)
 
     # --- Prepare Final DataFrame for Return ---
@@ -956,8 +991,16 @@ def _generate_v_summary_report(v_diagnosis_results):
 
     # --- Section 4: 正確但低效分析 ---
     report_lines.append("**4. 正確但低效分析**")
+    # === DEBUG START - Report Ch4 Input ===
+    logging.info("[_generate_v_summary_report - Ch4] Received ch4 data: %s", ch4)
+    # === DEBUG END ===
     cr_slow_correct = ch4.get('cr_correct_slow', {})
     rc_slow_correct = ch4.get('rc_correct_slow', {})
+    # === DEBUG START - Report Ch4 Counts ===
+    cr_count = cr_slow_correct.get('correct_slow_count', 0)
+    rc_count = rc_slow_correct.get('correct_slow_count', 0)
+    logging.info("[_generate_v_summary_report - Ch4] Extracted counts - CR: %s, RC: %s", cr_count, rc_count)
+    # === DEBUG END ===
     slow_correct_found = False
     for slow_data, type_name in [(cr_slow_correct, "CR"), (rc_slow_correct, "RC")]:
         if slow_data and slow_data.get('correct_slow_count', 0) > 0:
@@ -970,6 +1013,9 @@ def _generate_v_summary_report(v_diagnosis_results):
             bottleneck = _translate_v(slow_data.get('dominant_bottleneck_type', 'N/A'))
             report_lines.append(f"- {type_name}：{count} 題正確但慢（佔比 {rate}）。平均難度 {avg_diff}，平均耗時 {avg_time} 分鐘。主要瓶頸：{bottleneck}。")
             slow_correct_found = True
+    # === DEBUG START - Report Ch4 Found Flag ===
+    logging.info("[_generate_v_summary_report - Ch4] slow_correct_found flag before check: %s", slow_correct_found)
+    # === DEBUG END ===
     if not slow_correct_found:
         report_lines.append("- 未發現明顯的正確但低效問題。")
     report_lines.append("")
