@@ -888,6 +888,10 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         if 'is_sfe' in df_for_excel.columns:
              df_for_excel['is_sfe'] = df_for_excel['is_sfe'].astype(str)
 
+        # Ensure 'is_invalid' is also string for conditional formatting in to_excel
+        if 'is_invalid' in df_for_excel.columns:
+             df_for_excel['is_invalid'] = df_for_excel['is_invalid'].astype(str) # Convert TRUE/FALSE to text
+
 
         excel_bytes = to_excel(df_for_excel, excel_map) # Pass the df subset and the map
 
@@ -1295,6 +1299,14 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                 if not sim_history_df.attrs.get('simulation_skipped', False):
                       sim_b_values = sim_history_df['b'].tolist()
 
+                # --- MODIFIED: Assign difficulty to ALL questions based on simulation order ---
+                if len(sim_b_values) == len(user_df_subj_sorted):
+                    # Assign difficulty directly based on the simulation order
+                    # The simulation history order should correspond to the sorted user data order
+                    user_df_subj_sorted['question_difficulty'] = sim_b_values
+                    # logging.info(f"[{subject}] Successfully assigned {len(sim_b_values)} simulated difficulties to all {len(user_df_subj_sorted)} questions.")
+                elif not sim_history_df.attrs.get('simulation_skipped', False): # Only warn if simulation *should* have run
+                    st.warning(f"{subject}: 模擬難度數量 ({len(sim_b_values)}) 與實際題目數量 ({len(user_df_subj_sorted)}) 不符。無法分配模擬難度。", icon="⚠️")
                 # Create a mapping from valid question original position to its sim difficulty
                 valid_indices = user_df_subj_sorted[~user_df_subj_sorted['is_invalid']].index
                 if len(valid_indices) != len(sim_b_values):
