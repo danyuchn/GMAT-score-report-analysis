@@ -55,9 +55,10 @@
     `time_diff` = `max_allowed_time` - `total_test_time`
 
 - **判斷時間壓力狀態 (`time_pressure`)**: 
-    - 若 `time_diff` < 1.0 分鐘，則 `time_pressure` = `True`。
-    - 否則 `time_pressure` = `False`。
-    - *（用戶覆蓋規則可在此處應用，若需要）*
+    - 預設 `time_pressure` = `False`。
+    - 檢查測驗末尾情況：找出測驗最後 1/3 的題目 (`last_third_questions`) 中 `question_time` < 1.0 分鐘的題目 (`fast_end_questions`)。
+    - 判斷邏輯：如果 `time_diff` <= 3 分鐘 **且** `fast_end_questions` 不為空，則設定 `time_pressure` = `True`。
+    - **用戶覆蓋：** 若用戶明確指出壓力不大，則強制設定 `time_pressure` = `False`。
 
 - **設定超時閾值與規則 (基於 `time_pressure`)**: 
     - **CR 超時閾值 (`overtime_threshold_cr`)**: 
@@ -77,11 +78,14 @@
     - *說明：此標記提示可能存在基礎閱讀障礙，將在後續章節建議中引用。*
 
 - **識別無效數據 (`is_invalid`)**: 
-    - 檢查測驗最後 1/3 的題目 (`last_third_questions`)。
-    - 識別末尾作答異常題目：
-        - 「明顯倉促 (`hasty`)」：`question_time` < 1.0 分鐘 或 (`CR` 且 `question_time` < `first_third_average_time_per_type`['CR'] * 0.5) 或 (`RC` 題組且 `group_total_time` < (`first_third_average_time_per_type`['RC'] * `num_q_in_group`) * 0.5)。
-        - 「疑似放棄 (`abandoned`)」：`question_time` < 0.5 分鐘。
-    - 標記邏輯：如果一個題目滿足「明顯倉促」或「疑似放棄」的標準，**且** `time_pressure` == `True` (根據第 2 步判斷得出)，則將該題目標記為 `is_invalid` = `True`。
+    - **觸發前提:** 僅在 `time_pressure` == `True` 時，才執行無效數據的識別與標記。若 `time_pressure` == `False`，則不標記任何題目為 `is_invalid`。
+    - **檢查範圍:** 僅檢查測驗最後 1/3 的題目 (`last_third_questions`)。
+    - **定義「異常快速作答 (`abnormally_fast_response`)」標準 (滿足其一即可觸發):**
+        - *標準 1 (疑似放棄):* `question_time` < 0.5 分鐘。
+        - *標準 2 (絕對倉促):* `question_time` < 1.0 分鐘。
+        - *標準 3 (相對單題倉促):* 題目 `question_time` < (該題 `question_type` 在測驗前 1/3 的平均時間 `first_third_average_time_per_type`[Type] * 0.5)。
+        - *標準 4 (相對題組倉促 - 僅適用於 RC):* 該題目所屬的 RC 題組的 `group_total_time` < (`first_third_average_time_per_type`['RC'] * `num_q_in_group` * 0.5)。
+    - **標記邏輯:** 如果一個在檢查範圍內的題目 (或其所屬題組針對標準 4) 滿足了**至少一項** `abnormally_fast_response` 標準，**且 `time_pressure` == `True`**，則將該題目標記為 `is_invalid` = `True`。
     - 輸出診斷提示：若存在被標記為 `is_invalid` 的題目，提示「可能結尾趕時間，需評估策略合理性」。
 
 - **其他觀察與建議**: 
@@ -456,7 +460,7 @@
                 - 將宏觀建議 `G` 添加到 `recommendations_by_skill`[`S`]。
                 - 將技能 `S` 添加到 `processed_override_skills`。
         - **生成個案建議 (若技能 S 未觸發宏觀建議):**
-            - **確定練習難度 (`Y`):**
+            - **確定聚合練習難度 (`Y`):** (注意：這是基於技能 `S` 進行的聚合計算)
                 - **[修改]** 針對技能 `S`，找出所有需要關注的有效數據題目。
                 - **[修改]** 確定這些題目中的**最低**難度值 (`min_difficulty`)。
                 - **[修改]** 將 `min_difficulty` 映射到 **6 級標準** 以確定該技能的**整體練習難度** `Y`：
@@ -466,7 +470,7 @@
                     - 若 1 < `min_difficulty` ≤ 1.5: `Y` = "中難度 (Mid) / 655+"
                     - 若 1.5 < `min_difficulty` ≤ 1.95: `Y` = "高難度 (High) / 705+"
                     - 若 1.95 < `min_difficulty` ≤ 2: `Y` = "高難度 (High) / 805+"
-            - **確定起始練習限時 `Z` (分鐘):** (**統一計算規則**)
+            - **確定聚合起始練習限時 `Z` (分鐘):** (注意：這是基於技能 `S` 進行的聚合計算)
                 - **[修改]** 針對技能 `S` 下**每一個**需要關注的有效數據題目 `X` (原始用時為 `T`，題型為 `Type`)，單獨計算其建議限時 `Z_individual`:
                     - 設定目標時間 (`target_time`):
                         - 若 `Type` == 'CR': `target_time` = 2.0
@@ -475,10 +479,10 @@
                     - 計算 `base_time`: 若 `is_slow` == `True` 則 `T` - 0.5，否則 `T`。
                     - 計算 `Z_raw` = `floor_to_nearest_0.5`(`base_time`)。
                     - 確保最低值: `Z_individual` = `max`(`Z_raw`, `target_time`)。
-                - **[新增]** **聚合限時:** 確定技能 `S` 的最終起始練習限時 `Z`，取該技能下所有題目計算出的 `Z_individual` 中的 **最大值** (`max_z_minutes`)。
+                - **[新增]** **聚合限時:** 確定技能 `S` 的最終聚合起始練習限時 `Z`，取該技能下所有題目計算出的 `Z_individual` 中的 **最大值** (`max_z_minutes`)。
             - **構建建議文本:**
                 - 基本模板：「針對 [`S`] 技能的相關考點 (根據第三章診斷結果確定)，建議練習 [`Y`] 難度題目，起始練習限時建議為 [`Z`] 分鐘。(最終目標時間：`CR` 2分鐘 / `RC` 1.5分鐘)。"
-                - **優先級標註:** 如果該技能下的任何題目觸發了 `special_focus_error` = `True`，則在此建議前標註「*基礎掌握不穩*」。
+                - **優先級標註:** 如果該技能下的任何題目觸發了 `special_focus_error` = `True`，則在此建議前標註「**基礎掌握不穩** - 」以醒目標示其優先級。
                 - **超長提醒:** 若 `Z` - `target_time` > 2.0 分鐘，加註提醒「**注意：起始限時遠超目標，需加大練習量以確保逐步限時有效**」。
             - 將個案建議 `C` 添加到 `recommendations_by_skill`[`S`]。
     - **整理與輸出建議列表：**
@@ -486,7 +490,7 @@
     - **整理聚合建議:** 遍歷 `recommendations_by_skill` 字典。
         - 對於每個技能 `S` 及其建議列表 `skill_recs`:
             - 如果列表非空，將整理好的技能 `S` 的建議添加到 `final_recommendations`。
-    - **最終輸出:** 輸出 `final_recommendations`，確保按技能聚合，優先顯示標註 `special_focus_error` 的建議。
+    - **最終輸出:** 輸出 `final_recommendations`，確保排序優先展示標註 `special_focus_error` 的建議。
 
 <aside>
 
@@ -537,8 +541,8 @@
 **6. 練習計劃呈現**
 *   (清晰、完整地列出第七章生成的 **練習計劃**，按技能聚合。)
 *   (計劃包含：針對觸發覆蓋規則技能的 **宏觀建議 (Macroscopic Recommendations)**，以及針對其他問題的 **個案建議 (Case-Specific Recommendations)**。)
-*   (個案建議明確指出練習技能/考點、建議的 **練習難度 (Y)**、**起始練習限時 (Z)** 及最終目標時間。)
-*   (計劃中，與 `special_focus_error` (對應參數 `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``) 相關的建議會被 **優先顯示或特別標註** (如加註 "*基礎掌握不穩*")。)
+*   (個案建議明確指出練習技能/考點、建議的 **聚合練習難度 (Y)** (取自該技能下所有觸發題目中的最低難度)、**聚合起始練習限時 (Z)** (取自該技能下所有觸發題目單獨計算建議限時的最大值) 及最終目標時間。)
+*   (計劃中，與 `special_focus_error` (對應參數 `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``) 相關的建議會被 **優先顯示並特別標註** (如加註 "**基礎掌握不穩** - ")。)
 *   (計劃包含相關的 **超長提醒 (Volume Alerts)**，提示練習量需求。)
 *   (若觸發了基礎閱讀能力訓練建議，相應內容也會整合在此處。)
 

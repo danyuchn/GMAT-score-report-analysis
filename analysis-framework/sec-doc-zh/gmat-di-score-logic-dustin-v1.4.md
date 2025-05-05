@@ -67,9 +67,10 @@
    `time_diff` = `max_allowed_time` - `total_test_time`
 
 2. **判斷時間壓力狀態 (`time_pressure`)**: 
-   - 若 `time_diff` <= 3 分鐘，則 `time_pressure` = `True`。
-   - 否則 `time_pressure` = `False`。
-   - *（用戶覆蓋規則可在此處應用，若需要）*
+   - 預設 `time_pressure` = `False`。
+   - 檢查測驗末尾情況：找出測驗最後 1/3 的題目 (`last_third_questions`) 中 `question_time` < 1.0 分鐘的題目 (`fast_end_questions`)。
+   - 判斷邏輯：如果 `time_diff` <= 3 分鐘 **且** `fast_end_questions` 不為空，則設定 `time_pressure` = `True`。
+   - **用戶覆蓋：** 若用戶明確指出壓力不大，則強制設定 `time_pressure` = `False`。
 
 3. **設定超時閾值與規則 (基於 `time_pressure`)**: 
    - **`TPA` 超時閾值 (`overtime_threshold_tpa`)**: 
@@ -90,14 +91,15 @@
    - *說明：以上閾值和規則用於後續判斷各題型題目或題組是否超時 (`overtime`, `msr_group_overtime`)。*
 
 4. **識別無效數據 (`is_invalid`)**:
-   - **檢查範圍與前提:** 找出測驗最後 1/3 的題目 (`last_third_questions`，即 `question_position` > `Total Number of Questions` * 2/3)。**僅當 `time_pressure` == `True` 時**，才進行後續的無效數據標記。
+   - **觸發前提:** 僅在 `time_pressure` == `True` 時，才執行無效數據的識別與標記。若 `time_pressure` == `False`，則不標記任何題目為 `is_invalid`。
+   - **檢查範圍:** 僅檢查測驗最後 1/3 的題目 (`last_third_questions`)。
    - **定義「異常快速作答 (`abnormally_fast_response`)」標準 (滿足其一即可觸發):**
        - *標準 1 (疑似放棄):* `question_time` < 0.5 分鐘。
        - *標準 2 (絕對倉促):* `question_time` < 1.0 分鐘。
-       - *標準 3 (相對倉促 - DS):* `question_time` < (`first_third_average_time_per_type`['DS'] * 0.5)。 (需使用第零章計算的數據)
-       - *標準 4 (相對倉促 - TPA):* `question_time` < (`first_third_average_time_per_type`['TPA'] * 0.5)。 (需使用第零章計算的數據)
-       - *標準 5 (相對倉促 - GT):* `question_time` < (`first_third_average_time_per_type`['GT'] * 0.5)。 (需使用第零章計算的數據)
-       - *標準 6 (相對倉促 - MSR 題組):* 該題目所屬的 MSR 題組的 `group_total_time` < (`first_third_average_time_per_type`['MSR'] * `num_q_in_group` * 0.5)。 (此標準應用於該題組中的所有題目，需使用第零章預計算的 `group_total_time`, `num_q_in_group` 和計算的 `first_third_average_time_per_type`['MSR'])
+       - *標準 3 (相對單題倉促 - DS):* `question_time` < (`first_third_average_time_per_type`['DS'] * 0.5)。
+       - *標準 4 (相對單題倉促 - TPA):* `question_time` < (`first_third_average_time_per_type`['TPA'] * 0.5)。
+       - *標準 5 (相對單題倉促 - GT):* `question_time` < (`first_third_average_time_per_type`['GT'] * 0.5)。
+       - *標準 6 (相對題組倉促 - MSR):* 該題目所屬的 MSR 題組的 `group_total_time` < (`first_third_average_time_per_type`['MSR'] * `num_q_in_group` * 0.5)。
    - **標記邏輯:** 在 `last_third_questions` 範圍內，若某題目 (或其所屬的 MSR 題組針對標準 6) 滿足了**至少一項** `abnormally_fast_response` 標準，**且 `time_pressure` == `True`**，則將該題目標記為 `is_invalid` = `True`。
    - *說明:* 此多重標準邏輯旨在更精準地識別在時間壓力下，考試末期可能因放棄或過度倉促而導致的無效作答數據。
 
@@ -477,14 +479,19 @@
                 - 如果該組的 `question_type` 在 `processed_override_types` 中，則 `continue` 跳過此組。
                 - 如果 `exemption_status[question_type, content_domain]` 為 `True` (根據第五章計算)，則 `continue` 跳過此組。
             - **聚合信息:** 在該分組內聚合計算以下信息：
-                - **建議難度 (`Y`):** 基於組內所有觸發題目的 **最低** `question_difficulty` 分數，使用 `_grade_difficulty_di` 轉換為難度等級。
-                - **建議起始限時 (`Z`, 分鐘):** 對組內每個觸發題目，計算其個案目標限時 (`max(floor_to_nearest_0.5(T-0.5 if overtime else T), target_time_minutes)`)，然後取這些計算結果中的 **最大值** 作為聚合建議的 `Z`。
-                - **SFE 狀態 (`group_sfe`):** 如果組內 **任何** 題目觸發了 `is_sfe`，則此聚合建議標記為 SFE。
+                - **聚合練習難度 (`Y`):** 基於組內所有觸發題目的 **最低** `question_difficulty` 分數，使用 `_grade_difficulty_di` 轉換為難度等級（統一6級標準）。
+                - **聚合起始限時 (`Z`, 分鐘):** 對組內每個觸發題目，先計算其個案建議限時 `Z_individual`：
+                    - 設定目標時間：根據題型設定（例如 DS 為 2.0 分鐘，TPA/GT 為 3.0 分鐘）。
+                    - 計算 `base_time`：若題目 `overtime` 為 `True`，則 `T - 0.5`，否則 `T`。
+                    - 計算 `Z_raw`：將 `base_time` 向下取整到最近的 0.5 分鐘。
+                    - 確保最低值：`Z_individual` = `max(Z_raw, target_time_minutes)`。
+                    - 然後取這些計算結果中的 **最大值** 作為聚合建議的 `Z`。
+                - **SFE 狀態 (`group_sfe`):** 如果組內 **任何** 題目觸發了 `is_sfe`（即 `special_focus_error` 為 `True`），則此聚合建議標記為 `group_sfe` = `True`。
                 - **聚合診斷參數 (`aggregated_params`):** 收集組內所有觸發題目 unique 的 `diagnostic_params` 列表。
             - **構建聚合建議文本 (`rec_text`):**
                 - `translated_params` = `_translate_di(aggregated_params)`。
                 - `problem_desc` = "錯誤或超時"。
-                - `sfe_prefix` = "*基礎掌握不穩* " (如果 `group_sfe` 為 `True`) 或 ""。
+                - `sfe_prefix` = "**基礎掌握不穩** - " (如果 `group_sfe` 為 `True`) 或 ""。
                 - `param_text` = "(問題點可能涉及: {翻譯後的參數列表})" 或 "(具體問題點需進一步分析)"。
                 - `rec_text` = `"{sfe_prefix}針對 **{domain}** 領域的 **{question_type}** 題目 ({problem_desc}) {param_text}，建議練習 **{Y}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。"`
             - **添加超時警告:** 如果 `Z - target_time_minutes > 2.0`，追加警告。
@@ -500,9 +507,12 @@
                     - 將包含 `type='exemption'`, `text=exempt_text`, `question_type=question_type`, `domain=content_domain` 的字典添加到 `final_recommendations`。
         - 遍歷 `recommendations_by_type` 中的每個 `question_type` 和對應的 `type_recs` 列表 (如果該 type 未被豁免):\
             - ... (排序：宏觀在前，聚合建議在後)
-            - ... (應用領域側重規則，將 `focus_note` 追加到聚合建議或宏觀建議末尾)
+            - ... **應用領域側重規則:** 
+                - 根據第二章的內容領域表現差異分析結果 (`poor_math_related`, `slow_non_math_related` 等標籤)。
+                - 如果發現某個領域（Math Related 或 Non-Math Related）的表現明顯較差，將追加相應的 `focus_note` 到該領域相關的建議末尾。
+                - 例如：「數學相關領域題目練習佔比建議增加」或「非數學相關領域題目推薦側重練習」。
             - 將處理後的 `type_recs` 添加到 `final_recommendations`。
-    - **返回:** `final_recommendations` 列表 (包含豁免說明、宏觀建議、聚合建議)。
+    - **返回:** `final_recommendations` 列表 (包含豁免說明、宏觀建議、聚合建議)，確保標記為 `is_sfe` 的建議被優先排序。
 
 <aside>
 
@@ -537,6 +547,12 @@
 **6. 練習建議 (基於第六章)**
 
 *   (呈現第六章生成的具體練習建議。強調這些建議是基於識別出的問題點，並已應用宏觀覆蓋、**聚合**和完美表現豁免規則進行了個性化調整。)
+*   (建議以三種形式呈現：
+    * **豁免說明**：指出哪些 `question_type` + `content_domain` 組合表現完美，已豁免練習建議。
+    * **宏觀建議**：針對整體表現不佳的題型 (`question_type`) 的系統性鞏固建議。
+    * **聚合建議**：按 `question_type` + `content_domain` 組合聚合的具體練習建議，包含聚合練習難度 (Y) (取自該組合內所有觸發題目中的最低難度)、聚合起始限時 (Z) (取自該組合內所有觸發題目單獨計算建議限時的最大值) 及最終目標時間。)
+*   (標記 `special_focus_error` (SFE) 的聚合建議會被優先顯示並特別標註為「**基礎掌握不穩** - 」)
+*   (已應用領域側重規則：基於第二章發現的內容領域 (Math/Non-Math) 表現差異，對相關建議追加側重說明，如「數學相關領域題目練習佔比建議增加」)
 
 **7. 後續行動指引**
 

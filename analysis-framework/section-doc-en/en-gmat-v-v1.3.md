@@ -3,19 +3,18 @@
 <aside>
 
 **Objective:** To define all core input data structures required for subsequent analyses of the Verbal Reasoning (V) section.
-**Primary Focus:** Establishing per-question data points (`question_id`, `question_time`, `is_correct`, `question_type` mapping [CR/RC], `question_difficulty` `V_b`, `question_fundamental_skill`, `question_position`), overall test metrics (`total_test_time`, `max_allowed_time` [fixed at 45 min], `total_number_of_questions`), and derived data (e.g., `rc_group_id`, `questions_in_group`, `group_total_time`, `average_time_per_type`, `first_third_average_time_per_type`, `rc_reading_time`, `rc_group_target_time`).
+**Primary Focus:** Establishing per-question data points (`question_position`, `question_time`, `is_correct`, `question_type` mapping [CR/RC], `question_difficulty` `V_b`, `question_fundamental_skill`), overall test metrics (`total_test_time`, `max_allowed_time` [fixed at 45 min], `total_number_of_questions`), and derived data (e.g., `rc_group_id`, `questions_in_group`, `group_total_time`, `average_time_per_type`, `first_third_average_time_per_type`, `rc_reading_time`, `rc_group_target_time`).
 **Rationale:** The data defined in this chapter serves as the foundation for all subsequent analyses, calculations, and diagnoses. The completeness and accuracy of this data directly impact the validity of the diagnostic results.
 
 </aside>
 
 - **Per-Question Data:**
-    - `question_id` (Question Identifier)
+    - `question_position` (Question Sequence Number - used as the unique identifier)
     - `question_time` (Response Time/minutes)
     - `is_correct` (Correctness: `True`/`False`)
     - `question_type` (Question Type: `Critical Reasoning` mapped to `CR`; `Reading Comprehension` mapped to `RC`)
     - `question_difficulty` (Difficulty Value `V_b`)
     - `question_fundamental_skill` (Core Skill - e.g., `Plan/Construct`, `Identify Stated Idea`, `Identify Inferred Idea`, `Analysis/Critique`)
-    - `question_position` (Question Sequence Number)
 - **Overall Test Data:**
     - `total_test_time` (Total Response Time/minutes)
     - `max_allowed_time` (Maximum Allowed Test Time, fixed at 45 minutes)
@@ -36,7 +35,7 @@
 
 <aside>
 
-**Chapter Summary:** This chapter defines the core input data structure needed for all subsequent analyses, including detailed information for each question (`ID`, `Time`, `Correctness`, `Type`, `Difficulty`, `Skill`, `Position`), overall test data (`Total Time`, `Total Questions`), and derived data requiring preprocessing (like `RC group information`, `average times`, `RC reading time`, `RC group target time`, etc.).
+**Chapter Summary:** This chapter defines the core input data structure needed for all subsequent analyses, including detailed information for each question (`Position`, `Time`, `Correctness`, `Type`, `Difficulty`, `Skill`), overall test data (`Total Time`, `Total Questions`), and derived data requiring preprocessing (like `RC group information`, `average times`, `RC reading time`, `RC group target time`, etc.).
 
 **Results Destination:** The data defined in this chapter forms the basis for calculations, analyses, and judgments in all subsequent chapters. The completeness and accuracy of this data directly affect the validity of the diagnostic results.
 
@@ -228,7 +227,8 @@
             - `` `RC_READING_PASSAGE_STRUCTURE_DIFFICULTY` ``
             - `` `RC_READING_DOMAIN_KNOWLEDGE_GAP` ``
             - `` `RC_READING_PRECISION_INSUFFICIENT` ``
-            - `` `RC_QUESTION_UNDERSTANDING_MISINTERPRETATION` ``
+            - `` `RC_READING_INFO_LOCATION_ERROR` ``
+            - `` `RC_READING_KEYWORD_LOGIC_OMISSION` ``
             - `` `RC_LOCATION_ERROR_INEFFICIENCY` `` 
             - `` `RC_REASONING_INFERENCE_WEAKNESS` ``
             - `` `RC_AC_ANALYSIS_DIFFICULTY` ``
@@ -357,19 +357,19 @@
 
 - **Early Fast Questions:**
     - Identify questions where `question_position` <= `total_number_of_questions` / 3 AND `question_time` < 1.0 minute.
-    - Output Risk Reminder: If such questions exist, output the prompt: "**Note `flag for review` issue**".
+    - Output Risk Reminder: If such questions exist, trigger the parameter `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` and output the prompt: "**Note `flag for review` issue**".
 - **Carelessness Rate Calculation (`carelessness_issue`):**
     - `num_relatively_fast_total` = Total number of questions in valid data meeting the "Fast" definition from Chapter 3 (`is_relatively_fast` == `True`).
     - `num_relatively_fast_incorrect` = Total number of questions in valid data where `is_relatively_fast` == `True` AND `is_correct` == `False`.
     - If `num_relatively_fast_total` > 0, calculate `fast_wrong_rate` = `num_relatively_fast_incorrect` / `num_relatively_fast_total`.
     - If `fast_wrong_rate` > 0.25, then flag `carelessness_issue` = `True`.
-- **Output Diagnostic Label (to user):** If `carelessness_issue` = `True`, suggest "Possible carelessness issue."
+- **Output Diagnostic Parameter:** If `carelessness_issue` = `True`, trigger the parameter `` `BEHAVIOR_CARELESSNESS_ISSUE` ``.
 
 <aside>
 
-**Chapter Summary:** We checked for excessively fast responses in the initial part of the test and assessed potential carelessness (`carelessness_issue`) by calculating the proportion of "fast and wrong" questions among all "fast" questions (`fast_wrong_rate`), based on the relative time standard from Chapter 3.
+**Chapter Summary:** We checked for excessively fast responses in the initial part of the test (triggering `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` if found) and assessed potential carelessness (`carelessness_issue`, triggering `` `BEHAVIOR_CARELESSNESS_ISSUE` `` if criteria met) by calculating the proportion of "fast and wrong" questions among all "fast" questions (`fast_wrong_rate`), based on the relative time standard from Chapter 3.
 
-**Results Destination:** The findings from this chapter (early fast question reminder, `carelessness_issue` flag) provide additional insights into the student's test-taking strategy and habits. They will be incorporated as supplementary conclusions in the Chapter 8 summary report and may prompt the student to reflect on their pacing and attention to detail.
+**Results Destination:** The parameters triggered in this chapter (`` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``, `` `BEHAVIOR_CARELESSNESS_ISSUE` ``) provide additional insights into the student's test-taking strategy and habits. **After translation via Appendix A**, they will be incorporated as supplementary conclusions in the Chapter 8 summary report and may prompt the student to reflect on their pacing and attention to detail.
 
 </aside>
 
@@ -379,26 +379,52 @@
 
 <aside>
 
-**Objective:** To check if any fundamental skill (across RC and CR) presents widespread and severe difficulty for the student (using filtered data).
-**Primary Focus:** Calculating the overall error rate and overtime rate for each `question_fundamental_skill`. If either rate for a skill exceeds 50%, trigger the skill override rule (`skill_override_triggered`).
+**Objective:** To check if any **non-exempted** fundamental skill (across RC and CR) presents widespread and severe difficulty for the student (using filtered data).
 **Rationale:** Similar to Q, if a student struggles significantly across an entire skill domain (e.g., all types of CR `Assumption` questions), recommendations focused on individual difficult problems within that skill may be less effective than first consolidating the foundational understanding and application of that skill. This serves as a pre-check before detailed, case-based recommendations.
 
 </aside>
 
-1. **Calculate Performance Rates per Skill (Based on Filtered Data):**
-    - For each `question_fundamental_skill` (`S`) (using the skill lists from Chapter 0):
-        - Calculate `num_total_skill`, `num_errors_skill`, `num_overtime_skill` (using `overtime` for CR, `group_overtime` for RC).
-        - Calculate `error_rate_skill`, `overtime_rate_skill`.
-    - **Trigger Condition (`skill_override_triggered`):** If for a skill `S`, `error_rate_skill` > 0.5:
-        - Flag `skill_override_triggered`[`S`] = `True`.
-
-**Impact:** If triggered for a skill, the practice recommendations in Chapter 7 will focus on foundational consolidation for that skill, rather than addressing individual errors within it.
+**Added: Fundamental Skill Exemption Rule**
 
 <aside>
 
-**Chapter Summary:** This chapter established a skill-level override rule for Verbal. By examining the overall error and overtime rates for each `question_fundamental_skill`, it identifies skills with extremely poor performance (rate > 50%). If such a skill is found, its override flag (`skill_override_triggered`) is set, and the starting macro practice difficulty (`Y_agg`) and a type-appropriate macro time limit (`Z_agg`) are determined.
+**Objective:** To identify fundamental skills (`fundamental_skill`) that the student has **fully mastered in this test** and can complete stably within the time limit, to avoid generating unnecessary practice recommendations in Chapter 7.
 
-**Results Destination:** The `skill_override_triggered` flag directly impacts the practice recommendation generation in Chapter 7. If a skill triggers the override rule, Chapter 7 will generate macro-level, foundational consolidation recommendations for that skill (using `Y_agg` and `Z_agg`), overriding any micro-level recommendations based on individual incorrect or overtime questions within that skill.
+</aside>
+
+- **Exemption Condition Calculation (Calculated independently for each `fundamental_skill` before the override rule check):**
+    - For a specific core skill (`question_fundamental_skill`):
+        - Filter all valid questions belonging to this skill (excluding those with `is_invalid` = `True`).
+        - **Condition 1 (100% Accuracy):** All these valid questions **must have** `is_correct` == `True`.
+        - **Condition 2 (100% Efficiency):**
+            - For all `CR` questions under this skill: their `overtime` flag **must all be** `False`.
+            - For all `RC` questions under this skill: their `group_overtime` and `individual_overtime` flags **must all be** `False`.
+    - If **both** Condition 1 and Condition 2 are **fully met**, then the calculated exemption status for this core skill (`skill_exemption_status`) is `True`.
+- **Impact of Exemption Rule:**
+    - The calculated `skill_exemption_status` (True or False) will be passed on.
+    - This exemption status **is only used** in the Chapter 7 practice recommendation generation logic: skills marked as `True` will **completely skip** the generation of any related practice recommendations.
+    - This exemption status **does not affect** the calculation logic of the subsequent "Foundational Ability Override Rules Judgement" step in this chapter (i.e., the override rule check is still based on the original error rates of all skills, regardless of their exemption status).
+    - The diagnostic summary (Chapter 8) will explicitly mention these exempted skills to highlight the student's strengths.
+
+---
+
+**Foundational Ability Override Rules Judgement (Based on all skills, calculation is unaffected by exemption status)**
+
+1. **Calculate Performance Rates per Skill (Based on Filtered Data):**
+    - **(This calculation covers all core skills for a comprehensive assessment. Exemption status only affects downstream recommendation generation, not the error rate calculation here)**
+    - For each `question_fundamental_skill` (`S`) (using the skill lists from Chapter 0):
+        - Calculate `num_total_skill`, `num_errors_skill`.
+        - Calculate `error_rate_skill` = `num_errors_skill` / `num_total_skill` (if `num_total_skill` > 0).
+    - **Trigger Condition (`skill_override_triggered`):** If for a skill `S`, `error_rate_skill` > 0.50 (i.e., > 50%):
+        - Flag `skill_override_triggered`[`S`] = `True`.
+
+**Impact:** If triggered for a skill `S`, **and** that skill is **not exempted** (`skill_exemption_status` is `False`), the practice recommendations in Chapter 7 will focus on foundational consolidation for that skill, rather than addressing individual errors within it.
+
+<aside>
+
+**Chapter Summary:** This chapter first defined how to calculate the exemption status for core skills (100% correct and no overtime). Then, independent of the exemption status, it established an override rule by examining the overall error rate for each `question_fundamental_skill` to identify skills with extremely poor performance (error rate > 50%), recording this in `skill_override_triggered`.
+
+**Results Destination:** The calculated `skill_exemption_status` will be passed to Chapter 7 to skip recommendations for mastered skills. The `skill_override_triggered` flag will also be passed to Chapter 7 to guide the generation of macro-level recommendations for non-exempted weak skills.
 
 </aside>
 
@@ -409,54 +435,69 @@
 <aside>
 
 **Objective:** To generate specific, actionable practice recommendations based on the analysis results from all previous steps.
-**Primary Focus:** Consolidating findings from error analysis (Chapter 3), efficiency bottlenecks (Chapter 3, slow & correct), and skill override checks (Chapter 6) to create specific (difficulty `Y`, time limit `Z`) or macro (difficulty `Y_agg`, time limit `Z_agg`) practice tasks for relevant fundamental skills. Applying exemption rules for stable skills.
+**Primary Focus:** Consolidating findings from error analysis (Chapter 3), efficiency bottlenecks (Chapter 3, slow & correct), and skill override checks (Chapter 6) to create specific (difficulty `Y`, time limit `Z`) or macro practice tasks for relevant fundamental skills. Applying exemption rules for stable skills.
 **Rationale:** This chapter translates the diagnostic insights into a concrete improvement plan, providing targeted practice addressing specific weaknesses in content, difficulty, and timing.
 
 </aside>
 
-*Note: Recommendation generation relies on results from preceding chapters, including but not limited to: `question_fundamental_skill` (`S`), `question_difficulty` (`D`), `question_time` (`T`), `overtime`/`group_overtime`/`individual_overtime` flags, `skill_override_triggered` flag, difficulty level definitions, `RC` target time rules, etc., all adhering to the current version's definitions.*
+*Note: Recommendation generation relies on results from preceding chapters, including but not limited to: `question_fundamental_skill` (`S`), `question_difficulty` (`D`), `question_time` (`T`), `overtime`/`group_overtime`/`individual_overtime` flags, `skill_override_triggered` flag, `skill_exemption_status`, difficulty level definitions, `RC` target time rules, etc., all adhering to the current version's definitions.*
 
 1.  **Practice Materials and Scope Recommendation**
-    - **Identify Recommendation Triggers:** Pinpoint all questions flagged with diagnostic parameters from Chapter 3 (e.g., incorrect scenarios or slow & correct) and skills identified by `skill_override_triggered` in Chapter 6.
+    - Core materials: OG, OV (Official Guide & Verbal Review).
+    - Supplementary practice: GMAT Club platforms (for filtering specific difficulty/type).
 2.  **Recommendation Generation Logic**
     - **Helper Function Definition (Conceptual):**
-        - **Calculate Exempted Skills:**
-            - Initialize a set `exempted_skills` = `set()`.
-            - For each `fundamental_skill` (`S`):
-                - Calculate `num_correct_not_overtime`, the count of questions for skill `S` that are correct (`is_correct`==`True`) and not overtime (`CR`: `overtime`==`False`; `RC`: `group_overtime`==`False` AND `individual_overtime`==`False`).
-                - If `num_correct_not_overtime` > 2, add `S` to `exempted_skills`.
+        - `floor_to_nearest_0.5`(`value`): Rounds the input `value` down to the nearest multiple of 0.5.
+    - **Prerequisite Calculations:**
+        - Initialize a dictionary `recommendations_by_skill` = `{}`.
+        - Initialize a set `processed_override_skills` = `set()`.
     - **Iterate Through Questions:** Examine all valid data questions `X` flagged for attention in preceding analyses (with skill `S`, difficulty `D`, original time `T`, type `Type`).
-        - **Check Exemption:** If skill `S` is in `exempted_skills`, skip.
-        - **Check for Macro Recommendation (for skill S):** If `skill_override_triggered`[`S`] is `True` AND skill `S` is **not** in `processed_override_skills`:
-            - Generate macro recommendation `G` = "For skill [`S`], due to significant room for improvement (based on Chapter 6 analysis), recommend comprehensive foundational consolidation. Start systematic practice with [`Y_agg`] difficulty questions, focusing on core methods, with a recommended time limit of [`Z_agg`] minutes/passage." (`Y_agg` and `Z_agg` from Chapter 6).
-            - Add `G` to `recommendations_by_skill`[`S`].
-            - Add `S` to `processed_override_skills`.
-        - **Generate Case Recommendation (if skill S did not trigger macro and is not exempted):**
-            - **Practice Difficulty (`Y`):** Map `D` using the **unified 6-level standard** (same as Q/DI).
-            - **Starting Practice Time Limit (`Z`):** (**Unified Calculation Rule**)
-                - Set target time (`target_time`):
-                    - If `Type` == 'CR': `target_time` = 2.0
-                    - If `Type` == 'RC': `target_time` = 1.5 (single question analysis target)
-                - Check if slow (`is_slow`): (`CR`: `overtime` == `True`; `RC`: `group_overtime` == `True` or `individual_overtime` == `True`) (Based on Chapter 3 classification)
-                - Calculate `base_time`: If `is_slow` == `True`, then `T` - 0.5, else `T`.
-                - Calculate `Z_raw` = `floor`(`base_time` * 2) / 2 (round down to nearest 0.5).
-                - Ensure minimum value: `Z` = `max`(`Z_raw`, `target_time`).
+        - **Check Skill Exemption Status:**
+            - If skill `S` has `skill_exemption_status` == `True` (calculated based on the added exemption rule), **skip** further recommendation steps for this question and proceed to the next.
+        - **Check for Macro Recommendation (Only for non-exempted skills):**
+            - If `skill_override_triggered`[`S`] is `True` AND skill `S` is **not** in `processed_override_skills`:
+                - Generate macro recommendation `G` = "For skill [`S`], due to a high overall error rate (based on Chapter 6 analysis), recommend comprehensive foundational consolidation. Start systematic practice with medium-low difficulty questions, focusing on core methods."
+                - Add `G` to `recommendations_by_skill`[`S`].
+                - Add `S` to `processed_override_skills`.
+        - **Generate Case Recommendation (if skill S did not trigger macro):**
+            - **Determine Practice Difficulty (`Y`):**
+                - **[Modified]** Identify all valid data questions flagged for attention under skill `S`.
+                - **[Modified]** Determine the **minimum** difficulty value (`min_difficulty`) among these questions.
+                - **[Modified]** Map `min_difficulty` to the **6-level standard** to determine the **overall practice difficulty** `Y` for this skill:
+                    - If `min_difficulty` ≤ -1: `Y` = "Low / 505+"
+                    - If -1 < `min_difficulty` ≤ 0: `Y` = "Medium / 555+"
+                    - If 0 < `min_difficulty` ≤ 1: `Y` = "Medium / 605+"
+                    - If 1 < `min_difficulty` ≤ 1.5: `Y` = "Medium / 655+"
+                    - If 1.5 < `min_difficulty` ≤ 1.95: `Y` = "High / 705+"
+                    - If 1.95 < `min_difficulty` ≤ 2: `Y` = "High / 805+"
+            - **Determine Starting Practice Time Limit `Z` (minutes):** (**Unified Calculation Rule**)
+                - **[Modified]** For **each** valid data question `X` flagged for attention under skill `S` (original time `T`, type `Type`), individually calculate its recommended time limit `Z_individual`:
+                    - Set target time (`target_time`):
+                        - If `Type` == 'CR': `target_time` = 2.0
+                        - If `Type` == 'RC': `target_time` = 1.5 (single question analysis target)
+                    - Check if slow (`is_slow`): (`CR`: `overtime` == `True`; `RC`: `group_overtime` == `True` or `individual_overtime` == `True`)
+                    - Calculate `base_time`: If `is_slow` == `True`, then `T` - 0.5, else `T`.
+                    - Calculate `Z_raw` = `floor_to_nearest_0.5`(`base_time`).
+                    - Ensure minimum value: `Z_individual` = `max`(`Z_raw`, `target_time`).
+                - **[Added]** **Aggregate Time Limit:** Determine the final starting practice time limit `Z` for skill `S` by taking the **maximum** value (`max_z_minutes`) among all calculated `Z_individual` times for that skill.
+            - **Construct Recommendation Text:**
+                - Base template: "For relevant topics under skill [`S`] (identified based on Chapter 3 diagnosis), recommend practicing [`Y`] difficulty questions. Suggested starting time limit is [`Z`] minutes. (Final target time: CR 2 min / RC 1.5 min)."
+                - **Priority Annotation:** If any question under this skill triggered `special_focus_error` = `True`, prefix this recommendation with "*Fundamental mastery unstable*" .
+                - **Excessive Time Alert:** If `Z` - `target_time` > 2.0 minutes, append the alert: "**Note: Starting time limit significantly exceeds target; substantial practice volume is needed to ensure gradual time reduction is effective.**"
             - Add case recommendation `C` to `recommendations_by_skill`[`S`].
 3.  **Collate and Output Recommendation List:**
     - Initialize `final_recommendations`.
-    - **Process Exempted Skills:** For each skill `S` in `exempted_skills`, if it did **not** trigger a macro recommendation, add exemption note: "Skill [`S`] performance is stable; practice can be deferred."
-    - **Collate Aggregated Recommendations:** Iterate through `recommendations_by_skill`.
+    - **Process Aggregated Recommendations:** Iterate through `recommendations_by_skill`.
         - For each skill `S` and its list `skill_recs`:
             - If list is not empty:
-                - (No specific focus rules like Q/DI based on type performance applied here, rely on skill-level analysis).
                 - Add collated recommendations for skill `S` to `final_recommendations`.
-    - **Final Output:** Output `final_recommendations`, ensuring aggregation by skill, prioritization of `special_focus_error` / `` `V_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` recommendations, and inclusion of exemption notes.
+    - **Final Output:** Output `final_recommendations`, ensuring aggregation by skill and prioritization of `special_focus_error` recommendations.
 
 <aside>
 
-**Chapter Summary:** This chapter generated practice recommendations based on preceding analyses (Ch 3 error/efficiency, Ch 6 skill override). Recommendations were categorized as macro (for skills needing foundational work) or case-based (for specific flagged questions), specifying difficulty (Y/Y_agg) and time limits (Z/Z_agg) using unified rules. Exemption rules were applied for stable skills. Recommendations associated with `special_focus_error` / `` `V_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` were prioritized.
+**Chapter Summary:** This chapter utilized analysis results from all preceding chapters (diagnostic parameters, difficulty performance, time flags, skill error rates, override triggers, exemption status, reading barrier flags) to generate a personalized practice plan. It distinguishes between macro (foundational consolidation) and case-specific recommendations, specifying practice scope, difficulty (Y/Y_agg), starting time limits (Z), and final target times. Recommendations related to `special_focus_error` are prioritized. If foundational reading issues were indicated, relevant training suggestions are triggered.
 
-**Results Destination:** This detailed, skill-aggregated practice plan forms the actionable core of the final diagnostic report (Chapter 8).
+**Results Destination:** The complete practice plan generated here forms the core action plan of the entire diagnostic process, presented directly to the student and constituting the most crucial "Next Steps" component of the Chapter 8 summary report.
 
 </aside>
 
@@ -479,6 +520,7 @@
 **2. Performance Overview**
 
 *   (Summarize Chapter 2 findings: How did the student perform on `CR` and `RC` questions across different difficulty levels (Low/Medium/High)? Which difficulty levels showed concentrated errors? Which core skills (`question_fundamental_skill`) are relative weaknesses?)
+*   **(Mention which core skills were exempted due to perfect performance (100% correct and no overtime), showcasing them as mastered strengths.)**
 *   (Mention the preliminary `RC` reading time assessment from Chapter 1. If `reading_comprehension_barrier_inquiry` was triggered, note here or in core problem diagnosis that potential foundational reading barriers require attention.)
 
 **3. Core Problem Diagnosis**
@@ -488,8 +530,8 @@
 
 **4. Pattern Observation**
 
-*   (Mention Chapter 5 findings) (If `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` parameter applies based on Ch 5): "*Some questions at the beginning of the test were answered relatively quickly. It's advisable to maintain a steady pace to avoid potential 'flag for review' risks.*")
-*   (Mention Chapter 5 findings) (If `BEHAVIOR_CARELESSNESS_ISSUE` parameter applies based on Ch 5): "*Analysis shows a higher proportion of 'fast and wrong' instances, suggesting a potential need to focus on carefulness during problem-solving to reduce unforced errors.*")
+*   (Mention Chapter 5 findings) (If the parameter `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` was triggered based on Ch 5): "*Some questions at the beginning of the test were answered relatively quickly. It's advisable to maintain a steady pace to avoid potential 'flag for review' risks.*")
+*   (Mention Chapter 5 findings) (If the parameter `` `BEHAVIOR_CARELESSNESS_ISSUE` `` was triggered based on Ch 5): "*Analysis shows a higher proportion of 'fast and wrong' instances, suggesting a potential need to focus on carefulness during problem-solving to reduce unforced errors.*")
 
 **5. Foundational Consolidation Hint**
 
@@ -499,9 +541,8 @@
 *   (Clearly and completely list the **Practice Plan** generated in Chapter 7, aggregated by skill.)
 *   (The plan includes: **Macroscopic Recommendations** for skills triggering the override rule, and **Case-Specific Recommendations** for other identified issues.)
 *   (Case-specific recommendations specify the skill/topic, recommended **Practice Difficulty (Y)**, **Starting Practice Time Limit (Z)**, and the final target time.)
-*   (The plan includes **Exemption Notes** generated in Chapter 7 for skills with stable performance.)
 *   (In the plan, recommendations related to `special_focus_error` (corresponding to parameter `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``) will be **prioritized or specially annotated** (e.g., with "*Fundamental mastery unstable*").)
-*   (The plan includes relevant **Volume Alerts**, indicating the need for sufficient practice volume.)
+*   (The plan includes relevant **Excessive Time Alerts (Volume Alerts)**, indicating the need for sufficient practice volume.)
 *   (If foundational reading ability training was recommended, it will be integrated here.)
 
 **7. Next Steps Guidance**
@@ -568,7 +609,7 @@
 
 <aside>
 
-**Chapter Summary:** This chapter serves as the final output synthesis, integrating analysis findings from all preceding chapters (time pressure, invalid data, difficulty/skill performance, **English parameter-based** root cause diagnosis, special pattern observations, `RC` reading assessment, etc.) and the complete practice plan from Chapter 7 into a comprehensive, easy-to-understand natural language diagnostic report **(using English descriptions from Appendix A for internal parameters)**. The report highlights Verbal fatigue factors and potential foundational reading issues. It also includes guided reflection questions, suggestions for qualitative analysis and secondary evidence reference, and personalized tool recommendations based on diagnostic parameters.
+**Chapter Summary:** This chapter served as the final output synthesis, integrating analysis findings from all preceding chapters (time pressure, invalid data, difficulty/skill performance, **English parameter-based** root cause diagnosis, special pattern observations, `RC` reading assessment, etc.) and the complete practice plan from Chapter 7 into a comprehensive, easy-to-understand natural language diagnostic report **(using English descriptions from Appendix A for internal parameters)**. The report highlights Verbal fatigue factors and potential foundational reading issues. It also includes guided reflection questions, suggestions for qualitative analysis and secondary evidence reference, and personalized tool recommendations based on diagnostic parameters.
 
 **Results Destination:** This is the final product delivered to the student, aiming to provide deep insights into their Verbal performance and clearly outline the direction and specific action steps for improvement.
 
@@ -627,8 +668,8 @@
 | **Efficiency Issues (CR & RC)**            |                                                           |
 | `EFFICIENCY_BOTTLENECK_[AREA]`             | Efficiency Issue: Bottleneck in [Specific Area] causing inefficiency (Specify Area: READING, REASONING, LOCATION, AC_ANALYSIS) |
 | **Behavioral Patterns**                    |                                                           |
-| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`         | Behavioral Pattern: Rushing early in section (Flag risk)  |
-| `BEHAVIOR_CARELESSNESS_ISSUE`              | Behavioral Pattern: Carelessness issue (high fast-wrong rate) |
+| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`         | Behavioral Pattern: Rushing early in section (< 1.0 min, Note flag for review risk)  |
+| `BEHAVIOR_CARELESSNESS_ISSUE`              | Behavioral Pattern: Carelessness issue (high fast-wrong rate > 25%) |
 | `BEHAVIOR_GUESSING_HASTY`                  | Behavioral Pattern: Hasty response suggesting guessing/rushing |
 
 (End of document)

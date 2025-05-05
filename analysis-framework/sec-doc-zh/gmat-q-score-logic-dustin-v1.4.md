@@ -42,16 +42,14 @@
    - *說明：此閾值用於後續分析中標識單題作答時間 (`question_time`) 是否超時 (`overtime` = `True`)。*
 
 4. **識別無效數據 (`is_invalid`)**:
-   - 初始化 `invalid_question_positions` = `[]`。
-   - **標記邏輯 (僅在 `time_pressure` == `True` 時執行)**: 檢查測驗最後 1/3 的題目 (`last_third_questions`)。對於其中的每一道題目 `Q`：
-     - **定義異常快速作答 (`abnormally_fast_response`) 標準 (滿足其一即可觸發):**
-       - 標準 1 (疑似放棄): `Q.question_time` < 0.5 分鐘。
-       - 標準 2 (絕對倉促): `Q.question_time` < 1.0 分鐘。
-       - 標準 3 (相對倉促 - Real): 如果 `Q.question_type` == 'Real'，則判斷 `Q.question_time` < (`first_third_average_time_per_type['Real']` * 0.5)。
-       - 標準 4 (相對倉促 - Pure): 如果 `Q.question_type` == 'Pure'，則判斷 `Q.question_time` < (`first_third_average_time_per_type['Pure']` * 0.5)。
-     - **判斷與標記:** 如果 `time_pressure` == `True` **且** 題目 `Q` 滿足上述任一項 `abnormally_fast_response` 標準，則：
-       - 將 `Q.question_position` 加入 `invalid_question_positions` 列表。
-       - 為題目 `Q` 內部標記 `is_invalid` = `True`。
+   - **觸發前提:** 僅在 `time_pressure` == `True` 時，才執行無效數據的識別與標記。若 `time_pressure` == `False`，則不標記任何題目為 `is_invalid`。
+   - **檢查範圍:** 僅檢查測驗最後 1/3 的題目 (`last_third_questions`)。
+   - **定義「異常快速作答 (`abnormally_fast_response`)」標準 (滿足其一即可觸發):**
+     - *標準 1 (疑似放棄):* `question_time` < 0.5 分鐘。
+     - *標準 2 (絕對倉促):* `question_time` < 1.0 分鐘。
+     - *標準 3 (相對單題倉促 - Real):* 如果 `question_type` == 'Real'，則判斷 `question_time` < (`first_third_average_time_per_type`['Real'] * 0.5)。
+     - *標準 4 (相對單題倉促 - Pure):* 如果 `question_type` == 'Pure'，則判斷 `question_time` < (`first_third_average_time_per_type`['Pure'] * 0.5)。
+   - **標記邏輯:** 如果一個在檢查範圍內的題目滿足了**至少一項** `abnormally_fast_response` 標準，**且 `time_pressure` == `True`**，則將該題目標記為 `is_invalid` = `True`。
    - *說明：僅當學生處於整體時間壓力下，其在測驗末尾的作答如果滿足任一「異常快速」（包括絕對時間過短或相較於其測驗前期同類型題目的平均速度顯著過快）的標準時，該作答數據才被視為無效。*
 
 5. **輸出與總結**: 
@@ -331,25 +329,30 @@
 2. **生成與初步分類建議：**
     - 初始化一個字典 `recommendations_by_skill` = `{}`，用於按技能臨時存儲建議列表。
     - 初始化一個集合 `processed_override_skills` = `set()`，用於記錄已處理宏觀建議的技能。
+    - **說明：** 與Verbal和DI不同，Quant科目的建議不進行聚合，而是針對每個具體觸發點/考點獨立生成建議。這是因為fundamental_skill範圍較寬泛，為確保建議的針對性，需要維持每個觸發點的獨立建議。
     - 遍歷所有建議觸發點對應的題目 `X` (其核心技能為 `S`，難度為 `D`，原始用時為 `T`)：
         - **檢查豁免 (基於第六章):** 首先檢查技能 `S` 的豁免狀態 `skill_exemption_status[S]`。如果為 `True`，則**跳過**此技能相關的所有後續建議生成步驟，繼續處理下一個觸發點。
         - **檢查宏觀建議 (針對技能 S):** 如果 `skill_override_triggered`[`S`] 為 `True` 且技能 `S` **未**在 `processed_override_skills` 中：
             - 生成宏觀建議 `G` = "針對 [`S`] 技能，由於整體表現有較大提升空間 (根據第六章分析)，建議全面鞏固基礎，可從 [`Y_agg`] 難度題目開始系統性練習，掌握核心方法，建議限時 [`Z_agg`] 分鐘。" (`Y_agg` 和 `Z_agg` 來自第六章)。
             - 將宏觀建議 `G` 添加到 `recommendations_by_skill`[`S`]。
             - 將技能 `S` 添加到 `processed_override_skills`。
-        - **生成個案建議 (若技能 S 未被豁免):**
-            - **練習難度 (`Y`):** 根據題目 `X` 的難度 `D` 進行映射（**統一 6 級標準**）：
-                - 若 `D` ≤ -1: `Y` = "低難度 (Low) / 505+”
-                - 若 -1 < `D` ≤ 0: `Y` = "中難度 (Mid) / 555+”
-                - 若 0 < `D` ≤ 1: `Y` = "中難度 (Mid) / 605+”
-                - 若 1 < `D` ≤ 1.5: `Y` = "中難度 (Mid) / 655+”
-                - 若 1.5 < `D` ≤ 1.95: `Y` = "高難度 (High) / 705+”
-                - 若 1.95 < `D` ≤ 2: `Y` = "高難度 (High) / 805+”
-            - **起始練習限時 (`Z`):** (**統一計算規則**)
+        - **生成個案建議 (針對單個觸發點/考點，若技能 S 未被豁免且未觸發宏觀建議):**
+            - **個案練習難度 (`Y`):** 根據題目 `X` 的難度 `D` 進行映射（**統一 6 級標準**）：
+                - 若 `D` ≤ -1: `Y` = "低難度 (Low) / 505+"
+                - 若 -1 < `D` ≤ 0: `Y` = "中難度 (Mid) / 555+"
+                - 若 0 < `D` ≤ 1: `Y` = "中難度 (Mid) / 605+"
+                - 若 1 < `D` ≤ 1.5: `Y` = "中難度 (Mid) / 655+"
+                - 若 1.5 < `D` ≤ 1.95: `Y` = "高難度 (High) / 705+"
+                - 若 1.95 < `D` ≤ 2: `Y` = "高難度 (High) / 805+"
+            - **個案起始練習限時 (`Z`):** (**統一計算規則**)
                 - 設定目標時間: `target_time` = 2.0 分鐘。
                 - 計算 `base_time`: 若 `X` 的 `overtime` == `True` (即 `is_slow` == `True`) 則 `T` - 0.5，否則 `T`。
-                - 計算 `Z_raw` = `floor`(`base_time` * 2) / 2 (向下取整到最近的 0.5)。
+                - 計算 `Z_raw` = `floor_to_nearest_0.5`(`base_time`) (向下取整到最近的 0.5)。
                 - 確保最低值: `Z` = `max`(`Z_raw`, `target_time`)。
+            - **構建個案建議文本:**
+                - 基本模板：「針對 [`S`] 技能中的 [具體觸發考點 `X`]，建議練習 [`Y`] 難度題目，起始練習限時建議為 [`Z`] 分鐘。(最終目標時間：2.0 分鐘)。」
+                - **優先級標註:** 如果觸發點 `X` 標記為 `special_focus_error` = `True`，則在此建議前標註「**基礎掌握不穩** - 」以醒目標示其優先級。
+                - **超長提醒:** 若 `Z` > 4.0 分鐘，加註提醒「**注意：起始限時遠超目標，需加大練習量以確保逐步限時有效**」。
             - 添加個案建議 `C` 到 `recommendations_by_skill`[`S`]。
 3. **整理與輸出建議列表：**
     - 初始化 `final_recommendations` = []
@@ -362,7 +365,7 @@
                     - 檢查第二章的 `poor_real` 標籤：若 `poor_real` = `True` 且觸發該技能建議的題目中至少包含一道 `'Real'` 型題目，則在技能 `S` 的建議文本末尾追加「**Real題比例建議佔總練習題量2/3。**」
                     - 檢查第二章的 `slow_pure` 標籤：若 `slow_pure` = `True` 且觸發該技能建議的題目中至少包含一道 `'Pure'` 型題目，則在技能 `S` 的建議文本末尾追加「**建議此考點練習題量增加。**」
                 - 將整理好的技能 `S` 的建議（可能包含一條宏觀建議和/或多條個案建議，已應用側重規則）添加到 `final_recommendations`。
-    - **最終輸出:** 輸出 `final_recommendations`，確保按技能聚合，優先顯示標註 `special_focus_error` 的建議，並包含豁免說明。
+    - **最終輸出:** 輸出 `final_recommendations`，確保優先顯示標註 `special_focus_error` 的建議，並包含豁免說明。
 
 ---
 
@@ -399,8 +402,9 @@
 
 - (此處清晰、完整地列出第七章生成的所有練習建議)
 - (包含豁免說明，例如：『技能 [`被豁免的技能名`] 表現穩定，可暫緩練習。』)
+- (注意：Quant科目的建議不進行聚合，而是按具體觸發點/考點獨立列出，以確保更高的針對性，每條建議均包含對應的 `fundamental_skill`、具體考點、練習難度 `Y` 和起始限時 `Z`。)
 - (包含側重說明，例如：『針對 [`技能名`] 的練習，建議增加 `Real`/`Pure` 題的比例…』)
-- (確保 `special_focus_error` 相關建議優先顯示或突出標註)
+- (確保 `special_focus_error` 相關建議優先顯示並以『**基礎掌握不穩** - 』標註)
 
 **7. 後續行動指引**
 

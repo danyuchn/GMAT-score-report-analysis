@@ -17,22 +17,26 @@
     - `MSR`: Multi-Source Reasoning
     - `GT`: Graph & Table
 - **Per-Question Data:**
-    - `question_id` (Question Identifier)
+    - `question_position` (Question Sequence Number, required, serves as unique identifier)
     - `question_time` (Response Time/minutes)
     - `is_correct` (Correctness: `True`/`False`)
     - `content_domain` (Content Domain: `Math Related`/`Non-Math Related`)
     - `question_type` (Question Type: `DS`, `TPA`, `MSR`, `GT`)
+    - `msr_group_id` (MSR Group ID, required if `question_type` is `MSR`)
     - `Fundamental Skills` (**Tracking confirmed as NO**)
     - `question_difficulty` (Difficulty Value)
-    - `question_position` (Question Sequence Number)
 - **Overall Test Data:**
     - `Total Test Time` (Total Response Time/minutes)
     - `Max Allowed Time` (Maximum Allowed Test Time)
     - `Total Number of Questions` (Total Number of Questions)
 - **DI Derived Data:**
-    - **`MSR` Reading Time (`msr_reading_time`):** For each `MSR` question set (fixed at 3 questions), calculate `msr_reading_time` = `question_time` of the first question in the set - ( `question_time` of the second question + `question_time` of the third question ) / 2.
+    - **`MSR` Reading Time (`msr_reading_time`):** For each `MSR` group, calculate `msr_reading_time` = `question_time` of the first question in the group - (average `question_time` of all **other** questions in the group **excluding the first one**). This calculation is only valid if the group contains at least two questions, and the result is attached to the first question of the group. (*This data will be used in Chapter 1 for MSR single question overtime determination*)
+    - **`MSR` Group Data Pre-calculation:**
+        - `group_total_time`: Calculate the sum of `question_time` for all questions within each `MSR` group.
+        - `num_q_in_group`: Calculate the number of questions included in each `MSR` group.
     - **`GT` Time Allocation:** No special distinction needed between chart reading and response time.
-    - **Average Response Time per Question Type (`average_time_per_type`):** Based on **valid data (after filtering)**, calculate the average response time for each `question_type` (`DS`, `TPA`, `MSR`, `GT`).
+    - **Average Response Time per Question Type (`average_time_per_type`):** Based on **valid data (after filtering)**, calculate the average response time for each `question_type` (`DS`, `TPA`, `MSR`, `GT`). (*This data will be used in Chapter 3 to define `is_relatively_fast` and in Chapter 4 to calculate carelessness rate*)
+    - **Average Time per Type in First Third (`first_third_average_time_per_type`):** For each `question_type` (`DS`, `TPA`, `MSR`, `GT`), calculate the average `question_time` of all questions where `question_position` <= (`Total Number of Questions` / 3). (*This data will be used in Chapter 1 for invalid data determination*)
     - **Highest Mastered Difficulty (`max_correct_difficulty_per_combination`):** For each combination of `question_type` and `content_domain`, record the highest `question_difficulty` value among all questions where `is_correct` == `True`.
 
 <aside>
@@ -82,11 +86,16 @@
    - *Note: The above thresholds and rules are used subsequently to determine if individual questions or groups are overtime (`overtime`, `msr_group_overtime`).*
 
 4. **Identify Invalid Data (`is_invalid`)**: 
-   - Identify questions in the last 1/3 of the test (`question_position` > `Total Number of Questions` * 2/3).
-   - Among these, identify questions with response time < 1.0 minute (`fast_end_questions`).
-   - **Flagging Logic (Linked to `time_pressure`)**: 
-       - **Only when `time_pressure` == `True`**, mark the above `fast_end_questions` as `is_invalid` = `True`.
-   - *Note: The logic for identifying invalid data in the DI section is now unified with the Q/V sections; excessively fast responses at the end of the test are considered invalid only when time pressure is confirmed.*
+   - **Scope and Prerequisite:** Identify questions in the last 1/3 of the test (`last_third_questions`, i.e., `question_position` > `Total Number of Questions` * 2/3). **Only when `time_pressure` == `True`** proceed with the following invalid data flagging.
+   - **Define "Abnormally Fast Response (`abnormally_fast_response`)" Criteria (meeting any one triggers):**
+       - *Criterion 1 (Suspected Skip):* `question_time` < 0.5 minutes.
+       - *Criterion 2 (Absolute Rush):* `question_time` < 1.0 minutes.
+       - *Criterion 3 (Relative Rush - DS):* `question_time` < (`first_third_average_time_per_type`['DS'] * 0.5). (Uses data calculated in Chapter 0)
+       - *Criterion 4 (Relative Rush - TPA):* `question_time` < (`first_third_average_time_per_type`['TPA'] * 0.5). (Uses data calculated in Chapter 0)
+       - *Criterion 5 (Relative Rush - GT):* `question_time` < (`first_third_average_time_per_type`['GT'] * 0.5). (Uses data calculated in Chapter 0)
+       - *Criterion 6 (Relative Rush - MSR Group):* The `group_total_time` of the MSR group the question belongs to < (`first_third_average_time_per_type`['MSR'] * `num_q_in_group` * 0.5). (This criterion applies to all questions in the group; uses pre-calculated `group_total_time`, `num_q_in_group`, and calculated `first_third_average_time_per_type`['MSR'] from Chapter 0)
+   - **Flagging Logic:** Within the `last_third_questions` scope, if a question (or its MSR group for Criterion 6) meets **at least one** `abnormally_fast_response` criterion, **AND `time_pressure` == `True`**, then flag that question as `is_invalid` = `True`.
+   - *Note:* This multi-criteria logic aims to more accurately identify potentially invalid response data in the latter part of the test due to skipping or excessive rushing under time pressure.
 
 5. **Output and Summary**: 
    - Key outputs generated in this chapter: `time_pressure` (Boolean), overtime thresholds/rules per question type, `is_invalid` flag (applied to specific questions, and only when `time_pressure` is True).
@@ -97,13 +106,25 @@
     *   If `question_type` == `'TPA'` and `question_time` > `overtime_threshold_tpa`, flag `overtime` = `True`.
     *   If `question_type` == `'GT'` and `question_time` > `overtime_threshold_gt`, flag `overtime` = `True`.
     *   If `question_type` == `'DS'` and `question_time` > `overtime_threshold_ds`, flag `overtime` = `True`.
-    *   If `question_type` == `'MSR'` and the total time for its group > `msr_group_target_time`, flag all questions within that group as `overtime` = `True` (or use `msr_group_overtime` = `True` for distinction).
+    *   **Overtime Flagging for `MSR` Questions (Dual Criteria):**
+        *   **a. Group Overtime Flag (`msr_group_overtime`):**
+            *   Calculate the total time for each MSR group (`group_total_time`).
+            *   Get the group's target time `msr_group_target_time` (based on `time_pressure`: 6.0 min if True, 7.0 min if False).
+            *   Determine: If `group_total_time > msr_group_target_time`, then flag **all** questions within that MSR group with `msr_group_overtime = True`.
+        *   **b. Individual Question Overtime Flag (`msr_individual_overtime`):**
+            *   Set a fixed individual question threshold `msr_individual_q_threshold = 1.5` minutes (does not change with `time_pressure`).
+            *   Calculate adjusted time `adjusted_msr_time`:
+                *   For the first question in the group: `adjusted_msr_time = question_time - msr_reading_time` (uses `msr_reading_time` calculated in Chapter 0).
+                *   For non-first questions in the group: `adjusted_msr_time = question_time`.
+            *   Determine: If an MSR question's `adjusted_msr_time > msr_individual_q_threshold` (1.5 minutes), then flag that question with `msr_individual_overtime = True`.
+        *   **c. Final `overtime` Flag:**
+            *   An MSR question is finally flagged as `overtime = True` if and only if it satisfies `msr_group_overtime == True` **OR** `msr_individual_overtime == True`.
 2.  **Create Filtered Dataset:** Remove all questions marked as `is_invalid` = `True` from the original dataset.
 3.  **Scope of Subsequent Analysis:** All calculations, analyses, and recommendations from Chapter 2 through Chapter 6 will be based exclusively on this filtered dataset.
 
 <aside>
 
-**Chapter Summary:** This chapter first calculated the total time difference and determined the student's overall time pressure status (`time_pressure`). Based on this status, corresponding overtime thresholds or target time rules were established for different question types (`DS`, `TPA`, `GT`, `MSR`). Then, **only when time pressure was confirmed (`time_pressure` == `True`)**, potentially invalid data (`is_invalid`) was identified based on excessively fast response times (< 1.0 minute) for questions at the end of the test. Before subsequent analyses, overtime questions (`overtime`) are flagged according to the rules, and then the invalid data is filtered out.
+**Chapter Summary:** This chapter first calculated the total time difference and determined the student's overall time pressure status (`time_pressure`). Based on this status, corresponding overtime thresholds or target time rules were established for different question types (`DS`, `TPA`, `GT`, `MSR`). Then, **only when time pressure was confirmed (`time_pressure` == `True`)**, potentially invalid data (`is_invalid`) was identified for questions in the last third of the test based on new multi-criteria standards (including absolute short time, relative short time compared to first-third averages, and MSR group overall short time) indicating "abnormally fast responses". Before subsequent analyses, overtime questions (`overtime`) are flagged according to the rules (including the updated dual criteria for MSR), and then the invalid data is filtered out.
 
 **Results Destination:** The `time_pressure` status and the overtime settings for each question type serve as crucial context for subsequent analyses. Questions flagged as `overtime` will be used in later chapters to diagnose slow problem-solving. Questions flagged as `is_invalid` will be excluded from analyses in Chapters 2 through 6 and from trigger conditions for recommendations in Chapter 7 to ensure the accuracy and validity of the findings.
 
@@ -163,7 +184,7 @@
     - **Core Concept Definitions:**
         - **Time Performance Classification (`Time Performance`):**
             - Fast (`is_relatively_fast`): `question_time` < `average_time_per_type`[question's `question_type`] * 0.75.
-            - Slow (`is_slow`): Question is flagged `overtime` = `True` (based on Chapter 1 thresholds).
+            - Slow (`is_slow`): Question is flagged `overtime` = `True` (based on Chapter 1 thresholds, including the dual criteria for MSR).
             - Normal Time (`is_normal_time`): Neither fast nor slow.
         - **Special Focus Error (`special_focus_error`)**: (Definition and handling aligned with original DI logic)
             - *Definition*: An incorrect question (`is_correct`==`False`) whose `question_difficulty` < `max_correct_difficulty_per_combination`[question's `question_type`, question's `content_domain`].
@@ -270,8 +291,7 @@
 
         - **Independent `MSR` Time Checks (Priority over Slow/Fast/Normal classification):**
             - **Reading Time Check (for the first question of the group):** Calculate `msr_reading_time` (defined in Chapter 0). If `msr_reading_time` > `msr_reading_threshold` (1.5 minutes), trigger specific diagnostic parameter `` `DI_MSR_READING_COMPREHENSION_BARRIER` `` and record diagnostic action: "`MSR` group reading time is long. Ask student to recall source material absorption barrier (Vocabulary, Sentence structure, Domain, Chart, Cross-tab information integration)." Recommend secondary evidence if recall fails.
-            - **Single Question Response Time Check (for non-first questions):** Check `question_time`. If `question_time` > `msr_single_q_threshold` (1.5 minutes), trigger specific diagnostic parameter `` `DI_MSR_SINGLE_Q_BOTTLENECK` `` and record diagnostic action: "Response time for this question within the `MSR` group is long. Ask student to recall the barrier (Reading question, Locating info, Options)." Recommend secondary evidence if recall fails.
-            - *Note:* These two checks are performed independently to capture specific `MSR` time issues. Their triggered parameters and actions are separate from the subsequent "Slow" classification based on group overtime but should be aggregated into the final report.
+            - *Note:* This check is performed independently to capture specific `MSR` reading efficiency issues. Its triggered parameter and action are separate from the subsequent "Slow" classification but should be aggregated into the final report.
 
         - **D.1. `Math Related`**
             - **Slow & Wrong (`is_slow` & `is_correct`==`False`):**
@@ -328,7 +348,7 @@
 
 <aside>
 
-**Chapter Summary:** This chapter detailed the analysis of root causes behind different time-accuracy performance combinations across various question types and content domains, mapping these causes to standardized **English diagnostic parameters**. It defined `special_focus_error` (`` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``) and emphasized its priority. For each scenario, trigger actions were designed, guiding students towards recall or leveraging secondary evidence (with sample size suggestions) and qualitative analysis to confirm specific barriers. Specific time checks for MSR reading and single-question bottlenecks were also included.
+**Chapter Summary:** This chapter detailed the analysis of root causes behind different time-accuracy performance combinations across various question types and content domains, mapping these causes to standardized **English diagnostic parameters**. It defined `special_focus_error` (`` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``) and emphasized its priority. For each scenario, trigger actions were designed, guiding students towards recall or leveraging secondary evidence (with sample size suggestions) and qualitative analysis to confirm specific barriers. A specific time check for MSR reading bottlenecks was also included.
 
 **Results Destination:** The **English diagnostic parameters** and `special_focus_error` flags generated in this chapter are core inputs for creating targeted practice method recommendations in Chapter 6. The triggered actions directly guide subsequent student reflection and information gathering. The diagnostic findings (represented by **English parameters**) will form the core content of the Chapter 7 summary report (**requiring presentation in natural language based on Appendix A**).
 
@@ -341,7 +361,7 @@
 <aside>
 
 **Objective:** To identify special situations related to response behavior patterns, such as carelessness or inappropriate rapid responses early in the test (using filtered data), generating relevant **English diagnostic parameters**.
-**Primary Focus:** Calculating the overall proportion of "relatively fast and wrong" responses to assess potential carelessness issues (associating with `` `DI_BEHAVIOR_CARELESSNESS_ISSUE` ``); checking if the student responded too quickly (`question_time` < 1.0 minute) in the early stage of the test (first 1/3 of questions) (associating with `` `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``).
+**Primary Focus:** Calculating the overall proportion of "relatively fast and wrong" responses to assess potential carelessness issues (associating with `` `BEHAVIOR_CARELESSNESS_ISSUE` ``); checking if the student responded too quickly (`question_time` < 1.0 minute) in the early stage of the test (first 1/3 of questions) (associating with `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``).
 **Rationale:** Carelessness issues require different corrective methods than knowledge or skill deficiencies. Rushing early in the test might reflect poor testing strategies or psychological states.
 
 </aside>
@@ -351,16 +371,16 @@
     - `num_relatively_fast_total` = Total count of questions in filtered data where `is_relatively_fast` == `True`.
     - `num_relatively_fast_incorrect` = Total count of questions in filtered data where `is_relatively_fast` == `True` and `is_correct` == `False`.
     - `fast_wrong_rate` = `num_relatively_fast_incorrect` / `num_relatively_fast_total` (if `num_relatively_fast_total` > 0).
-    - If `fast_wrong_rate` > `threshold_fast_wrong_rate` (e.g., 0.3), set diagnostic parameter `` `DI_BEHAVIOR_CARELESSNESS_ISSUE` `` to `True`, and record diagnostic action: "Remind student to pay attention to carelessness, reflect on potential issues like misreading, calculation errors, or misinterpreting options."
+    - If `fast_wrong_rate` > `threshold_fast_wrong_rate` (e.g., 0.25), set diagnostic parameter `` `BEHAVIOR_CARELESSNESS_ISSUE` `` to `True`, and record diagnostic action: "Remind student to pay attention to carelessness, reflect on potential issues like misreading, calculation errors, or misinterpreting options."
 
 2. **Early-Stage Rapid Responses (`early_rushing_flag_risk`):**
     - Identify questions where `question_position` <= `total_number_of_questions` / 3 AND `question_time` < 1.0 minute (absolute standard).
     - Record the `question_id`, `question_type`, `content_domain` for these questions.
-    - If any such questions are found, set diagnostic parameter `` `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` to `True`, and record diagnostic action: "Remind student that some responses early in the test were excessively fast, potentially impacting accuracy or missing key information; suggest adjusting the initial pace."
+    - If any such questions are found, set diagnostic parameter `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` to `True`, and record diagnostic action: "Remind student that some responses early in the test were excessively fast, potentially impacting accuracy or missing key information; suggest adjusting the initial pace."
 
 <aside>
 
-**Chapter Summary:** This chapter defined two key behavioral pattern indicators: overall carelessness rate (`` `DI_BEHAVIOR_CARELESSNESS_ISSUE` ``) and early rushing risk (`` `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``). These patterns were assessed by calculating the proportion of relatively fast and wrong responses and checking response times for early-stage questions.
+**Chapter Summary:** This chapter defined two key behavioral pattern indicators: overall carelessness rate (`` `BEHAVIOR_CARELESSNESS_ISSUE` ``) and early rushing risk (`` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``). These patterns were assessed by calculating the proportion of relatively fast and wrong responses and checking response times for early-stage questions.
 
 **Results Destination:** The **English behavioral parameters** generated in this chapter will be included in the Chapter 7 diagnostic summary to alert the student to relevant behavioral patterns and assist in generating diagnostic actions (e.g., carelessness requires specific reflection exercises).
 
@@ -368,13 +388,32 @@
 
 ---
 
-# **Chapter 5: Foundational Ability Override Rules**
+# **Chapter 5: Foundational Performance Assessment (Exemption & Override)**
+
+## Foundational Performance Exemption Rule
+
+<aside>
+**Objective:** To identify specific areas where the student has demonstrated complete mastery and efficiency within time limits, avoiding unnecessary practice recommendations.
+</aside>
+
+- **Judgment Level:** This rule operates at the level of **`question_type` + `content_domain` combinations** (e.g., "DS - Math Related", "TPA - Non-Math Related").
+- **Exemption Status Calculation:**
+    - For each `question_type` + `content_domain` combination:
+        - Filter all **valid questions** belonging to this combination (excluding `is_invalid` = `True` questions).
+        - **Condition 1 (Accuracy):** All these valid questions must have `is_correct` == `True`.
+        - **Condition 2 (Efficiency):** All these valid questions must have `overtime` == `False` (based on the definition for the corresponding `question_type` in Chapter 1, including MSR's dual criteria).
+    - If **both** Condition 1 and Condition 2 are met, the exemption status `exemption_status[type, domain]` for this combination is calculated as `True`, otherwise `False`.
+- **Impact of Exemption Rule:**
+    - The calculated exemption status **will be used** in the Chapter 6 practice recommendation generation logic. Combinations flagged as exempted will **skip** all practice recommendations.
+    - The diagnostic summary (Chapter 7) will mention these exempted combinations to highlight the student's strengths.
+
+---
+
+## Foundational Ability Override Rule
 
 <aside>
 
-**Objective:** To conduct a preliminary check before generating detailed practice recommendations, determining if a specific `question_type` poses widespread and severe difficulty for the student.
-**Primary Focus:** Calculating the overall error rate and overtime rate for each `question_type` (`DS`, `TPA`, `MSR`, `GT`). If the error rate or overtime rate for a `question_type` exceeds 50%, trigger the override rule (`override_triggered`) for that type.
-**Rationale:** If a student demonstrates extreme difficulty across an entire question type, micro-level recommendations for individual challenging questions within that type may be ineffective. Triggering the override rule signifies the need to prioritize foundational consolidation and method learning for that question type, rather than addressing isolated problems.
+**Objective:** To check if there is widespread and severe difficulty within a specific `question_type` **(regardless of whether it was exempted)**.
 
 </aside>
 
@@ -411,13 +450,13 @@
     - **Pre-Calculation/Preparation:**
         - Initialize dictionary `recommendations_by_type` = `{}`.
         - Initialize set `processed_override_types` = `set()`.
-        - **Calculate Exemption Combinations:**
+        - **Calculate Exemption Combinations (`exempted_combinations`):**
             - Initialize set `exempted_combinations` = `set()`.
             - For each `question_type` (`Qt`) and `content_domain` (`Dm`) combination:
-                - Calculate the number of correct (`is_correct`==`True`) and not overtime (`overtime`==`False`) questions in that combination `num_correct_not_overtime`.
-                - If `num_correct_not_overtime` > 2, add `(Qt, Dm)` to `exempted_combinations`.
+                - Check the `exemption_status[Qt, Dm]` calculated in Chapter 5.
+                - If `exemption_status[Qt, Dm]` is `True`, add `(Qt, Dm)` to `exempted_combinations`.
     - **Traverse Trigger Points (Question `X` or Question Type `Qt`):**
-        - **Process Macro Suggestion:** If the trigger point is question type `Qt` and `override_triggered`[`Qt`] == `True` and `Qt` not in `processed_override_types`:
+        - **Process Macro Suggestion:** If the trigger point is question type `Qt` and `override_triggered`[`Qt`] == `True` (from Chapter 5) and `Qt` not in `processed_override_types`:
             - Generate macro suggestion `G`: "For [`Qt`] type, since overall performance has significant room for improvement, it's recommended to systematically reinforce the foundation, starting from [`Y_agg`] difficulty questions, to master the core method, and it's recommended to limit time to [`Z_agg`] minutes." (`Y_agg` and `Z_agg` from Chapter 5).
             - Add `G` to `recommendations_by_type`[`Qt`].
             - Add `Qt` to `processed_override_types`.
@@ -437,7 +476,9 @@
             - Add case suggestion `C` to `recommendations_by_type`[`Qt`].
     - **Collate and Output Recommendation List:**
         - Initialize `final_recommendations`.
-        - **Process Exempted Combinations:** For each `(Qt, Dm)` in `exempted_combinations`, if `Qt` did **not** trigger a macro suggestion, add an exemption note to `final_recommendations`: "Performance on [`Qt`] questions in [`Dm`] is stable; practice can be deferred."
+        - **Process Exempted Combinations:** For each `(Qt, Dm)` in `exempted_combinations`:
+            - If `Qt` did **not** trigger a macro suggestion (`Qt` not in `processed_override_types`):
+                - Add an exemption note to `final_recommendations`: "Performance on [`Qt`] questions in [`Dm`] is stable; practice can be deferred."
         - **Collate Aggregated Suggestions:** Iterate through `recommendations_by_type`.
             - For each type `Qt` and its recommendation list `type_recs`:
                 - If the list is not empty:
@@ -449,7 +490,7 @@
 
 <aside>
 
-**Chapter Summary:** This chapter generated a structured list of practice recommendations, aggregated by `question_type` (`DS`, `TPA`, `MSR`, `GT`). Based on the override rules from Chapter 5, recommendations were categorized as macro (for types needing foundational strengthening) or case-based (for specific incorrect or overtime questions). Each recommendation specified the practice difficulty (`Y` or `Y_agg`) and starting time limit (`Z` or `Z_agg`), with method suggestions appended based on Chapter 3 diagnoses. `special_focus_error` recommendations were prioritized. Finally, `content_domain`-based exemption and focus rules were applied to fine-tune the suggestions.
+**Chapter Summary:** This chapter generated a structured list of practice recommendations, aggregated by `question_type` (`DS`, `TPA`, `MSR`, `GT`). Based on the override rules from Chapter 5, recommendations were categorized as macro (for types needing foundational strengthening) or case-based (for specific incorrect or overtime questions). Each recommendation specified the practice difficulty (`Y` or `Y_agg`) and starting time limit (`Z` or `Z_agg`), with method suggestions potentially appended based on Chapter 3 diagnoses (though explicit appending wasn't detailed here). `special_focus_error` recommendations were prioritized. Finally, `content_domain`-based exemption (from Chapter 5) and focus rules (from Chapter 2) were applied to fine-tune the suggestions.
 
 **Results Destination:** This detailed, type-organized list of practice recommendations forms the core action plan section of the final student diagnostic report (Chapter 7).
 
@@ -482,15 +523,19 @@
 
 **4. Special Pattern Observation (Based on Chapter 4)**
 
-*   (Report behavioral pattern parameters found in Chapter 4: Is there a carelessness issue `` `DI_BEHAVIOR_CARELESSNESS_ISSUE` ``? Is there a risk of rushing early in the test `` `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``?)
+*   (Report behavioral pattern parameters found in Chapter 4: Is there a carelessness issue `` `BEHAVIOR_CARELESSNESS_ISSUE` ``? Is there a risk of rushing early in the test `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``?)
 
 **5. Detailed Diagnostic Explanation (Based on Chapter 3 - Supplementary, for deeper review)**
 
-*   (Optional: Provide a brief list showing the main **English diagnostic parameters** triggered under different `question_type` and `content_domain` combinations, for student/consultant reference, **using descriptions from Appendix A**.)
+*   (Optional: Provide a detailed list showing **each** error or overtime question (`is_correct`=False or `overtime`=True) with its specific diagnostic information for detailed tracking. The list should be **sorted by question type, content domain, and question number**. Each entry includes:)
+    *   **Question Number, Type (Full Name), Domain (Full Name)**
+    *   **Performance Tag:** Labeled as "Fast & Wrong", "Slow & Wrong", "Normal Time & Wrong", or "Slow & Correct" based on time and accuracy.
+    *   **Diagnostic Parameters:** List the **translated descriptions (from Appendix A)** of all English diagnostic parameters triggered by this question, **grouped by pre-defined categories** (e.g., SFE, Reading/Interpretation, Concept Application, Logical Reasoning, Data Handling, MSR Specific, Efficiency, Behavior).
+*   (Note: This list is intended to provide a more granular view than the core problem analysis.)
 
 **6. Practice Recommendations (Based on Chapter 6)**
 
-*   (Present the specific practice recommendation table or list generated in Chapter 6. Emphasize that these recommendations are based on identified **English diagnostic parameters** and have been personalized by applying exemption (`exempted_combinations`) and focus (`content_domain` focus) rules.)
+*   (Present the specific practice recommendation table or list generated in Chapter 6. Emphasize that these recommendations are based on identified **English diagnostic parameters** and have been personalized by applying macro override, **aggregation**, and perfect performance exemption rules.)
 
 **7. Next Steps Guidance**
 
@@ -505,39 +550,78 @@
     *   *Trigger Condition:* When the student cannot accurately recall specific barrier points (especially involving specific knowledge points or barrier types corresponding to certain **English parameters**), or needs objective data to support the diagnosis.
     *   *Recommended Action:* Suggest referring to practice records. E.g.: "To more precisely locate the issue related to parameter [`Parameter X`] encountered in [`content_domain`] [`question_type`] questions, it is recommended you review recent practice records..." (Refer to specific wording in Chapter 3)
 *   **Auxiliary Tools and AI Prompt Recommendation Suggestion:**
-    *   *Recommendation Logic:* To help you organize practice more effectively and address problems in a targeted manner, here are some potentially applicable auxiliary tools and AI prompts. Please select based on your specific diagnostic results (**triggered by the following parameters**):
-    *   *Tool Recommendations:* \n\
-        *   **If diagnosis shows `` `DI_LOGICAL_REASONING_ERROR` `` is a significant weakness in Non-Math DS:** Consider using **`Dustin_GMAT_DI_Non-math_DS_Simulator`**.\n\
-        *   If you need to classify questions by knowledge point or question type (to aid secondary evidence analysis or practice): Consider using **`Dustin's GMAT Q: Question Classifier`** (mainly for Math Related) or manual classification.\n\
-        *   If diagnosis shows `` `DI_READING_COMPREHENSION_ERROR` `` is an issue in `Math Related` questions (especially text-heavy, complex context): Try using **`Dustin_GMAT_Q_Real-Context_Converter`** to rewrite pure math problems for practice.\n\
-    *   *AI Prompt Recommendations (Categorized by triggering parameter):*\n\
-        *   **Basic Understanding & Steps (`DI_READING_COMPREHENSION_ERROR`, `DI_CONCEPT_APPLICATION_ERROR` (Basic), `DI_LOGICAL_REASONING_ERROR` (Basic), `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`)**: \n\
-            *   `` `Verbal-related\\01_basic_explanation.md` `` (Explain Non-Math Q)\n\
-            *   `` `Quant-related\\01_basic_explanation.md` `` (Explain Math Q)\n\
-        *   **Problem-Solving Efficiency & Techniques (`DI_EFFICIENCY_BOTTLENECK_...` all series, `DI_CALCULATION_ERROR`, `DI_MSR_READING_COMPREHENSION_BARRIER`, `DI_MSR_SINGLE_Q_BOTTLENECK`)**: \n\
-            *   `` `Verbal-related\\02_quick_cr_tpa_tricks.md` `` (For TPA Non-Math)\n\
-            *   `` `Verbal-related\\03_quick_rc_tricks.md` `` (For MSR Non-Math)\n\
-            *   `` `Quant-related\\02_quick_math_tricks.md` `` (For Math calculation or step optimization)\n\
-        *   **Conceptual Depth & Pattern Recognition (`DI_CONCEPT_APPLICATION_ERROR` (Advanced), `DI_GRAPH_TABLE_INTERPRETATION_ERROR`, `DI_LOGICAL_REASONING_ERROR` (Advanced), `DI_MULTI_SOURCE_INTEGRATION_ERROR`)**: \n\
-            *   `` `Verbal-related\\04_mindmap_passage.md` `` (For MSR/GT Non-Math structure understanding)\n\
-            *   `` `Verbal-related\\07_logical_term_explained.md` `` (For DS/TPA/MSR Non-Math option analysis)\n\
-            *   `` `Quant-related\\03_test_math_concepts.md` `` (Analyze Math Q concepts)\n\
-            *   `` `Quant-related\\04_problem_pattern.md` `` (Identify Math Q patterns)\n\
-        *   **Method Consolidation & Evaluation (`DI_BEHAVIOR_CARELESSNESS_ISSUE`, requires method reflection)**: \n\
-            *   `` `Verbal-related\\05_evaluate_explanation.md` `` (Evaluate Non-Math solution)\n\
-        *   **Specific Question Type Strengthening (`DI_QUESTION_TYPE_SPECIFIC_ERROR` - MSR Non-Math)**: \n\
-            *   (Can refer to `Verbal-related\\03_quick_rc_tricks.md`, `Verbal-related\\04_mindmap_passage.md`)\n\
-        *   **Extended Practice & Variations (`DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` or any parameter needing consolidation)**: \n\
-            *   `` `Quant-related\\05_variant_questions.md` `` (Generate Math variant Qs)\n\
-            *   `` `Quant-related\\06_similar_questions.md` `` (Find similar Math Qs)\n\
-            *   `` `Verbal-related\\08_source_passage_rewrite.md` `` (Simplify MSR reading material)\n\
-            *   `` `Verbal-related\\09_complex_sentence_rewrite.md` `` (Complexify MSR reading material)\n\
+    *   *Recommendation Logic:* To help you organize practice more effectively and address problems in a targeted manner, here are some potentially applicable auxiliary tools and AI prompts. The system recommends relevant resources based on the combination of diagnostic parameters triggered for you. Please select based on your specific diagnostic results.
+    *   *Recommendation List (Based on Diagnostic Parameters):*
+
+        * **If diagnosis involves errors in reading comprehension, chart, or data interpretation:**
+            * `` `DI_READING_COMPREHENSION_ERROR` `` →
+                * **Tool:** `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Close_Reading_Coach.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
+                * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/03_quick_rc_tricks.md` `` , `` `Verbal-related/09_complex_sentence_rewrite.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
+            * `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` `` →
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/04_problem_pattern.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
+            * `` `DI_DATA_EXTRACTION_ERROR` `` (GT) →
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
+            * `` `DI_INFORMATION_EXTRACTION_INFERENCE_ERROR` `` (GT/MSR Non-Math) →
+                * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `DI-related/03_msr_info_flow.md` `` (MSR)
+
+        * **If diagnosis involves errors in math concepts, calculation, or logic:**
+            * `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math) →
+                * **Tool:** `Dustin_GMAT_Textbook_Explainer.md`, `Dustin_GMAT_Q_Question_Classifier.md`
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/05_variant_questions.md` ``
+            * `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math) →
+                * **Tool:** `Dustin_GMAT_DI_Non-math_DS_Simulator.md` (if DS), `Dustin_GMAT_Textbook_Explainer.md`
+                * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/02_quick_cr_tpa_tricks.md` `` , `` `Verbal-related/05_evaluate_explanation.md` ``, `` `Verbal-related/07_logical_term_explained.md` ``
+            * `` `DI_CALCULATION_ERROR` `` →
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/02_quick_math_tricks.md` ``
+
+        * **If diagnosis involves MSR specific issues:**
+            * `` `DI_MULTI_SOURCE_INTEGRATION_ERROR` `` →
+                * **Tool:** `Dustin_GMAT_Chunk_Reading_Coach.md` (if integration slow due to reading slow)
+                * AI Prompt: `` `Verbal-related/04_mindmap_passage.md` ``, `` `Verbal-related/01_basic_explanation.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
+            * `` `DI_MSR_READING_COMPREHENSION_BARRIER` `` →
+                * **Tool:** `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
+                * AI Prompt: `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `Verbal-related/01_basic_explanation.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `Verbal-related/09_complex_sentence_rewrite.md` ``
+
+        * **If diagnosis involves specific question type or foundational mastery issues:**
+            * `` `DI_QUESTION_TYPE_SPECIFIC_ERROR` `` →
+                * **Tool:** `Dustin_GMAT_DI_Non-math_DS_Simulator.md` (if DS-NonMath)
+                * AI Prompt: Choose based on specific type, e.g., `` `DI-related/02_quick_g&t_tricks.md` `` (GT), `` `DI-related/03_msr_info_flow.md` `` (MSR).
+            * `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` →
+                * **Tool:** `Dustin_GMAT_Textbook_Explainer.md`
+                * AI Prompt: **Prioritize** `` `Quant-related/01_basic_explanation.md` `` ; supplement with `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/05_variant_questions.md` ``.
+
+        * **If diagnosis involves efficiency bottlenecks:**
+            * `` `DI_EFFICIENCY_BOTTLENECK_READING` `` →
+                * **Tool:** `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Close_Reading_Coach.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
+                * AI Prompt: `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
+            * `` `DI_EFFICIENCY_BOTTLENECK_CONCEPT` `` (Math) →
+                * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Quant-related/04_problem_pattern.md` ``
+            * `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` `` →
+                * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``
+            * `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math) →
+                * AI Prompt: `` `Verbal-related/02_quick_cr_tpa_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
+            * `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` `` →
+                * **Tool:** `GMAT_Terminator_DI_Review.md` (if course covers GT)
+                * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
+            * `` `DI_EFFICIENCY_BOTTLENECK_INTEGRATION` `` (MSR) →
+                * **Tool:** `GMAT_Terminator_DI_Review.md` (if course covers MSR), `Dustin_GMAT_Chunk_Reading_Coach.md` (if due to slow reading)
+                * AI Prompt: `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `Verbal-related/04_mindmap_passage.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
+
+        * **If diagnosis involves behavioral patterns:** 
+            * `` `BEHAVIOR_CARELESSNESS_ISSUE` `` →
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
+            * `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` →
+                * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
+            * `` `DI_CARELESSNESS_DETAIL_OMISSION` `` →
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
+
+        * **General DI Review/Practice:**
+            * **Tool:** `GMAT_Terminator_DI_Review.md`
+            * AI Prompt: `` `Quant-related/06_similar_questions.md` `` (Math related), `` `Quant-related/05_variant_questions.md` `` (Math related variants)
 
 <aside>
 
-**Chapter Summary:** This chapter aims to translate the analysis results from previous chapters into a student-facing, clear, understandable, and actionable diagnostic report. The report structure includes: an opening summary, performance overview, core problem analysis (based on **English diagnostic parameters**, described using **Appendix A**), special pattern observation (based on **English behavioral parameters**), an optional detailed diagnostic list, personalized practice recommendations (with exemption/focus rules applied), and next steps guidance including diagnostic confirmation, qualitative analysis suggestions, secondary evidence suggestions, and auxiliary tool/AI prompt recommendations.
-
-**Results Destination:** This report is the final output of the entire DI diagnostic process, used for communication with the student, explaining their performance, pinpointing issues, and guiding their subsequent learning, practice, and reflection.
+**Chapter Summary:** This chapter aims to translate the analysis results from previous chapters into a student-facing, clear, understandable, and actionable diagnostic report. The report structure includes: an opening summary, performance overview, core problem analysis (based on **English diagnostic parameters**, described using **Appendix A**), special pattern observation (based on **English behavioral parameters**), an optional detailed diagnostic list (containing performance tags, categorized translated parameters, sorted), personalized practice recommendations (distinguishing macro, aggregated, exempted), and next steps guidance including diagnostic confirmation, qualitative analysis suggestions, secondary evidence suggestions, and auxiliary tool/AI prompt recommendations based on **parameter combination mapping**.
 
 </aside>
 
@@ -561,7 +645,6 @@
 | **DI - MSR Specific**                      |                                                                      |
 | `DI_MULTI_SOURCE_INTEGRATION_ERROR`        | DI Multi-Source Integration (MSR): Error/Barrier integrating info across tabs/sources |
 | `DI_MSR_READING_COMPREHENSION_BARRIER`     | DI MSR Reading Barrier: Excessive overall reading time for the group |
-| `DI_MSR_SINGLE_Q_BOTTLENECK`               | DI MSR Single Q Bottleneck: Excessive response time for one question within group |
 | **DI - Question Type Specific**            |                                                                      |
 | `DI_QUESTION_TYPE_SPECIFIC_ERROR`          | DI Specific Question Type Barrier (e.g., MSR Non-Math sub-type)       |
 | **DI - Foundational & Efficiency**         |                                                                      |
@@ -574,7 +657,8 @@
 | `DI_EFFICIENCY_BOTTLENECK_INTEGRATION`     | DI Efficiency Bottleneck: Multi-Source Info Integration Time (MSR)  |
 | **DI - Behavior**                          |                                                                      |
 | `DI_CARELESSNESS_DETAIL_OMISSION`          | DI Behavior: Carelessness - Detail Omission/Misread (Implied in Fast & Wrong) |
-| `DI_BEHAVIOR_CARELESSNESS_ISSUE`           | DI Behavior: Carelessness - High Overall Fast & Wrong Rate          |
-| `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK`      | DI Behavior: Risk of Rushing Early in the Test                     |
+| **Behavioral Patterns**                  |                                                                      |
+| `BEHAVIOR_CARELESSNESS_ISSUE`              | Behavioral Pattern: Carelessness - High Overall Fast & Wrong Rate    |
+| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`         | Behavioral Pattern: Risk of Rushing Early in the Test                |
 
 \n\n(End of document)\n\
