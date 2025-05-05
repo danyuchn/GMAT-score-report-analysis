@@ -1104,8 +1104,29 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
         v_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'V', 'question_time'], errors='coerce').sum()
         di_total_time = pd.to_numeric(df_combined_input.loc[df_combined_input['Subject'] == 'DI', 'question_time'], errors='coerce').sum()
 
-        # Update pressure logic to use THRESHOLDS
-        time_pressure_q = (THRESHOLDS['Q']['MAX_ALLOWED_TIME'] - q_total_time) <= THRESHOLDS['Q']['TIME_DIFF_PRESSURE'] # Using the defined pressure diff for Q
+        # --- Q Time Pressure Calculation (Modified) ---
+        q_df = df_combined_input[df_combined_input['Subject'] == 'Q'].copy()
+        q_df['question_time'] = pd.to_numeric(q_df['question_time'], errors='coerce')
+        q_df['question_position'] = pd.to_numeric(q_df['question_position'], errors='coerce') # Ensure numeric for sorting
+        q_df = q_df.sort_values('question_position').dropna(subset=['question_position']) # Sort and remove NaNs
+
+        time_diff_q = THRESHOLDS['Q']['MAX_ALLOWED_TIME'] - q_total_time
+        time_diff_check = time_diff_q <= THRESHOLDS['Q']['TIME_DIFF_PRESSURE'] # Check time diff <= 3
+
+        fast_end_questions_exist = False
+        if not q_df.empty:
+            total_q_questions = len(q_df)
+            last_third_start_index = int(total_q_questions * 2 / 3) # Start index for last third
+            # Select last third based on sorted position index
+            last_third_q_df = q_df.iloc[last_third_start_index:]
+            if not last_third_q_df.empty:
+                # Check if any question time in the last third is < 1.0
+                fast_end_questions_exist = (last_third_q_df['question_time'] < 1.0).any()
+
+        # Combine conditions as per markdown
+        time_pressure_q = time_diff_check and fast_end_questions_exist
+        # --- End Q Time Pressure Modification ---
+
         time_pressure_v = (THRESHOLDS['V']['MAX_ALLOWED_TIME'] - v_total_time) < 1.0 # Keep V logic as is for now, might need its own threshold in THRESHOLDS
         time_pressure_di = (THRESHOLDS['DI']['MAX_ALLOWED_TIME'] - di_total_time) <= THRESHOLDS['DI']['TIME_PRESSURE_DIFF_MIN'] # Using DI pressure diff
 
@@ -1125,16 +1146,12 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
             status_text.text(f"步驟 {current_step}/{total_steps}: 計算超時狀態...")
             # Ensure df_combined_input has necessary columns ('question_time', 'question_type', 'Subject')
             # These should exist due to validation and standardization steps.
-            df_with_overtime = calculate_overtime(df_combined_input, time_pressure_map)
-            if 'overtime' not in df_with_overtime.columns:
-                st.error("calculate_overtime 未返回 'overtime' 欄位。")
-                analysis_success = False
-                status_text.text(f"步驟 {current_step}/{total_steps}: 計算超時狀態時出錯。")
-            else:
-                 # st.write("超時狀態計算完成。") # Removed detailed write
-                 # Use this dataframe going forward, it includes the user-confirmed 'is_invalid' flag
-                 df_final_input_for_sim = df_with_overtime
-                 progress_bar.progress(current_step / total_steps)
+            # df_with_overtime = calculate_overtime(df_combined_input, time_pressure_map) # REMOVED CALL
+            df_final_input_for_sim = df_combined_input # Use the combined input directly for simulation
+            # st.write("超時狀態計算完成。") # Removed detailed write
+            # Use this dataframe going forward, it includes the user-confirmed 'is_invalid' flag
+            # df_final_input_for_sim = df_with_overtime # This line is no longer needed
+            progress_bar.progress(current_step / total_steps)
 
         except Exception as e:
             st.error(f"計算 overtime 時出錯: {e}")
@@ -1342,15 +1359,26 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
              for subject in SUBJECTS:
                  # st.write(f"  診斷 {subject} 科...") # Removed detailed write
                  df_subj = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == subject].copy()
-                 # Skip diagnosis if dataframe is empty for the subject (e.g., all invalid)
-                 if df_subj.empty:
-                      st.warning(f"  {subject}: 沒有有效數據進行診斷。", icon="⚠️")
-                      # Add a placeholder report?
-                      temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 沒有有效數據可供診斷。*\n"
-                      # Create empty df with expected columns to avoid concat errors later?
-                      # Or handle this during results display. Let's handle in display.
-                      all_diagnosed_dfs.append(None) # Append None to signal skip
-                      continue
+                 # --- Calculate Overtime for the subject AFTER potential filtering (assuming filtering happens before/in diagnosis funcs) ---
+                 time_pressure_subj = time_pressure_map.get(subject, False)
+                 try:
+                     # Pass only the subject's data and its pressure status
+                     # Need to pass df_subj which might be filtered by subsequent steps
+                     # Let's assume run_q_diagnosis_processed etc. handle filtering *or* operate on non-filtered data where invalid is just a flag
+                     # calculate_overtime needs the DataFrame for the specific subject.
+                     # Create a mini-map for the current subject
+                     current_subj_pressure_map = {subject: time_pressure_subj}
+                     df_subj_with_overtime = calculate_overtime(df_subj, current_subj_pressure_map)
+                     # Now use df_subj_with_overtime for the diagnosis function call
+                     df_subj = df_subj_with_overtime # Replace df_subj with the one containing the 'overtime' column
+                 except Exception as overtime_calc_err:
+                      st.error(f"  {subject}: 計算 Overtime 時出錯: {overtime_calc_err}")
+                      # Decide how to proceed: skip subject? continue without overtime?
+                      # Let's add a placeholder report and continue without diagnosis for this subject
+                      temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 計算超時狀態時出錯: {overtime_calc_err}*\n"
+                      all_diagnosed_dfs.append(df_subj) # Append original df without overtime/diagnosis
+                      continue # Skip diagnosis for this subject
+                 # --- End Overtime Calculation ---
 
                  # Fill NaN difficulties with a default (e.g., average ability) before diagnosis? Or handle in diagnostic funcs.
                  # Let's assume diagnostic functions can handle potential NaNs in difficulty for invalid items.
@@ -1363,6 +1391,7 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
 
                  try:
                      if subject == 'Q':
+                         # Pass the df_subj which now includes the calculated 'overtime' column
                          subj_results, subj_report, df_subj_diagnosed = run_q_diagnosis_processed(df_subj, time_pressure)
                      elif subject == 'DI':
                          subj_results, subj_report, df_subj_diagnosed = run_di_diagnosis_processed(df_subj, time_pressure)
@@ -1370,9 +1399,6 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                          subj_results, subj_report, df_subj_diagnosed = run_v_diagnosis_processed(df_subj, time_pressure, v_avg_time_per_type)
                  except Exception as diag_err:
                       st.error(f"  {subject} 科診斷函數執行時出錯: {diag_err}")
-                      subj_report = f"**{subject} 科診斷報告**\n\n* 診斷過程中發生錯誤: {diag_err}*\n"
-                      df_subj_diagnosed = df_subj # Return original data for the subject on error
-                      # Mark report dict and df list to indicate failure? Keep processing others.
 
 
                  if subj_report is not None and df_subj_diagnosed is not None:
