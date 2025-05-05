@@ -32,9 +32,13 @@
     - `Max Allowed Time` (測驗上限時間)
     - `Total Number of Questions` (總題數)
 - **DI 衍生數據：**
-    - **`MSR` 閱讀時間 (`msr_reading_time`)：** 針對每個 `MSR` 題組，計算 `msr_reading_time` = 該題組第一題的 `question_time` - (該題組中**除第一題外**所有其他題目的平均 `question_time`)。此計算僅在題組包含至少兩題時有效，且計算結果附加在題組的第一題上。
+    - **`MSR` 閱讀時間 (`msr_reading_time`)：** 針對每個 `MSR` 題組，計算 `msr_reading_time` = 該題組第一題的 `question_time` - (該題組中**除第一題外**所有其他題目的平均 `question_time`)。此計算僅在題組包含至少兩題時有效，且計算結果附加在題組的第一題上。(*此數據將用於第一章 MSR 單題超時判斷*)
+    - **`MSR` 題組數據預計算:**
+        - `group_total_time`: 計算每個 `MSR` 題組內所有題目的 `question_time` 總和。
+        - `num_q_in_group`: 計算每個 `MSR` 題組包含的題目數量。
     - **`GT` 時間分配：** 無需特別區分看圖和作答時間。
-    - **各題型平均作答時間 (`average_time_per_type`)：** 基於**有效數據（過濾後）**計算各 `question_type` (`DS`, `TPA`, `MSR`, `GT`) 的平均作答時間。
+    - **各題型平均作答時間 (`average_time_per_type`)：** 基於**有效數據（過濾後）**計算各 `question_type` (`DS`, `TPA`, `MSR`, `GT`) 的平均作答時間。(*此數據將用於第三章定義 `is_relatively_fast` 和第四章計算粗心率*)
+    - **考試前三分之一各題型平均時間 (`first_third_average_time_per_type`)：** 對於每種 `question_type` (`DS`, `TPA`, `MSR`, `GT`)，計算 `question_position` <= (`Total Number of Questions` / 3) 的所有題目的平均 `question_time`。(*此數據將用於第一章無效數據判斷*)
     - **已掌握最高難度 (`max_correct_difficulty_per_combination`)：** 對於每個 `question_type` 和 `content_domain` 的組合，記錄該組合下所有 `is_correct` == `True` 的題目中的最高 `question_difficulty` 值。
 
 <aside>
@@ -85,12 +89,17 @@
        - `msr_single_q_threshold`: 1.5 分鐘 (用於判斷單題作答時間是否過長)。
    - *說明：以上閾值和規則用於後續判斷各題型題目或題組是否超時 (`overtime`, `msr_group_overtime`)。*
 
-4. **識別無效數據 (`is_invalid`)**: 
-   - 找出測驗最後 1/3 的題目 (`question_position` > `Total Number of Questions` * 2/3)。
-   - 在這些題目中，找出作答時間小於 1.0 分鐘的題目 (`fast_end_questions`)。
-   - **標記邏輯 (與 `time_pressure` 掛鉤)**：
-       - **僅當 `time_pressure` == `True` 時**，將上述 `fast_end_questions` 標記為 `is_invalid` = `True`。
-   - *說明：DI 部分識別無效數據的邏輯現在與 Q/V 部分統一，只有在確認存在時間壓力的情況下，測驗末尾過快的作答才被視為無效。*
+4. **識別無效數據 (`is_invalid`)**:
+   - **檢查範圍與前提:** 找出測驗最後 1/3 的題目 (`last_third_questions`，即 `question_position` > `Total Number of Questions` * 2/3)。**僅當 `time_pressure` == `True` 時**，才進行後續的無效數據標記。
+   - **定義「異常快速作答 (`abnormally_fast_response`)」標準 (滿足其一即可觸發):**
+       - *標準 1 (疑似放棄):* `question_time` < 0.5 分鐘。
+       - *標準 2 (絕對倉促):* `question_time` < 1.0 分鐘。
+       - *標準 3 (相對倉促 - DS):* `question_time` < (`first_third_average_time_per_type`['DS'] * 0.5)。 (需使用第零章計算的數據)
+       - *標準 4 (相對倉促 - TPA):* `question_time` < (`first_third_average_time_per_type`['TPA'] * 0.5)。 (需使用第零章計算的數據)
+       - *標準 5 (相對倉促 - GT):* `question_time` < (`first_third_average_time_per_type`['GT'] * 0.5)。 (需使用第零章計算的數據)
+       - *標準 6 (相對倉促 - MSR 題組):* 該題目所屬的 MSR 題組的 `group_total_time` < (`first_third_average_time_per_type`['MSR'] * `num_q_in_group` * 0.5)。 (此標準應用於該題組中的所有題目，需使用第零章預計算的 `group_total_time`, `num_q_in_group` 和計算的 `first_third_average_time_per_type`['MSR'])
+   - **標記邏輯:** 在 `last_third_questions` 範圍內，若某題目 (或其所屬的 MSR 題組針對標準 6) 滿足了**至少一項** `abnormally_fast_response` 標準，**且 `time_pressure` == `True`**，則將該題目標記為 `is_invalid` = `True`。
+   - *說明:* 此多重標準邏輯旨在更精準地識別在時間壓力下，考試末期可能因放棄或過度倉促而導致的無效作答數據。
 
 5. **輸出與總結**: 
    - 本章產生的關鍵標記：`time_pressure` (布林值), 各題型超時閾值/規則, `is_invalid` 標記 (針對特定題目，且僅在 `time_pressure` 為 True 時觸發)。
@@ -101,13 +110,25 @@
     *   若 `question_type` == `'TPA'` 且 `question_time` > `overtime_threshold_tpa`，標記 `overtime` = `True`。
     *   若 `question_type` == `'GT'` 且 `question_time` > `overtime_threshold_gt`，標記 `overtime` = `True`。
     *   若 `question_type` == `'DS'` 且 `question_time` > `overtime_threshold_ds`，標記 `overtime` = `True`。
-    *   若 `question_type` == `'MSR'` 且其所在題組的總時間 > `msr_group_target_time`，則該題組內所有題目標記 `overtime` = `True` (也可用 `msr_group_overtime` = `True` 區分)。
+    *   **針對 `MSR` 題目的超時標記 (雙重標準):**
+        *   **a. 題組超時標記 (`msr_group_overtime`):**
+            *   計算每個 MSR 題組的總時間 (`group_total_time`)。
+            *   獲取該題組的目標時間 `msr_group_target_time` (基於 `time_pressure`: True 時 6.0 分鐘, False 時 7.0 分鐘)。
+            *   判斷: 如果 `group_total_time > msr_group_target_time`，則該 MSR 題組內**所有**題目標記 `msr_group_overtime = True`。
+        *   **b. 單題超時標記 (`msr_individual_overtime`):**
+            *   設定固定單題閾值 `msr_individual_q_threshold = 1.5` 分鐘 (不隨 `time_pressure` 變化)。
+            *   計算調整後時間 `adjusted_msr_time`:
+                *   對於題組第一題: `adjusted_msr_time = question_time - msr_reading_time` (使用第零章計算的 `msr_reading_time`)。
+                *   對於題組非第一題: `adjusted_msr_time = question_time`。
+            *   判斷: 如果某 MSR 題目的 `adjusted_msr_time > msr_individual_q_threshold` (1.5 分鐘)，則該題標記 `msr_individual_overtime = True`。
+        *   **c. 最終 `overtime` 標記:**
+            *   一個 MSR 題目最終被標記為 `overtime = True`，當且僅當該題目滿足 `msr_group_overtime == True` **或者** `msr_individual_overtime == True`。
 2.  **創建過濾數據集：** 從原始題目數據中，移除所有被標記為 `is_invalid` = `True` 的題目。
 3.  **後續分析範圍：** 第二章至第六章的所有計算、分析和建議，僅基於這個過濾後的數據集。
 
 <aside>
 
-**本章總結：** 我們首先計算了總時間差，判斷了學生的整體時間壓力狀態 (`time_pressure`)。基於此狀態，我們為不同題型（`DS`, `TPA`, `GT`, `MSR`）設定了相應的超時閾值或目標時間規則。然後，**僅在確定存在時間壓力 (`time_pressure` == `True`) 的情況下**，根據測驗末尾題目過快的作答時間 (< 1.0 分鐘)，識別了可能無效的數據 (`is_invalid`)。在進行後續分析前，我們會先根據超時規則標記超時題目 (`overtime`)，然後過濾掉無效數據。
+**本章總結：** 我們首先計算了總時間差，判斷了學生的整體時間壓力狀態 (`time_pressure`)。基於此狀態，我們為不同題型（`DS`, `TPA`, `GT`, `MSR`）設定了相應的超時閾值或目標時間規則。然後，**僅在確定存在時間壓力 (`time_pressure` == `True`) 的情況下**，針對測驗最後三分之一的題目，根據新的多重標準（包括絕對時間過短、相對時間過短——與前三分之一平均時間比較、MSR題組整體時間過短）判斷是否為「異常快速作答 (`abnormally_fast_response`)」，並將滿足條件的題目識別為可能無效的數據 (`is_invalid`)。在進行後續分析前，我們會先根據超時規則標記超時題目 (`overtime`)，然後過濾掉無效數據。
 
 **結果去向：** `time_pressure` 狀態和各題型的超時設定將作為後續分析的重要背景信息。被標記為 `overtime` 的題目會在後續章節用於診斷慢題。被標記為 `is_invalid` 的題目將在第二章至第六章的分析以及第七章建議觸發判斷中被過濾排除，以確保分析的準確性。
 
@@ -169,16 +190,16 @@
     - **核心概念定義:**
         - **時間表現分類 (`Time Performance`):**
             - 快 (`is_relatively_fast`): `question_time` < `average_time_per_type`[該題 `question_type`] * 0.75。
-            - 慢 (`is_slow`): 該題被標記為 `overtime` = `True` (根據第一章的閾值判斷)。
+            - 慢 (`is_slow`): 該題被標記為 `overtime` = `True` (根據第一章的閾值判斷，對於 MSR 題目，基於 `msr_group_overtime` 或 `msr_individual_overtime` 的新定義)。
             - 正常時間 (`is_normal_time`): 非快也非慢。
-        - **特殊關注錯誤 (`special_focus_error`)**: (定義和處理方式保持DI原有邏輯)
+        - **特殊關注錯誤 (`special_focus_error`)**:
             - *定義*: 錯誤題目 (`is_correct`==`False`) 的 `question_difficulty` < `max_correct_difficulty_per_combination`[該題 `question_type`, 該題 `content_domain`]。
             - *標記*: 若滿足條件，則標記 `special_focus_error` = `True`。
             - *優先處理方式*: 在第六章生成個案建議和第七章輸出診斷總結時，應將標記為 `special_focus_error` = `True` 的題目及其對應的診斷和建議**優先列出或特別標註**。
 - **診斷流程與分析要點 (針對有效數據題目)**
     - **按 `question_type` 和 `content_domain` 組合進行分析:**
 
-    - **(新增) 數學相關考點參考列表:** `Rates`, `Ratio`, `Percent`, `Equalities`, `Inequalties`, `Algebra`, `Value`, `Order`, `Factor`, `Counting`, `Sets`, `Probabilities`, `Series`, `Statistics`。
+    - **數學相關考點參考列表:** `Rates`, `Ratio`, `Percent`, `Equalities`, `Inequalties`, `Algebra`, `Value`, `Order`, `Factor`, `Counting`, `Sets`, `Probabilities`, `Series`, `Statistics`。
 
     - **通用診斷行動邏輯 (適用於各分類下的診斷行動建議):**
         1. **回憶優先:** 首先請學生回憶卡關點、錯誤原因或效率瓶頸。
@@ -272,12 +293,12 @@
                 - *診斷行動*: 應用通用邏輯，強調在正常/快錯時進行質化分析。
 
     - **D. Multi-Source Reasoning (`MSR`)** (結構同上，應用通用診斷行動邏輯)
-        *注意：`MSR`的「慢」通常指題組超時，診斷時需結合題組整體情況和單題表現。*
+        *注意：`MSR`的「慢 (`is_slow`)」指該題被標記為 `overtime` = `True` (根據第一章更新的定義，即題組超時或調整後單題超時)。診斷時需結合題組整體情況和單題表現。*
 
         - **獨立 `MSR` 時間檢查 (優先於慢快正常分類)：**
-            - **閱讀時間檢查 (針對題組第一題):** 計算 `msr_reading_time` (定義見第零章)。若 `msr_reading_time` > `msr_reading_threshold` (1.5 分鐘)，觸發特定診斷參數 `` `DI_MSR_READING_COMPREHENSION_BARRIER` `` 並記錄診斷行動：「`MSR` 題組閱讀時間偏長。請學生回憶源資料吸收障礙是（單字、句構、領域、圖表、跨分頁整合資訊）」。若無法回憶，建議啟用二級證據。
-            - **單題回答時間檢查 (針對非第一題):** 檢查 `question_time`。若 `question_time` > `msr_single_q_threshold` (1.5 分鐘)，觸發特定診斷參數 `` `DI_MSR_SINGLE_Q_BOTTLENECK` `` 並記錄診斷行動：「`MSR` 題組中該問題回答時間偏長。請學生回憶障礙是（讀題、定位、選項）」。若無法回憶，建議啟用二級證據。
-            - *說明：* 這兩項檢查獨立進行，旨在捕捉特定的 `MSR` 時間問題，其觸發的診斷參數和行動獨立於後續基於題組超時的「慢」分類，但結果應匯總至最終報告。
+            - **閱讀時間檢查 (針對題組第一題):** 計算 `msr_reading_time` (定義見第零章)。若 `msr_reading_time` > `msr_reading_threshold` (1.5 分鐘)，觸發特定診斷參數 `` `DI_MSR_READING_COMPREHENSION_BARRIER` `` 並記錄診斷行動：「`MSR` 題組閱讀時間偏長。請學生回憶源資料吸收障礙是（單字、句構、領域、圖表、跨分頁整合資訊）」。若無法回憶，建議啟用二級證據。*(說明：過長的閱讀時間也可能導致第一題的 `adjusted_msr_time` 增加，從而可能使其被標記為 `msr_individual_overtime`，進而觸發 `overtime`。) *
+    
+            - *說明：* `DI_MSR_READING_COMPREHENSION_BARRIER` 檢查獨立進行，旨在捕捉特定的 `MSR` 閱讀效率問題。
 
         - **D.1. `Math Related**
             - **慢而錯 (`is_slow` & `is_correct`==`False`):**
@@ -348,7 +369,7 @@
 
 **本章目標：** 識別與答題行為模式相關的特殊情況，例如粗心大意或測驗初期不恰當的快速作答（使用過濾數據），生成相關的**英文診斷參數**。
 
-**主要關注：** 計算整體「相對快且錯」的比例，用於評估潛在的粗心問題 (關聯 `` `DI_BEHAVIOR_CARELESSNESS_ISSUE` ``)；檢查學生是否在測驗前期（前 1/3 題目）就出現作答過快（`question_time` < 1.0 分鐘）的情況 (關聯 `` `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``)。
+**主要關注：** 計算整體「相對快且錯」的比例，用於評估潛在的粗心問題 (關聯 `` `BEHAVIOR_CARELESSNESS_ISSUE` ``)；檢查學生是否在測驗前期（前 1/3 題目）就出現作答過快（`question_time` < 1.0 分鐘）的情況 (關聯 `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``)。
 
 **為何重要：** 粗心問題需要不同於知識或技能缺陷的糾正方法。測驗初期就匆忙作答則可能反映了不良的考試策略或心理狀態。
 
@@ -359,16 +380,16 @@
     - `num_relatively_fast_total` = 過濾數據中 `is_relatively_fast` == `True` 的總數。
     - `num_relatively_fast_incorrect` = 過濾數據中 `is_relatively_fast` == `True` 且 `is_correct` == `False` 的總數。
     - `fast_wrong_rate` = `num_relatively_fast_incorrect` / `num_relatively_fast_total` (如果 `num_relatively_fast_total` > 0)。
-    - 若 `fast_wrong_rate` > `threshold_fast_wrong_rate` (例如 0.3)，則設置診斷參數 `` `DI_BEHAVIOR_CARELESSNESS_ISSUE` `` 為 `True`，並記錄診斷行動：「提醒學生注意粗心問題，反思是否存在審題不清、計算馬虎、選項看錯等情況。」
+    - 若 `fast_wrong_rate` > `threshold_fast_wrong_rate` (例如 0.25)，則設置診斷參數 `` `BEHAVIOR_CARELESSNESS_ISSUE` `` 為 `True`，並記錄診斷行動：「提醒學生注意粗心問題，反思是否存在審題不清、計算馬虎、選項看錯等情況。」
 
 2. **前期過快題目 (`early_rushing_flag_risk`)：**
     - 找出 `question_position` <= `total_number_of_questions` / 3 且 `question_time` < 1.0 分鐘的題目 (絕對標準)。
     - 記錄這些題目的 `question_position`, `question_type`, `content_domain`。
-    - 若找到任何此類題目，則設置診斷參數 `` `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` 為 `True`，並記錄診斷行動：「提醒學生測驗前期存在作答過快情況，可能影響準確率或遺漏關鍵信息，建議調整開局節奏。」
+    - 若找到任何此類題目，則設置診斷參數 `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` 為 `True`，並記錄診斷行動：「提醒學生測驗前期存在作答過快情況，可能影響準確率或遺漏關鍵信息，建議調整開局節奏，注意 flag for review 議題。」
 
 <aside>
 
-**本章總結：** 本章定義了兩個關鍵的行為模式指標：整體粗心率 (`` `DI_BEHAVIOR_CARELESSNESS_ISSUE` ``) 和前期過快風險 (`` `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``)。通過計算相對快且錯的比例和檢查測驗初期題目用時，評估了這些行為模式是否存在。
+**本章總結：** 本章定義了兩個關鍵的行為模式指標：整體粗心率 (`` `BEHAVIOR_CARELESSNESS_ISSUE` ``) 和前期過快風險 (`` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``)。通過計算相對快且錯的比例和檢查測驗初期題目用時，評估了這些行為模式是否存在。
 
 **結果去向：** 本章產生的**英文行為參數**標記將被納入第七章的診斷總結中，用於提醒學生注意相關的行為模式問題，並輔助診斷行動的生成（例如，粗心問題需要特定的反思練習）。
 
@@ -376,15 +397,32 @@
 
 ---
 
-# **第五章：基礎能力覆蓋規則**
+# **第五章：基礎表現評估 (豁免與覆蓋)**
+
+## 基礎表現豁免規則 (Exemption Rule)
+
+<aside>
+**目標:** 識別學生已完全掌握且能在時間限制內高效完成的特定領域，避免生成不必要的練習建議。
+</aside>
+
+- **判斷層級:** 本規則作用於 **`question_type` + `content_domain` 的組合** 層級 (例如 "DS - Math Related", "TPA - Non-Math Related" 等)。
+- **豁免條件計算 (Exemption Status Calculation):**
+    - 對於每一個 `question_type` + `content_domain` 的組合：
+        - 篩選出屬於該組合的所有**有效題目** (排除 `is_invalid` = `True` 的題目)。
+        - **條件一 (準確性):** 所有這些有效題目的 `is_correct` 均必須為 `True`。
+        - **條件二 (效率):** 所有這些有效題目的 `overtime` 標記 (根據第一章對應 `question_type` 的定義，包括 MSR 的雙重標準 - 如果已修改) 均必須為 `False`。
+    - 若**同時滿足**條件一和條件二，則計算得出該 `question_type` + `content_domain` 組合的豁免狀態 `exemption_status[type, domain]` 為 `True`，否則為 `False`。
+- **豁免規則的影響:**
+    - 計算出的豁免狀態將**用於**第六章練習建議生成邏輯。被標記為豁免的組合將**跳過**所有練習建議。
+    - 診斷總結（第七章）會提及這些被豁免的組合，以展示學生的強項。
+
+---
+
+## 基礎能力覆蓋規則 (Override Rule)
 
 <aside>
 
-**本章目標：** 在生成詳細練習建議前，進行前置檢查，判斷是否有某個 `question_type` 對該學生來說存在普遍且嚴重的困難。
-
-**主要關注：** 計算每個 `question_type`（`DS`, `TPA`, `MSR`, `GT`）的整體錯誤率和超時率。如果某個 `question_type` 的錯誤率或超時率超過 50%，則觸發該題型的覆蓋規則 (`override_triggered`)。
-
-**為何重要：** 如果學生在某個完整的題型上都表現出極大困難，那麼針對該題型下個別難題的微觀建議可能效果不佳。觸發覆蓋規則意味著需要優先進行該題型的基礎鞏固和方法學習，而不是頭痛醫頭、腳痛醫腳。
+**目標:** 檢查是否有某個 `question_type` **(無論是否被豁免)** 存在普遍且嚴重的困難。
 
 </aside>
 
@@ -427,7 +465,7 @@
         - **計算豁免題型 (`exempted_types`):** ...
     - **生成宏觀建議 (來自第五章的 `override_results`):**
         - 遍歷 `override_results` 中的每個 `question_type`:\
-            - 如果該 `question_type` 觸發了 `override_triggered` 且 **未被豁免 (`exempted_types`)**:\
+            - 如果該 `question_type` 觸發了 `override_triggered`:\
                 - ... (生成宏觀建議文本)
                 - 將此宏觀建議添加到 `recommendations_by_type[question_type]`。
                 - 將 `question_type` 添加到 `processed_override_types`。
@@ -435,7 +473,9 @@
         - 選取觸發點: `df_trigger` = `df_diagnosed` 中 `is_correct` 為 `False` 或 `overtime` 為 `True` 的題目。
         - **按 `question_type` 和 `content_domain` 分組:** 將 `df_trigger` 中的題目進行分組。
         - **遍歷每個分組 (Group):** 對應一個特定的 `question_type` 和 `content_domain` 組合。
-            - **檢查是否被宏觀建議覆蓋或豁免:** 如果該組的 `question_type` 在 `processed_override_types` 或 `exempted_types` 中，則 `continue` 跳過此組。
+            - **檢查是否被宏觀建議覆蓋或豁免:** 
+                - 如果該組的 `question_type` 在 `processed_override_types` 中，則 `continue` 跳過此組。
+                - 如果 `exemption_status[question_type, content_domain]` 為 `True` (根據第五章計算)，則 `continue` 跳過此組。
             - **聚合信息:** 在該分組內聚合計算以下信息：
                 - **建議難度 (`Y`):** 基於組內所有觸發題目的 **最低** `question_difficulty` 分數，使用 `_grade_difficulty_di` 轉換為難度等級。
                 - **建議起始限時 (`Z`, 分鐘):** 對組內每個觸發題目，計算其個案目標限時 (`max(floor_to_nearest_0.5(T-0.5 if overtime else T), target_time_minutes)`)，然後取這些計算結果中的 **最大值** 作為聚合建議的 `Z`。
@@ -452,9 +492,12 @@
     - **最終組裝與領域側重規則應用:**
         - 初始化 `final_recommendations` = `[]`。
         - **添加豁免說明 (若存在):**
-            - 遍歷 `exempted_types` 中的每個 `question_type`：
-                - ... (生成豁免說明文本)
-                - 將豁免說明添加到 `final_recommendations`。
+            - 遍歷所有 `question_type` + `content_domain` 組合：
+                - 如果 `exemption_status[question_type, content_domain]` 為 `True`:
+                    - `exempt_domain_zh` = ... (獲取 domain 中文名)
+                    - `exempt_type_zh` = ... (獲取 type 中文名)
+                    - `exempt_text` = f"**{exempt_domain_zh}** 領域的 **{exempt_type_zh}** 題目表現完美，已豁免練習建議。"
+                    - 將包含 `type='exemption'`, `text=exempt_text`, `question_type=question_type`, `domain=content_domain` 的字典添加到 `final_recommendations`。
         - 遍歷 `recommendations_by_type` 中的每個 `question_type` 和對應的 `type_recs` 列表 (如果該 type 未被豁免):\
             - ... (排序：宏觀在前，聚合建議在後)
             - ... (應用領域側重規則，將 `focus_note` 追加到聚合建議或宏觀建議末尾)
@@ -499,11 +542,74 @@
 
 *   ... (診斷理解確認, 質化分析建議, 二級證據參考建議)
 *   **輔助工具與 AI 提示推薦建議:**
-    *   *推薦邏輯：* 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示。系統會根據您觸發的**診斷參數組合**，在預定義的映射表 (`DI_TOOL_RECOMMENDATIONS_MAP`) 中查找匹配項，並推薦相關的工具 (`名稱`) 或 AI 提示 (`*.md` 文件名)。請根據您的具體診斷結果選用。
-    *   *推薦列表：* (此處將列出基於 `DI_TOOL_RECOMMENDATIONS_MAP` 匹配結果生成的具體工具和提示列表，可能包含工具分類和提示分類)
-        *   *工具:* (例如: `Dustin_GMAT_DI_Non-math_DS_Simulator`, ...)
-        *   *AI提示:* (例如: `Quant-related/01_basic_explanation.md`, ...)
+    *   *推薦邏輯：* 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示。系統會根據您觸發的診斷參數組合，推薦相關的資源。請根據您的具體診斷結果選用。
+    *   *推薦列表 (基於診斷參數):*
 
+        * **若診斷涉及閱讀理解、圖表或數據解讀錯誤:**
+            * `` `DI_READING_COMPREHENSION_ERROR` `` →
+                * **Tool:** `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Close_Reading_Coach.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
+                * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/03_quick_rc_tricks.md` `` , `` `Verbal-related/09_complex_sentence_rewrite.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
+            * `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` `` →
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/04_problem_pattern.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
+            * `` `DI_DATA_EXTRACTION_ERROR` `` (GT) →
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
+            * `` `DI_INFORMATION_EXTRACTION_INFERENCE_ERROR` `` (GT/MSR Non-Math) →
+                * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `DI-related/03_msr_info_flow.md` `` (MSR)
+
+        * **若診斷涉及數學概念、計算或邏輯錯誤:**
+            * `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math) →
+                * **Tool:** `Dustin_GMAT_Textbook_Explainer.md`, `Dustin_GMAT_Q_Question_Classifier.md`
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/05_variant_questions.md` ``
+            * `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math) →
+                * **Tool:** `Dustin_GMAT_DI_Non-math_DS_Simulator.md` (若為 DS), `Dustin_GMAT_Textbook_Explainer.md`
+                * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/02_quick_cr_tpa_tricks.md` `` , `` `Verbal-related/05_evaluate_explanation.md` ``, `` `Verbal-related/07_logical_term_explained.md` ``
+            * `` `DI_CALCULATION_ERROR` `` →
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/02_quick_math_tricks.md` ``
+
+        * **若診斷涉及 MSR 特定問題:**
+            * `` `DI_MULTI_SOURCE_INTEGRATION_ERROR` `` →
+                * **Tool:** `Dustin_GMAT_Chunk_Reading_Coach.md` (若整合慢因閱讀慢)
+                * AI Prompt: `` `Verbal-related/04_mindmap_passage.md` ``, `` `Verbal-related/01_basic_explanation.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
+            * `` `DI_MSR_READING_COMPREHENSION_BARRIER` `` →
+                * **Tool:** `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
+                * AI Prompt: `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `Verbal-related/01_basic_explanation.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `Verbal-related/09_complex_sentence_rewrite.md` ``
+
+        * **若診斷涉及特定題型或基礎掌握問題:**
+            * `` `DI_QUESTION_TYPE_SPECIFIC_ERROR` `` →
+                * **Tool:** `Dustin_GMAT_DI_Non-math_DS_Simulator.md` (若為 DS-NonMath)
+                * AI Prompt: 根據具體題型選擇，如 `` `DI-related/02_quick_g&t_tricks.md` `` (GT), `` `DI-related/03_msr_info_flow.md` `` (MSR)。
+            * `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` →
+                * **Tool:** `Dustin_GMAT_Textbook_Explainer.md`
+                * AI Prompt: **優先** `` `Quant-related/01_basic_explanation.md` ``；輔助 `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/05_variant_questions.md` ``。
+
+        * **若診斷涉及效率瓶頸:**
+            * `` `DI_EFFICIENCY_BOTTLENECK_READING` `` →
+                * **Tool:** `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Close_Reading_Coach.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
+                * AI Prompt: `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
+            * `` `DI_EFFICIENCY_BOTTLENECK_CONCEPT` `` (Math) →
+                * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Quant-related/04_problem_pattern.md` ``
+            * `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` `` →
+                * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``
+            * `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math) →
+                * AI Prompt: `` `Verbal-related/02_quick_cr_tpa_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
+            * `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` `` →
+                * **Tool:** `GMAT_Terminator_DI_Review.md` (若課程涵蓋 GT)
+                * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
+            * `` `DI_EFFICIENCY_BOTTLENECK_INTEGRATION` `` (MSR) →
+                * **Tool:** `GMAT_Terminator_DI_Review.md` (若課程涵蓋 MSR), `Dustin_GMAT_Chunk_Reading_Coach.md` (若因閱讀慢)
+                * AI Prompt: `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `Verbal-related/04_mindmap_passage.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
+
+        * **若診斷涉及行為模式:** 
+            * `` `BEHAVIOR_CARELESSNESS_ISSUE` `` →
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
+            * `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` →
+                * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
+            * `` `DI_CARELESSNESS_DETAIL_OMISSION` `` →
+                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
+
+        * **通用 DI 複習/練習:**
+            * **Tool:** `GMAT_Terminator_DI_Review.md`
+            * AI Prompt: `` `Quant-related/06_similar_questions.md` `` (數學相關), `` `Quant-related/05_variant_questions.md` `` (數學相關變體)
 <aside>
 
 **本章總結：** 本章旨在將前面各章的分析結果轉化為一份面向學生的、清晰易懂、可執行的診斷報告。報告結構包括：開篇總結、表現概覽、核心問題分析、特殊模式觀察、可選的詳細診斷列表（包含性能標籤、分類診斷參數、排序）、個性化的練習建議（區分宏觀、聚合、豁免），以及包含診斷確認、質化分析建議、二級證據建議和基於 **參數組合映射** 的輔助工具/AI 提示推薦的後續行動指引。
@@ -532,7 +638,6 @@
 | **DI - MSR Specific**                      |                                                    |
 | `DI_MULTI_SOURCE_INTEGRATION_ERROR`        | DI 多源整合 (MSR): 跨分頁/來源信息整合錯誤/障礙    |
 | `DI_MSR_READING_COMPREHENSION_BARRIER`     | DI MSR 閱讀障礙: 題組整體閱讀時間過長              |
-| `DI_MSR_SINGLE_Q_BOTTLENECK`               | DI MSR 單題瓶頸: 題組內單題回答時間過長            |
 | **DI - Question Type Specific**            |                                                    |
 | `DI_QUESTION_TYPE_SPECIFIC_ERROR`          | DI 特定題型障礙 (例如 MSR Non-Math 子題型)         |
 | **DI - Foundational & Efficiency**         |                                                    |
@@ -545,8 +650,9 @@
 | `DI_EFFICIENCY_BOTTLENECK_INTEGRATION`     | DI 效率瓶頸: 多源信息整合耗時 (MSR)              |
 | **DI - Behavior**                          |                                                    |
 | `DI_CARELESSNESS_DETAIL_OMISSION`          | DI 行為: 粗心 - 細節忽略/看錯 (快錯時隱含)         |
-| `DI_BEHAVIOR_CARELESSNESS_ISSUE`           | DI 行為: 粗心 - 整體快錯率偏高                     |
-| `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK`      | DI 行為: 測驗前期作答過快風險                      |
+| **行為模式 (Behavioral Patterns)**       |                                                    |
+| `BEHAVIOR_CARELESSNESS_ISSUE`         | 行為模式: 粗心 - 整體快錯率偏高 (fast_wrong_rate > 25%) |
+| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`    | 行為模式: 測驗前期作答過快風險 (< 1.0 min, 注意 flag for review) |
 
 
 
