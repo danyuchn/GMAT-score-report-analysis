@@ -1,11 +1,7 @@
 import pandas as pd
 import numpy as np
 import logging # Ensure logging is imported
-import sys # Add this if not already imported
-
-# Add this line VERY EARLY in your script execution, before other logging setup
-# Force basic config to stderr at INFO level for debugging
-logging.basicConfig(level=logging.INFO, stream=sys.stderr, format='%(asctime)s - %(levelname)s - %(message)s')
+# import sys # Remove this line
 
 # --- V-Specific Constants ---
 # CR Overtime Thresholds (minutes) based on pressure
@@ -248,7 +244,8 @@ def _observe_patterns(df_v, v_time_pressure_status):
         'early_rushing_flag_for_review': False,
         'fast_wrong_rate': None, # Based on is_relatively_fast (0.75*avg)
         'carelessness_issue': False, # Based on fast_wrong_rate > 0.25
-        'param_triggers': [] # To store triggered behavioral params
+        'param_triggers': [], # To store triggered behavioral params
+        'carelessness_question_indices': [] # NEW: Store indices of questions triggering carelessness
     }
     if df_v.empty:
         return analysis
@@ -284,7 +281,9 @@ def _observe_patterns(df_v, v_time_pressure_status):
     if 'is_relatively_fast' in df_v.columns and 'is_correct' in df_v.columns:
         fast_mask = df_v['is_relatively_fast'] == True
         num_relatively_fast_total = fast_mask.sum()
-        num_relatively_fast_incorrect = (fast_mask & (df_v['is_correct'] == False)).sum()
+        # Define the mask for fast & incorrect questions
+        fast_wrong_mask = fast_mask & (df_v['is_correct'] == False)
+        num_relatively_fast_incorrect = fast_wrong_mask.sum()
 
         if num_relatively_fast_total > 0:
             fast_wrong_rate = num_relatively_fast_incorrect / num_relatively_fast_total
@@ -292,6 +291,8 @@ def _observe_patterns(df_v, v_time_pressure_status):
             if fast_wrong_rate > 0.25:
                 analysis['carelessness_issue'] = True
                 analysis['param_triggers'].append('BEHAVIOR_CARELESSNESS_ISSUE')
+                # Store the indices of the questions that were fast and wrong
+                analysis['carelessness_question_indices'] = df_v.index[fast_wrong_mask].tolist()
 
     return analysis
 
@@ -620,8 +621,10 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
     # --- Populate Chapter 3 Results ---
     print("  Structuring V Analysis Results (Chapter 3)...")
     # Store the dataframe WITH BOTH param columns for report generator
-    # Store the df *after* Ch3 rules have been applied
-    v_diagnosis_results['chapter_3'] = {'diagnosed_dataframe': df_v.copy()}
+    # Store the df *after* Ch3 rules have been applied (initially)
+    # We will update this df later after adding behavioral tags from Ch5
+    df_after_ch3 = df_v.copy()
+    v_diagnosis_results['chapter_3'] = {'diagnosed_dataframe': df_after_ch3} # Store initial Ch3 df
     print("    Finished Chapter 3 V result structuring.")
 
     # --- Populate Chapter 4 Results (Correct but Slow on VALID data) ---
@@ -651,14 +654,51 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
     }
     print("    Finished Chapter 4 V correct slow analysis.")
 
-    # --- Populate Chapter 5 Results (Patterns on VALID data) ---
-    print("  Executing V Analysis (Chapter 5 - Patterns)...")
-    # Use valid data derived from the df *after* Ch3 processing
-    v_diagnosis_results['chapter_5'] = _observe_patterns(df_valid_v_post_ch3, v_time_pressure_status)
-    print("    Finished Chapter 5 V pattern observation.")
+    # --- Populate Chapter 5 Results (Behavioral Patterns on VALID data) ---
+    print("  Executing V Analysis (Chapter 5 - Behavioral Patterns)...")
+    # Use the valid data derived from the df *after* Ch3 processing for pattern observation
+    df_valid_v_for_ch5 = df_v[~df_v['is_invalid']].copy() # Use df_v state AFTER Ch3
+    ch5_behavioral_analysis = _observe_patterns(df_valid_v_for_ch5, v_time_pressure_status)
+    v_diagnosis_results['chapter_5'] = ch5_behavioral_analysis
+    print("    Finished Chapter 5 V behavioral analysis.")
 
-    # --- Populate Chapter 6 Results (Skill Override & Exemption on VALID data) --- #
-    print("  Executing V Analysis (Chapter 6 - Skill Exemption & Override)...")
+    # === NEW: Apply Behavioral Tags (e.g., Carelessness) BACK to DataFrame ===
+    # We modify the main df_v dataframe, which contains all rows (incl. invalid)
+    # but the indices come from analysis on valid data.
+    carelessness_indices = ch5_behavioral_analysis.get('carelessness_question_indices', [])
+    if carelessness_indices:
+        print(f"    Applying BEHAVIOR_CARELESSNESS_ISSUE tag to indices: {carelessness_indices}")
+        for index in carelessness_indices:
+            if index in df_v.index: # Ensure index exists in the main df
+                 current_params = df_v.loc[index, 'diagnostic_params']
+                 # Ensure it's a list before appending
+                 if not isinstance(current_params, list):
+                     current_params = []
+                 if 'BEHAVIOR_CARELESSNESS_ISSUE' not in current_params:
+                     # Create a new list and assign it back
+                     new_params = current_params + ['BEHAVIOR_CARELESSNESS_ISSUE']
+                     # Use .at for scalar assignment
+                     df_v.at[index, 'diagnostic_params'] = new_params
+                     # Also update the translated list if it exists
+                     if 'diagnostic_params_list' in df_v.columns:
+                         current_translated = df_v.loc[index, 'diagnostic_params_list'] # Reading with .loc is fine
+                         if not isinstance(current_translated, list):
+                             current_translated = []
+                         translated_tag = _translate_v('BEHAVIOR_CARELESSNESS_ISSUE')
+                         if translated_tag not in current_translated:
+                             # Create a new list and assign it back
+                             new_translated_list = current_translated + [translated_tag]
+                             # Use .at for scalar assignment
+                             df_v.at[index, 'diagnostic_params_list'] = new_translated_list
+            else:
+                 print(f"    Warning: Carelessness index {index} not found in main df_v.")
+
+    # Update the dataframe in Chapter 3 results *after* adding behavioral tags
+    v_diagnosis_results['chapter_3']['diagnosed_dataframe'] = df_v.copy()
+    # =========================================================================
+
+    # --- Populate Chapter 6 Results (Skill Override Check on VALID data) ---
+    print("  Executing V Analysis (Chapter 6 - Skill Override)...")
     # Use valid data derived from the df *after* Ch3 processing
     exempted_skills = _calculate_skill_exemption_status(df_valid_v_post_ch3)
     ch6_override_results = _calculate_skill_override(df_valid_v_post_ch3)
@@ -991,15 +1031,15 @@ def _generate_v_summary_report(v_diagnosis_results):
 
     # --- Section 4: 正確但低效分析 ---
     report_lines.append("**4. 正確但低效分析**")
-    # === DEBUG START - Report Ch4 Input ===
-    logging.info("[_generate_v_summary_report - Ch4] Received ch4 data: %s", ch4)
+    # === DEBUG START - Report Ch4 Input === ## REMOVE
+    # logging.info("[_generate_v_summary_report - Ch4] Received ch4 data: %s", ch4)
     # === DEBUG END ===
     cr_slow_correct = ch4.get('cr_correct_slow', {})
     rc_slow_correct = ch4.get('rc_correct_slow', {})
-    # === DEBUG START - Report Ch4 Counts ===
-    cr_count = cr_slow_correct.get('correct_slow_count', 0)
-    rc_count = rc_slow_correct.get('correct_slow_count', 0)
-    logging.info("[_generate_v_summary_report - Ch4] Extracted counts - CR: %s, RC: %s", cr_count, rc_count)
+    # === DEBUG START - Report Ch4 Counts === ## REMOVE
+    # cr_count = cr_slow_correct.get('correct_slow_count', 0)
+    # rc_count = rc_slow_correct.get('correct_slow_count', 0)
+    # logging.info("[_generate_v_summary_report - Ch4] Extracted counts - CR: %s, RC: %s", cr_count, rc_count)
     # === DEBUG END ===
     slow_correct_found = False
     for slow_data, type_name in [(cr_slow_correct, "CR"), (rc_slow_correct, "RC")]:
@@ -1013,8 +1053,8 @@ def _generate_v_summary_report(v_diagnosis_results):
             bottleneck = _translate_v(slow_data.get('dominant_bottleneck_type', 'N/A'))
             report_lines.append(f"- {type_name}：{count} 題正確但慢（佔比 {rate}）。平均難度 {avg_diff}，平均耗時 {avg_time} 分鐘。主要瓶頸：{bottleneck}。")
             slow_correct_found = True
-    # === DEBUG START - Report Ch4 Found Flag ===
-    logging.info("[_generate_v_summary_report - Ch4] slow_correct_found flag before check: %s", slow_correct_found)
+    # === DEBUG START - Report Ch4 Found Flag === ## REMOVE
+    # logging.info("[_generate_v_summary_report - Ch4] slow_correct_found flag before check: %s", slow_correct_found)
     # === DEBUG END ===
     if not slow_correct_found:
         report_lines.append("- 未發現明顯的正確但低效問題。")
@@ -1352,10 +1392,18 @@ def _generate_v_recommendations(v_diagnosis_results, exempted_skills):
                     # Aggregate Time Limit (Z)
                     z_minutes_list = []
                     # Use the first valid question type for the skill group
-                    q_type_for_skill = skill_rows['question_type'].dropna().iloc[0] if not skill_rows['question_type'].dropna().empty else 'CR' # Default to CR if no type found
-                    # >>> MODIFICATION: Use V-Doc target times <<<
+                    q_type_full_name = skill_rows['question_type'].dropna().iloc[0] if not skill_rows['question_type'].dropna().empty else 'Critical Reasoning' # Default to full name
+                    # Convert to abbreviation for map lookup
+                    if q_type_full_name == 'Critical Reasoning':
+                        q_type_abbr = 'CR'
+                    elif q_type_full_name == 'Reading Comprehension':
+                        q_type_abbr = 'RC'
+                    else:
+                        q_type_abbr = None # Handle unexpected types
+
+                    # >>> MODIFICATION: Use V-Doc target times <<< AND USE ABBREVIATION FOR LOOKUP
                     target_time_map = {'CR': 2.0, 'RC': 1.5}
-                    target_time_minutes = target_time_map.get(q_type_for_skill, 1.8) # Default slightly lower than CR
+                    target_time_minutes = target_time_map.get(q_type_abbr, 1.8) # Default slightly lower than CR
 
                     for _, row in skill_rows.iterrows():
                         q_time_minutes = row['question_time']
@@ -1418,7 +1466,7 @@ def _generate_v_recommendations(v_diagnosis_results, exempted_skills):
 def _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_per_type, time_pressure_status):
     """
     Applies Chapter 3 diagnostic rules row-by-row.
-    Calculates 'overtime', 'is_sfe', 'is_relatively_fast', 'time_performance_category', and 'diagnostic_params'.
+    Calculates \'overtime\', \'is_sfe\', \'is_relatively_fast\', \'time_performance_category\', and \'diagnostic_params\'.
     MODIFIED: Includes overtime calculation based on time_pressure_status.
     """
     if df_v.empty:
