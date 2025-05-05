@@ -357,7 +357,7 @@
 
 - **前期過快題目:**
     - 找出 `question_position` <= `total_number_of_questions` / 3 且 `question_time` < 1.0 分鐘 的題目。
-    - 輸出風險提醒參數: 若存在此類題目，觸發參數 `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``。
+    - 輸出風險提醒參數: 若存在此類題目，觸發參數 `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` ``，並提示注意 flag for review 議題。
 - **粗心率計算 (`carelessness_issue`):**
     - `num_relatively_fast_total` = 有效數據中滿足第三章 "快" 定義 (`is_relatively_fast` == `True`) 的題目總數。
     - `num_relatively_fast_incorrect` = 有效數據中 `is_relatively_fast` == `True` 且 `is_correct` = `False` 的題目總數。
@@ -387,32 +387,33 @@
 
 <aside>
 
-**目標:** 識別學生已完全掌握且能在時間限制內完成的技能，避免在第七章生成不必要的練習建議。
+**目標:** 識別學生已**在本次測驗中**完全掌握且能在時間限制內穩定完成的核心技能 (`fundamental_skill`)，避免在第七章生成不必要的練習建議。
 
 </aside>
 
-- **豁免條件計算 (在覆蓋規則判斷之前進行):**
+- **豁免條件計算 (在覆蓋規則判斷之前，針對每個 `fundamental_skill` 獨立計算):**
     - 對於某個核心技能 (`question_fundamental_skill`)：
         - 篩選出屬於該技能的所有有效題目（排除 `is_invalid` = `True` 的題目）。
-        - **條件一 (準確性):** 所有這些有效題目的 `is_correct` 均為 `True`。
-        - **條件二 (效率):**
-            - 對於 `CR` 題目：所有有效題目的 `overtime` 標記均為 `False`。
-            - 對於 `RC` 題目：所有有效題目的 `group_overtime` 標記和 `individual_overtime` 標記均為 `False`。
-    - 若同時滿足**條件一**和**條件二**，則計算得出該核心技能的豁免狀態 `skill_exemption_status` 為 `True`。
+        - **條件一 (100% 準確性):** 所有這些有效題目的 `is_correct` **必須全部**為 `True`。
+        - **條件二 (100% 效率):**
+            - 對於該技能下的所有 `CR` 題目：其 `overtime` 標記**必須全部**為 `False`。
+            - 對於該技能下的所有 `RC` 題目：其 `group_overtime` 標記和 `individual_overtime` 標記**必須全部**為 `False`。
+    - 若**同時完全滿足**上述**條件一**和**條件二**，則計算得出該核心技能的豁免狀態 `skill_exemption_status` 為 `True`。
 - **豁免規則的影響:**
-    - 計算出的豁免狀態 (`skill_exemption_status`) **僅用於**第七章練習建議生成邏輯。被標記為豁免的技能將**跳過**所有練習建議。
-    - 豁免狀態**不影響**本章後續的基礎能力覆蓋規則判斷（覆蓋規則仍基於所有非豁免技能的錯誤率）。
-    - 診斷總結（第八章）會提及這些被豁免的技能，以展示學生的強項。
+    - 計算出的 `skill_exemption_status` (True 或 False) 將被傳遞。
+    - 此豁免狀態**僅用於**第七章的練習建議生成邏輯：被標記為 `True` 的技能將**完全跳過**所有相關練習建議的生成。
+    - 此豁免狀態**不影響**本章後續的「基礎能力覆蓋規則判斷」步驟的計算邏輯（即覆蓋規則的判斷仍然基於所有技能的原始錯誤率，無論其是否被豁免）。
+    - 診斷總結（第八章）會明確提及這些被豁免的技能，以展示學生的強項。
 
 ---
 
-**基礎能力覆蓋規則判斷 (基於所有技能，不考慮豁免狀態)**
+**基礎能力覆蓋規則判斷 (基於所有技能，計算不受豁免狀態影響)**
 
 - **邏輯:**
-    - **(此處計算基於所有技能，以便全面評估，豁免狀態僅影響下游建議)**
+    - **(此處計算涵蓋所有核心技能，以便進行全面評估。豁免狀態僅影響下游的建議生成，不影響此處的錯誤率計算)**
     - 計算每個核心技能 (`question_fundamental_skill`) 在有效數據中的 總錯誤率 (`error_rate_skill`)。
     - 若某技能的 `error_rate_skill` > 0.50 (即 > 50%)，則觸發 `skill_override_triggered`[`Skill`] = `True`。
-- **影響:** 若觸發 `skill_override_triggered`，第七章的練習建議 (如果該技能未被豁免) 將側重該技能的基礎鞏固，而非針對個別錯題。
+- **影響:** 若某技能觸發了 `skill_override_triggered`，並且該技能**未被豁免** (`skill_exemption_status` 為 `False`)，則第七章的練習建議將側重於該技能的基礎鞏固，而非僅針對個別錯題。
 
 <aside>
 
@@ -665,8 +666,8 @@
 | **Efficiency Issues (CR & RC)**               |                                                    |
 | `EFFICIENCY_BOTTLENECK_[AREA]`                | 效率問題: [具體障礙] 導致效率低下 (需指明 Area: READING, REASONING, LOCATION, AC_ANALYSIS)     |
 | **Behavioral Patterns**                       |                                                    |
-| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`            | 行為模式: 前期作答過快 (Flag risk)                 |
-| `BEHAVIOR_CARELESSNESS_ISSUE`                 | 行為模式: 粗心問題 (快而錯比例高)                    |
+| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`            | 行為模式: 前期作答過快 (< 1.0 min, 注意 flag for review 風險) |
+| `BEHAVIOR_CARELESSNESS_ISSUE`                 | 行為模式: 粗心問題 (快而錯比例 > 25%)                    |
 | `BEHAVIOR_GUESSING_HASTY`                     | 行為模式: 過快疑似猜題/倉促                     |
 
 （本文件結束）
