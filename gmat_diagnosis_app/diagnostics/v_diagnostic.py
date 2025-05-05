@@ -759,22 +759,23 @@ APPENDIX_A_TRANSLATION_V = {
 }
 
 def _translate_v(param):
-    """Translates an internal V param/skill name to a Mandarin display string."""
-    if param is None:
-        return "未知參數"
-    if not isinstance(param, str):
-        if isinstance(param, list):
-            # Translate each item in the list
-            return [_translate_v(p) for p in param]
-        return str(param) # Convert non-string non-list to string
+    """Translates V diagnostic parameter/term to Chinese, returning original if not found or explicitly mapped to English."""
+    # Explicitly check for skills to keep in English first
+    skills_to_keep_english = [
+        'Analysis/Critique',
+        'Plan/Construct',
+        'Identify Inferred Idea',
+        'Identify Stated Idea'
+    ]
+    if param in skills_to_keep_english:
+        return param # Return English original
 
-    # Use the main APPENDIX_A_TRANSLATION_V dictionary directly
-    return APPENDIX_A_TRANSLATION_V.get(param, param) # Return original if not found
-
-# --- V Summary Report Generation Helper ---
+    # Otherwise, use the map (which might also map to English if defined above)
+    # Corrected to use the defined APPENDIX_A_TRANSLATION_V map
+    return APPENDIX_A_TRANSLATION_V.get(param, param) # Default to original if not in map at all
 
 def _format_rate(rate_value):
-    """Formats a value as percentage if numeric, otherwise returns as string."""
+    """Formats a rate value (0 to 1) as a percentage string, handling None/NaN."""
     if isinstance(rate_value, (int, float)) and not pd.isna(rate_value):
         return f"{rate_value:.1%}"
     else:
@@ -947,18 +948,7 @@ def _generate_v_summary_report(v_diagnosis_results):
     core_issues_params = triggered_params_all - {'FOUNDATIONAL_MASTERY_INSTABILITY_SFE', INVALID_DATA_TAG_V} # Exclude SFE and Invalid Tag
     if core_issues_params:
         report_lines.append("- **主要問題點（根據觸發標籤推斷）：**")
-        # Group by category for better readability
-        params_by_category = {cat: [] for cat in V_PARAM_CATEGORY_ORDER}
-        for param in core_issues_params:
-            cat = V_PARAM_TO_CATEGORY.get(param, 'Unknown')
-            params_by_category[cat].append(param)
-
-        for cat_name in V_PARAM_CATEGORY_ORDER:
-            params_in_cat = params_by_category.get(cat_name, [])
-            if params_in_cat:
-                translated_cat_name = _translate_v(cat_name)
-                translated_params = sorted([_translate_v(p) for p in params_in_cat])
-                report_lines.append(f"  - {translated_cat_name}：{'、'.join(translated_params)}")
+        report_lines.append("請參考試算表中的診斷標籤") # Replace the detailed list generation
     elif not sfe_triggered_overall:
         report_lines.append("- 未識別出明顯的核心問題模式（基於錯誤及效率分析）。")
     report_lines.append("")
@@ -1469,13 +1459,13 @@ def _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time
             continue
 
         # 1. Calculate Overtime Status (Only for CR directly here)
-        if q_type == 'CR' and pd.notna(q_time) and q_time > cr_ot_threshold:
+        # --- MODIFICATION: Use full question type names ---
+        if q_type == 'Critical Reasoning' and pd.notna(q_time) and q_time > cr_ot_threshold:
             current_is_overtime = True
         # >>> IMPORTANT: For RC, we assume 'overtime' flag is potentially pre-calculated <<<
-        # If an 'overtime' column was provided reflecting RC group/individual status, use it.
-        elif q_type == 'RC' and 'overtime' in row and bool(row['overtime']):
+        elif q_type == 'Reading Comprehension' and 'overtime' in row and bool(row['overtime']):
              current_is_overtime = True
-        # Otherwise, RC overtime remains False based on this direct calculation step.
+        # --- END MODIFICATION ---
 
         # 2. Check SFE
         if not is_correct and pd.notna(q_diff):
@@ -1506,16 +1496,24 @@ def _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time
         # 4. Assign Time Performance Category based on calculated flags
         if is_correct:
             if current_is_relatively_fast: current_time_performance_category = 'Fast & Correct'
-            elif is_slow: current_time_performance_category = 'Slow & Correct'
-            else: current_time_performance_category = 'Normal Time & Correct' # Includes normal time
+            elif current_is_overtime: current_time_performance_category = 'Slow & Correct' # Use current_is_overtime directly
+            else: current_time_performance_category = 'Normal Time & Correct'
         else: # Incorrect
             if current_is_relatively_fast: current_time_performance_category = 'Fast & Wrong'
-            elif is_slow: current_time_performance_category = 'Slow & Wrong'
-            else: current_time_performance_category = 'Normal Time & Wrong' # Includes normal time
+            elif current_is_overtime: current_time_performance_category = 'Slow & Wrong' # Use current_is_overtime directly
+            else: current_time_performance_category = 'Normal Time & Wrong'
 
         # 5. Assign DETAILED Diagnostic Params using the map based on the category
         # Ensure q_type is valid before lookup
-        valid_q_type = 'CR' if q_type == 'CR' else ('RC' if q_type == 'RC' else None)
+        # --- MODIFICATION: Handle full question type names ---
+        if q_type == 'Critical Reasoning':
+            valid_q_type = 'CR'
+        elif q_type == 'Reading Comprehension':
+            valid_q_type = 'RC'
+        else:
+            valid_q_type = None # Keep None for other types or invalid values
+        # --- END MODIFICATION ---
+
         if valid_q_type:
              params_to_add = param_assignment_map.get((valid_q_type, current_time_performance_category), [])
              current_params.extend(params_to_add)
@@ -1535,7 +1533,6 @@ def _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time
         if INVALID_DATA_TAG_V in unique_params:
              unique_params.remove(INVALID_DATA_TAG_V)
              unique_params.append(INVALID_DATA_TAG_V)
-
 
         # Append calculated values for this row
         all_params.append(unique_params)
