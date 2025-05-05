@@ -1369,8 +1369,13 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                      # Create a mini-map for the current subject
                      current_subj_pressure_map = {subject: time_pressure_subj}
                      df_subj_with_overtime = calculate_overtime(df_subj, current_subj_pressure_map)
-                     # Now use df_subj_with_overtime for the diagnosis function call
-                     df_subj = df_subj_with_overtime # Replace df_subj with the one containing the 'overtime' column
+                     df_subj = df_subj_with_overtime # Replace df_subj
+
+                     # === START DEBUG LOGGING ===
+                     logging.info(f"[{subject}] Overtime calculated. Overtime count: {df_subj['overtime'].sum()}")
+                     logging.info(f"[{subject}] df_subj head with overtime before diagnosis:\n{df_subj[['Subject', 'question_position', 'question_type', 'question_time', 'overtime']].head().to_string()}")
+                     # === END DEBUG LOGGING ===
+
                  except Exception as overtime_calc_err:
                       st.error(f"  {subject}: 計算 Overtime 時出錯: {overtime_calc_err}")
                       # Decide how to proceed: skip subject? continue without overtime?
@@ -1429,6 +1434,19 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
              valid_diagnosed_dfs = [df for df in all_diagnosed_dfs if df is not None and not df.empty]
              if valid_diagnosed_dfs:
                   st.session_state.processed_df = pd.concat(valid_diagnosed_dfs, ignore_index=True)
+
+                  # === START DEBUG LOGGING ===
+                  logging.info("Concatenated diagnosed dfs. Final processed_df info:")
+                  logging.info(f"Shape: {st.session_state.processed_df.shape}")
+                  logging.info(f"Columns: {st.session_state.processed_df.columns.tolist()}")
+                  if 'overtime' in st.session_state.processed_df.columns:
+                      logging.info("Overtime counts per subject in final df:")
+                      logging.info(st.session_state.processed_df.groupby('Subject')['overtime'].sum())
+                      logging.info(f"Final df head with overtime:\n{st.session_state.processed_df[['Subject', 'question_position', 'question_type', 'question_time', 'overtime', 'time_performance_category', 'diagnostic_params_list']].head().to_string()}") # Added related columns
+                  else:
+                      logging.warning("Final processed_df is missing 'overtime' column after concatenation.")
+                  # === END DEBUG LOGGING ===
+
                   st.session_state.report_dict = temp_report_dict
                   st.session_state.final_thetas = final_thetas_local # Store thetas from sim
                   st.session_state.theta_plots = all_theta_plots # NEW: Store the plots in session state

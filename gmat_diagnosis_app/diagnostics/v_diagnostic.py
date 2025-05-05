@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import logging # Ensure logging is imported
 # Removed: import math
 
 # --- V-Specific Constants ---
@@ -435,6 +436,10 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
 
 
 def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time_per_type):
+    # === DEBUG START ===
+    logging.info("[V Diag - Entry] Received data. Overtime count: %s", df_v_processed['overtime'].sum())
+    logging.info("[V Diag - Entry] Input df overtime head:\n%s", df_v_processed[['question_position', 'question_time', 'overtime']].head().to_string())
+    # === DEBUG END ===
     """
     Runs the diagnostic analysis for Verbal using a preprocessed DataFrame.
     """
@@ -556,6 +561,11 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
     # Overtime calculation is now embedded within this function.
     df_v = _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill_v, v_avg_time_per_type, v_time_pressure_status)
 
+    # === DEBUG START ===
+    logging.info("[V Diag - After Ch3 Rules] Overtime count: %s", df_v['overtime'].sum())
+    logging.info("[V Diag - After Ch3 Rules] Sample with time category:\n%s", df_v[['question_position', 'overtime', 'time_performance_category']].head().to_string())
+    # === DEBUG END ===
+
     # --- Translate diagnostic codes ---
     if 'diagnostic_params' in df_v.columns:
         # Ensure the lambda handles non-list inputs gracefully
@@ -634,6 +644,11 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
 
     # --- Prepare Final DataFrame for Return ---
     df_v_final = df_v.copy() # Start with the df that has Ch3 results
+
+    # === DEBUG START ===
+    logging.info("[V Diag - Before Return] Final df overtime count: %s", df_v_final['overtime'].sum())
+    logging.info("[V Diag - Before Return] Final df overtime head:\n%s", df_v_final[['question_position', 'overtime']].head().to_string())
+    # === DEBUG END ===
 
     # --- Drop English column AFTER report is generated ---
     if 'diagnostic_params' in df_v_final.columns:
@@ -1535,7 +1550,7 @@ def _apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time
         df_v['is_sfe'] = all_sfe
         df_v['is_relatively_fast'] = all_fast_flags
         df_v['time_performance_category'] = all_time_categories
-        df_v['overtime'] = all_overtime_flags # Overwrite overtime column with calculated status
+        # df_v['overtime'] = all_overtime_flags # REMOVE THIS LINE - Overtime should be calculated earlier
     else:
         print("Error: Length mismatch during Chapter 3 rule application. DataFrame not fully updated.")
 

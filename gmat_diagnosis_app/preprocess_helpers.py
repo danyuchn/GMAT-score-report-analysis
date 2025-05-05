@@ -269,7 +269,8 @@ def _calculate_overtime_v(df_v, pressure, thresholds):
 
         # Combine individual and group overtime for RC questions
         # Handle potential NaNs from comparisons
-        is_rc_overtime = is_individual_overtime.fillna(False) | is_group_overtime.fillna(False)
+        is_individual_overtime_series = pd.Series(is_individual_overtime, index=df_rc.index)
+        is_rc_overtime = is_individual_overtime_series.fillna(False) | is_group_overtime.fillna(False)
 
         # Update the main overtime mask using the index from df_rc
         overtime_mask.loc[df_rc.index[is_rc_overtime]] = True # Update where is_rc_overtime is True
