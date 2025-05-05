@@ -114,35 +114,34 @@ SUBJECTS = ['Q', 'V', 'DI'] # Define subjects for iteration
 
 # --- Styling Constants & Helpers ---
 ERROR_FONT_COLOR = '#D32F2F' # Red for errors
-OVERTIME_FILL_COLOR = '#FFCDD2' # Light red fill for overtime
+OVERTIME_FONT_COLOR = '#0000FF' # Blue for overtime
+OVERTIME_FILL_COLOR = '#FFCDD2' # Light red fill for overtime (kept for reference)
 
 def apply_styles(row):
     """Applies styling for invalid rows, incorrect answers, and overtime."""
     styles = [''] * len(row)
     INVALID_FONT_COLOR = '#A9A9A9' # DarkGray
     ERROR_FONT_COLOR = '#D32F2F' # Red for errors
-    OVERTIME_FILL_COLOR = '#FFCDD2' # Light red fill for overtime
-
+    OVERTIME_FONT_COLOR = '#0000FF' # Blue for overtime
+    
     try:
         # Grey text for invalid rows (overrides other text styles)
         if 'is_invalid' in row.index and row['is_invalid']:
             styles = [f'color: {INVALID_FONT_COLOR}'] * len(row)
-            # Apply overtime background even if invalid
+            # Apply overtime text color even if invalid
             if 'overtime' in row.index and row['overtime'] and 'question_time' in row.index:
                 time_col_idx = row.index.get_loc('question_time')
-                styles[time_col_idx] = f'{styles[time_col_idx]}; background-color: {OVERTIME_FILL_COLOR}'.lstrip('; ')
+                styles[time_col_idx] = f'color: {OVERTIME_FONT_COLOR}'
             return styles # Return early if invalid
 
         # Red text for incorrect (only if not invalid)
         if 'is_correct' in row.index and not row['is_correct']:
             styles = [f'color: {ERROR_FONT_COLOR}'] * len(row)
 
-        # Red background for overtime time cell (applies to correct or incorrect, but not invalid text color)
+        # Blue text for overtime time cell
         if 'overtime' in row.index and row['overtime'] and 'question_time' in row.index:
             time_col_idx = row.index.get_loc('question_time')
-            current_style = styles[time_col_idx]
-            # Add background without overriding potential error text color
-            styles[time_col_idx] = f'{current_style}; background-color: {OVERTIME_FILL_COLOR}'.lstrip('; ')
+            styles[time_col_idx] = f'color: {OVERTIME_FONT_COLOR}'
 
     except (KeyError, IndexError):
         pass # Ignore styling errors if columns are missing
@@ -164,7 +163,7 @@ def to_excel(df, column_map):
 
         # Define formats
         error_format = workbook.add_format({'font_color': ERROR_FONT_COLOR})
-        overtime_format = workbook.add_format({'bg_color': OVERTIME_FILL_COLOR})
+        overtime_format = workbook.add_format({'font_color': OVERTIME_FONT_COLOR})
         invalid_format = workbook.add_format({'font_color': '#A9A9A9'})
 
         # --- Apply Conditional Formatting ---
@@ -200,9 +199,9 @@ def to_excel(df, column_map):
                                                      'criteria': f'=${correct_col_letter}2="False"', # Check text value
                                                      'format': error_format})
 
-            # Red background for overtime time cells
+            # Blue text for overtime time cells
             worksheet.conditional_format(time_col_range, {'type': 'formula',
-                                                          'criteria': f'=${overtime_col_letter}2=TRUE', # Check the flag column (still bool maybe?)
+                                                          'criteria': f'=${overtime_col_letter}2=TRUE', # Check the flag column
                                                           'format': overtime_format})
 
             # Hide the overtime flag column ONLY
