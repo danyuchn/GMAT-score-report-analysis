@@ -455,26 +455,31 @@
                 - 將宏觀建議 `G` 添加到 `recommendations_by_skill`[`S`]。
                 - 將技能 `S` 添加到 `processed_override_skills`。
         - **生成個案建議 (若技能 S 未觸發宏觀建議):**
-            - **確定練習難度 (`Y`):** 根據題目 `X` 的難度 `D` 進行映射（**統一 6 級標準**）：
-                - 若 `D` ≤ -1: `Y` = "低難度 (Low) / 505+"
-                - 若 -1 < `D` ≤ 0: `Y` = "中難度 (Mid) / 555+"
-                - 若 0 < `D` ≤ 1: `Y` = "中難度 (Mid) / 605+"
-                - 若 1 < `D` ≤ 1.5: `Y` = "中難度 (Mid) / 655+"
-                - 若 1.5 < `D` ≤ 1.95: `Y` = "高難度 (High) / 705+"
-                - 若 1.95 < `D` ≤ 2: `Y` = "高難度 (High) / 805+"
+            - **確定練習難度 (`Y`):**
+                - **[修改]** 針對技能 `S`，找出所有需要關注的有效數據題目。
+                - **[修改]** 確定這些題目中的**最低**難度值 (`min_difficulty`)。
+                - **[修改]** 將 `min_difficulty` 映射到 **6 級標準** 以確定該技能的**整體練習難度** `Y`：
+                    - 若 `min_difficulty` ≤ -1: `Y` = "低難度 (Low) / 505+"
+                    - 若 -1 < `min_difficulty` ≤ 0: `Y` = "中難度 (Mid) / 555+"
+                    - 若 0 < `min_difficulty` ≤ 1: `Y` = "中難度 (Mid) / 605+"
+                    - 若 1 < `min_difficulty` ≤ 1.5: `Y` = "中難度 (Mid) / 655+"
+                    - 若 1.5 < `min_difficulty` ≤ 1.95: `Y` = "高難度 (High) / 705+"
+                    - 若 1.95 < `min_difficulty` ≤ 2: `Y` = "高難度 (High) / 805+"
             - **確定起始練習限時 `Z` (分鐘):** (**統一計算規則**)
-                - 設定目標時間 (`target_time`):
-                    - 若 `Type` == 'CR': `target_time` = 2.0
-                    - 若 `Type` == 'RC': `target_time` = 1.5 (單題分析目標)
-                - 判斷是否慢 (`is_slow`): (`CR`: `overtime` == `True`; `RC`: `group_overtime` == `True` 或 `individual_overtime` == `True`)
-                - 計算 `base_time`: 若 `is_slow` == `True` 則 `T` - 0.5，否則 `T`。
-                - 計算 `Z_raw` = `floor_to_nearest_0.5`(`base_time`)。
-                - 確保最低值: `Z` = `max`(`Z_raw`, `target_time`)。
+                - **[修改]** 針對技能 `S` 下**每一個**需要關注的有效數據題目 `X` (原始用時為 `T`，題型為 `Type`)，單獨計算其建議限時 `Z_individual`:
+                    - 設定目標時間 (`target_time`):
+                        - 若 `Type` == 'CR': `target_time` = 2.0
+                        - 若 `Type` == 'RC': `target_time` = 1.5 (單題分析目標)
+                    - 判斷是否慢 (`is_slow`): (`CR`: `overtime` == `True`; `RC`: `group_overtime` == `True` 或 `individual_overtime` == `True`)
+                    - 計算 `base_time`: 若 `is_slow` == `True` 則 `T` - 0.5，否則 `T`。
+                    - 計算 `Z_raw` = `floor_to_nearest_0.5`(`base_time`)。
+                    - 確保最低值: `Z_individual` = `max`(`Z_raw`, `target_time`)。
+                - **[新增]** **聚合限時:** 確定技能 `S` 的最終起始練習限時 `Z`，取該技能下所有題目計算出的 `Z_individual` 中的 **最大值** (`max_z_minutes`)。
             - **構建建議文本:**
-                - 基本模板：「針對 [`Skill`] 的相關考點 (根據第三章診斷結果確定)，建議練習 [`Y`] 難度題目，起始練習限時建議為 [`Z`] 分鐘。(最終目標時間：`CR` 2分鐘 / `RC` 1.5分鐘)。"
-                - **優先級標註:** 如果該題觸發了 `special_focus_error` = `True`，則在此建議前標註「*基礎掌握不穩*」。
-                - **超長提醒:** 若 `Z` - `target_time` > 2.0 分鐘，加註提醒「**需加大練習量以確保逐步限時有效**」。
-            - 將個案建議 `C` 添加到 `recommendations_by_skill`[`Skill`]。
+                - 基本模板：「針對 [`S`] 技能的相關考點 (根據第三章診斷結果確定)，建議練習 [`Y`] 難度題目，起始練習限時建議為 [`Z`] 分鐘。(最終目標時間：`CR` 2分鐘 / `RC` 1.5分鐘)。"
+                - **優先級標註:** 如果該技能下的任何題目觸發了 `special_focus_error` = `True`，則在此建議前標註「*基礎掌握不穩*」。
+                - **超長提醒:** 若 `Z` - `target_time` > 2.0 分鐘，加註提醒「**注意：起始限時遠超目標，需加大練習量以確保逐步限時有效**」。
+            - 將個案建議 `C` 添加到 `recommendations_by_skill`[`S`]。
     - **整理與輸出建議列表：**
         - 初始化最終建議列表 `final_recommendations`。
     - **整理聚合建議:** 遍歷 `recommendations_by_skill` 字典。
