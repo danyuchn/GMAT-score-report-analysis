@@ -1307,21 +1307,10 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                     # logging.info(f"[{subject}] Successfully assigned {len(sim_b_values)} simulated difficulties to all {len(user_df_subj_sorted)} questions.")
                 elif not sim_history_df.attrs.get('simulation_skipped', False): # Only warn if simulation *should* have run
                     st.warning(f"{subject}: 模擬難度數量 ({len(sim_b_values)}) 與實際題目數量 ({len(user_df_subj_sorted)}) 不符。無法分配模擬難度。", icon="⚠️")
-                # Create a mapping from valid question original position to its sim difficulty
-                valid_indices = user_df_subj_sorted[~user_df_subj_sorted['is_invalid']].index
-                if len(valid_indices) != len(sim_b_values):
-                     st.warning(f"{subject}: 有效題目數量 ({len(valid_indices)}) 與模擬難度值數量 ({len(sim_b_values)}) 不符。難度可能分配不準確。", icon="⚠️")
-                     # Truncate to minimum? Or assign NaN? Assign NaN for safety.
-                     min_len = min(len(valid_indices), len(sim_b_values))
-                     difficulty_map = {user_df_subj_sorted.loc[idx, 'question_position']: sim_b_values[i]
-                                       for i, idx in enumerate(valid_indices[:min_len])}
-                else:
-                     difficulty_map = {user_df_subj_sorted.loc[idx, 'question_position']: sim_b_values[i]
-                                       for i, idx in enumerate(valid_indices)}
-
-
-                # Assign difficulty based on the map, assign NaN to invalid or unmapped questions
-                user_df_subj_sorted['question_difficulty'] = user_df_subj_sorted['question_position'].map(difficulty_map)
+                    user_df_subj_sorted['question_difficulty'] = np.nan # Assign NaN if mismatch occurs
+                else: # Simulation was skipped, assign NaN
+                    user_df_subj_sorted['question_difficulty'] = np.nan
+                # --- END MODIFICATION ---
 
                 # Fill missing essential columns (content_domain, fundamental_skill) if they don't exist
                 if 'content_domain' not in user_df_subj_sorted.columns:
