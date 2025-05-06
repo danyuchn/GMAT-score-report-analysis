@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import re
 import logging
+import streamlit as st
 from gmat_diagnosis_app.constants.config import BASE_RENAME_MAP
 
 def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_bytes, suggest_invalid_questions, validate_dataframe, required_original_cols):
@@ -138,7 +139,7 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
                 use_container_width=True,
                 column_order=column_order,
                 column_config={
-                    "is_manually_invalid": tab_container.column_config.CheckboxColumn(
+                    "is_manually_invalid": st.column_config.CheckboxColumn(
                         "是否草率做題？ (手動標記)",
                         help="勾選此框表示您手動判斷此題為無效（例如因倉促/慌亂）。此標記將優先於系統自動建議。",
                         default=False,

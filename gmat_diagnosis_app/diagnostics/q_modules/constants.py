@@ -1,0 +1,46 @@
+"""
+Q診斷模塊的常量和參數映射
+
+此模塊包含所有用於Q(Quantitative)診斷的常量、閾值和參數映射，
+用於診斷報告生成和分析。
+"""
+
+# --- Q-Specific Constants ---
+# 第零章與第一章的常數
+MAX_ALLOWED_TIME_Q = 45.0  # 測驗上限時間（分鐘）
+TOTAL_QUESTIONS_Q = 20  # 題目總數
+TIME_PRESSURE_THRESHOLD_Q = 3.0  # 時間差閾值（分鐘）
+INVALID_TIME_THRESHOLD_MINUTES = 0.5  # 判斷為疑似放棄的閾值（分鐘）
+SUSPICIOUS_FAST_MULTIPLIER = 0.5  # 相對於前三分之一平均時間的倍數，判斷相對倉促
+
+# 超時閾值（分鐘）基於時間壓力狀態
+OVERTIME_THRESHOLDS = {
+    True: 2.5,  # 高壓力
+    False: 3.0  # 低壓力
+}
+
+# 粗心閾值（核心邏輯文件第五章）
+CARELESSNESS_THRESHOLD = 0.25  # 快錯率超過25%判定為粗心
+
+INVALID_DATA_TAG_Q = "數據無效：用時過短（受時間壓力影響）"
+
+# 參數分配規則字典
+PARAM_ASSIGNMENT_RULES = {
+    # (time_performance_category, question_type): [param_list]
+    ('Fast & Wrong', 'REAL'): ['Q_CARELESSNESS_DETAIL_OMISSION', 'Q_CONCEPT_APPLICATION_ERROR', 'Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_READING_COMPREHENSION_ERROR'],
+    ('Fast & Wrong', 'PURE'): ['Q_CARELESSNESS_DETAIL_OMISSION', 'Q_CONCEPT_APPLICATION_ERROR', 'Q_PROBLEM_UNDERSTANDING_ERROR'],
+    ('Slow & Wrong', 'REAL'): ['Q_EFFICIENCY_BOTTLENECK_CONCEPT', 'Q_EFFICIENCY_BOTTLENECK_CALCULATION', 'Q_CONCEPT_APPLICATION_ERROR', 'Q_CALCULATION_ERROR', 'Q_EFFICIENCY_BOTTLENECK_READING'],
+    ('Slow & Wrong', 'PURE'): ['Q_EFFICIENCY_BOTTLENECK_CONCEPT', 'Q_EFFICIENCY_BOTTLENECK_CALCULATION', 'Q_CONCEPT_APPLICATION_ERROR', 'Q_CALCULATION_ERROR'],
+    ('Normal Time & Wrong', 'REAL'): ['Q_CONCEPT_APPLICATION_ERROR', 'Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_CALCULATION_ERROR', 'Q_READING_COMPREHENSION_ERROR'],
+    ('Normal Time & Wrong', 'PURE'): ['Q_CONCEPT_APPLICATION_ERROR', 'Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_CALCULATION_ERROR'],
+    ('Slow & Correct', 'REAL'): ['Q_EFFICIENCY_BOTTLENECK_CONCEPT', 'Q_EFFICIENCY_BOTTLENECK_CALCULATION', 'Q_EFFICIENCY_BOTTLENECK_READING'],
+    ('Slow & Correct', 'PURE'): ['Q_EFFICIENCY_BOTTLENECK_CONCEPT', 'Q_EFFICIENCY_BOTTLENECK_CALCULATION'],
+    # Handle 'Unknown' time category (assign general error types if incorrect)
+    ('Unknown', 'REAL'): ['Q_CONCEPT_APPLICATION_ERROR', 'Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_CALCULATION_ERROR', 'Q_READING_COMPREHENSION_ERROR'],
+    ('Unknown', 'PURE'): ['Q_CONCEPT_APPLICATION_ERROR', 'Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_CALCULATION_ERROR'],
+    # Add entries for correct but unknown time if needed, currently assigns nothing
+    ('Unknown', None): ['Q_CONCEPT_APPLICATION_ERROR', 'Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_CALCULATION_ERROR'], # Fallback if type is None (shouldn't happen)
+}
+
+# Default params if incorrect but category/type combo not found above
+DEFAULT_INCORRECT_PARAMS = ['Q_CONCEPT_APPLICATION_ERROR', 'Q_PROBLEM_UNDERSTANDING_ERROR', 'Q_CALCULATION_ERROR'] 

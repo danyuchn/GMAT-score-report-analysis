@@ -32,7 +32,8 @@ try:
     from gmat_diagnosis_app.preprocess_helpers import suggest_invalid_questions, calculate_overtime, THRESHOLDS
     from gmat_diagnosis_app.diagnostics.v_diagnostic import run_v_diagnosis_processed
     from gmat_diagnosis_app.diagnostics.di_diagnostic import run_di_diagnosis_processed
-    from gmat_diagnosis_app.diagnostics.q_diagnostic import run_q_diagnosis_processed
+    from gmat_diagnosis_app.diagnostics.q_diagnostic import diagnose_q
+    # from gmat_diagnosis_app.diagnostics.ir_diagnostic import run_ir_diagnosis_processed
     
     # Import our modularized components
     from gmat_diagnosis_app.constants.config import (
@@ -109,7 +110,7 @@ def init_session_state():
 
 def reset_session_for_new_upload():
     """Reset session state for new data upload or analysis start"""
-    st.session_state.analysis_run = False
+    # st.session_state.analysis_run = False # DO NOT reset this here. It's controlled by the main flow.
     st.session_state.diagnosis_complete = False
     st.session_state.report_dict = {}
     st.session_state.ai_consolidated_report = None
@@ -375,7 +376,7 @@ def run_analysis(df_combined_input):
 
                 try:
                     if subject == 'Q':
-                        subj_results, subj_report, df_subj_diagnosed = run_q_diagnosis_processed(df_subj, time_pressure)
+                        subj_results, subj_report, df_subj_diagnosed = diagnose_q(df_subj)
                     elif subject == 'DI':
                         subj_results, subj_report, df_subj_diagnosed = run_di_diagnosis_processed(df_subj, time_pressure)
                     elif subject == 'V':
@@ -444,18 +445,24 @@ def run_analysis(df_combined_input):
     # --- Final Status Update ---
     if analysis_success and st.session_state.processed_df is not None:
         status_text.text("分析成功完成！")  # Update final status text
-        st.session_state.diagnosis_complete = True  # Mark diagnosis as done
+        st.session_state.diagnosis_complete = True
         st.session_state.error_message = None
+        st.session_state.analysis_error = False # Explicitly set on success
         st.balloons()  # Celebrate success
     else:
-        if analysis_success and st.session_state.processed_df is None:
+        # This block handles cases where analysis_success is False OR processed_df is None
+        if analysis_success and st.session_state.processed_df is None: # Succeeded but no data
             status_text.error("分析完成但未產生有效數據，請檢查輸入或診斷邏輯。")
-        elif not analysis_success:
-            if "準備開始分析" in status_text.text(""):  # Check if it's still initial text
-                status_text.error("分析過程中斷或失敗，請檢查上方錯誤訊息。")
+        elif not analysis_success: # Explicitly failed
+            # Check if status_text was ever updated beyond initial
+            current_status_text_value = status_text.text("") # Get current value by re-calling with empty
+            if "準備開始分析..." in current_status_text_value or not current_status_text_value.strip():
+                 status_text.error("分析過程中斷或失敗，請檢查上方錯誤訊息。")
+            # else: status_text already reflects the error step
 
-        st.session_state.diagnosis_complete = False  # Ensure it's False on error
-        st.session_state.error_message = "分析未能成功完成，請檢查上方錯誤訊息。"
+        st.session_state.diagnosis_complete = False
+        st.session_state.analysis_error = True # Set on failure
+        st.session_state.error_message = st.session_state.error_message or "分析未能成功完成，請檢查上方錯誤訊息。" # Preserve specific error if set
         st.session_state.theta_plots = {}  # Clear plots on error
 
     return analysis_success
@@ -465,9 +472,9 @@ def display_results():
     st.header("📊 診斷結果")
 
     if st.session_state.analysis_error:
-        st.error(st.session_state.error_message)
+        st.error(st.session_state.error_message or "分析過程中發生錯誤，請檢查。") # Fallback error message
     elif not st.session_state.diagnosis_complete:
-        st.info("分析正在進行中或尚未完成。")
+        st.info("分析正在進行中或尚未完成。請稍候或檢查是否有錯誤提示。") # More informative message
     elif st.session_state.processed_df is None or st.session_state.processed_df.empty:
         st.warning("診斷完成，但沒有可顯示的數據。")
         # Display any report messages even if df is empty (e.g., all invalid)
@@ -599,17 +606,28 @@ def main():
     
     # --- Analysis Execution Block ---
     if button_clicked and not button_disabled:
-        st.session_state.analysis_run = True
-        # Reset previous analysis outputs
-        reset_session_for_new_upload()
-        st.rerun()  # Rerun to enter the analysis block immediately
+        # This is a new analysis request
+        reset_session_for_new_upload() # Clear previous *results* and *completion status*
+        st.session_state.analysis_run = True # Mark that analysis should run *now*
+                                             # This flag will persist for the current script run
+                                             # to ensure results are displayed.
+        st.session_state.diagnosis_complete = False # Ensure it starts as not complete
+
+        if df_combined_input is not None:
+            st.header("2. 執行 IRT 模擬與診斷")
+            run_analysis(df_combined_input) # This will update diagnosis_complete and analysis_error
+        else:
+            # If there's no data, then analysis didn't really "run" in a meaningful way.
+            st.session_state.analysis_run = False 
+            st.warning("沒有合併的數據可以分析，無法啟動分析。")
     
-    if st.session_state.analysis_run and df_combined_input is not None and not st.session_state.diagnosis_complete:
-        st.header("2. 執行 IRT 模擬與診斷")
-        run_analysis(df_combined_input)
+    # Note: The elif block that was here for `st.session_state.analysis_run and not st.session_state.diagnosis_complete`
+    # has been removed as its primary utility was with st.rerun() for iterative display on slow steps.
+    # With the current synchronous call to run_analysis, this simplified structure should be sufficient.
     
     # --- Results Display ---
-    if st.session_state.analysis_run:  # Only show results area if analysis was at least started
+    # Show results if analysis_run was set to True by the button click (meaning an analysis was attempted)
+    if st.session_state.analysis_run:
         display_results()
     
     # --- Chat Interface ---
