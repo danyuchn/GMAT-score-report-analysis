@@ -84,7 +84,7 @@ def observe_patterns(df_v, v_time_pressure_status):
 def analyze_correct_slow(df_correct, question_type):
     """Analyzes correct but slow questions for Chapter 4."""
     # === DEBUG START - _analyze_correct_slow Entry ===
-    logging.info("[analyze_correct_slow - %s] Entry. Input df_correct shape: %s. Overtime counts:\n%s",
+    logging.debug("[analyze_correct_slow - %s] Entry. Input df_correct shape: %s. Overtime counts:\n%s",
                  question_type, df_correct.shape, df_correct['overtime'].value_counts().to_string() if 'overtime' in df_correct else "Overtime col missing")
     # === DEBUG END ===
     analysis = {
@@ -109,9 +109,8 @@ def analyze_correct_slow(df_correct, question_type):
     correct_slow_count = len(slow_correct_df)
     analysis['correct_slow_count'] = correct_slow_count
     # === DEBUG START - _analyze_correct_slow Count ===
-    logging.info("[analyze_correct_slow - %s] Filtered slow_correct_df shape: %s. Calculated correct_slow_count: %s",
+    logging.debug("[analyze_correct_slow - %s] Filtered slow_correct_df shape: %s. Calculated correct_slow_count: %s",
                  question_type, slow_correct_df.shape, correct_slow_count)
-    print(f"DEBUG PRINT: [analyze_correct_slow - {question_type}] Correct slow count: {correct_slow_count}")
     # === DEBUG END ===
 
     if total_correct > 0:
@@ -155,7 +154,7 @@ def analyze_correct_slow(df_correct, question_type):
             analysis['dominant_bottleneck_type'] = 'Skill data missing'
 
     # === DEBUG START - _analyze_correct_slow Return ===
-    logging.info("[analyze_correct_slow - %s] Returning analysis: %s", question_type, analysis)
+    logging.debug("[analyze_correct_slow - %s] Returning analysis: %s", question_type, analysis)
     # === DEBUG END ===
     return analysis
 
