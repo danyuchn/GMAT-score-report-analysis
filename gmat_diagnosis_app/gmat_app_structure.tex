@@ -27,14 +27,26 @@
   where nchildren>0{fill=orange!10, rounded corners=2pt}{},
 [gmat\_diagnosis\_app, name=root, folder, open
   [ {\textbf{app.py}\\{\scriptsize Path: app.py}\\{\scriptsize 主應用程式進入點 (Main application entry point)}} , tier=file]
+  [ {\textbf{analysis\_orchestrator.py}\\{\scriptsize Path: analysis\_orchestrator.py}\\{\scriptsize 分析協調器 (Analysis orchestrator)}} , tier=file]
   [ {\textbf{diagnosis\_module.py}\\{\scriptsize Path: diagnosis\_module.py}\\{\scriptsize 診斷主模組 (Main diagnosis module)}} , tier=file]
   [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: \_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
   [ {\textbf{irt\_module.py}\\{\scriptsize Path: irt\_module.py}\\{\scriptsize 項目反應理論模組 (Item Response Theory module)}} , tier=file]
   [ {\textbf{preprocess\_helpers.py}\\{\scriptsize Path: preprocess\_helpers.py}\\{\scriptsize 預處理輔助函數 (Preprocessing helper functions)}} , tier=file]
+  [ {\textbf{session\_manager.py}\\{\scriptsize Path: session\_manager.py}\\{\scriptsize 會話管理器 (Session manager)}} , tier=file]
+  [ {\textbf{README.md}\\{\scriptsize Path: README.md}\\{\scriptsize 專案說明文件 (Project README)}} , tier=file]
+  [analysis\_helpers, folder
+    [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: analysis\_helpers/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+    [ {\textbf{time\_analyzer.py}\\{\scriptsize Path: analysis\_helpers/time\_analyzer.py}\\{\scriptsize 時間分析器 (Time analyzer)}} , tier=file]
+  ]
   [constants, folder
     [ {\textbf{config.py}\\{\scriptsize Path: constants/config.py}\\{\scriptsize 配置設定 (Configuration settings)}} , tier=file]
     [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: constants/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+    [ {\textbf{thresholds.py}\\{\scriptsize Path: constants/thresholds.py}\\{\scriptsize 閾值設定 (Threshold settings)}} , tier=file]
     [ {\textbf{validation\_rules.py}\\{\scriptsize Path: constants/validation\_rules.py}\\{\scriptsize 驗證規則定義 (Validation rules definition)}} , tier=file]
+  ]
+  [data\_validation, folder
+    [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: data\_validation/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+    [ {\textbf{invalid\_suggestion.py}\\{\scriptsize Path: data\_validation/invalid\_suggestion.py}\\{\scriptsize 無效建議處理 (Invalid suggestion handling)}} , tier=file]
   ]
   [diagnostics, folder
     [ {\textbf{di\_diagnostic.py}\\{\scriptsize Path: diagnostics/di\_diagnostic.py}\\{\scriptsize DI (Data Insights) 診斷協調器 (DI diagnostic coordinator)}} , tier=file]
@@ -77,6 +89,11 @@
     [ {\textbf{plotting\_service.py}\\{\scriptsize Path: services/plotting\_service.py}\\{\scriptsize 繪圖服務 (Plotting service)}} , tier=file]
     [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: services/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
   ]
+  [subject\_preprocessing, folder
+    [ {\textbf{di\_preprocessor.py}\\{\scriptsize Path: subject\_preprocessing/di\_preprocessor.py}\\{\scriptsize DI 預處理器 (DI preprocessor)}} , tier=file]
+    [ {\textbf{verbal\_preprocessor.py}\\{\scriptsize Path: subject\_preprocessing/verbal\_preprocessor.py}\\{\scriptsize Verbal 預處理器 (Verbal preprocessor)}} , tier=file]
+    [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: subject\_preprocessing/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+  ]
   [ui, folder
     [ {\textbf{chat\_interface.py}\\{\scriptsize Path: ui/chat\_interface.py}\\{\scriptsize 聊天介面元件 (Chat interface component)}} , tier=file]
     [ {\textbf{input\_tabs.py}\\{\scriptsize Path: ui/input\_tabs.py}\\{\scriptsize 輸入頁籤元件 (Input tabs component)}} , tier=file]
@@ -86,6 +103,7 @@
   [utils, folder
     [ {\textbf{data\_processing.py}\\{\scriptsize Path: utils/data\_processing.py}\\{\scriptsize 通用資料處理 (General data processing)}} , tier=file]
     [ {\textbf{excel\_utils.py}\\{\scriptsize Path: utils/excel\_utils.py}\\{\scriptsize Excel 操作工具 (Excel utilities)}} , tier=file]
+    [ {\textbf{parsing\_utils.py}\\{\scriptsize Path: utils/parsing\_utils.py}\\{\scriptsize 解析工具 (Parsing utilities)}} , tier=file]
     [ {\textbf{styling.py}\\{\scriptsize Path: utils/styling.py}\\{\scriptsize 樣式相關工具 (Styling utilities)}} , tier=file]
     [ {\textbf{validation.py}\\{\scriptsize Path: utils/validation.py}\\{\scriptsize 資料驗證工具 (Data validation utilities)}} , tier=file]
     [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: utils/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
