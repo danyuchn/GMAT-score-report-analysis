@@ -314,7 +314,9 @@ def initialize_question_bank(num_questions=1000, seed=None):
     # question_bank.set_index('id', inplace=True)
     return question_bank
 
-def simulate_cat_exam(question_bank, wrong_question_positions, initial_theta, total_questions, theta_bounds=(-4, 4)):
+def simulate_cat_exam(question_bank, wrong_question_positions, initial_theta, total_questions, theta_bounds=(-4, 4),
+                        incorrect_to_correct_qns: set[int] = None, 
+                        correct_to_incorrect_qns: set[int] = None):
     """Simulates a Computerized Adaptive Test (CAT) exam section.
 
     Args:
@@ -324,6 +326,8 @@ def simulate_cat_exam(question_bank, wrong_question_positions, initial_theta, to
         initial_theta (float): Starting ability estimate.
         total_questions (int): Number of questions to administer.
         theta_bounds (tuple, optional): Bounds for theta estimation.
+        incorrect_to_correct_qns (set[int], optional): Set of 1-based question positions to be treated as correct for IRT.
+        correct_to_incorrect_qns (set[int], optional): Set of 1-based question positions to be treated as incorrect for IRT.
 
     Returns:
         pd.DataFrame: Simulation history, or empty DataFrame on failure.
@@ -359,7 +363,15 @@ def simulate_cat_exam(question_bank, wrong_question_positions, initial_theta, to
     results_log = [] # Stores more detailed info for the final output DataFrame
     theta_est = initial_theta
 
+    # Initialize adjustment sets safely
+    effective_i_to_c = incorrect_to_correct_qns if incorrect_to_correct_qns is not None else set()
+    effective_c_to_i = correct_to_incorrect_qns if correct_to_incorrect_qns is not None else set()
+
     logger.debug(f"Starting CAT simulation: Initial Theta = {theta_est:.3f}, Total Questions = {total_questions}")
+    if effective_i_to_c:
+        logger.debug(f"  Adjusting to CORRECT: Positions {effective_i_to_c}")
+    if effective_c_to_i:
+        logger.debug(f"  Adjusting to INCORRECT: Positions {effective_c_to_i}")
 
     # --- Simulation Loop ---
     for i in range(total_questions):
@@ -375,8 +387,17 @@ def simulate_cat_exam(question_bank, wrong_question_positions, initial_theta, to
         # Get question parameters using the selected ID (index)
         question_params = remaining_questions_df.loc[next_q_id]
 
-        # Determine correctness based on *position*
-        answered_correctly = question_number not in wrong_question_positions
+        # Determine correctness based on *position* and adjustments
+        original_answered_correctly = question_number not in wrong_question_positions
+        
+        # Apply adjustments
+        answered_correctly = original_answered_correctly
+        if question_number in effective_i_to_c:
+            answered_correctly = True
+            logger.debug(f"  Q {question_number} (ID={next_q_id}): Original correct={original_answered_correctly}, Adjusted to CORRECT.")
+        if question_number in effective_c_to_i: # This will override i_to_c if qn is in both
+            answered_correctly = False
+            logger.debug(f"  Q {question_number} (ID={next_q_id}): Original correct={original_answered_correctly}, Adjusted to INCORRECT.")
 
         # Prepare response info for history (used in theta estimation)
         # Ensure keys match neg_log_likelihood requirements

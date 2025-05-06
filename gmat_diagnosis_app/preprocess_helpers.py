@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import math
 import warnings # Use warnings module instead of print
+import re # Import re for parsing question numbers
 
 # --- Centralized Thresholds and Constants ---
 THRESHOLDS = {
@@ -47,6 +48,36 @@ THRESHOLDS = {
         }
     }
 }
+
+# --- Helper function for parsing adjusted question numbers ---
+def parse_adjusted_qns(qns_string: str) -> set[int]:
+    """
+    Parses a comma-separated string of question numbers into a set of integers.
+
+    Args:
+        qns_string: A string containing comma-separated question numbers.
+                    Example: "1, 5, 10, 23"
+
+    Returns:
+        A set of unique integer question numbers.
+        Returns an empty set if the input string is empty, None, or contains no valid numbers.
+        Logs a warning for non-integer values.
+    """
+    if not qns_string or not qns_string.strip():
+        return set()
+
+    parsed_qns = set()
+    # Regex to find all numbers, handles extra spaces and non-numeric parts gracefully
+    potential_qns = re.findall(r'\d+', qns_string)
+
+    for qn_str in potential_qns:
+        try:
+            # The regex findall should already give us digits, but int() is a final check
+            parsed_qns.add(int(qn_str))
+        except ValueError:
+            # This case should be rare due to re.findall(r'\d+'), but good for safety
+            warnings.warn(f"無效的題號 '{qn_str}' 在字串 '{qns_string}' 中被忽略。", UserWarning, stacklevel=2)
+    return parsed_qns
 
 # --- Invalid Question Suggestion ---
 
