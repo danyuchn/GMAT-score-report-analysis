@@ -87,21 +87,32 @@ def _calculate_msr_metrics(df):
        Assumes MSR questions are grouped by a 'msr_group_id' column.
        Adds 'msr_group_total_time', 'msr_reading_time', and 'is_first_msr_q' columns.
     """
+    # logging.debug(f"[_calculate_msr_metrics] Input df shape: {df.shape}")
     if df.empty or 'msr_group_id' not in df.columns or 'question_time' not in df.columns:
+        # logging.debug("[_calculate_msr_metrics] Input df empty or missing required columns. Initializing MSR columns to NaN/False.")
         df['msr_group_total_time'] = np.nan
         df['msr_reading_time'] = np.nan
         df['is_first_msr_q'] = False # Initialize column
         return df
 
     df_msr = df[df['question_type'] == 'Multi-source reasoning'].copy()
+    # logging.debug(f"[_calculate_msr_metrics] df_msr shape: {df_msr.shape}")
     if df_msr.empty:
+        # logging.debug("[_calculate_msr_metrics] No MSR rows found. Initializing MSR columns to NaN/False.")
         df['msr_group_total_time'] = np.nan
         df['msr_reading_time'] = np.nan
         df['is_first_msr_q'] = False # Initialize column even if no MSR
         return df
 
     group_times = df_msr.groupby('msr_group_id')['question_time'].sum()
-    df_msr['msr_group_total_time'] = df_msr['msr_group_id'].map(group_times)
+    # logging.debug(f"[_calculate_msr_metrics] Calculated group_times series (len: {len(group_times)}):\\n{group_times.head()}")
+    # Assignment 1: Map group times
+    try:
+        # logging.debug(f"[_calculate_msr_metrics] Assigning 'msr_group_total_time'. df_msr shape: {df_msr.shape}, map series len: {len(df_msr['msr_group_id'].map(group_times))}")
+        df_msr['msr_group_total_time'] = df_msr['msr_group_id'].map(group_times)
+    except Exception as e:
+        logging.error(f"[_calculate_msr_metrics] Error assigning 'msr_group_total_time': {e}", exc_info=True)
+        raise e
 
     reading_times = {}
     first_q_indices = set()
@@ -122,14 +133,50 @@ def _calculate_msr_metrics(df):
         elif len(group_df_sorted) == 1:
              reading_times[first_q_index] = np.nan
 
-    df_msr['msr_reading_time'] = df_msr.index.map(reading_times)
-    df_msr['is_first_msr_q'] = df_msr.index.isin(first_q_indices)
+    # Assignment 2: Map reading times
+    try:
+        reading_times_series = df_msr.index.map(reading_times)
+        # logging.debug(f"[_calculate_msr_metrics] Assigning 'msr_reading_time'. df_msr shape: {df_msr.shape}, reading_times_series len: {len(reading_times_series)}")
+        df_msr['msr_reading_time'] = reading_times_series
+    except Exception as e:
+        logging.error(f"[_calculate_msr_metrics] Error assigning 'msr_reading_time': {e}", exc_info=True)
+        raise e
 
-    df = df.merge(df_msr[['msr_group_total_time', 'msr_reading_time', 'is_first_msr_q']], left_index=True, right_index=True, how='left')
-    df['is_first_msr_q'].fillna(False, inplace=True)
-    # Fill NaN for MSR times for robustness, although merge 'left' should handle non-MSR
-    df['msr_group_total_time'].fillna(np.nan, inplace=True)
-    df['msr_reading_time'].fillna(np.nan, inplace=True)
+    # Assignment 3: Assign boolean for first MSR question
+    try:
+        is_first_q_series = df_msr.index.isin(first_q_indices)
+        # logging.debug(f"[_calculate_msr_metrics] Assigning 'is_first_msr_q'. df_msr shape: {df_msr.shape}, is_first_q_series len: {len(is_first_q_series)}")
+        df_msr['is_first_msr_q'] = is_first_q_series
+    except Exception as e:
+        logging.error(f"[_calculate_msr_metrics] Error assigning 'is_first_msr_q': {e}", exc_info=True)
+        raise e
+
+    # Assignment 4: Merge back into original df
+    df_to_merge = df_msr[['msr_group_total_time', 'msr_reading_time', 'is_first_msr_q']]
+    # logging.debug(f"[_calculate_msr_metrics] Merging MSR columns back. Original df shape: {df.shape}, df_to_merge shape: {df_to_merge.shape}")
+    try:
+        df = df.merge(df_to_merge, left_index=True, right_index=True, how='left')
+    except Exception as e:
+        logging.error(f"[_calculate_msr_metrics] Error merging MSR columns: {e}", exc_info=True)
+        raise e
+    # logging.debug(f"[_calculate_msr_metrics] df shape after merge: {df.shape}")
+
+    # Fill NaNs added by merge
+    try:
+        # logging.debug("[_calculate_msr_metrics] Filling NaNs for 'is_first_msr_q' after merge.")
+        # df['is_first_msr_q'].fillna(False, inplace=True)
+        df['is_first_msr_q'] = df['is_first_msr_q'].fillna(False)
+        # logging.debug("[_calculate_msr_metrics] Filling NaNs for 'msr_group_total_time' after merge.")
+        # df['msr_group_total_time'].fillna(np.nan, inplace=True)
+        df['msr_group_total_time'] = df['msr_group_total_time'].fillna(np.nan)
+        # logging.debug("[_calculate_msr_metrics] Filling NaNs for 'msr_reading_time' after merge.")
+        # df['msr_reading_time'].fillna(np.nan, inplace=True)
+        df['msr_reading_time'] = df['msr_reading_time'].fillna(np.nan)
+    except Exception as e:
+        logging.error(f"[_calculate_msr_metrics] Error filling NaNs after merge: {e}", exc_info=True)
+        raise e
+
+    # logging.debug(f"[_calculate_msr_metrics] Returning df shape: {df.shape}")
     return df
 
 
@@ -151,350 +198,416 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
     """
     # logging.info("開始DI診斷處理...") # Removed
     di_diagnosis_results = {}
+    report_str = "Data Insights (DI) 診斷過程中發生錯誤。"
+    df_to_return = pd.DataFrame() # Default empty DataFrame
+    empty_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type',
+                  'question_fundamental_skill', 'content_domain', 'Subject', 'is_invalid',
+                  'overtime', 'suspiciously_fast', 'msr_group_id', 'msr_group_total_time',
+                  'msr_reading_time', 'is_first_msr_q', 'is_sfe',
+                  'time_performance_category', 'diagnostic_params_list']
 
-    if df_di_processed.empty:
-        empty_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type',
-                      'question_fundamental_skill', 'content_domain', 'Subject', 'is_invalid',
-                      'overtime', 'suspiciously_fast', 'msr_group_id', 'msr_group_total_time',
-                      'msr_reading_time', 'is_first_msr_q', 'is_sfe',
-                      'time_performance_category', 'diagnostic_params_list']
+    try: # --- Start Main Try Block ---
+        if df_di_processed.empty:
+            report_str = "Data Insights (DI) 部分無數據可供診斷。"
+            df_to_return = pd.DataFrame(columns=empty_cols)
+            if 'Subject' not in df_to_return.columns:
+                df_to_return['Subject'] = 'DI'
+            logging.info("[run_di_diagnosis_processed] Input DataFrame is empty.")
+            return {}, report_str, df_to_return
+
+        df_di = df_di_processed.copy()
+        logging.debug(f"[run_di_diagnosis_processed] Starting diagnosis. Input df shape: {df_di.shape}")
+
+        # --- Chapter 0: Derivative Data Calculation & Basic Prep ---
+        logging.debug("[run_di_diagnosis_processed] Chapter 0: Basic Prep")
+        df_di['question_time'] = pd.to_numeric(df_di['question_time'], errors='coerce')
+        if 'question_position' not in df_di.columns: df_di['question_position'] = range(len(df_di))
+        else: df_di['question_position'] = pd.to_numeric(df_di['question_position'], errors='coerce')
+        if 'is_correct' not in df_di.columns: df_di['is_correct'] = True
+        else: df_di['is_correct'] = df_di['is_correct'].astype(bool)
+        if 'question_type' not in df_di.columns: df_di['question_type'] = 'Unknown Type'
+        if 'msr_group_id' not in df_di.columns:
+            logging.warning("[run_di_diagnosis_processed] 'msr_group_id' column missing. MSR metrics will be NaN.")
+            df_di['msr_group_id'] = np.nan # Ensure column exists even if empty
+        if 'is_invalid' not in df_di.columns:
+            df_di['is_invalid'] = False
+
+        df_di = _calculate_msr_metrics(df_di)
+        logging.debug(f"[run_di_diagnosis_processed] After _calculate_msr_metrics, df shape: {df_di.shape}")
+
+        # --- Chapter 1: Time Strategy & Validity ---
+        logging.debug("[run_di_diagnosis_processed] Chapter 1: Time Strategy & Validity")
+        total_test_time_di = df_di['question_time'].sum(skipna=True) # Ensure NaNs are skipped
+        time_diff = MAX_ALLOWED_TIME_DI - total_test_time_di
+
+        num_invalid_questions_total = df_di['is_invalid'].sum()
+        di_diagnosis_results['invalid_count'] = num_invalid_questions_total
+
+        # Initialize diagnostic_params if needed
+        if 'diagnostic_params' not in df_di.columns:
+            # Assignment 5: Initialize diagnostic_params list
+            try:
+                logging.debug(f"[run_di_diagnosis_processed] Initializing 'diagnostic_params'. df_di shape: {df_di.shape}, length of list: {len(df_di)}")
+                df_di['diagnostic_params'] = [[] for _ in range(len(df_di))]
+            except Exception as e:
+                logging.error(f"[run_di_diagnosis_processed] Error initializing 'diagnostic_params': {e}", exc_info=True)
+                raise e
+        else:
+            # Ensure it's a mutable list
+            # Assignment 6: Ensure diagnostic_params is list
+            try:
+                logging.debug(f"[run_di_diagnosis_processed] Ensuring 'diagnostic_params' is list. df_di shape: {df_di.shape}")
+                df_di['diagnostic_params'] = df_di['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, set, tuple)) else [])
+            except Exception as e:
+                logging.error(f"[run_di_diagnosis_processed] Error ensuring 'diagnostic_params' is list: {e}", exc_info=True)
+                raise e
+
+        # Add invalid tag
+        final_invalid_mask_di = df_di['is_invalid']
+        if final_invalid_mask_di.any():
+            # Assignment 7: Update diagnostic_params for invalid rows (loop)
+            logging.debug(f"[run_di_diagnosis_processed] Updating 'diagnostic_params' for invalid rows. df_di shape: {df_di.shape}, number invalid: {final_invalid_mask_di.sum()}")
+            for idx in df_di.index[final_invalid_mask_di]:
+                try:
+                    current_list = df_di.loc[idx, 'diagnostic_params']
+                    if not isinstance(current_list, list): current_list = []
+                    if INVALID_DATA_TAG_DI not in current_list:
+                        current_list.append(INVALID_DATA_TAG_DI)
+                    # This assignment is within a loop, less likely the direct cause but good to be aware
+                    df_di.loc[idx, 'diagnostic_params'] = current_list
+                except Exception as e:
+                    logging.error(f"[run_di_diagnosis_processed] Error updating 'diagnostic_params' for invalid row index {idx}: {e}", exc_info=True)
+                    # Decide if we should raise e or just log and continue
+                    continue # Log and continue to next invalid row
+
+        # --- Mark Overtime (Vectorized Approach) ---
+        # Assignment 8: Initialize overtime column
+        try:
+            logging.debug(f"[run_di_diagnosis_processed] Initializing 'overtime' column. df_di shape: {df_di.shape}")
+            df_di['overtime'] = False
+        except Exception as e:
+            logging.error(f"[run_di_diagnosis_processed] Error initializing 'overtime': {e}", exc_info=True)
+            raise e
+
+        thresholds = OVERTIME_THRESHOLDS[di_time_pressure_status]
+        
+        # Define masks for non-invalid rows
+        valid_mask = ~df_di['is_invalid']
+        
+        # --- Non-MSR Overtime ---
+        # TPA
+        tpa_mask = valid_mask & ((df_di['question_type'] == 'Two-part analysis') | (df_di['question_type'] == 'TPA'))
+        tpa_over_mask = tpa_mask & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['TPA'])
+        
+        # GT
+        gt_mask = valid_mask & ((df_di['question_type'] == 'Graph and Table') | (df_di['question_type'] == 'GT'))
+        gt_over_mask = gt_mask & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['GT'])
+        
+        # DS
+        ds_mask = valid_mask & ((df_di['question_type'] == 'Data Sufficiency') | (df_di['question_type'] == 'DS'))
+        ds_over_mask = ds_mask & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['DS'])
+
+        # --- MSR Overtime ---
+        msr_mask = valid_mask & ((df_di['question_type'] == 'Multi-source reasoning') | (df_di['question_type'] == 'MSR'))
+        
+        # 1. Group Overtime
+        msr_group_over = msr_mask & df_di['msr_group_total_time'].notna() & \
+                         (df_di['msr_group_total_time'] > thresholds['MSR_GROUP'])
+
+        # 2. Reading Overtime (First Q, if Group not Overtime)
+        msr_reading_over = msr_mask & (~msr_group_over) & \
+                           df_di['is_first_msr_q'] & df_di['msr_reading_time'].notna() & \
+                           (df_di['msr_reading_time'] > thresholds['MSR_READING'])
+
+        # 3. Adjusted Single Q Overtime (First Q, if Group/Reading not Overtime)
+        # Calculate adjusted time safely
+        adj_time = df_di['question_time'] - df_di['msr_reading_time']
+        msr_adj_first_over = msr_mask & (~msr_group_over) & (~msr_reading_over) & \
+                             df_di['is_first_msr_q'] & \
+                             df_di['msr_reading_time'].notna() & df_di['question_time'].notna() & \
+                             adj_time.notna() & \
+                             (adj_time > thresholds['MSR_SINGLE_Q'])
+
+        # 4. Single Q Overtime (Non-First Q, if Group not Overtime)
+        msr_non_first_over = msr_mask & (~msr_group_over) & \
+                             (~df_di['is_first_msr_q']) & df_di['question_time'].notna() & \
+                             (df_di['question_time'] > thresholds['MSR_SINGLE_Q'])
+
+        # Combine all MSR overtime conditions
+        msr_over_mask = msr_group_over | msr_reading_over | msr_adj_first_over | msr_non_first_over
+        
+        # --- Combine all Overtime conditions ---
+        # Ensure only valid rows are considered by applying valid_mask implicitly through component masks
+        overall_overtime_mask = tpa_over_mask | gt_over_mask | ds_over_mask | msr_over_mask
+        
+        # Apply the final mask to set the 'overtime' column
+        df_di.loc[overall_overtime_mask, 'overtime'] = True
+        logging.debug(f"[run_di_diagnosis_processed] Overtime calculated. Count: {df_di['overtime'].sum()}")
+        # --- End Vectorized Overtime ---
+
+        # Store Chapter 1 results (moved inside try block)
+        di_diagnosis_results['chapter_1'] = {
+            'total_test_time_minutes': total_test_time_di,
+            'time_difference_minutes': time_diff,
+            'time_pressure': di_time_pressure_status,
+            'invalid_questions_excluded': num_invalid_questions_total,
+            'overtime_thresholds_minutes': thresholds
+        }
+
+        # Create filtered dataset for subsequent chapters
+        df_di_filtered = df_di[~df_di['is_invalid']].copy() # Use ~is_invalid
+        logging.debug(f"[run_di_diagnosis_processed] Created df_di_filtered. Shape: {df_di_filtered.shape}")
+
+        # --- Chapter 2: Multidimensional Performance Analysis ---
+        logging.debug("[run_di_diagnosis_processed] Chapter 2: Performance Analysis")
+        domain_analysis = {}
+        type_analysis = {}
+        difficulty_analysis = {}
+        domain_comparison_tags = {
+            'poor_math_related': False, 'slow_math_related': False,
+            'poor_non_math_related': False, 'slow_non_math_related': False,
+            'significant_diff_error': False, 'significant_diff_overtime': False
+        }
+
+        if not df_di_filtered.empty:
+            if 'content_domain' in df_di_filtered.columns:
+                domain_analysis = _analyze_dimension(df_di_filtered, 'content_domain')
+                math_metrics = domain_analysis.get('Math Related', {})
+                non_math_metrics = domain_analysis.get('Non-Math Related', {})
+                math_errors = math_metrics.get('errors', 0)
+                non_math_errors = non_math_metrics.get('errors', 0)
+                math_overtime = math_metrics.get('overtime', 0)
+                non_math_overtime = non_math_metrics.get('overtime', 0)
+
+                if abs(math_errors - non_math_errors) >= 2:
+                    domain_comparison_tags['significant_diff_error'] = True
+                    domain_comparison_tags['poor_math_related'] = math_errors > non_math_errors
+                    domain_comparison_tags['poor_non_math_related'] = non_math_errors > math_errors
+
+                if abs(math_overtime - non_math_overtime) >= 2:
+                     domain_comparison_tags['significant_diff_overtime'] = True
+                     domain_comparison_tags['slow_math_related'] = math_overtime > non_math_overtime
+                     domain_comparison_tags['slow_non_math_related'] = non_math_overtime > math_overtime
+
+            if 'question_type' in df_di_filtered.columns:
+                type_analysis = _analyze_dimension(df_di_filtered, 'question_type')
+
+            if 'question_difficulty' in df_di_filtered.columns:
+                df_di_filtered['difficulty_grade'] = df_di_filtered['question_difficulty'].apply(_grade_difficulty_di)
+                difficulty_analysis = _analyze_dimension(df_di_filtered, 'difficulty_grade')
+
+        di_diagnosis_results['chapter_2'] = {
+            'by_domain': domain_analysis,
+            'by_type': type_analysis,
+            'by_difficulty': difficulty_analysis,
+            'domain_comparison_tags': domain_comparison_tags
+        }
+        logging.debug("[run_di_diagnosis_processed] Completed Chapter 2.")
+
+        # --- Chapter 3: Root Cause Diagnosis ---
+        logging.debug("[run_di_diagnosis_processed] Chapter 3: Root Cause Diagnosis")
+        if not df_di_filtered.empty and 'question_type' in df_di_filtered.columns:
+            avg_time_per_type = df_di_filtered.groupby('question_type')['question_time'].mean().to_dict()
+            max_correct_difficulty_per_combination = pd.DataFrame() # Init empty
+            if 'content_domain' in df_di_filtered.columns and 'question_difficulty' in df_di_filtered.columns:
+                 correct_rows = df_di_filtered['is_correct'] == True
+                 if correct_rows.any(): # Ensure there are correct rows before grouping
+                     max_correct_difficulty_per_combination = df_di_filtered[correct_rows].groupby(
+                         ['question_type', 'content_domain']
+                     )['question_difficulty'].max().unstack(fill_value=-np.inf)
+
+            # 確保time_performance_category列存在初始值
+            if 'time_performance_category' not in df_di_filtered.columns:
+                df_di_filtered['time_performance_category'] = 'Unknown'
+
+            df_di_filtered = _diagnose_root_causes(df_di_filtered, avg_time_per_type, max_correct_difficulty_per_combination, thresholds)
+
+            di_diagnosis_results['chapter_3'] = {
+                'diagnosed_dataframe': df_di_filtered.copy(), # Store a copy
+                'avg_time_per_type_minutes': avg_time_per_type,
+                'max_correct_difficulty': max_correct_difficulty_per_combination.to_dict() if not max_correct_difficulty_per_combination.empty else {}
+            }
+        logging.debug("[run_di_diagnosis_processed] Completed Chapter 3.")
+
+        # --- Chapter 4: Special Pattern Observation ---
+        logging.debug("[run_di_diagnosis_processed] Chapter 4: Special Patterns")
+        avg_times_ch3 = di_diagnosis_results.get('chapter_3', {}).get('avg_time_per_type_minutes', {})
+        # Pass the potentially modified df from Ch3
+        df_ch3_diagnosed = di_diagnosis_results['chapter_3']['diagnosed_dataframe']
+        # Operate on a copy if _observe_di_patterns modifies in place, or ensure it returns modified df
+        df_for_ch4 = df_ch3_diagnosed.copy()
+        pattern_analysis_results = _observe_di_patterns(df_for_ch4, avg_times_ch3) # Assume modifies df_for_ch4
+        di_diagnosis_results['chapter_4'] = pattern_analysis_results
+        logging.debug("[run_di_diagnosis_processed] Completed Chapter 4.")
+
+        # --- Chapter 5: Foundation Ability Override Rule ---
+        logging.debug("[run_di_diagnosis_processed] Chapter 5: Override Rule")
+        type_analysis_ch2 = di_diagnosis_results.get('chapter_2', {}).get('by_type', {})
+        # Use the potentially modified df from Ch4
+        override_analysis = _check_foundation_override(df_for_ch4, type_analysis_ch2)
+        di_diagnosis_results['chapter_5'] = override_analysis
+        logging.debug("[run_di_diagnosis_processed] Completed Chapter 5.")
+
+        # --- Chapter 6: Practice Planning & Recommendations ---
+        logging.debug("[run_di_diagnosis_processed] Chapter 6: Recommendations")
+        # Use the potentially modified df from Ch4/Ch5
+        diagnosed_df_ch4_ch5 = df_for_ch4
+        domain_tags_ch2 = di_diagnosis_results.get('chapter_2', {}).get('domain_comparison_tags', {})
+        override_analysis_ch5 = di_diagnosis_results.get('chapter_5', {})
+
+        recommendations = []
+        if not diagnosed_df_ch4_ch5.empty:
+            recommendations = _generate_di_recommendations(diagnosed_df_ch4_ch5, override_analysis_ch5, domain_tags_ch2)
+        di_diagnosis_results['chapter_6'] = {'recommendations_list': recommendations}
+        logging.debug("[run_di_diagnosis_processed] Completed Chapter 6.")
+
+        # --- Chapter 7: Summary Report Generation ---
+        logging.debug("[run_di_diagnosis_processed] Chapter 7: Summary Report")
+        # Ensure the latest df (after Ch4 modifications) is used for the report
+        di_diagnosis_results['chapter_3']['diagnosed_dataframe'] = diagnosed_df_ch4_ch5.copy()
+        report_str = _generate_di_summary_report(di_diagnosis_results)
+        logging.debug("[run_di_diagnosis_processed] Completed Chapter 7 (Report Generation).")
+
+        # --- Final DataFrame Preparation ---
+        logging.debug("[run_di_diagnosis_processed] Final DataFrame Preparation")
+        # Start with the original DataFrame containing all rows (including invalid)
+        df_base = df_di.copy()
+        # Select only the diagnostic columns we calculated on the filtered data
+        diagnostic_cols_to_merge = [] 
+        if diagnosed_df_ch4_ch5 is not None and not diagnosed_df_ch4_ch5.empty:
+            potential_cols = ['diagnostic_params', 'is_sfe', 'time_performance_category']
+            diagnostic_cols_to_merge = [col for col in potential_cols if col in diagnosed_df_ch4_ch5.columns]
+
+        if diagnostic_cols_to_merge:
+            # Merge diagnostic columns from the filtered/diagnosed df back to the base df
+            # Merge on index, keep all rows from the base df ('left' merge)
+            # logging.info(f"DI DEBUG: Before merge - df_base columns: {df_base.columns.tolist()}") # Removed
+            # logging.info(f"DI DEBUG: Before merge - diagnosed_df_ch4_ch5 columns: {diagnosed_df_ch4_ch5.columns.tolist()}") # Removed
+            # logging.info(f"DI DEBUG: Before merge - Columns to merge: {diagnostic_cols_to_merge}") # Removed
+            df_merged = pd.merge(
+                df_base,
+                diagnosed_df_ch4_ch5[diagnostic_cols_to_merge], # Only select the columns to merge
+                left_index=True,
+                right_index=True,
+                how='left', # Keep all rows from df_base
+                suffixes=('', '_diag') # Add suffix in case of potential name conflicts
+            )
+            # Check if merge created duplicate columns (e.g., time_performance_category_diag)
+            # Prioritize the _diag version if it exists
+            for col in diagnostic_cols_to_merge:
+                diag_col = col + '_diag'
+                if diag_col in df_merged.columns:
+                    # Use the merged value (_diag), potentially overwriting original or filling NaNs
+                    df_merged[col] = df_merged[diag_col]
+                    df_merged.drop(columns=[diag_col], inplace=True)
+                    # logging.info(f"Prioritized merged column '{col}' from '{diag_col}'.") # Removed
+
+            df_to_return = df_merged # Use the merged result
+            # logging.info(f"Merged diagnostic columns: {diagnostic_cols_to_merge}") # Removed
+            # Removed logging block for time_perf after merge
+
+        else:
+            # If no diagnostic columns were calculated (e.g., filtered df was empty)
+            df_to_return = df_base
+            # logging.warning("No diagnostic columns found to merge back.") # Removed
+
+        # Translate params (now operating on the potentially merged df_to_return)
+        if 'diagnostic_params' in df_to_return.columns:
+            # Ensure list type after potential merge (NaNs might appear for rows not in diagnosed_df)
+            df_to_return['diagnostic_params'] = df_to_return['diagnostic_params'].apply(
+                lambda x: list(x) if isinstance(x, (list, tuple, set)) else ([] if pd.isna(x) else [x] if isinstance(x, str) else [])
+            )
+            df_to_return['diagnostic_params_list_chinese'] = df_to_return['diagnostic_params'].apply(
+                lambda params_list: _translate_di(params_list)
+            )
+            # Safely drop and rename
+            # if 'diagnostic_params' in df_to_return.columns: df_to_return.drop(columns=['diagnostic_params'], inplace=True)
+            if 'diagnostic_params' in df_to_return.columns: df_to_return = df_to_return.drop(columns=['diagnostic_params'])
+            # if 'diagnostic_params_list_chinese' in df_to_return.columns: df_to_return.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
+            if 'diagnostic_params_list_chinese' in df_to_return.columns: df_to_return = df_to_return.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'})
+        else:
+            # Initialize if missing entirely
+            df_to_return['diagnostic_params_list'] = [[] for _ in range(len(df_to_return))]
+
+        # --- Refined fillna logic --- 
+        # 1. Ensure the time_performance_category column exists, default to 'Unknown'
+        if 'time_performance_category' not in df_to_return.columns:
+            df_to_return['time_performance_category'] = 'Unknown'
+            # logging.info("Initialized 'time_performance_category' column as 'Unknown'.") # Removed
+        
+        # 2. Fill NaNs potentially introduced by the merge (for rows NOT diagnosed) with 'Unknown'
+        # Also ensure empty strings are treated as 'Unknown'
+        df_to_return['time_performance_category'] = df_to_return['time_performance_category'].fillna('Unknown').replace('', 'Unknown')
+        # logging.info(f"After fillna/replace('Unknown'): unique values: {df_to_return['time_performance_category'].unique()}") # Removed
+
+        # 3. Specifically set 'Invalid/Excluded' for rows marked as invalid
+        if 'is_invalid' in df_to_return.columns:
+            invalid_mask = df_to_return['is_invalid'] == True
+            if invalid_mask.any():
+                df_to_return.loc[invalid_mask, 'time_performance_category'] = 'Invalid/Excluded'
+                # logging.info(f"Set 'Invalid/Excluded' for {invalid_mask.sum()} rows. Final unique values: {df_to_return['time_performance_category'].unique()}") # Removed
+
+        # Handle potential NaNs in 'is_sfe' after merge
+        if 'is_sfe' in df_to_return.columns:
+            # df_to_return['is_sfe'].fillna(False, inplace=True)
+            df_to_return['is_sfe'] = df_to_return['is_sfe'].fillna(False)
+            df_to_return['is_sfe'] = df_to_return['is_sfe'].astype(bool)
+        else:
+            df_to_return['is_sfe'] = False # Initialize if missing
+        
+        # Ensure Subject column exists
+        if 'Subject' not in df_to_return.columns:
+            df_to_return['Subject'] = 'DI'
+        else:
+             df_to_return['Subject'] = 'DI' # Force correct value
+
+        # Final check for overtime column existence (should be fine as we start with df_di)
+        if 'overtime' not in df_to_return.columns:
+            logging.warning("[run_di_diagnosis_processed] 'overtime' column missing before return. Initializing to False.")
+            df_to_return['overtime'] = False # Should not happen now
+
+        # Fill NaNs in diagnostic columns for invalid rows if introduced by update/merge
+        cols_to_fill_na = ['is_sfe', 'time_performance_category'] # Add others if needed
+        fill_values = {'is_sfe': False, 'time_performance_category': 'Invalid/Excluded'}
+        for col in cols_to_fill_na:
+            if col in df_to_return.columns:
+                # df_to_return[col].fillna(fill_values.get(col, 'Unknown'), inplace=True)
+                df_to_return[col] = df_to_return[col].fillna(fill_values.get(col, 'Unknown'))
+
+        # Ensure is_invalid column is boolean
+        if 'is_invalid' in df_to_return.columns:
+            df_to_return['is_invalid'] = df_to_return['is_invalid'].astype(bool)
+        else:
+            df_to_return['is_invalid'] = False # Should exist from input
+
+        # --- Remove DEBUG START ---
+        # print(f"DEBUG (DI): Before return - Invalid rows in df_to_return: {df_to_return['is_invalid'].sum()}")
+        # if 'is_invalid' in df_to_return.columns and df_to_return['is_invalid'].sum() > 0:
+        #     print(f"DEBUG (DI): Before return - Invalid rows index: {df_to_return[df_to_return['is_invalid']].index.tolist()}")
+        # --- Remove DEBUG END ---
+
+        # 在return前最後記錄狀態
+        # Removed logging block before return
+        # logging.info("DI診斷處理完成。") # Removed
+        logging.debug(f"[run_di_diagnosis_processed] Final df_di shape before return: {df_to_return.shape}")
+        logging.debug(f"[run_di_diagnosis_processed] Columns: {df_to_return.columns.tolist()}")
+        # logging.debug(f"[run_di_diagnosis_processed] diagnostic_params head:\n{df_to_return['diagnostic_params'].head().to_string()}")
+        # Use the correct column name after renaming:
+        if 'diagnostic_params_list' in df_to_return.columns:
+             logging.debug(f"[run_di_diagnosis_processed] diagnostic_params_list head:\n{df_to_return['diagnostic_params_list'].head().to_string()}")
+        else:
+             logging.debug("[run_di_diagnosis_processed] 'diagnostic_params_list' column not found before return.")
+
+        logging.debug(f"[run_di_diagnosis_processed] Diagnosis successful. Returning df shape: {df_to_return.shape}")
+        return di_diagnosis_results, report_str, df_to_return
+
+    except Exception as e: # --- Catch All Exceptions ---
+        logging.error(f"[run_di_diagnosis_processed] Unhandled exception during DI diagnosis: {e}", exc_info=True)
+        # Return default error state
         df_to_return = pd.DataFrame(columns=empty_cols)
         if 'Subject' not in df_to_return.columns:
             df_to_return['Subject'] = 'DI'
-        return {}, "Data Insights (DI) 部分無數據可供診斷。", df_to_return
-
-    df_di = df_di_processed.copy()
-
-    # --- Chapter 0: Derivative Data Calculation & Basic Prep ---
-    df_di['question_time'] = pd.to_numeric(df_di['question_time'], errors='coerce')
-    if 'question_position' not in df_di.columns: df_di['question_position'] = range(len(df_di))
-    else: df_di['question_position'] = pd.to_numeric(df_di['question_position'], errors='coerce')
-    if 'is_correct' not in df_di.columns: df_di['is_correct'] = True
-    else: df_di['is_correct'] = df_di['is_correct'].astype(bool)
-    if 'question_type' not in df_di.columns: df_di['question_type'] = 'Unknown Type'
-    if 'msr_group_id' not in df_di.columns: df_di['msr_group_id'] = np.nan
-    if 'is_invalid' not in df_di.columns: df_di['is_invalid'] = False
-
-    df_di = _calculate_msr_metrics(df_di)
-
-    # --- Chapter 1: Time Strategy & Validity ---
-    total_test_time_di = df_di['question_time'].sum(skipna=True) # Ensure NaNs are skipped
-    time_diff = MAX_ALLOWED_TIME_DI - total_test_time_di
-
-    num_invalid_questions_total = df_di['is_invalid'].sum()
-    di_diagnosis_results['invalid_count'] = num_invalid_questions_total
-
-    # Initialize diagnostic_params if needed
-    if 'diagnostic_params' not in df_di.columns:
-        df_di['diagnostic_params'] = [[] for _ in range(len(df_di))]
-    else:
-        # Ensure it's a mutable list
-        df_di['diagnostic_params'] = df_di['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, set, tuple)) else [])
-
-    # Add invalid tag
-    final_invalid_mask_di = df_di['is_invalid']
-    if final_invalid_mask_di.any():
-        for idx in df_di.index[final_invalid_mask_di]:
-            current_list = df_di.loc[idx, 'diagnostic_params']
-            if not isinstance(current_list, list): current_list = []
-            if INVALID_DATA_TAG_DI not in current_list:
-                current_list.append(INVALID_DATA_TAG_DI)
-            df_di.loc[idx, 'diagnostic_params'] = current_list
-
-    # --- Mark Overtime (Vectorized Approach) ---
-    df_di['overtime'] = False
-    thresholds = OVERTIME_THRESHOLDS[di_time_pressure_status]
-    
-    # Define masks for non-invalid rows
-    valid_mask = ~df_di['is_invalid']
-    
-    # --- Non-MSR Overtime ---
-    # TPA
-    tpa_mask = valid_mask & ((df_di['question_type'] == 'Two-part analysis') | (df_di['question_type'] == 'TPA'))
-    tpa_over_mask = tpa_mask & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['TPA'])
-    
-    # GT
-    gt_mask = valid_mask & ((df_di['question_type'] == 'Graph and Table') | (df_di['question_type'] == 'GT'))
-    gt_over_mask = gt_mask & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['GT'])
-    
-    # DS
-    ds_mask = valid_mask & ((df_di['question_type'] == 'Data Sufficiency') | (df_di['question_type'] == 'DS'))
-    ds_over_mask = ds_mask & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['DS'])
-
-    # --- MSR Overtime ---
-    msr_mask = valid_mask & ((df_di['question_type'] == 'Multi-source reasoning') | (df_di['question_type'] == 'MSR'))
-    
-    # 1. Group Overtime
-    msr_group_over = msr_mask & df_di['msr_group_total_time'].notna() & \
-                     (df_di['msr_group_total_time'] > thresholds['MSR_GROUP'])
-
-    # 2. Reading Overtime (First Q, if Group not Overtime)
-    msr_reading_over = msr_mask & (~msr_group_over) & \
-                       df_di['is_first_msr_q'] & df_di['msr_reading_time'].notna() & \
-                       (df_di['msr_reading_time'] > thresholds['MSR_READING'])
-
-    # 3. Adjusted Single Q Overtime (First Q, if Group/Reading not Overtime)
-    # Calculate adjusted time safely
-    adj_time = df_di['question_time'] - df_di['msr_reading_time']
-    msr_adj_first_over = msr_mask & (~msr_group_over) & (~msr_reading_over) & \
-                         df_di['is_first_msr_q'] & \
-                         df_di['msr_reading_time'].notna() & df_di['question_time'].notna() & \
-                         adj_time.notna() & \
-                         (adj_time > thresholds['MSR_SINGLE_Q'])
-
-    # 4. Single Q Overtime (Non-First Q, if Group not Overtime)
-    msr_non_first_over = msr_mask & (~msr_group_over) & \
-                         (~df_di['is_first_msr_q']) & df_di['question_time'].notna() & \
-                         (df_di['question_time'] > thresholds['MSR_SINGLE_Q'])
-
-    # Combine all MSR overtime conditions
-    msr_over_mask = msr_group_over | msr_reading_over | msr_adj_first_over | msr_non_first_over
-    
-    # --- Combine all Overtime conditions ---
-    # Ensure only valid rows are considered by applying valid_mask implicitly through component masks
-    overall_overtime_mask = tpa_over_mask | gt_over_mask | ds_over_mask | msr_over_mask
-    
-    # Apply the final mask to set the 'overtime' column
-    df_di.loc[overall_overtime_mask, 'overtime'] = True
-    
-    # --- End Vectorized Overtime ---
-
-    # Store Chapter 1 results
-    di_diagnosis_results['chapter_1'] = {
-        'total_test_time_minutes': total_test_time_di,
-        'time_difference_minutes': time_diff,
-        'time_pressure': di_time_pressure_status, # Store the status used
-        'invalid_questions_excluded': num_invalid_questions_total,
-        'overtime_thresholds_minutes': thresholds
-    }
-
-    # Create filtered dataset for subsequent chapters
-    df_di_filtered = df_di[~df_di['is_invalid']].copy() # Use ~is_invalid
-
-    # --- Chapter 2: Multidimensional Performance Analysis ---
-    domain_analysis = {}
-    type_analysis = {}
-    difficulty_analysis = {}
-    domain_comparison_tags = {
-        'poor_math_related': False, 'slow_math_related': False,
-        'poor_non_math_related': False, 'slow_non_math_related': False,
-        'significant_diff_error': False, 'significant_diff_overtime': False
-    }
-
-    if not df_di_filtered.empty:
-        if 'content_domain' in df_di_filtered.columns:
-            domain_analysis = _analyze_dimension(df_di_filtered, 'content_domain')
-            math_metrics = domain_analysis.get('Math Related', {})
-            non_math_metrics = domain_analysis.get('Non-Math Related', {})
-            math_errors = math_metrics.get('errors', 0)
-            non_math_errors = non_math_metrics.get('errors', 0)
-            math_overtime = math_metrics.get('overtime', 0)
-            non_math_overtime = non_math_metrics.get('overtime', 0)
-
-            if abs(math_errors - non_math_errors) >= 2:
-                domain_comparison_tags['significant_diff_error'] = True
-                domain_comparison_tags['poor_math_related'] = math_errors > non_math_errors
-                domain_comparison_tags['poor_non_math_related'] = non_math_errors > math_errors
-
-            if abs(math_overtime - non_math_overtime) >= 2:
-                 domain_comparison_tags['significant_diff_overtime'] = True
-                 domain_comparison_tags['slow_math_related'] = math_overtime > non_math_overtime
-                 domain_comparison_tags['slow_non_math_related'] = non_math_overtime > math_overtime
-
-        if 'question_type' in df_di_filtered.columns:
-            type_analysis = _analyze_dimension(df_di_filtered, 'question_type')
-
-        if 'question_difficulty' in df_di_filtered.columns:
-            df_di_filtered['difficulty_grade'] = df_di_filtered['question_difficulty'].apply(_grade_difficulty_di)
-            difficulty_analysis = _analyze_dimension(df_di_filtered, 'difficulty_grade')
-
-    di_diagnosis_results['chapter_2'] = {
-        'by_domain': domain_analysis,
-        'by_type': type_analysis,
-        'by_difficulty': difficulty_analysis,
-        'domain_comparison_tags': domain_comparison_tags
-    }
-
-    # --- Chapter 3: Root Cause Diagnosis ---
-    if not df_di_filtered.empty and 'question_type' in df_di_filtered.columns:
-        avg_time_per_type = df_di_filtered.groupby('question_type')['question_time'].mean().to_dict()
-        max_correct_difficulty_per_combination = pd.DataFrame() # Init empty
-        if 'content_domain' in df_di_filtered.columns and 'question_difficulty' in df_di_filtered.columns:
-             correct_rows = df_di_filtered['is_correct'] == True
-             if correct_rows.any(): # Ensure there are correct rows before grouping
-                 max_correct_difficulty_per_combination = df_di_filtered[correct_rows].groupby(
-                     ['question_type', 'content_domain']
-                 )['question_difficulty'].max().unstack(fill_value=-np.inf)
-
-        # 確保time_performance_category列存在初始值
-        if 'time_performance_category' not in df_di_filtered.columns:
-            df_di_filtered['time_performance_category'] = 'Unknown'
-
-        df_di_filtered = _diagnose_root_causes(df_di_filtered, avg_time_per_type, max_correct_difficulty_per_combination, thresholds)
-
-        di_diagnosis_results['chapter_3'] = {
-            'diagnosed_dataframe': df_di_filtered.copy(), # Store a copy
-            'avg_time_per_type_minutes': avg_time_per_type,
-            'max_correct_difficulty': max_correct_difficulty_per_combination.to_dict() if not max_correct_difficulty_per_combination.empty else {}
-        }
-    else:
-        di_diagnosis_results['chapter_3'] = {
-             'diagnosed_dataframe': pd.DataFrame(),
-             'avg_time_per_type_minutes': {},
-             'max_correct_difficulty': {}
-         }
-
-    # --- Chapter 4: Special Pattern Observation ---
-    avg_times_ch3 = di_diagnosis_results.get('chapter_3', {}).get('avg_time_per_type_minutes', {})
-    # Pass the potentially modified df from Ch3
-    df_ch3_diagnosed = di_diagnosis_results['chapter_3']['diagnosed_dataframe']
-    # Operate on a copy if _observe_di_patterns modifies in place, or ensure it returns modified df
-    df_for_ch4 = df_ch3_diagnosed.copy()
-    pattern_analysis_results = _observe_di_patterns(df_for_ch4, avg_times_ch3) # Assume modifies df_for_ch4
-    di_diagnosis_results['chapter_4'] = pattern_analysis_results
-
-    # --- Chapter 5: Foundation Ability Override Rule ---
-    type_analysis_ch2 = di_diagnosis_results.get('chapter_2', {}).get('by_type', {})
-    # Use the potentially modified df from Ch4
-    override_analysis = _check_foundation_override(df_for_ch4, type_analysis_ch2)
-    di_diagnosis_results['chapter_5'] = override_analysis
-
-    # --- 記錄 Ch4/Ch5 後 df_for_ch4 (即將成為 diagnosed_df_ch4_ch5) 的狀態 ---
-    # Removed logging block here
-    # --- 結束記錄 ---
-
-    # --- Chapter 6: Practice Planning & Recommendations ---
-    # Use the potentially modified df from Ch4/Ch5
-    diagnosed_df_ch4_ch5 = df_for_ch4
-    domain_tags_ch2 = di_diagnosis_results.get('chapter_2', {}).get('domain_comparison_tags', {})
-    override_analysis_ch5 = di_diagnosis_results.get('chapter_5', {})
-
-    recommendations = []
-    if not diagnosed_df_ch4_ch5.empty:
-        recommendations = _generate_di_recommendations(diagnosed_df_ch4_ch5, override_analysis_ch5, domain_tags_ch2)
-    di_diagnosis_results['chapter_6'] = {'recommendations_list': recommendations}
-
-    # --- Chapter 7: Summary Report Generation ---
-    # Ensure the latest df (after Ch4 modifications) is used for the report
-    di_diagnosis_results['chapter_3']['diagnosed_dataframe'] = diagnosed_df_ch4_ch5.copy()
-    report_str = _generate_di_summary_report(di_diagnosis_results)
-
-    # --- Final DataFrame Preparation ---
-    # Start with the original DataFrame containing all rows (including invalid)
-    df_base = df_di.copy()
-    # Select only the diagnostic columns we calculated on the filtered data
-    diagnostic_cols_to_merge = [] 
-    if diagnosed_df_ch4_ch5 is not None and not diagnosed_df_ch4_ch5.empty:
-        potential_cols = ['diagnostic_params', 'is_sfe', 'time_performance_category']
-        diagnostic_cols_to_merge = [col for col in potential_cols if col in diagnosed_df_ch4_ch5.columns]
-
-    if diagnostic_cols_to_merge:
-        # Merge diagnostic columns from the filtered/diagnosed df back to the base df
-        # Merge on index, keep all rows from the base df ('left' merge)
-        # logging.info(f"DI DEBUG: Before merge - df_base columns: {df_base.columns.tolist()}") # Removed
-        # logging.info(f"DI DEBUG: Before merge - diagnosed_df_ch4_ch5 columns: {diagnosed_df_ch4_ch5.columns.tolist()}") # Removed
-        # logging.info(f"DI DEBUG: Before merge - Columns to merge: {diagnostic_cols_to_merge}") # Removed
-        df_merged = pd.merge(
-            df_base,
-            diagnosed_df_ch4_ch5[diagnostic_cols_to_merge], # Only select the columns to merge
-            left_index=True,
-            right_index=True,
-            how='left', # Keep all rows from df_base
-            suffixes=('', '_diag') # Add suffix in case of potential name conflicts
-        )
-        # Check if merge created duplicate columns (e.g., time_performance_category_diag)
-        # Prioritize the _diag version if it exists
-        for col in diagnostic_cols_to_merge:
-            diag_col = col + '_diag'
-            if diag_col in df_merged.columns:
-                # Use the merged value (_diag), potentially overwriting original or filling NaNs
-                df_merged[col] = df_merged[diag_col]
-                df_merged.drop(columns=[diag_col], inplace=True)
-                # logging.info(f"Prioritized merged column '{col}' from '{diag_col}'.") # Removed
-
-        df_to_return = df_merged # Use the merged result
-        # logging.info(f"Merged diagnostic columns: {diagnostic_cols_to_merge}") # Removed
-        # Removed logging block for time_perf after merge
-
-    else:
-        # If no diagnostic columns were calculated (e.g., filtered df was empty)
-        df_to_return = df_base
-        # logging.warning("No diagnostic columns found to merge back.") # Removed
-
-    # Translate params (now operating on the potentially merged df_to_return)
-    if 'diagnostic_params' in df_to_return.columns:
-        # Ensure list type after potential merge (NaNs might appear for rows not in diagnosed_df)
-        df_to_return['diagnostic_params'] = df_to_return['diagnostic_params'].apply(
-            lambda x: list(x) if isinstance(x, (list, tuple, set)) else ([] if pd.isna(x) else [x] if isinstance(x, str) else [])
-        )
-        df_to_return['diagnostic_params_list_chinese'] = df_to_return['diagnostic_params'].apply(
-            lambda params_list: _translate_di(params_list)
-        )
-        # Safely drop and rename
-        if 'diagnostic_params' in df_to_return.columns: df_to_return.drop(columns=['diagnostic_params'], inplace=True)
-        if 'diagnostic_params_list_chinese' in df_to_return.columns: df_to_return.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'}, inplace=True)
-    else:
-        # Initialize if missing entirely
-        df_to_return['diagnostic_params_list'] = [[] for _ in range(len(df_to_return))]
-
-    # --- Refined fillna logic --- 
-    # 1. Ensure the time_performance_category column exists, default to 'Unknown'
-    if 'time_performance_category' not in df_to_return.columns:
-        df_to_return['time_performance_category'] = 'Unknown'
-        # logging.info("Initialized 'time_performance_category' column as 'Unknown'.") # Removed
-    
-    # 2. Fill NaNs potentially introduced by the merge (for rows NOT diagnosed) with 'Unknown'
-    # Also ensure empty strings are treated as 'Unknown'
-    df_to_return['time_performance_category'] = df_to_return['time_performance_category'].fillna('Unknown').replace('', 'Unknown')
-    # logging.info(f"After fillna/replace('Unknown'): unique values: {df_to_return['time_performance_category'].unique()}") # Removed
-
-    # 3. Specifically set 'Invalid/Excluded' for rows marked as invalid
-    if 'is_invalid' in df_to_return.columns:
-        invalid_mask = df_to_return['is_invalid'] == True
-        if invalid_mask.any():
-            df_to_return.loc[invalid_mask, 'time_performance_category'] = 'Invalid/Excluded'
-            # logging.info(f"Set 'Invalid/Excluded' for {invalid_mask.sum()} rows. Final unique values: {df_to_return['time_performance_category'].unique()}") # Removed
-
-    # Handle potential NaNs in 'is_sfe' after merge
-    if 'is_sfe' in df_to_return.columns:
-        df_to_return['is_sfe'].fillna(False, inplace=True)
-        df_to_return['is_sfe'] = df_to_return['is_sfe'].astype(bool)
-    else:
-        df_to_return['is_sfe'] = False # Initialize if missing
-    
-    # Ensure Subject column exists
-    if 'Subject' not in df_to_return.columns:
-        df_to_return['Subject'] = 'DI'
-    else:
-         df_to_return['Subject'] = 'DI' # Force correct value
-
-    # Final check for overtime column existence (should be fine as we start with df_di)
-    if 'overtime' not in df_to_return.columns:
-         df_to_return['overtime'] = False # Should not happen now
-
-    # Fill NaNs in diagnostic columns for invalid rows if introduced by update/merge
-    cols_to_fill_na = ['is_sfe', 'time_performance_category'] # Add others if needed
-    fill_values = {'is_sfe': False, 'time_performance_category': 'Invalid/Excluded'}
-    for col in cols_to_fill_na:
-        if col in df_to_return.columns:
-            df_to_return[col].fillna(fill_values.get(col, 'Unknown'), inplace=True)
-
-    # Ensure is_invalid column is boolean
-    if 'is_invalid' in df_to_return.columns:
-        df_to_return['is_invalid'] = df_to_return['is_invalid'].astype(bool)
-    else:
-        df_to_return['is_invalid'] = False # Should exist from input
-
-    # --- Remove DEBUG START ---
-    # print(f"DEBUG (DI): Before return - Invalid rows in df_to_return: {df_to_return['is_invalid'].sum()}")
-    # if 'is_invalid' in df_to_return.columns and df_to_return['is_invalid'].sum() > 0:
-    #     print(f"DEBUG (DI): Before return - Invalid rows index: {df_to_return[df_to_return['is_invalid']].index.tolist()}")
-    # --- Remove DEBUG END ---
-
-    # 在return前最後記錄狀態
-    # Removed logging block before return
-    # logging.info("DI診斷處理完成。") # Removed
-    return di_diagnosis_results, report_str, df_to_return
+        return {}, f"DI 診斷過程中發生未預期錯誤: {e}", df_to_return
 
 
 # --- Root Cause Diagnosis Helper (Chapter 3 Logic) --- REWRITTEN ---
@@ -724,7 +837,8 @@ def _observe_di_patterns(df, avg_times):
                 if not isinstance(current_params, list): current_params = []
                 if early_rush_param not in current_params:
                      current_params.append(early_rush_param)
-                     df.loc[index, 'diagnostic_params'] = current_params # Assign back
+                     # df.loc[index, 'diagnostic_params'] = current_params # Assign back <--- Potential Error
+                     df.at[index, 'diagnostic_params'] = current_params # Use .at for single cell assignment
 
                 # Collect details safely using .get()
                 row = df.loc[index]
