@@ -55,8 +55,6 @@ def _suggest_invalid_last_third(pos_series, time_series, total_q, fraction, thre
     if total_q <= 0:
         return pd.Series(False, index=pos_series.index) # No questions, nothing invalid
     last_part_start_pos = math.ceil(total_q * fraction) # Position number starts at 1
-    # If question_position is 1-based, >= last_part_start_pos
-    # If 0-based index used for position: >= last_part_start_pos - 1
     # Assuming question_position is 1-based from original code.
     is_last_part = pos_series >= last_part_start_pos
     is_too_fast = time_series < threshold
@@ -77,7 +75,6 @@ def suggest_invalid_questions(df, time_pressure_status_map):
         pd.DataFrame: DataFrame with 'is_invalid', 'is_manually_invalid' (preserved or added),
                       and 'is_auto_suggested_invalid' columns.
     """
-    # warnings.warn("Entering suggest_invalid_questions", stacklevel=2) # Optional: Use warnings for debug/info
     df_processed = df.copy()
 
     # --- Initialize Columns Safely ---
@@ -133,23 +130,18 @@ def suggest_invalid_questions(df, time_pressure_status_map):
                  threshold = section_thresholds['INVALID_HASTY_MIN']
                  is_fast = q_time_series < threshold
                  # Combine with eligibility mask, handle NaNs resulting from comparison
-                 auto_invalid_section_mask = is_fast.fillna(False) & eligible_for_auto
+                 auto_invalid_section_mask = is_fast.fillna(False) # No need for eligible_for_auto here, applied later
              # else: No auto-suggestion if no pressure for V
 
-        # Update the main dataframe
-        df_processed.loc[indices, 'is_auto_suggested_invalid'] = auto_invalid_section_mask & eligible_for_auto
+        # Update the main dataframe where eligible
+        df_processed.loc[indices[eligible_for_auto], 'is_auto_suggested_invalid'] = auto_invalid_section_mask[eligible_for_auto]
+
 
     # --- Create Final 'is_invalid' for Preview ---
     df_processed['is_invalid'] = df_processed['is_manually_invalid'] | df_processed['is_auto_suggested_invalid']
 
     # Clean up temporary columns
     df_processed.drop(columns=['q_time_numeric', 'q_pos_numeric'], inplace=True, errors='ignore')
-
-    # Optional: Log summary
-    # num_manual = df_processed['is_manually_invalid'].sum()
-    # num_auto = df_processed['is_auto_suggested_invalid'].sum()
-    # num_final = df_processed['is_invalid'].sum()
-    # print(f"Suggest Invalid Summary: Manual={num_manual}, Auto={num_auto}, Final Preview={num_final}")
 
     return df_processed
 
@@ -171,14 +163,14 @@ def _calculate_overtime_di(df_di, pressure, thresholds):
     msr_group_overtime_map = {}
     if 'msr_group_id' in df_di.columns:
         # Group by msr_group_id *within DI section*
-        msr_groups = df_di[df_di['question_type'] == 'MSR'].groupby('msr_group_id', dropna=False) # include NaN groups? No, dropna=True default
+        msr_groups = df_di[df_di['question_type'] == 'MSR'].groupby('msr_group_id', dropna=True) # dropna=True is default
         for group_id, group_df in msr_groups:
-             if pd.isna(group_id): continue # Skip invalid group IDs
+             # if pd.isna(group_id): continue # Covered by dropna=True
              group_total_time = group_df['q_time_numeric'].sum(skipna=True) # Sum ignoring NaNs within group
              target_time = msr_target_times['pressure'] if pressure else msr_target_times['no_pressure']
              msr_group_overtime_map[group_id] = group_total_time > target_time
     else:
-        warnings.warn("DI overtime: Missing 'msr_group_id' column, cannot calculate MSR group overtime.", UserWarning, stacklevel=3) # Use stacklevel 3
+        warnings.warn("DI overtime: Missing 'msr_group_id' column, cannot calculate MSR group overtime.", UserWarning, stacklevel=3)
 
     # --- Apply rules per type using vectorized operations where possible ---
     for q_type, type_thresholds in overtime_thresholds.items():
@@ -228,15 +220,13 @@ def _calculate_overtime_v(df_v, pressure, thresholds):
         df_rc = df_v.loc[rc_mask].copy() # Work on RC subset
 
         # -- Individual RC Check --
-        # Find first question in each group
+        # Find first question in each group using index from idxmin()
         df_rc['q_pos_numeric'] = pd.to_numeric(df_rc['question_position'], errors='coerce')
-        # Avoid SettingWithCopyWarning by using .loc on the original df_rc index
-        is_first_in_group = df_rc.loc[df_rc.groupby('rc_group_id')['q_pos_numeric'].idxmin(), 'question_position'].notna() # Series indicating first q per group
-        # Map this back to df_rc based on index
-        df_rc['is_first_q'] = df_rc.index.isin(is_first_in_group[is_first_in_group].index) # Map True/False based on index match
-
+        first_q_indices = df_rc.loc[df_rc.dropna(subset=['q_pos_numeric']).groupby('rc_group_id')['q_pos_numeric'].idxmin()].index
+        df_rc['is_first_q'] = df_rc.index.isin(first_q_indices)
 
         reading_time = df_rc['rc_reading_time'].fillna(0) # Use 0 if reading time calculation failed
+        # Use numeric time directly, np.where handles types correctly if one branch is float
         adjusted_time = np.where(df_rc['is_first_q'], df_rc['q_time_numeric'] - reading_time, df_rc['q_time_numeric'])
         adjusted_time = np.maximum(0, adjusted_time) # Ensure non-negative adjusted time
 
@@ -247,20 +237,22 @@ def _calculate_overtime_v(df_v, pressure, thresholds):
         group_sizes = df_rc.groupby('rc_group_id').size()
         df_rc['rc_group_size'] = df_rc['rc_group_id'].map(group_sizes)
 
-        # Determine target time based on group size and pressure
-        target_time = 0 # Default
-        if pressure:
-             target_time = np.select(
-                 [df_rc['rc_group_size'] == 3, df_rc['rc_group_size'] == 4],
-                 [rc_group_targets['3Q']['pressure'], rc_group_targets['4Q']['pressure']],
-                 default=0 # No target for other sizes
-             )
-        else: # No pressure
-             target_time = np.select(
-                 [df_rc['rc_group_size'] == 3, df_rc['rc_group_size'] == 4],
-                 [rc_group_targets['3Q']['no_pressure'], rc_group_targets['4Q']['no_pressure']],
-                 default=0
-             )
+        # Determine target time based on group size and pressure using np.select
+        target_time = np.select(
+             [
+                 (df_rc['rc_group_size'] == 3) & pressure,
+                 (df_rc['rc_group_size'] == 4) & pressure,
+                 (df_rc['rc_group_size'] == 3) & ~pressure,
+                 (df_rc['rc_group_size'] == 4) & ~pressure,
+             ],
+             [
+                 rc_group_targets['3Q']['pressure'],
+                 rc_group_targets['4Q']['pressure'],
+                 rc_group_targets['3Q']['no_pressure'],
+                 rc_group_targets['4Q']['no_pressure'],
+             ],
+             default=0 # No target for other sizes or if pressure condition is false
+         )
 
         # Check group total time against target (+1 min buffer like original logic)
         # Fill NaN total times with 0 to avoid errors in comparison
@@ -269,8 +261,7 @@ def _calculate_overtime_v(df_v, pressure, thresholds):
 
         # Combine individual and group overtime for RC questions
         # Handle potential NaNs from comparisons
-        is_individual_overtime_series = pd.Series(is_individual_overtime, index=df_rc.index)
-        is_rc_overtime = is_individual_overtime_series.fillna(False) | is_group_overtime.fillna(False)
+        is_rc_overtime = is_individual_overtime.fillna(False) | is_group_overtime.fillna(False)
 
         # Update the main overtime mask using the index from df_rc
         overtime_mask.loc[df_rc.index[is_rc_overtime]] = True # Update where is_rc_overtime is True
@@ -290,11 +281,9 @@ def calculate_overtime(df, time_pressure_status_map):
     Returns:
         pd.DataFrame: DataFrame with added boolean 'overtime' column.
     """
-    # warnings.warn("Entering calculate_overtime", stacklevel=2) # Optional info
     df_processed = df.copy()
 
     # --- 1. Preprocess Verbal Data FIRST to get RC info ---
-    # This adds 'rc_group_id', 'rc_group_total_time', 'rc_reading_time'
     try:
         df_processed = preprocess_verbal_data(df_processed)
     except Exception as e:
@@ -316,7 +305,7 @@ def calculate_overtime(df, time_pressure_status_map):
 
     # --- 4. Calculate Overtime Per Subject using Helpers ---
     all_overtime_masks = []
-    processed_indices = [] # Keep track of indices processed to ensure full coverage
+    processed_indices = set() # Use set for efficient membership checking
 
     for section, section_thresholds in THRESHOLDS.items():
         section_mask_bool = (df_processed['Subject'] == section)
@@ -324,7 +313,7 @@ def calculate_overtime(df, time_pressure_status_map):
             continue # Skip if no data for this section
 
         indices = df_processed.index[section_mask_bool]
-        processed_indices.extend(indices.tolist())
+        processed_indices.update(indices) # Add processed indices to set
         df_section = df_processed.loc[indices]
         pressure = time_pressure_status_map.get(section, False)
         overtime_section_mask = pd.Series(False, index=indices) # Default
@@ -348,36 +337,34 @@ def calculate_overtime(df, time_pressure_status_map):
     if all_overtime_masks:
          # Concatenate all boolean Series masks
          combined_mask = pd.concat(all_overtime_masks)
-         # Assign to the 'overtime' column, ensuring index alignment
+         # Assign to the 'overtime' column, ensuring index alignment and filling potential NaNs
          df_processed['overtime'] = combined_mask.reindex(df_processed.index).fillna(False)
     else:
          # Handle case where no subjects were processed (e.g., empty input df)
          df_processed['overtime'] = False
 
-    # Check if all original rows were processed
-    if len(processed_indices) != len(df_processed):
-        warnings.warn(f"Overtime calculation: Not all rows were processed ({len(processed_indices)} vs {len(df_processed)}). Defaulting unprocessed rows to False.", RuntimeWarning, stacklevel=2)
-        unprocessed_indices = df_processed.index.difference(processed_indices)
+    # Check if all original rows were processed (more robust check)
+    unprocessed_indices = df_processed.index.difference(list(processed_indices))
+    if not unprocessed_indices.empty:
+        warnings.warn(f"Overtime calculation: {len(unprocessed_indices)} rows were not processed (likely due to missing Subject). Defaulting overtime to False for these rows.", RuntimeWarning, stacklevel=2)
         df_processed.loc[unprocessed_indices, 'overtime'] = False # Ensure default
 
-
     df_processed.drop(columns=['q_time_numeric'], inplace=True, errors='ignore')
-
-    # Optional: Log summary
-    # num_overtime = df_processed['overtime'].sum()
-    # print(f"Calculate Overtime Summary: Total Overtime={num_overtime}")
 
     return df_processed
 
 
-# --- Verbal Preprocessing & RC Helpers (Keep logic largely the same) ---
+# --- Verbal Preprocessing & RC Helpers ---
 
 def preprocess_verbal_data(df):
     """Applies preprocessing specific to Verbal data: RC grouping and time calcs."""
     df_processed = df.copy()
     v_mask = df_processed['Subject'] == 'V'
     if not v_mask.any():
-        return df_processed # No verbal data
+        # Ensure columns exist even if no V data, filled with NaN
+        for col in ['rc_group_id', 'rc_group_total_time', 'rc_reading_time']:
+             if col not in df_processed.columns: df_processed[col] = np.nan
+        return df_processed
 
     # Work on a view/copy of the verbal subset
     df_v_subset = df_processed[v_mask]
@@ -389,7 +376,7 @@ def preprocess_verbal_data(df):
         # Ensure expected columns exist anyway, filled with NaN
         for col in ['rc_group_id', 'rc_group_total_time', 'rc_reading_time']:
              if col not in df_processed.columns: df_processed[col] = np.nan
-        return df_processed
+        return df_processed # Return original df if requirements not met
 
     # Apply RC grouping and time calculations
     df_v_processed = _identify_rc_groups(df_v_subset)
@@ -399,6 +386,7 @@ def preprocess_verbal_data(df):
     for col in ['rc_group_id', 'rc_group_total_time', 'rc_reading_time']:
          if col not in df_processed.columns: df_processed[col] = np.nan # Ensure column exists in main df
          # Update using the index from the processed verbal subset
+         # Use .loc to avoid potential SettingWithCopyWarning if df_processed was a slice
          df_processed.loc[df_v_processed.index, col] = df_v_processed[col]
 
     return df_processed
@@ -406,15 +394,15 @@ def preprocess_verbal_data(df):
 
 def _identify_rc_groups(df_v_subset):
     """Identifies RC passages groups based on consecutive question positions."""
-    # Ensure working with a copy if modifications are made (already handled by caller)
-    df_v = df_v_subset.sort_values('question_position').copy() # Sort for continuity check
+    # Sort by position ensures continuity check works
+    df_v = df_v_subset.sort_values('question_position').copy()
     df_v['rc_group_id'] = np.nan
 
     # Convert position to numeric ONCE
     df_v['q_pos_numeric'] = pd.to_numeric(df_v['question_position'], errors='coerce')
 
     rc_indices = df_v[df_v['question_type'] == 'Reading Comprehension'].index
-    if not rc_indices.any():
+    if rc_indices.empty: # More explicit check
         df_v.drop(columns=['q_pos_numeric'], inplace=True, errors='ignore')
         return df_v # No RC questions
 
@@ -428,11 +416,12 @@ def _identify_rc_groups(df_v_subset):
         if row['question_type'] == 'Reading Comprehension':
             current_pos = row['q_pos_numeric'] # Use pre-calculated numeric pos
             if pd.isna(current_pos):
-                warnings.warn(f"Skipping RC Group ID for index {idx} due to invalid position.", RuntimeWarning, stacklevel=2)
+                warnings.warn(f"Skipping RC Group ID for index {idx} due to invalid position '{row['question_position']}'.", RuntimeWarning, stacklevel=3)
                 last_valid_pos = -2 # Reset continuity
-                continue
+                current_group_id = np.nan # Ensure no carry-over
+                continue # Skip assignment for this row
 
-            # Check for break in continuity
+            # Check for break in continuity (position must be exactly +1)
             if current_pos != last_valid_pos + 1:
                 group_counter += 1
                 current_group_id = f"RC_Group_{group_counter}"
@@ -440,15 +429,15 @@ def _identify_rc_groups(df_v_subset):
             df_v.loc[idx, 'rc_group_id'] = current_group_id
             last_valid_pos = current_pos
         else:
-            # Reset if not RC
+            # Reset if not RC or if continuity broke on previous RC
             current_group_id = np.nan
             last_valid_pos = -2
 
-    # Validate group sizes
+    # Validate group sizes after assigning all IDs
     group_sizes = df_v.dropna(subset=['rc_group_id']).groupby('rc_group_id').size()
     oversized_groups = group_sizes[group_sizes > 4].index.tolist()
     if oversized_groups:
-         warnings.warn(f"RC groups detected with > 4 questions: {oversized_groups}. Verify data.", UserWarning, stacklevel=2)
+         warnings.warn(f"RC groups detected with > 4 questions: {oversized_groups}. Verify data continuity.", UserWarning, stacklevel=2)
 
     df_v.drop(columns=['q_pos_numeric'], inplace=True, errors='ignore')
     return df_v
@@ -466,36 +455,36 @@ def _calculate_rc_times(df_v_grouped):
     df_v['q_time_numeric'] = pd.to_numeric(df_v['question_time'], errors='coerce')
     df_v['q_pos_numeric'] = pd.to_numeric(df_v['question_position'], errors='coerce')
 
-    # Calculate group total time (sum numeric times per group)
-    # Important: Map this back to *all* rows belonging to the group
-    group_total_times = df_v.groupby('rc_group_id')['q_time_numeric'].transform('sum')
-    df_v['rc_group_total_time'] = group_total_times
+    # Calculate group total time (sum numeric times per group) using transform
+    df_v['rc_group_total_time'] = df_v.groupby('rc_group_id')['q_time_numeric'].transform('sum')
 
     # Calculate reading time (first q time - avg time of others in group)
     df_v['rc_reading_time'] = np.nan # Initialize
 
-    # Find the index of the first question in each group
-    first_q_indices = df_v.loc[df_v.dropna(subset=['q_pos_numeric']).groupby('rc_group_id')['q_pos_numeric'].idxmin()].index
+    # Group by rc_group_id, dropping groups where id is NaN
+    for group_id, group_df in df_v.groupby('rc_group_id', dropna=True):
+        # Ensure group has valid numeric positions and times, sort by position
+        group_df_valid = group_df.dropna(subset=['q_pos_numeric', 'q_time_numeric']).sort_values('q_pos_numeric')
 
-    for group_id, group_df in df_v.groupby('rc_group_id'):
-        if pd.isna(group_id): continue # Skip if group_id is NaN
+        if len(group_df_valid) <= 1:
+            # Cannot calculate reading time with 0 or 1 valid questions
+            # Reading time remains NaN for these rows (initialized above)
+            continue
 
-        group_df_sorted = group_df.dropna(subset=['q_pos_numeric', 'q_time_numeric']).sort_values('q_pos_numeric')
-        if len(group_df_sorted) <= 1:
-            continue # Cannot calculate reading time with 0 or 1 valid questions
+        first_q_index = group_df_valid.index[0]
+        first_q_time = group_df_valid['q_time_numeric'].iloc[0]
+        # Calculate mean of remaining valid times (iloc[1:])
+        other_q_times_avg = group_df_valid['q_time_numeric'].iloc[1:].mean()
 
-        first_q_index = group_df_sorted.index[0]
-        first_q_time = group_df_sorted['q_time_numeric'].iloc[0]
-        other_q_times_avg = group_df_sorted['q_time_numeric'].iloc[1:].mean() # Mean of remaining valid times
-
-        if pd.isna(first_q_time) or pd.isna(other_q_times_avg):
-             reading_time = 0 # Default if calculation not possible
+        # Calculate reading time, defaulting to 0 if avg calculation failed (e.g., only one question)
+        # This case is already handled by len(group_df_valid) check, but robust check here:
+        if pd.isna(other_q_times_avg):
+            reading_time = 0
         else:
-             reading_time = max(0, first_q_time - other_q_times_avg)
+            reading_time = max(0, first_q_time - other_q_times_avg)
 
-        # Assign reading time only to the first question's index in the main working copy df_v
+        # Assign reading time ONLY to the first question's index in the main working copy df_v
         df_v.loc[first_q_index, 'rc_reading_time'] = reading_time
-
 
     df_v.drop(columns=['q_time_numeric', 'q_pos_numeric'], inplace=True, errors='ignore')
     return df_v
