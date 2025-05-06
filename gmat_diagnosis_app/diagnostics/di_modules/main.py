@@ -341,14 +341,14 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
 
         if 'time_performance_category' not in df_to_return.columns:
             df_to_return['time_performance_category'] = 'Unknown'
-        df_to_return['time_performance_category'] = df_to_return['time_performance_category'].fillna('Unknown').replace('', 'Unknown')
+        df_to_return['time_performance_category'] = df_to_return['time_performance_category'].fillna('Unknown').infer_objects(copy=False).replace('', 'Unknown')
         if 'is_invalid' in df_to_return.columns:
             invalid_mask = df_to_return['is_invalid'] == True
             if invalid_mask.any():
                 df_to_return.loc[invalid_mask, 'time_performance_category'] = 'Invalid/Excluded'
 
         if 'is_sfe' in df_to_return.columns:
-            df_to_return['is_sfe'] = df_to_return['is_sfe'].fillna(False)
+            df_to_return['is_sfe'] = df_to_return['is_sfe'].fillna(False).infer_objects(copy=False)
             df_to_return['is_sfe'] = df_to_return['is_sfe'].astype(bool)
         else:
             df_to_return['is_sfe'] = False
@@ -366,7 +366,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         fill_values = {'is_sfe': False, 'time_performance_category': 'Invalid/Excluded'}
         for col in cols_to_fill_na:
             if col in df_to_return.columns:
-                df_to_return[col] = df_to_return[col].fillna(fill_values.get(col, 'Unknown'))
+                df_to_return[col] = df_to_return[col].fillna(fill_values.get(col, 'Unknown')).infer_objects(copy=False)
 
         if 'is_invalid' in df_to_return.columns:
             df_to_return['is_invalid'] = df_to_return['is_invalid'].astype(bool)

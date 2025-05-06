@@ -261,7 +261,10 @@ def _calculate_overtime_v(df_v, pressure, thresholds):
 
         # Combine individual and group overtime for RC questions
         # Handle potential NaNs from comparisons
-        is_rc_overtime = is_individual_overtime.fillna(False) | is_group_overtime.fillna(False)
+        # Ensure fillna is called on pandas Series
+        is_individual_overtime_series = pd.Series(is_individual_overtime, index=df_rc.index)
+        is_group_overtime_series = pd.Series(is_group_overtime, index=df_rc.index)
+        is_rc_overtime = is_individual_overtime_series.fillna(False) | is_group_overtime_series.fillna(False)
 
         # Update the main overtime mask using the index from df_rc
         overtime_mask.loc[df_rc.index[is_rc_overtime]] = True # Update where is_rc_overtime is True
@@ -288,9 +291,16 @@ def calculate_overtime(df, time_pressure_status_map):
         df_processed = preprocess_verbal_data(df_processed)
     except Exception as e:
          warnings.warn(f"Error during verbal preprocessing: {e}. Overtime calculation may be affected.", RuntimeWarning, stacklevel=2)
-         # Add expected columns as NaN if they failed, to prevent KeyError later
          for col in ['rc_group_id', 'rc_group_total_time', 'rc_reading_time']:
               if col not in df_processed.columns: df_processed[col] = np.nan
+
+    # --- 1b. Preprocess DI Data to get MSR info ---
+    try:
+        df_processed = preprocess_di_data(df_processed)
+    except Exception as e:
+        warnings.warn(f"Error during DI preprocessing: {e}. MSR overtime calculation may be affected.", RuntimeWarning, stacklevel=2)
+        if 'msr_group_id' not in df_processed.columns:
+            df_processed['msr_group_id'] = pd.Series(index=df_processed.index, dtype='object') # Ensure col exists even on error
 
     # --- 2. Check Base Required Columns ---
     required_cols = ['Subject', 'question_time', 'question_type']
@@ -384,9 +394,13 @@ def preprocess_verbal_data(df):
 
     # Update the main dataframe safely using .loc and the original index
     for col in ['rc_group_id', 'rc_group_total_time', 'rc_reading_time']:
-         if col not in df_processed.columns: df_processed[col] = np.nan # Ensure column exists in main df
+         if col not in df_processed.columns:
+             # Ensure column exists in main df and is of object type for rc_group_id
+             if col == 'rc_group_id':
+                 df_processed[col] = pd.Series(index=df_processed.index, dtype='object')
+             else: # For time columns, float is fine, but can be object too if mixed with NaN initially
+                 df_processed[col] = np.nan 
          # Update using the index from the processed verbal subset
-         # Use .loc to avoid potential SettingWithCopyWarning if df_processed was a slice
          df_processed.loc[df_v_processed.index, col] = df_v_processed[col]
 
     return df_processed
@@ -396,7 +410,8 @@ def _identify_rc_groups(df_v_subset):
     """Identifies RC passages groups based on consecutive question positions."""
     # Sort by position ensures continuity check works
     df_v = df_v_subset.sort_values('question_position').copy()
-    df_v['rc_group_id'] = np.nan
+    # Initialize rc_group_id with object dtype to prevent FutureWarning
+    df_v['rc_group_id'] = pd.Series(index=df_v.index, dtype='object')
 
     # Convert position to numeric ONCE
     df_v['q_pos_numeric'] = pd.to_numeric(df_v['question_position'], errors='coerce')
@@ -488,3 +503,93 @@ def _calculate_rc_times(df_v_grouped):
 
     df_v.drop(columns=['q_time_numeric', 'q_pos_numeric'], inplace=True, errors='ignore')
     return df_v
+
+# --- DI Preprocessing & MSR Helpers (NEW) ---
+
+def _identify_msr_groups(df_di_subset):
+    """
+    Identifies MSR (Multi-source reasoning) groups in DI data.
+    Consecutive MSR questions (by position) are grouped into sets of up to 3.
+    A break in position continuity or a full group (3 questions) starts a new group.
+    """
+    # Ensure working on a copy, sort by position
+    df_d = df_di_subset.sort_values('question_position').copy()
+    
+    # Initialize msr_group_id with object dtype to handle strings and NaN
+    df_d['msr_group_id'] = pd.Series(index=df_d.index, dtype='object')
+
+    # Convert question_position to numeric for comparison
+    df_d['q_pos_numeric'] = pd.to_numeric(df_d['question_position'], errors='coerce')
+
+    group_id_counter = 0
+    current_msr_in_group_count = 0
+    last_msr_pos = -2  # Ensures the first MSR question starts a new group
+    current_group_name = None
+
+    # Iterate through all rows of the sorted DI subset
+    for idx in df_d.index:
+        row = df_d.loc[idx]
+        is_msr = (
+            (row['question_type'] == 'Multi-source reasoning') or (row['question_type'] == 'MSR')
+        ) and pd.notna(row['q_pos_numeric'])
+
+        if is_msr:
+            current_pos = row['q_pos_numeric']
+            
+            # Start a new group if:
+            # 1. Continuity is broken (current_pos != last_msr_pos + 1)
+            # 2. Current group is full (current_msr_in_group_count == 3)
+            if current_pos != last_msr_pos + 1 or current_msr_in_group_count == 3:
+                group_id_counter += 1
+                current_group_name = f"MSR_Group_{group_id_counter}"
+                current_msr_in_group_count = 0  # Reset count for the new group
+            
+            df_d.loc[idx, 'msr_group_id'] = current_group_name
+            current_msr_in_group_count += 1
+            last_msr_pos = current_pos
+        else:
+            # If not an MSR question, it doesn't belong to an MSR group.
+            # Reset continuity trackers for MSRs to ensure next MSR starts a new group.
+            last_msr_pos = -2 
+            current_msr_in_group_count = 0
+            current_group_name = None
+            
+    df_d.drop(columns=['q_pos_numeric'], inplace=True, errors='ignore')
+    return df_d
+
+def preprocess_di_data(df):
+    """Applies preprocessing specific to DI data: MSR grouping."""
+    df_processed = df.copy()
+    di_mask = df_processed['Subject'] == 'DI'
+    
+    # Initialize msr_group_id in the main df if not present, ensuring object type
+    if 'msr_group_id' not in df_processed.columns:
+        df_processed['msr_group_id'] = pd.Series(index=df_processed.index, dtype='object')
+    elif df_processed['msr_group_id'].dtype != 'object':
+        df_processed['msr_group_id'] = df_processed['msr_group_id'].astype('object')
+
+    if not di_mask.any():
+        # No DI data, return with potentially initialized (empty) msr_group_id column
+        return df_processed
+
+    # Work on a copy of the DI subset
+    df_di_subset = df_processed[di_mask].copy()
+
+    required_for_msr = ['question_type', 'question_position']
+    if not all(col in df_di_subset.columns for col in required_for_msr):
+        warnings.warn(
+            "Skipping MSR preprocessing for DI (Missing required columns: 'question_type', 'question_position'). 'msr_group_id' will be empty.", 
+            UserWarning, 
+            stacklevel=2
+        )
+        return df_processed # Return with existing (likely empty or all NaN) msr_group_id
+
+    # Apply MSR grouping to the DI subset
+    df_di_processed_subset = _identify_msr_groups(df_di_subset)
+
+    # Update the 'msr_group_id' in the main dataframe using .loc and the original index
+    # Only update for rows that were part of the DI subset and processed
+    if 'msr_group_id' in df_di_processed_subset.columns:
+        df_processed.loc[df_di_processed_subset.index, 'msr_group_id'] = df_di_processed_subset['msr_group_id']
+    
+    return df_processed

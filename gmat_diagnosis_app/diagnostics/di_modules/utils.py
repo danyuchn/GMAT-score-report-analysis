@@ -137,13 +137,13 @@ def _calculate_msr_metrics(df):
     try:
         # logging.debug("[_calculate_msr_metrics] Filling NaNs for 'is_first_msr_q' after merge.")
         # df['is_first_msr_q'].fillna(False, inplace=True)
-        df['is_first_msr_q'] = df['is_first_msr_q'].fillna(False)
+        df['is_first_msr_q'] = df['is_first_msr_q'].fillna(False).infer_objects(copy=False)
         # logging.debug("[_calculate_msr_metrics] Filling NaNs for 'msr_group_total_time' after merge.")
         # df['msr_group_total_time'].fillna(np.nan, inplace=True)
-        df['msr_group_total_time'] = df['msr_group_total_time'].fillna(np.nan)
+        df['msr_group_total_time'] = df['msr_group_total_time'].fillna(np.nan).infer_objects(copy=False)
         # logging.debug("[_calculate_msr_metrics] Filling NaNs for 'msr_reading_time' after merge.")
         # df['msr_reading_time'].fillna(np.nan, inplace=True)
-        df['msr_reading_time'] = df['msr_reading_time'].fillna(np.nan)
+        df['msr_reading_time'] = df['msr_reading_time'].fillna(np.nan).infer_objects(copy=False)
     except Exception as e:
         logging.error(f"[_calculate_msr_metrics] Error filling NaNs after merge: {e}", exc_info=True)
         raise e

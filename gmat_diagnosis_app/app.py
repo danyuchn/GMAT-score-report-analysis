@@ -352,9 +352,9 @@ def run_analysis(df_combined_input):
             # Pre-calculate V average times if V is present
             v_avg_time_per_type = {}
             if 'V' in SUBJECTS:
-                df_v_temp = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == 'V']
+                df_v_temp = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == 'V'].copy()
                 if not df_v_temp.empty and 'question_time' in df_v_temp.columns and 'question_type' in df_v_temp.columns:
-                    df_v_temp['question_time'] = pd.to_numeric(df_v_temp['question_time'], errors='coerce')
+                    df_v_temp.loc[:, 'question_time'] = pd.to_numeric(df_v_temp['question_time'], errors='coerce')
                     v_avg_time_per_type = df_v_temp.dropna(subset=['question_time']).groupby('question_type')['question_time'].mean().to_dict()
 
             for subject in SUBJECTS:
