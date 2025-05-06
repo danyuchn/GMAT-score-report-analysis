@@ -1653,17 +1653,17 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
     # (Moved near the top as constants/config)
     COLUMN_DISPLAY_CONFIG = {
         "question_position": st.column_config.NumberColumn("題號", help="題目順序"),
-        # "Subject": st.column_config.TextColumn("科目"), # Usually known from tab context
+        # 拿掉科目欄位
         "question_type": st.column_config.TextColumn("題型"),
-        "content_domain": st.column_config.TextColumn("內容領域"), # Added back
         "question_fundamental_skill": st.column_config.TextColumn("考察能力"),
-        "is_correct": st.column_config.CheckboxColumn("答對?", help="是否回答正確"),
         "question_difficulty": st.column_config.NumberColumn("難度(模擬)", help="系統模擬的題目難度 (有效題目)", format="%.2f", width="small"),
-        # "estimated_ability": st.column_config.NumberColumn("能力估計", help="本科目最終能力估計值", format="%.2f", width="small"), # Add overall ability back (Removed)
         "question_time": st.column_config.NumberColumn("用時(分)", format="%.2f", width="small"),
         "time_performance_category": st.column_config.TextColumn("時間表現"),
-        "is_sfe": st.column_config.CheckboxColumn("SFE?", help="是否為Special Focus Error", width="small"),
+        "content_domain": st.column_config.TextColumn("內容領域"),
         "diagnostic_params_list": st.column_config.ListColumn("診斷標籤", help="初步診斷標籤", width="medium"),
+        # 移到最右側的欄位
+        "is_correct": st.column_config.CheckboxColumn("答對?", help="是否回答正確"),
+        "is_sfe": st.column_config.CheckboxColumn("SFE?", help="是否為Special Focus Error", width="small"),
         "is_invalid": st.column_config.CheckboxColumn("標記無效?", help="此題是否被標記為無效 (手動優先)", width="small"), # Show the final invalid flag
         # Internal columns for styling, set config to None to hide in st.dataframe
         "overtime": None,
@@ -1672,17 +1672,17 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
 
     EXCEL_COLUMN_MAP = {
         "question_position": "題號",
-        "Subject": "科目", # Keep subject in Excel export
+        # 拿掉科目欄位（在Excel顯示中）
         "question_type": "題型",
-        "content_domain": "內容領域",
         "question_fundamental_skill": "考察能力",
-        "is_correct": "答對", # Use text TRUE/FALSE (converted in display_subject_results)
         "question_difficulty": "難度(模擬)",
-        # "estimated_ability": "能力估計", # Removed as per user request
         "question_time": "用時(分)",
         "time_performance_category": "時間表現",
-        "is_sfe": "SFE", # Use text TRUE/FALSE
+        "content_domain": "內容領域",
         "diagnostic_params_list": "診斷標籤",
+        # 移到最右側的欄位
+        "is_correct": "答對", # Use text TRUE/FALSE (converted in display_subject_results)
+        "is_sfe": "SFE", # Use text TRUE/FALSE
         "is_invalid": "是否無效", # Use text TRUE/FALSE
         "overtime": "overtime_flag", # Internal flag for Excel styling, will be hidden by to_excel
     }
