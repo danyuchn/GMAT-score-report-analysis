@@ -49,7 +49,10 @@ FINAL_DIAGNOSIS_INPUT_COLS = [
     'question_type', 'content_domain', 'question_fundamental_skill',
     'is_invalid', 'overtime', 'is_manually_invalid',  # Keep manual flag for reference if needed
     # Add simulation/calculated columns later:
-    'question_difficulty', 'estimated_ability'
+    'question_difficulty', 'estimated_ability',
+    # Added for V and DI diagnosis and overtime calculation needs
+    'rc_group_id', 'rc_reading_time', 'rc_group_total_time', 'rc_group_num_questions', # For Verbal
+    'msr_group_id'                                                                   # For DI
 ]
 
 # --- Column Display Configuration ---
