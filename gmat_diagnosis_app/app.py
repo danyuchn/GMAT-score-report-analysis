@@ -5,19 +5,17 @@ import re # Import regex module
 import io # Ensure io is imported
 import pandas as pd # Ensure pandas is imported
 import streamlit as st
-from io import StringIO # Use io.StringIO directly
-import traceback # For detailed error logging
+# Use io.StringIO directly later
+# import traceback # Removed unused import
 import numpy as np
 import logging
 import openpyxl # Required by pandas for Excel export
-from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
-from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl.utils import get_column_letter
+# Removed unused openpyxl style/util imports
 import plotly.graph_objects as go # Add plotly import
 import openai # Keep openai import
 
-# --- Logging Configuration --- Added --- 
-# logging.basicConfig(level=logging.DEBUG, 
+# --- Logging Configuration --- (Kept commented out as in original)
+# logging.basicConfig(level=logging.DEBUG,
 #                     format='%(asctime)s - %(levelname)s - [%(module)s:%(lineno)d] - %(message)s',
 #                     stream=sys.stdout) # Log to standard output
 # logging.getLogger().setLevel(logging.DEBUG) # Force root logger level
@@ -122,15 +120,15 @@ SUBJECTS = ['Q', 'V', 'DI'] # Define subjects for iteration
 # --- Styling Constants & Helpers ---
 ERROR_FONT_COLOR = '#D32F2F' # Red for errors
 OVERTIME_FONT_COLOR = '#0000FF' # Blue for overtime
-OVERTIME_FILL_COLOR = '#FFCDD2' # Light red fill for overtime (kept for reference)
+# OVERTIME_FILL_COLOR = '#FFCDD2' # Removed unused
 
 def apply_styles(row):
     """Applies styling for invalid rows, incorrect answers, and overtime."""
     styles = [''] * len(row)
     INVALID_FONT_COLOR = '#A9A9A9' # DarkGray
-    ERROR_FONT_COLOR = '#D32F2F' # Red for errors
-    OVERTIME_FONT_COLOR = '#0000FF' # Blue for overtime
-    
+    ERROR_FONT_COLOR = '#D32F2F' # Red for errors (local scope)
+    OVERTIME_FONT_COLOR = '#0000FF' # Blue for overtime (local scope)
+
     try:
         # Grey text for invalid rows (overrides other text styles)
         if 'is_invalid' in row.index and row['is_invalid']:
@@ -158,11 +156,11 @@ def to_excel(df, column_map):
     """Converts DataFrame to styled Excel bytes, hiding overtime flag."""
     output = io.BytesIO()
     df_copy = df.copy()
-    
+
     # 根據Subject判斷是否需要移除question_fundamental_skill欄位（針對DI科目）
     subject = df_copy['Subject'].iloc[0] if 'Subject' in df_copy.columns and not df_copy.empty else None
     local_column_map = column_map.copy()
-    
+
     # 如果是DI科目，從column_map中移除question_fundamental_skill
     if subject == 'DI' and 'question_fundamental_skill' in local_column_map:
         del local_column_map['question_fundamental_skill']
@@ -177,7 +175,7 @@ def to_excel(df, column_map):
     # 添加臨時超時標記列
     if '_overtime_for_time' in df_copy.columns:
         columns_to_keep.append('_overtime_for_time')
-    
+
     df_renamed = df_copy[columns_to_keep].rename(columns=local_column_map)
 
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -185,11 +183,11 @@ def to_excel(df, column_map):
         workbook = writer.book
         worksheet = writer.sheets['Sheet1']
 
-        # Define formats
+        # Define formats (Using global color constants here)
         error_format = workbook.add_format({'font_color': ERROR_FONT_COLOR})
         overtime_format = workbook.add_format({'font_color': OVERTIME_FONT_COLOR})
         invalid_format = workbook.add_format({'font_color': '#A9A9A9'})
-        
+
         # 定義數值格式
         number_format = workbook.add_format({'num_format': '0.00'})
 
@@ -202,7 +200,7 @@ def to_excel(df, column_map):
             time_col_disp = next(v for k, v in local_column_map.items() if k == 'question_time')
             overtime_col_disp = next(v for k, v in local_column_map.items() if k == 'overtime') # Name of the overtime flag column
             invalid_col_disp = next(v for k, v in local_column_map.items() if k == 'is_invalid') # Name of the invalid flag column
-            
+
             # 找到診斷標籤欄位的索引
             diagnostic_col_disp = next(v for k, v in local_column_map.items() if k == 'diagnostic_params_list')
             diagnostic_col_idx = header_list.index(diagnostic_col_disp)
@@ -211,7 +209,7 @@ def to_excel(df, column_map):
             time_col_idx = header_list.index(time_col_disp)
             overtime_col_idx = header_list.index(overtime_col_disp)
             invalid_col_idx = header_list.index(invalid_col_disp)
-            
+
             # 找到臨時超時標記列的索引
             _overtime_for_time_idx = header_list.index('_overtime_for_time') if '_overtime_for_time' in header_list else -1
 
@@ -229,32 +227,32 @@ def to_excel(df, column_map):
                 worksheet.set_column(difficulty_col_idx, difficulty_col_idx, None, number_format)
             except (StopIteration, ValueError):
                 pass  # 如果找不到難度欄位，跳過
-                
+
             # 設定用時欄位為數值格式
             worksheet.set_column(time_col_idx, time_col_idx, None, number_format)
 
             # 確保每一行都有獨立的條件格式，並使用cell方式
             # 按指定優先順序處理條件格式（1.無效項灰色，2.錯題紅色，3.超時藍色）
-            
+
             # 獨立處理每一行
             for row in range(2, max_row):
                 # 計算當前行的範圍（整行）
                 row_range = f'A{row}:{chr(ord("A") + len(header_list) - 1)}{row}'
-                
+
                 # 1. 當行的無效項標記為灰色（最高優先順序）
                 worksheet.conditional_format(row_range, {
                     'type': 'formula',
                     'criteria': f'=${invalid_col_letter}{row}="True"',
                     'format': invalid_format
                 })
-                
+
                 # 2. 當行的錯題標記為紅色（第二優先順序，僅當不是無效項時）
                 worksheet.conditional_format(row_range, {
                     'type': 'formula',
                     'criteria': f'=AND(${correct_col_letter}{row}="False",${invalid_col_letter}{row}<>"True")',
                     'format': error_format
                 })
-                
+
                 # 3. 直接使用與行綁定的超時標記，而不依賴overtime列
                 if _overtime_for_time_letter:
                     worksheet.conditional_format(f'{time_col_letter}{row}', {
@@ -267,7 +265,7 @@ def to_excel(df, column_map):
             worksheet.set_column(overtime_col_idx, overtime_col_idx, None, None, {'hidden': True})
             if _overtime_for_time_idx >= 0:
                 worksheet.set_column(_overtime_for_time_idx, _overtime_for_time_idx, None, None, {'hidden': True})
-                
+
             # 隱藏診斷標籤右側的所有欄位
             # 找出所有在診斷標籤右側的欄位並隱藏
             for col_idx in range(len(header_list)):
@@ -435,7 +433,7 @@ def create_theta_plot(theta_history_df, subject_name):
         x_values = [0] + (theta_history_df.index + 1).tolist()
         y_values = [initial_theta] + theta_history_df['theta_est_after_answer'].tolist()
         hover_text = [f"初始 Theta: {initial_theta:.3f}<extra></extra>"] + \
-                     [f"題號 {i+1}<br>Theta: {theta:.3f}<extra></extra>" for i, theta in enumerate(theta_history_df['theta_est_after_answer'])]
+                         [f"題號 {i+1}<br>Theta: {theta:.3f}<extra></extra>" for i, theta in enumerate(theta_history_df['theta_est_after_answer'])]
 
     elif 'theta_est_after_answer' in theta_history_df.columns and not theta_history_df['theta_est_after_answer'].empty:
         # Fallback: Start from question 1 if 'before' data is missing
@@ -528,14 +526,14 @@ def summarize_report_with_openai(report_markdown, api_key):
         logging.error(f"OpenAI APIConnectionError: {e}")
         return report_markdown
     except openai.APITimeoutError:
-         st.warning("OpenAI API 請求超時。暫時使用原始報告文字。", icon="⏱️")
-         logging.error("OpenAI APITimeoutError.")
-         return report_markdown
+        st.warning("OpenAI API 請求超時。暫時使用原始報告文字。", icon="⏱️")
+        logging.error("OpenAI APITimeoutError.")
+        return report_markdown
     except openai.BadRequestError as e:
-         # Often happens with context length issues or invalid requests
-         st.warning(f"OpenAI API 請求無效 ({e})。可能是報告過長或格式問題。暫時使用原始報告文字。", icon="❗") # Use valid emoji
-         logging.error(f"OpenAI BadRequestError: {e}")
-         return report_markdown
+        # Often happens with context length issues or invalid requests
+        st.warning(f"OpenAI API 請求無效 ({e})。可能是報告過長或格式問題。暫時使用原始報告文字。", icon="❗") # Use valid emoji
+        logging.error(f"OpenAI BadRequestError: {e}")
+        return report_markdown
     except Exception as e:
         st.warning(f"調用 OpenAI API 時發生未知錯誤：{e}。暫時使用原始報告文字。", icon="⚠️")
         logging.error(f"Unknown OpenAI API error: {e}", exc_info=True)
@@ -645,13 +643,13 @@ User: 從以下 GMAT 診斷報告中提取練習建議和後續行動部分，�
         logging.error(f"OpenAI APIConnectionError (consolidated report): {e}")
         return None
     except openai.APITimeoutError:
-         st.warning("OpenAI API 請求超時，無法生成匯總報告。", icon="⏱️")
-         logging.error("OpenAI APITimeoutError (consolidated report).")
-         return None
+        st.warning("OpenAI API 請求超時，無法生成匯總報告。", icon="⏱️")
+        logging.error("OpenAI APITimeoutError (consolidated report).")
+        return None
     except openai.BadRequestError as e:
-         st.warning(f"OpenAI API 請求無效 ({e})，無法生成匯總報告。", icon="❗")
-         logging.error(f"OpenAI BadRequestError (consolidated report): {e}")
-         return None
+        st.warning(f"OpenAI API 請求無效 ({e})，無法生成匯總報告。", icon="❗")
+        logging.error(f"OpenAI BadRequestError (consolidated report): {e}")
+        return None
     except Exception as e:
         st.warning(f"生成 AI 匯總建議時發生未知錯誤：{e}", icon="⚠️")
         logging.error(f"Unknown error during consolidated report generation: {e}", exc_info=True)
@@ -680,13 +678,13 @@ def _get_dataframe_context(max_rows=50):
             bool_cols = df_context.select_dtypes(include=bool).columns
             for col in bool_cols:
                 df_context[col] = df_context[col].map({True: 'Yes', False: 'No'})
-                
+
             # Convert list column to string
             if 'diagnostic_params_list' in df_context.columns:
                 df_context['diagnostic_params_list'] = df_context['diagnostic_params_list'].apply(
                     lambda x: ', '.join(map(str, x)) if isinstance(x, list) else str(x)
                 )
-                
+
             # Limit rows to avoid excessive context length
             if len(df_context) > max_rows:
                 df_context_str = df_context.head(max_rows).to_markdown(index=False)
@@ -701,7 +699,7 @@ def _get_dataframe_context(max_rows=50):
 
 def _get_openai_response(current_chat_history, report_context, dataframe_context):
     """Gets response from OpenAI using the responses endpoint and handles conversation history.
-    
+
     Args:
         current_chat_history (list): The current chat history list.
         report_context (str): The combined markdown report context.
@@ -712,16 +710,16 @@ def _get_openai_response(current_chat_history, report_context, dataframe_context
     """
     if not st.session_state.openai_api_key:
         raise ValueError("OpenAI API Key is missing.")
-        
+
     client = openai.OpenAI(api_key=st.session_state.openai_api_key)
-    
+
     # Find the last user prompt
     last_user_prompt = ""
     if current_chat_history and current_chat_history[-1]["role"] == "user":
         last_user_prompt = current_chat_history[-1]["content"]
     else:
         raise ValueError("Could not find the last user prompt in history.")
-        
+
     # Find the previous response ID from the last assistant message
     previous_response_id = None
     if len(current_chat_history) > 1:
@@ -729,7 +727,7 @@ def _get_openai_response(current_chat_history, report_context, dataframe_context
             if current_chat_history[i]["role"] == "assistant":
                 previous_response_id = current_chat_history[i].get("response_id")
                 break
-                
+
     # Construct the input for the API using standard multi-line string and .format()
     input_template = '''You are a GMAT diagnostic assistant. Analyze the provided report summary and detailed data table (excerpt) to answer the user's question accurately and concisely. If the information is not present in the provided context, say so.
 
@@ -747,9 +745,9 @@ USER QUESTION:
         data=dataframe_context,
         prompt=last_user_prompt
     )
-    
+
     try:
-        logging.info(f"Calling OpenAI responses.create with model gpt-4.1-mini. Previous ID: {previous_response_id}")
+        logging.info(f"Calling OpenAI responses.create with model o4-mini. Previous ID: {previous_response_id}")
         response = client.responses.create(
             model="o4-mini", # Using the model from user's example
             input=api_input,
@@ -768,19 +766,19 @@ USER QUESTION:
                 if hasattr(item, 'type') and item.type == 'message':
                     message_block = item
                     break # Found the message block
-            
+
             if message_block and hasattr(message_block, 'content') and message_block.content:
                 for content_block in message_block.content:
                     # Ensure the content_block itself has a type attribute before checking
                     if hasattr(content_block, 'type') and content_block.type == 'output_text':
                         response_text += content_block.text
-            
+
             if not response_text:
                  # --- Log the output structure before raising error ---
                  logging.error(f"OpenAI response completed but no text found after iterating. Response output structure: {response.output}")
                  # --- End Log ---
                  raise ValueError("OpenAI response completed but contained no text output after iterating.")
-                 
+
             return response_text.strip(), response.id
         elif response.status == 'error':
              error_details = response.error if response.error else "Unknown error"
@@ -834,7 +832,7 @@ def process_subject_tab(subject, tab_container, base_rename_map):
             source = uploaded_file
             data_source_type = 'File Upload'
     elif pasted_data:
-        source = StringIO(pasted_data)
+        source = io.StringIO(pasted_data) # Use io.StringIO
         data_source_type = 'Pasted Data'
 
     if source is not None:
@@ -1021,7 +1019,7 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     # 複製配置以進行科目特定調整
     subject_col_config = col_config.copy()
     subject_excel_map = excel_map.copy()
-    
+
     # 針對DI科目移除「考察能力」欄位
     if subject == 'DI':
         if 'question_fundamental_skill' in subject_col_config:
@@ -1182,7 +1180,7 @@ else:
 
 st.sidebar.divider() # Keep divider maybe?
 
-# --- IRT Simulation Settings --- 
+# --- IRT Simulation Settings ---
 st.sidebar.subheader("IRT 模擬設定")
 # Store initial thetas in session state to persist them
 if 'initial_theta_q' not in st.session_state: st.session_state.initial_theta_q = 0.0
@@ -1258,14 +1256,14 @@ else: # Not all subjects loaded or combined DF failed
     subjects_actually_loaded = [subj for subj, df in input_dfs.items() if df is not None]
     missing_subjects = [subj for subj in SUBJECTS if subj not in subjects_actually_loaded]
     if missing_subjects:
-         button_message = f"請確保已為 {'、'.join(missing_subjects)} 科目提供有效數據。"
-         st.warning(button_message, icon="⚠️")
+        button_message = f"請確保已為 {'、'.join(missing_subjects)} 科目提供有效數據。"
+        st.warning(button_message, icon="⚠️")
     elif not input_dfs: # No data attempted at all
-         button_message = "請在上方分頁中為 Q, V, DI 三個科目上傳或貼上資料。"
-         st.info(button_message)
+        button_message = "請在上方分頁中為 Q, V, DI 三個科目上傳或貼上資料。"
+        st.info(button_message)
     else: # All attempted, but maybe combination failed or validation error cleared?
-         button_message = "請檢查所有科目的數據是否已成功加載且無誤。"
-         st.warning(button_message, icon="⚠️")
+        button_message = "請檢查所有科目的數據是否已成功加載且無誤。"
+        st.warning(button_message, icon="⚠️")
 
 
 # Display the button
@@ -1333,32 +1331,28 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
         time_pressure_di = (THRESHOLDS['DI']['MAX_ALLOWED_TIME'] - di_total_time) <= THRESHOLDS['DI']['TIME_PRESSURE_DIFF_MIN'] # Using DI pressure diff
 
         time_pressure_map = {'Q': time_pressure_q, 'V': time_pressure_v, 'DI': time_pressure_di}
-        # st.write(f"時間壓力狀態: {time_pressure_map}") # Removed detailed write
         progress_bar.progress(current_step / total_steps)
     except Exception as e:
         st.error(f"計算時間壓力時出錯: {e}")
         analysis_success = False
         status_text.text(f"步驟 {current_step}/{total_steps}: 計算時間壓力時出錯。") # Update status on error
 
-    # --- 2. Calculate Overtime ---
-    df_with_overtime = None
+    # --- 2. Calculate Overtime (Moved inside Step 5) ---
+    # This step now primarily prepares the dataframe for simulation.
+    df_final_input_for_sim = None
     if analysis_success:
         try:
             current_step = 2
-            status_text.text(f"步驟 {current_step}/{total_steps}: 計算超時狀態...")
-            # Ensure df_combined_input has necessary columns ('question_time', 'question_type', 'Subject')
-            # These should exist due to validation and standardization steps.
-            # df_with_overtime = calculate_overtime(df_combined_input, time_pressure_map) # REMOVED CALL
+            status_text.text(f"步驟 {current_step}/{total_steps}: 準備模擬輸入...") # Renamed step slightly
             df_final_input_for_sim = df_combined_input # Use the combined input directly for simulation
-            # st.write("超時狀態計算完成。") # Removed detailed write
-            # Use this dataframe going forward, it includes the user-confirmed 'is_invalid' flag
-            # df_final_input_for_sim = df_with_overtime # This line is no longer needed
+            # df_with_overtime = calculate_overtime(df_combined_input, time_pressure_map) # REMOVED CALL
+            # Removed unused variable df_with_overtime
             progress_bar.progress(current_step / total_steps)
 
         except Exception as e:
-            st.error(f"計算 overtime 時出錯: {e}")
+            st.error(f"準備模擬輸入時出錯: {e}") # Updated error message context
             analysis_success = False
-            status_text.text(f"步驟 {current_step}/{total_steps}: 計算超時狀態時出錯。") # Update status on error
+            status_text.text(f"步驟 {current_step}/{total_steps}: 準備模擬輸入時出錯。") # Update status on error
 
     # --- 3. IRT Simulation ---
     all_simulation_histories = {}
@@ -1366,22 +1360,18 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
     all_theta_plots = {} # NEW: Store plots locally first
     question_banks = {} # Define banks here
     if analysis_success:
-        # st.write("執行 IRT 模擬...") # Removed detailed write
         current_step = 3
         status_text.text(f"步驟 {current_step}/{total_steps}: 執行 IRT 模擬...")
         try:
             # Initialize banks
-            # st.write("  初始化模擬題庫...") # Removed detailed write
             for subject in SUBJECTS:
                 seed = RANDOM_SEED + SUBJECT_SIM_PARAMS[subject]['seed_offset']
                 question_banks[subject] = irt.initialize_question_bank(BANK_SIZE, seed=seed)
                 if question_banks[subject] is None:
-                     raise ValueError(f"Failed to initialize question bank for {subject}")
-            # st.write("  模擬題庫創建完成。") # Removed detailed write
+                    raise ValueError(f"Failed to initialize question bank for {subject}")
 
             # Run simulation per subject
             for subject in SUBJECTS:
-                # st.write(f"  執行 {subject} 科目模擬...") # Removed detailed write
                 params = SUBJECT_SIM_PARAMS[subject]
                 initial_theta = st.session_state[params['initial_theta_key']]
                 bank = question_banks[subject]
@@ -1391,7 +1381,7 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
 
                 # --- Calculate total questions and wrong positions from user_df_subj --- #
                 if user_df_subj.empty:
-                    st.warning(f"  {subject}: 沒有找到該科目的作答數據，無法執行模擬。", icon="⚠️")
+                    st.warning(f"  {subject}: 沒有找到該科目的作答數據，無法執行模擬。", icon="⚠️")
                     final_thetas_local[subject] = initial_theta
                     all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
                     all_simulation_histories[subject].attrs['simulation_skipped'] = True
@@ -1409,20 +1399,18 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                     user_df_subj['question_position'] = pd.to_numeric(user_df_subj['question_position'], errors='coerce')
                     wrong_positions = user_df_subj.loc[(user_df_subj['is_correct'] == False) & user_df_subj['question_position'].notna(), 'question_position'].astype(int).tolist()
 
-                    # st.write(f"    {subject}: 模擬全部 {total_questions_attempted} 個作答題目，其中錯誤位置: {wrong_positions}") # Removed detailed write
-
                 except (KeyError, ValueError, TypeError) as e:
-                     st.error(f"  {subject}: 無法確定總作答題數或錯誤位置: {e}。跳過模擬。", icon="🚨")
-                     final_thetas_local[subject] = initial_theta
-                     all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
-                     all_simulation_histories[subject].attrs['simulation_skipped'] = True
-                     continue # Skip to next subject
+                    st.error(f"  {subject}: 無法確定總作答題數或錯誤位置: {e}。跳過模擬。", icon="🚨")
+                    final_thetas_local[subject] = initial_theta
+                    all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
+                    all_simulation_histories[subject].attrs['simulation_skipped'] = True
+                    continue # Skip to next subject
                 # --- End Calculation --- #
 
                 # --- Filter valid responses for later difficulty assignment --- #
                 valid_responses = user_df_subj[~user_df_subj['is_invalid']].copy()
                 if valid_responses.empty:
-                    st.warning(f"  {subject}: 所有題目均被標記為無效，Theta 模擬仍基於完整序列。", icon="⚠️")
+                    st.warning(f"  {subject}: 所有題目均被標記為無效，Theta 模擬仍基於完整序列。", icon="⚠️")
                 # --- End Filtering --- #
 
                 # --- Run simulation using the calculated total and wrong list --- #
@@ -1439,21 +1427,19 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                     all_simulation_histories[subject] = history_df
                     final_theta_subj = history_df['theta_est_after_answer'].iloc[-1]
                     final_thetas_local[subject] = final_theta_subj
-                    # st.write(f"    {subject}: 模擬完成。最後 Theta 估計: {final_theta_subj:.3f}") # Removed detailed write
 
                     # --- Generate and store plot ---
                     try:
                         theta_plot = create_theta_plot(history_df, subject)
                         if theta_plot:
                             all_theta_plots[subject] = theta_plot
-                            # st.write(f"    {subject}: Theta 歷史圖表已生成。") # Removed detailed write
                         else:
-                            st.warning(f"    {subject}: 未能生成 Theta 圖表 (create_theta_plot 返回 None)。", icon="📊") # More specific warning
+                            st.warning(f"    {subject}: 未能生成 Theta 圖表 (create_theta_plot 返回 None)。", icon="📊") # More specific warning
                     except Exception as plot_err:
-                        st.warning(f"    {subject}: 生成 Theta 圖表時出錯: {plot_err}", icon="📊")
+                        st.warning(f"    {subject}: 生成 Theta 圖表時出錯: {plot_err}", icon="📊")
                     # --- End plot generation ---
                 elif history_df is not None and history_df.empty: # Succeeded but empty
-                    st.warning(f"  {subject}: 模擬執行但未產生歷史記錄。將使用初始 Theta。")
+                    st.warning(f"  {subject}: 模擬執行但未產生歷史記錄。將使用初始 Theta。")
                     final_thetas_local[subject] = initial_theta
                     all_simulation_histories[subject] = pd.DataFrame(columns=['question_number', 'question_id', 'a', 'b', 'c', 'answered_correctly', 'theta_est_before_answer', 'theta_est_after_answer'])
                     all_simulation_histories[subject].attrs['simulation_skipped'] = True # Mark skipped
@@ -1470,13 +1456,11 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
 
     # --- 4. Prepare Data for Diagnosis ---
     if analysis_success:
-        # st.write("準備診斷數據...") # Removed detailed write
         current_step = 4
         status_text.text(f"步驟 {current_step}/{total_steps}: 準備診斷數據...")
         df_final_for_diagnosis_list = []
         try:
             for subject in SUBJECTS:
-                # st.write(f"  處理 {subject} 科目...") # Removed detailed write
                 user_df_subj = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].copy()
                 sim_history_df = all_simulation_histories.get(subject)
                 final_theta = final_thetas_local.get(subject)
@@ -1495,14 +1479,13 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                 # Get simulated difficulties IF simulation was not skipped
                 sim_b_values = []
                 if not sim_history_df.attrs.get('simulation_skipped', False):
-                      sim_b_values = sim_history_df['b'].tolist()
+                     sim_b_values = sim_history_df['b'].tolist()
 
                 # --- MODIFIED: Assign difficulty to ALL questions based on simulation order ---
                 if len(sim_b_values) == len(user_df_subj_sorted):
                     # Assign difficulty directly based on the simulation order
                     # The simulation history order should correspond to the sorted user data order
                     user_df_subj_sorted['question_difficulty'] = sim_b_values
-                    # logging.info(f"[{subject}] Successfully assigned {len(sim_b_values)} simulated difficulties to all {len(user_df_subj_sorted)} questions.")
                 elif not sim_history_df.attrs.get('simulation_skipped', False): # Only warn if simulation *should* have run
                     st.warning(f"{subject}: 模擬難度數量 ({len(sim_b_values)}) 與實際題目數量 ({len(user_df_subj_sorted)}) 不符。無法分配模擬難度。", icon="⚠️")
                     user_df_subj_sorted['question_difficulty'] = np.nan # Assign NaN if mismatch occurs
@@ -1522,7 +1505,6 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
 
             if analysis_success and df_final_for_diagnosis_list: # Check again after loop
                  df_final_for_diagnosis = pd.concat(df_final_for_diagnosis_list, ignore_index=True)
-                 # st.write("診斷數據準備完成。") # Removed detailed write
                  progress_bar.progress(current_step / total_steps)
             elif analysis_success: # List is empty but no error flagged?
                  st.warning("未能準備任何科目的診斷數據。")
@@ -1539,7 +1521,6 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
     # --- 5. Run Diagnosis ---
     all_diagnosed_dfs = []
     if analysis_success and df_final_for_diagnosis is not None:
-        # st.write("執行診斷分析...") # Removed detailed write
         current_step = 5
         status_text.text(f"步驟 {current_step}/{total_steps}: 執行診斷分析...")
         temp_report_dict = {} # Use temporary dict during run
@@ -1549,46 +1530,33 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
              if 'V' in SUBJECTS:
                  df_v_temp = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == 'V']
                  if not df_v_temp.empty and 'question_time' in df_v_temp.columns and 'question_type' in df_v_temp.columns:
-                      # Ensure time is numeric for calculation
-                      df_v_temp['question_time'] = pd.to_numeric(df_v_temp['question_time'], errors='coerce')
-                      # Filter out rows where time is NaN after conversion
-                      v_avg_time_per_type = df_v_temp.dropna(subset=['question_time']).groupby('question_type')['question_time'].mean().to_dict()
+                     # Ensure time is numeric for calculation
+                     df_v_temp['question_time'] = pd.to_numeric(df_v_temp['question_time'], errors='coerce')
+                     # Filter out rows where time is NaN after conversion
+                     v_avg_time_per_type = df_v_temp.dropna(subset=['question_time']).groupby('question_type')['question_time'].mean().to_dict()
 
 
              for subject in SUBJECTS:
-                 # st.write(f"  診斷 {subject} 科...") # Removed detailed write
                  df_subj = df_final_for_diagnosis[df_final_for_diagnosis['Subject'] == subject].copy()
-                 # --- Calculate Overtime for the subject AFTER potential filtering (assuming filtering happens before/in diagnosis funcs) ---
+                 # --- Calculate Overtime for the subject *before* diagnosis ---
                  time_pressure_subj = time_pressure_map.get(subject, False)
                  try:
                      # Pass only the subject's data and its pressure status
-                     # Need to pass df_subj which might be filtered by subsequent steps
-                     # Let's assume run_q_diagnosis_processed etc. handle filtering *or* operate on non-filtered data where invalid is just a flag
-                     # calculate_overtime needs the DataFrame for the specific subject.
-                     # Create a mini-map for the current subject
                      current_subj_pressure_map = {subject: time_pressure_subj}
                      df_subj_with_overtime = calculate_overtime(df_subj, current_subj_pressure_map)
                      df_subj = df_subj_with_overtime # Replace df_subj
 
-                     # === START DEBUG LOGGING ===
-                     logging.info(f"[{subject}] Overtime calculated. Overtime count: {df_subj['overtime'].sum()}")
-                     logging.info(f"[{subject}] df_subj head with overtime before diagnosis:\n{df_subj[['Subject', 'question_position', 'question_type', 'question_time', 'overtime']].head().to_string()}")
+                     # === START DEBUG LOGGING (kept for potential use) ===
+                     # logging.info(f"[{subject}] Overtime calculated. Overtime count: {df_subj['overtime'].sum()}")
+                     # logging.info(f"[{subject}] df_subj head with overtime before diagnosis:\n{df_subj[['Subject', 'question_position', 'question_type', 'question_time', 'overtime']].head().to_string()}")
                      # === END DEBUG LOGGING ===
 
                  except Exception as overtime_calc_err:
-                      st.error(f"  {subject}: 計算 Overtime 時出錯: {overtime_calc_err}")
-                      # Decide how to proceed: skip subject? continue without overtime?
-                      # Let's add a placeholder report and continue without diagnosis for this subject
-                      temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 計算超時狀態時出錯: {overtime_calc_err}*\n"
-                      all_diagnosed_dfs.append(df_subj) # Append original df without overtime/diagnosis
-                      continue # Skip diagnosis for this subject
+                     st.error(f"  {subject}: 計算 Overtime 時出錯: {overtime_calc_err}")
+                     temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 計算超時狀態時出錯: {overtime_calc_err}*\n"
+                     all_diagnosed_dfs.append(df_subj) # Append original df without overtime/diagnosis
+                     continue # Skip diagnosis for this subject
                  # --- End Overtime Calculation ---
-
-                 # Fill NaN difficulties with a default (e.g., average ability) before diagnosis? Or handle in diagnostic funcs.
-                 # Let's assume diagnostic functions can handle potential NaNs in difficulty for invalid items.
-                 # If not, fill here:
-                 # final_theta = final_thetas_local.get(subject, 0) # Get final theta
-                 # df_subj['question_difficulty'].fillna(final_theta, inplace=True)
 
                  time_pressure = time_pressure_map.get(subject, False)
                  subj_results, subj_report, df_subj_diagnosed = None, None, None
@@ -1602,86 +1570,63 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
                      elif subject == 'V':
                          subj_results, subj_report, df_subj_diagnosed = run_v_diagnosis_processed(df_subj, time_pressure, v_avg_time_per_type)
                  except Exception as diag_err:
-                      st.error(f"  {subject} 科診斷函數執行時出錯: {diag_err}")
+                     st.error(f"  {subject} 科診斷函數執行時出錯: {diag_err}")
 
 
                  if subj_report is not None and df_subj_diagnosed is not None:
                      # --- Attempt OpenAI Summarization --- #
                      final_report_for_subject = subj_report # Start with the original
-                     # Retrieve api key (it's loaded near the top)
+                     # Retrieve api key
                      if st.session_state.openai_api_key and subj_report and "發生錯誤" not in subj_report and "未成功執行" not in subj_report:
-                         # st.write(f"    嘗試使用 OpenAI 整理 {subject} 科報告...") # Removed detailed write
                          summarized_report = summarize_report_with_openai(subj_report, st.session_state.openai_api_key)
                          if summarized_report != subj_report: # Check if summarization actually changed something
-                             # st.write(f"      -> {subject} 科報告已由 AI 整理。") # Removed detailed write
                              final_report_for_subject = summarized_report
-                         # else: # No need to write anything if no change
-                             # st.write(f"      -> {subject} 科報告整理失敗或無需整理。")
-                     # elif not st.session_state.openai_api_key:
-                          # st.info(f"    未提供 OpenAI API Key，跳過 {subject} 科報告整理。") # Removed, less verbose
 
                      temp_report_dict[subject] = final_report_for_subject # Store the final version
                      all_diagnosed_dfs.append(df_subj_diagnosed) # Append the diagnosed dataframe
-                     # st.write(f"    {subject} 科診斷處理完成。") # Removed detailed write
 
                  else:
-                     st.error(f"  {subject} 科診斷未返回預期結果。")
+                     st.error(f"  {subject} 科診斷未返回預期結果。")
                      temp_report_dict[subject] = f"**{subject} 科診斷報告**\n\n* 診斷未成功執行或未返回結果。*\n"
 
 
              # Combine results *after* loop
              valid_diagnosed_dfs = [df for df in all_diagnosed_dfs if df is not None and not df.empty]
              if valid_diagnosed_dfs:
-                  st.session_state.processed_df = pd.concat(valid_diagnosed_dfs, ignore_index=True)
+                 st.session_state.processed_df = pd.concat(valid_diagnosed_dfs, ignore_index=True)
+                 st.session_state.report_dict = temp_report_dict
+                 st.session_state.final_thetas = final_thetas_local # Store thetas from sim
+                 st.session_state.theta_plots = all_theta_plots # NEW: Store the plots in session state
+                 progress_bar.progress(current_step / total_steps) # Mark final step complete
 
-                  # === START DEBUG LOGGING ===
-                  logging.info("Concatenated diagnosed dfs. Final processed_df info:")
-                  logging.info(f"Shape: {st.session_state.processed_df.shape}")
-                  logging.info(f"Columns: {st.session_state.processed_df.columns.tolist()}")
-                  if 'overtime' in st.session_state.processed_df.columns:
-                      logging.info("Overtime counts per subject in final df:")
-                      logging.info(st.session_state.processed_df.groupby('Subject')['overtime'].sum())
-                      logging.info(f"Final df head with overtime:\n{st.session_state.processed_df[['Subject', 'question_position', 'question_type', 'question_time', 'overtime', 'time_performance_category', 'diagnostic_params_list']].head().to_string()}") # Added related columns
-                  else:
-                      logging.warning("Final processed_df is missing 'overtime' column after concatenation.")
-                  # === END DEBUG LOGGING ===
-
-                  st.session_state.report_dict = temp_report_dict
-                  st.session_state.final_thetas = final_thetas_local # Store thetas from sim
-                  st.session_state.theta_plots = all_theta_plots # NEW: Store the plots in session state
-                  # st.write("所有科目診斷完成。") # Removed detailed write
-                  progress_bar.progress(current_step / total_steps) # Mark final step complete
-
-                  # --- NEW: Generate Consolidated AI Report --- #
-                  if st.session_state.openai_api_key and st.session_state.report_dict:
-                      status_text.text(f"步驟 {current_step}/{total_steps}: 生成 AI 匯總建議...") # Update status
-                      try:
-                          consolidated_report = generate_ai_consolidated_report(
-                              st.session_state.report_dict,
-                              st.session_state.openai_api_key
-                          )
-                          st.session_state.ai_consolidated_report = consolidated_report
-                          if consolidated_report:
-                              logging.info("AI consolidated report generated successfully.")
-                              # status_text.text(f"步驟 {current_step}/{total_steps}: AI 匯總建議生成完成。") # Optional: Final update
-                          else:
-                              logging.warning("AI consolidated report generation returned None or empty.")
-                              # Warning message should be shown by the helper function
-                      except Exception as ai_gen_err:
-                          st.warning(f"生成 AI 匯總建議時發生錯誤: {ai_gen_err}", icon="⚠️")
-                          logging.error(f"Error calling generate_ai_consolidated_report: {ai_gen_err}", exc_info=True)
-                          st.session_state.ai_consolidated_report = None # Ensure it's None on error
-                  else:
-                      st.session_state.ai_consolidated_report = None # Ensure None if no key/report
-                  # --- End NEW --- #
+                 # --- NEW: Generate Consolidated AI Report --- #
+                 if st.session_state.openai_api_key and st.session_state.report_dict:
+                     status_text.text(f"步驟 {current_step}/{total_steps}: 生成 AI 匯總建議...") # Update status
+                     try:
+                         consolidated_report = generate_ai_consolidated_report(
+                             st.session_state.report_dict,
+                             st.session_state.openai_api_key
+                         )
+                         st.session_state.ai_consolidated_report = consolidated_report
+                         if consolidated_report:
+                             logging.info("AI consolidated report generated successfully.")
+                         else:
+                             logging.warning("AI consolidated report generation returned None or empty.")
+                     except Exception as ai_gen_err:
+                         st.warning(f"生成 AI 匯總建議時發生錯誤: {ai_gen_err}", icon="⚠️")
+                         logging.error(f"Error calling generate_ai_consolidated_report: {ai_gen_err}", exc_info=True)
+                         st.session_state.ai_consolidated_report = None # Ensure it's None on error
+                 else:
+                     st.session_state.ai_consolidated_report = None # Ensure None if no key/report
+                 # --- End NEW --- #
 
              else:
-                  st.error("所有科目均未能成功診斷或無數據。")
-                  st.session_state.processed_df = None # Ensure no stale data
-                  st.session_state.report_dict = temp_report_dict # Still show error reports
-                  st.session_state.theta_plots = {} # Clear plots
-                  analysis_success = False
-                  status_text.text(f"步驟 {current_step}/{total_steps}: 診斷完成，但無有效結果。")
+                 st.error("所有科目均未能成功診斷或無數據。")
+                 st.session_state.processed_df = None # Ensure no stale data
+                 st.session_state.report_dict = temp_report_dict # Still show error reports
+                 st.session_state.theta_plots = {} # Clear plots
+                 analysis_success = False
+                 status_text.text(f"步驟 {current_step}/{total_steps}: 診斷完成，但無有效結果。")
 
 
         except Exception as e:
@@ -1693,29 +1638,26 @@ if st.session_state.analysis_run and df_combined_input is not None and not st.se
     # --- Final Status Update ---
     # Use st.session_state.processed_df existence check directly
     if analysis_success and st.session_state.processed_df is not None:
-         # analysis_status.update(label="分析成功完成！", state="complete", expanded=False) # Removed status block update
-         status_text.text("分析成功完成！") # Update final status text
-         st.session_state.diagnosis_complete = True # Mark diagnosis as done
-         st.session_state.error_message = None
-         st.balloons() # Celebrate success
+        status_text.text("分析成功完成！") # Update final status text
+        st.session_state.diagnosis_complete = True # Mark diagnosis as done
+        st.session_state.error_message = None
+        st.balloons() # Celebrate success
     else:
-         # analysis_status.update(label="分析過程中斷或失敗。", state="error", expanded=True) # Removed status block update
-         # Error message already set in status_text during the step failure
-         if analysis_success and st.session_state.processed_df is None:
-             # Handle the case where analysis technically succeeded but produced no df
-             status_text.error("分析完成但未產生有效數據，請檢查輸入或診斷邏輯。")
-         elif not analysis_success:
-              # If analysis failed earlier, the status_text should already reflect the error step
-              # Optionally add a generic error message if it's still the default text
-              if "準備開始分析" in status_text.text("") : # Check if it's still initial text
-                  status_text.error("分析過程中斷或失敗，請檢查上方錯誤訊息。")
+        # Error message already set in status_text during the step failure
+        if analysis_success and st.session_state.processed_df is None:
+            # Handle the case where analysis technically succeeded but produced no df
+            status_text.error("分析完成但未產生有效數據，請檢查輸入或診斷邏輯。")
+        elif not analysis_success:
+            # If analysis failed earlier, the status_text should already reflect the error step
+            # Optionally add a generic error message if it's still the default text
+            if "準備開始分析" in status_text.text("") : # Check if it's still initial text
+                status_text.error("分析過程中斷或失敗，請檢查上方錯誤訊息。")
 
-         st.session_state.diagnosis_complete = False # Ensure it's False on error
-         st.session_state.error_message = "分析未能成功完成，請檢查上方錯誤訊息。"
-         st.session_state.theta_plots = {} # Clear plots on error
+        st.session_state.diagnosis_complete = False # Ensure it's False on error
+        st.session_state.error_message = "分析未能成功完成，請檢查上方錯誤訊息。"
+        st.session_state.theta_plots = {} # Clear plots on error
 
-    # Explicitly clear the progress bar maybe? Or leave it at 100% / error state.
-    # Leaving it might be fine.
+    # Leaving progress bar as is (100% or error state)
 
 
 # --- Display Results Section ---
@@ -1724,7 +1666,7 @@ if st.session_state.analysis_run: # Only show results area if analysis was at le
     st.header("📊 診斷結果")
 
     # --- Define Column Configuration and Excel Map ---
-    # (Moved near the top as constants/config)
+    # (Moved near the top as constants/config) - Using global constants here
     COLUMN_DISPLAY_CONFIG = {
         "question_position": st.column_config.NumberColumn("題號", help="題目順序"),
         # 拿掉科目欄位
@@ -1834,7 +1776,7 @@ if st.session_state.openai_api_key and st.session_state.diagnosis_complete:
     st.session_state.show_chat = True
 else:
     st.session_state.show_chat = False
-    
+
 if st.session_state.show_chat:
     st.header("💬 與 AI 對話 (基於本次報告)")
 
@@ -1855,20 +1797,20 @@ if st.session_state.show_chat:
             message_placeholder = st.empty() # Placeholder for streaming or waiting message
             message_placeholder.markdown("思考中...")
             try:
-                # --- Prepare Context --- 
-                report_context = _get_combined_report_context() 
+                # --- Prepare Context ---
+                report_context = _get_combined_report_context()
                 dataframe_context = _get_dataframe_context()
-                # --- Call OpenAI --- 
+                # --- Call OpenAI ---
                 ai_response_text, response_id = _get_openai_response(
-                    st.session_state.chat_history, 
-                    report_context, 
+                    st.session_state.chat_history,
+                    report_context,
                     dataframe_context
                 )
-                
+
                 # Display AI response and add to history with response_id
                 message_placeholder.markdown(ai_response_text)
                 st.session_state.chat_history.append({
-                    "role": "assistant", 
+                    "role": "assistant",
                     "content": ai_response_text,
                     "response_id": response_id # Store the ID for the next turn
                 })
@@ -1879,5 +1821,5 @@ if st.session_state.show_chat:
                 # Add error message to history, without a response_id
                 st.session_state.chat_history.append({"role": "assistant", "content": error_message})
 
-# --- End of Main Page --- 
+# --- End of Main Page ---
 # (Add any final footers or elements after the chat interface if needed)
