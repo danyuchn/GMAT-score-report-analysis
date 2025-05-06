@@ -16,6 +16,13 @@ from openpyxl.utils import get_column_letter
 import plotly.graph_objects as go # Add plotly import
 import openai # Keep openai import
 
+# --- Logging Configuration --- Added --- 
+# logging.basicConfig(level=logging.DEBUG, 
+#                     format='%(asctime)s - %(levelname)s - [%(module)s:%(lineno)d] - %(message)s',
+#                     stream=sys.stdout) # Log to standard output
+# logging.getLogger().setLevel(logging.DEBUG) # Force root logger level
+# --- End Logging Configuration ---
+
 # --- Project Path Setup --- (Keep as is)
 try:
     app_dir = os.path.dirname(os.path.abspath(__file__))
