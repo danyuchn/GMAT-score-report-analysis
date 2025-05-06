@@ -5,8 +5,10 @@ from scipy.special import expit # Sigmoid function
 from scipy.stats import norm
 import logging # Import logging
 
-# Configure basic logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure basic logging (this might be better in the main app entry point)
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+logger = logging.getLogger(__name__) # Define module-level logger
 
 def probability_correct(theta, a, b, c):
     """Calculates the probability of a correct response using the 3PL IRT model.
@@ -103,7 +105,7 @@ def neg_log_likelihood(theta, history):
         TypeError: If history is not a list or theta is not numeric.
         ValueError: If items in history are invalid (missing keys, non-numeric params).
     """
-    logging.debug(f"neg_log_likelihood called with theta type: {type(theta)}, value: {theta}")
+    logger.debug(f"neg_log_likelihood called with theta type: {type(theta)}, value: {theta}")
 
     # --- More robust handling of theta from scipy.optimize.minimize ---
     # Minimize often passes a numpy array, even for a scalar objective function.
@@ -112,7 +114,7 @@ def neg_log_likelihood(theta, history):
             current_theta = float(theta[0]) # Extract scalar value
         else:
             # This case should not happen for scalar optimization like L-BFGS-B
-            logging.error(f"neg_log_likelihood received unexpected numpy array theta shape: {theta.shape}")
+            logger.error(f"neg_log_likelihood received unexpected numpy array theta shape: {theta.shape}")
             return np.inf # Indicate error
     elif isinstance(theta, (int, float, np.number)):
          current_theta = float(theta)
@@ -121,11 +123,11 @@ def neg_log_likelihood(theta, history):
          if len(theta) == 1 and isinstance(theta[0], (int, float, np.number)):
              current_theta = float(theta[0])
          else:
-              logging.error(f"neg_log_likelihood received unsupported list/tuple theta format: {theta}")
+              logger.error(f"neg_log_likelihood received unsupported list/tuple theta format: {theta}")
               return np.inf
     else:
         # If none of the above, log the type and raise error
-        logging.error(f"neg_log_likelihood received non-numeric theta type: {type(theta)}, value: {theta}")
+        logger.error(f"neg_log_likelihood received non-numeric theta type: {type(theta)}, value: {theta}")
         raise TypeError("Theta must be numeric or a single-element array/list.") # More specific error
 
     # --- Original log-likelihood calculation ---
@@ -159,13 +161,13 @@ def neg_log_likelihood(theta, history):
 
         # Check for NaNs or Infs resulting from log (should be less likely with clipping)
         if np.isnan(log_likelihood) or np.isinf(log_likelihood):
-            logging.warning(f"Log calculation resulted in NaN/Inf for item {i}. Theta: {current_theta}, P: {P}, P_clipped: {P_clipped}")
+            logger.warning(f"Log calculation resulted in NaN/Inf for item {i}. Theta: {current_theta}, P: {P}, P_clipped: {P_clipped}")
             # Decide handling: raise error, return large value? Raising error is cleaner.
             raise ValueError(f"Log likelihood calculation failed for item {i} (NaN/Inf).")
 
     # Check for NaN or Inf likelihood which can stop optimization
     if np.isnan(log_likelihood) or np.isinf(log_likelihood):
-        logging.warning(f"Log-likelihood became NaN or Inf for theta={current_theta:.4f}. History length={len(history)}. Returning Inf.")
+        logger.warning(f"Log-likelihood became NaN or Inf for theta={current_theta:.4f}. History length={len(history)}. Returning Inf.")
         return np.inf
 
     return -log_likelihood # Return negative for minimization
@@ -183,7 +185,7 @@ def estimate_theta(history, initial_theta_guess=0.0, bounds=(-4, 4)):
         float: Estimated theta, or initial_theta_guess on failure.
     """
     if not history:
-        logging.info("Theta estimation: No history provided, returning initial guess.")
+        logger.info("Theta estimation: No history provided, returning initial guess.")
         return initial_theta_guess
 
     try:
@@ -202,21 +204,21 @@ def estimate_theta(history, initial_theta_guess=0.0, bounds=(-4, 4)):
             estimated_theta = result.x[0]
             # Clamp the result within the bounds explicitly
             final_theta = np.clip(estimated_theta, bounds[0], bounds[1])
-            logging.debug(f"Theta estimation successful. Theta: {final_theta:.4f} (Optimizer status: {result.message})")
+            logger.debug(f"Theta estimation successful. Theta: {final_theta:.4f} (Optimizer status: {result.message})")
             return final_theta
         else:
             # Log detailed failure information
-            logging.warning(f"Theta estimation optimization FAILED. Status: {result.status}, Message: {result.message}")
-            logging.warning(f"Optimizer Result Details: {result}") # Log the full result object for debugging
-            logging.warning(f"Returning previous guess: {initial_theta_guess:.4f}")
+            logger.warning(f"Theta estimation optimization FAILED. Status: {result.status}, Message: {result.message}")
+            logger.warning(f"Optimizer Result Details: {result}") # Log the full result object for debugging
+            logger.warning(f"Returning previous guess: {initial_theta_guess:.4f}")
             return initial_theta_guess # Return previous guess
 
     except ValueError as ve:
         # This might catch the TypeError from neg_log_likelihood now, or other value issues
-        logging.error(f"ValueError or TypeError during theta estimation (check history data or theta type?): {ve}")
+        logger.error(f"ValueError or TypeError during theta estimation (check history data or theta type?): {ve}")
         return initial_theta_guess
     except Exception as e:
-        logging.error(f"Unexpected error during theta estimation: {e}", exc_info=True)
+        logger.error(f"Unexpected error during theta estimation: {e}", exc_info=True)
         return initial_theta_guess
 
 
@@ -232,17 +234,17 @@ def select_next_question(theta, remaining_questions_df):
     """
     required_cols = ['a', 'b', 'c']
     if not isinstance(remaining_questions_df, pd.DataFrame) or remaining_questions_df.empty:
-        logging.warning("No remaining questions available for selection.")
+        logger.warning("No remaining questions available for selection.")
         return None
     if not all(col in remaining_questions_df.columns for col in required_cols):
-        logging.error(f"remaining_questions_df must contain columns: {required_cols}.")
+        logger.error(f"remaining_questions_df must contain columns: {required_cols}.")
         return None
 
     # Check if columns are numeric before applying calculations
     numeric_cols = True
     for col in required_cols:
         if not pd.api.types.is_numeric_dtype(remaining_questions_df[col]):
-             logging.warning(f"Column '{col}' is not numeric. Attempting conversion.")
+             logger.warning(f"Column '{col}' is not numeric. Attempting conversion.")
              numeric_cols = False
              # Attempt conversion here or let apply handle it (might be slower)
 
@@ -257,20 +259,20 @@ def select_next_question(theta, remaining_questions_df):
         )
         # Handle potential NaN/Inf results robustly
         if information.isnull().any() or np.isinf(information).any():
-             logging.warning("NaN or Inf encountered during item information calculation. Treating as zero information.")
+             logger.warning("NaN or Inf encountered during item information calculation. Treating as zero information.")
              information = information.fillna(0.0).replace([np.inf, -np.inf], 0.0)
 
     except (TypeError, ValueError) as e:
         # Catch errors from float conversion or item_information itself
-        logging.error(f"Error calculating item information across DataFrame: {e}")
+        logger.error(f"Error calculating item information across DataFrame: {e}")
         return None
     except Exception as e:
-        logging.error(f"Unexpected error calculating item information: {e}", exc_info=True)
+        logger.error(f"Unexpected error calculating item information: {e}", exc_info=True)
         return None
 
     # Find the index (question ID) of the question with the maximum *positive* information
     if information.empty or information.max() <= 1e-9: # Use small threshold instead of zero
-         logging.warning(f"Could not find a question with positive information at theta={theta:.3f}.")
+         logger.warning(f"Could not find a question with positive information at theta={theta:.3f}.")
          # Fallback strategy: Maybe choose the question with b closest to theta?
          # Or just return None if no informative question exists.
          return None
@@ -291,7 +293,7 @@ def initialize_question_bank(num_questions=1000, seed=None):
         pd.DataFrame or None: DataFrame with ['id', 'a', 'b', 'c'] or None if invalid input.
     """
     if not isinstance(num_questions, int) or num_questions <= 0:
-        logging.error("num_questions must be a positive integer.")
+        logger.error("num_questions must be a positive integer.")
         return None
 
     rng = np.random.default_rng(seed) # Modern way to handle seeding
@@ -328,24 +330,24 @@ def simulate_cat_exam(question_bank, wrong_question_positions, initial_theta, to
     """
     # --- Input Validation ---
     if not isinstance(question_bank, pd.DataFrame) or not all(col in question_bank.columns for col in ['a', 'b', 'c']):
-        logging.error("Invalid question_bank DataFrame format (missing a/b/c).")
+        logger.error("Invalid question_bank DataFrame format (missing a/b/c).")
         return pd.DataFrame() # Return empty DataFrame
     # Check if index is suitable as ID (e.g., unique) - assumes index is the ID here
     if not question_bank.index.is_unique:
-        logging.warning("Question bank index is not unique. Selection might be ambiguous.")
+        logger.warning("Question bank index is not unique. Selection might be ambiguous.")
         # Or try using an 'id' column if available: question_bank.set_index('id', inplace=True) if 'id' in question_bank.columns else error...
 
     if not isinstance(wrong_question_positions, list):
-        logging.error("wrong_question_positions must be a list.")
+        logger.error("wrong_question_positions must be a list.")
         return pd.DataFrame()
     if not isinstance(initial_theta, (int, float, np.number)):
-        logging.error("initial_theta must be numeric.")
+        logger.error("initial_theta must be numeric.")
         return pd.DataFrame()
     if not isinstance(total_questions, int) or total_questions <= 0:
-        logging.error("total_questions must be a positive integer.")
+        logger.error("total_questions must be a positive integer.")
         return pd.DataFrame()
     if total_questions > len(question_bank):
-         logging.warning(f"total_questions ({total_questions}) exceeds bank size ({len(question_bank)}). Adjusting.")
+         logger.warning(f"total_questions ({total_questions}) exceeds bank size ({len(question_bank)}). Adjusting.")
          total_questions = len(question_bank)
     if not question_bank.index.name: # Often useful to have a named index
         question_bank.index.name = 'question_id' # Assume index is the ID
@@ -357,7 +359,7 @@ def simulate_cat_exam(question_bank, wrong_question_positions, initial_theta, to
     results_log = [] # Stores more detailed info for the final output DataFrame
     theta_est = initial_theta
 
-    logging.info(f"Starting CAT simulation: Initial Theta = {theta_est:.3f}, Total Questions = {total_questions}")
+    logger.debug(f"Starting CAT simulation: Initial Theta = {theta_est:.3f}, Total Questions = {total_questions}")
 
     # --- Simulation Loop ---
     for i in range(total_questions):
@@ -367,7 +369,7 @@ def simulate_cat_exam(question_bank, wrong_question_positions, initial_theta, to
         # Select next question (returns index label/ID)
         next_q_id = select_next_question(theta_est, remaining_questions_df)
         if next_q_id is None:
-            logging.error(f"Could not select next question at step {question_number}. Stopping simulation.")
+            logger.error(f"Could not select next question at step {question_number}. Stopping simulation.")
             break
 
         # Get question parameters using the selected ID (index)
@@ -407,9 +409,11 @@ def simulate_cat_exam(question_bank, wrong_question_positions, initial_theta, to
         # Remove administered question from the *copy*
         remaining_questions_df = remaining_questions_df.drop(next_q_id)
 
-        logging.info(f"  Q {question_number}: ID={next_q_id}, b={question_params['b']:.2f}, "
+        # No need for 'if logger:' if logger is defined at module level and always available
+        b_val_formatted = format(question_params['b'], '.2f')
+        logger.debug(f"  Q {question_number}: ID={next_q_id}, b={b_val_formatted}, "
                      f"Answer={'Correct' if answered_correctly else 'Incorrect'}, New Theta={theta_est:.3f}")
 
-    logging.info(f"Simulation finished. Final Theta = {theta_est:.3f}")
+    logger.debug(f"Simulation finished. Final Theta = {theta_est:.3f}")
 
     return pd.DataFrame(results_log)
