@@ -29,7 +29,7 @@ except NameError:
 try:
     # Import custom modules
     from gmat_diagnosis_app import irt_module as irt
-    from gmat_diagnosis_app.preprocess_helpers import suggest_invalid_questions, calculate_overtime, THRESHOLDS
+    from gmat_diagnosis_app.preprocess_helpers import suggest_invalid_questions, calculate_overtime, THRESHOLDS, parse_adjusted_qns
     from gmat_diagnosis_app.diagnostics.v_diagnostic import run_v_diagnosis_processed
     from gmat_diagnosis_app.diagnostics.di_diagnostic import run_di_diagnosis_processed
     from gmat_diagnosis_app.diagnostics.q_diagnostic import diagnose_q
@@ -97,7 +97,14 @@ def init_session_state():
         # --- AI Chat State ---
         'openai_api_key': None,
         'show_chat': False,
-        'chat_history': [] # List of dicts: {"role": "user/assistant", "content": "..."}
+        'chat_history': [], # List of dicts: {"role": "user/assistant", "content": "..."}
+        # --- Manual IRT Adjustment Inputs ---
+        'q_incorrect_to_correct_qns': '',
+        'q_correct_to_incorrect_qns': '',
+        'v_incorrect_to_correct_qns': '',
+        'v_correct_to_incorrect_qns': '',
+        'di_incorrect_to_correct_qns': '',
+        'di_correct_to_incorrect_qns': ''
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -212,6 +219,17 @@ def run_analysis(df_combined_input):
                 # Get user data for the subject, sorted by position
                 user_df_subj = df_final_input_for_sim[df_final_input_for_sim['Subject'] == subject].sort_values(by='question_position')
 
+                # --- Parse Manually Adjusted Question Numbers for IRT ---
+                incorrect_to_correct_str_key = f"{subject.lower()}_incorrect_to_correct_qns"
+                correct_to_incorrect_str_key = f"{subject.lower()}_correct_to_incorrect_qns"
+                
+                i_to_c_qns_str = st.session_state.get(incorrect_to_correct_str_key, "")
+                c_to_i_qns_str = st.session_state.get(correct_to_incorrect_str_key, "")
+                
+                i_to_c_qns_set = parse_adjusted_qns(i_to_c_qns_str)
+                c_to_i_qns_set = parse_adjusted_qns(c_to_i_qns_str)
+                # --- End Parsing ---
+
                 # Calculate total questions and wrong positions
                 if user_df_subj.empty:
                     st.warning(f"  {subject}: 沒有找到該科目的作答數據，無法執行模擬。", icon="⚠️")
@@ -249,7 +267,9 @@ def run_analysis(df_combined_input):
                     question_bank=bank,
                     wrong_question_positions=wrong_positions,
                     initial_theta=initial_theta,
-                    total_questions=total_questions_attempted
+                    total_questions=total_questions_attempted,
+                    incorrect_to_correct_qns=i_to_c_qns_set,      # Pass the parsed set
+                    correct_to_incorrect_qns=c_to_i_qns_set        # Pass the parsed set
                 )
 
                 if history_df is not None and not history_df.empty:
@@ -580,6 +600,55 @@ def main():
         step=0.1,
         key="theta_di_input"
     )
+
+    # --- Manual IRT Adjustment Inputs in Sidebar ---
+    st.sidebar.markdown("#### 手動調整題目正確性 (僅影響IRT模擬)")
+    
+    # Quant
+    st.sidebar.markdown("##### 計量 (Quant)")
+    st.session_state.q_incorrect_to_correct_qns = st.sidebar.text_input(
+        "Q 由錯改對題號", 
+        value=st.session_state.q_incorrect_to_correct_qns,
+        placeholder="例: 1,5,10",
+        key="q_i_to_c_input"
+    )
+    st.session_state.q_correct_to_incorrect_qns = st.sidebar.text_input(
+        "Q 由對改錯題號", 
+        value=st.session_state.q_correct_to_incorrect_qns,
+        placeholder="例: 2,7,12",
+        key="q_c_to_i_input"
+    )
+
+    # Verbal
+    st.sidebar.markdown("##### 語文 (Verbal)")
+    st.session_state.v_incorrect_to_correct_qns = st.sidebar.text_input(
+        "V 由錯改對題號", 
+        value=st.session_state.v_incorrect_to_correct_qns,
+        placeholder="例: 1,5,10",
+        key="v_i_to_c_input"
+    )
+    st.session_state.v_correct_to_incorrect_qns = st.sidebar.text_input(
+        "V 由對改錯題號", 
+        value=st.session_state.v_correct_to_incorrect_qns,
+        placeholder="例: 2,7,12",
+        key="v_c_to_i_input"
+    )
+
+    # Data Insights (DI)
+    st.sidebar.markdown("##### 資料洞察 (DI)")
+    st.session_state.di_incorrect_to_correct_qns = st.sidebar.text_input(
+        "DI 由錯改對題號", 
+        value=st.session_state.di_incorrect_to_correct_qns,
+        placeholder="例: 1,5,10",
+        key="di_i_to_c_input"
+    )
+    st.session_state.di_correct_to_incorrect_qns = st.sidebar.text_input(
+        "DI 由對改錯題號", 
+        value=st.session_state.di_correct_to_incorrect_qns,
+        placeholder="例: 2,7,12",
+        key="di_c_to_i_input"
+    )
+    st.sidebar.divider() # Add a divider after these inputs
     
     # --- Data Input Section ---
     from gmat_diagnosis_app import preprocess_helpers

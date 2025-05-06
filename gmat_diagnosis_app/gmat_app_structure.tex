@@ -1,0 +1,97 @@
+\documentclass[tikz, border=10pt]{standalone}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{forest}
+\usepackage{CJKutf8}
+\usepackage{beramono}
+\begin{document}
+\begin{CJK}{UTF8}{bsmi}
+
+\begin{forest}
+  for tree={
+    grow'=0,
+    folder,             % Default style for nodes (directories)
+    font=\ttfamily\footnotesize,
+    s sep=0.5em,
+    l sep=2em,
+    edge={draw, -latex},
+    align=left,
+    anchor=west,
+    child anchor=west,
+    text width=5.5cm,     % Default text width for nodes
+    minimum height=2em,   % Min height for CJK and multi-line
+  },
+  % Style for file nodes (leaf nodes)
+  where nchildren=0{tier=file, fill=blue!10, rounded corners=2pt, text width=6.5cm}{},
+  % Style for directory nodes (non-leaf nodes with 'folder' style)
+  where nchildren>0{fill=orange!10, rounded corners=2pt}{},
+[gmat\_diagnosis\_app, name=root, folder, open
+  [ {\textbf{app.py}\\{\scriptsize Path: app.py}\\{\scriptsize 主應用程式進入點 (Main application entry point)}} , tier=file]
+  [ {\textbf{diagnosis\_module.py}\\{\scriptsize Path: diagnosis\_module.py}\\{\scriptsize 診斷主模組 (Main diagnosis module)}} , tier=file]
+  [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: \_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+  [ {\textbf{irt\_module.py}\\{\scriptsize Path: irt\_module.py}\\{\scriptsize 項目反應理論模組 (Item Response Theory module)}} , tier=file]
+  [ {\textbf{preprocess\_helpers.py}\\{\scriptsize Path: preprocess\_helpers.py}\\{\scriptsize 預處理輔助函數 (Preprocessing helper functions)}} , tier=file]
+  [constants, folder
+    [ {\textbf{config.py}\\{\scriptsize Path: constants/config.py}\\{\scriptsize 配置設定 (Configuration settings)}} , tier=file]
+    [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: constants/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+    [ {\textbf{validation\_rules.py}\\{\scriptsize Path: constants/validation\_rules.py}\\{\scriptsize 驗證規則定義 (Validation rules definition)}} , tier=file]
+  ]
+  [diagnostics, folder
+    [ {\textbf{di\_diagnostic.py}\\{\scriptsize Path: diagnostics/di\_diagnostic.py}\\{\scriptsize DI (Data Insights) 診斷協調器 (DI diagnostic coordinator)}} , tier=file]
+    [ {\textbf{q\_diagnostic.py}\\{\scriptsize Path: diagnostics/q\_diagnostic.py}\\{\scriptsize Quant 診斷協調器 (Quant diagnostic coordinator)}} , tier=file]
+    [ {\textbf{v\_diagnostic.py}\\{\scriptsize Path: diagnostics/v\_diagnostic.py}\\{\scriptsize Verbal 診斷協調器 (Verbal diagnostic coordinator)}} , tier=file]
+    [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: diagnostics/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+    [di\_modules, folder
+      [ {\textbf{chapter\_logic.py}\\{\scriptsize Path: diagnostics/di\_modules/chapter\_logic.py}\\{\scriptsize DI 章節邏輯 (DI chapter logic)}} , tier=file]
+      [ {\textbf{constants.py}\\{\scriptsize Path: diagnostics/di\_modules/constants.py}\\{\scriptsize DI 模組常數 (DI module constants)}} , tier=file]
+      [ {\textbf{main.py}\\{\scriptsize Path: diagnostics/di\_modules/main.py}\\{\scriptsize DI 模組主要邏輯 (DI module main logic)}} , tier=file]
+      [ {\textbf{report\_generation.py}\\{\scriptsize Path: diagnostics/di\_modules/report\_generation.py}\\{\scriptsize DI 報告生成 (DI report generation)}} , tier=file]
+      [ {\textbf{translation.py}\\{\scriptsize Path: diagnostics/di\_modules/translation.py}\\{\scriptsize DI 翻譯 (DI translations)}} , tier=file]
+      [ {\textbf{utils.py}\\{\scriptsize Path: diagnostics/di\_modules/utils.py}\\{\scriptsize DI 模組工具 (DI module utilities)}} , tier=file]
+      [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: diagnostics/di\_modules/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+    ]
+    [q\_modules, folder
+      [ {\textbf{analysis.py}\\{\scriptsize Path: diagnostics/q\_modules/analysis.py}\\{\scriptsize Quant 分析 (Quant analysis)}} , tier=file]
+      [ {\textbf{behavioral.py}\\{\scriptsize Path: diagnostics/q\_modules/behavioral.py}\\{\scriptsize Quant 行為分析 (Quant behavioral analysis)}} , tier=file]
+      [ {\textbf{constants.py}\\{\scriptsize Path: diagnostics/q\_modules/constants.py}\\{\scriptsize Quant 模組常數 (Quant module constants)}} , tier=file]
+      [ {\textbf{main.py}\\{\scriptsize Path: diagnostics/q\_modules/main.py}\\{\scriptsize Quant 模組主要邏輯 (Quant module main logic)}} , tier=file]
+      [ {\textbf{recommendations.py}\\{\scriptsize Path: diagnostics/q\_modules/recommendations.py}\\{\scriptsize Quant 建議 (Quant recommendations)}} , tier=file]
+      [ {\textbf{reporting.py}\\{\scriptsize Path: diagnostics/q\_modules/reporting.py}\\{\scriptsize Quant 報告生成 (Quant reporting)}} , tier=file]
+      [ {\textbf{translations.py}\\{\scriptsize Path: diagnostics/q\_modules/translations.py}\\{\scriptsize Quant 翻譯 (Quant translations)}} , tier=file]
+      [ {\textbf{utils.py}\\{\scriptsize Path: diagnostics/q\_modules/utils.py}\\{\scriptsize Quant 模組工具 (Quant module utilities)}} , tier=file]
+      [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: diagnostics/q\_modules/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+    ]
+    [v\_modules, folder
+      [ {\textbf{analysis.py}\\{\scriptsize Path: diagnostics/v\_modules/analysis.py}\\{\scriptsize Verbal 分析 (Verbal analysis)}} , tier=file]
+      [ {\textbf{constants.py}\\{\scriptsize Path: diagnostics/v\_modules/constants.py}\\{\scriptsize Verbal 模組常數 (Verbal module constants)}} , tier=file]
+      [ {\textbf{main.py}\\{\scriptsize Path: diagnostics/v\_modules/main.py}\\{\scriptsize Verbal 模組主要邏輯 (Verbal module main logic)}} , tier=file]
+      [ {\textbf{recommendations.py}\\{\scriptsize Path: diagnostics/v\_modules/recommendations.py}\\{\scriptsize Verbal 建議 (Verbal recommendations)}} , tier=file]
+      [ {\textbf{reporting.py}\\{\scriptsize Path: diagnostics/v\_modules/reporting.py}\\{\scriptsize Verbal 報告生成 (Verbal reporting)}} , tier=file]
+      [ {\textbf{translations.py}\\{\scriptsize Path: diagnostics/v\_modules/translations.py}\\{\scriptsize Verbal 翻譯 (Verbal translations)}} , tier=file]
+      [ {\textbf{utils.py}\\{\scriptsize Path: diagnostics/v\_modules/utils.py}\\{\scriptsize Verbal 模組工具 (Verbal module utilities)}} , tier=file]
+      [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: diagnostics/v\_modules/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+    ]
+  ]
+  [services, folder
+    [ {\textbf{openai\_service.py}\\{\scriptsize Path: services/openai\_service.py}\\{\scriptsize OpenAI服務互動 (OpenAI service interaction)}} , tier=file]
+    [ {\textbf{plotting\_service.py}\\{\scriptsize Path: services/plotting\_service.py}\\{\scriptsize 繪圖服務 (Plotting service)}} , tier=file]
+    [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: services/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+  ]
+  [ui, folder
+    [ {\textbf{chat\_interface.py}\\{\scriptsize Path: ui/chat\_interface.py}\\{\scriptsize 聊天介面元件 (Chat interface component)}} , tier=file]
+    [ {\textbf{input\_tabs.py}\\{\scriptsize Path: ui/input\_tabs.py}\\{\scriptsize 輸入頁籤元件 (Input tabs component)}} , tier=file]
+    [ {\textbf{results\_display.py}\\{\scriptsize Path: ui/results\_display.py}\\{\scriptsize 結果顯示元件 (Results display component)}} , tier=file]
+    [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: ui/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+  ]
+  [utils, folder
+    [ {\textbf{data\_processing.py}\\{\scriptsize Path: utils/data\_processing.py}\\{\scriptsize 通用資料處理 (General data processing)}} , tier=file]
+    [ {\textbf{excel\_utils.py}\\{\scriptsize Path: utils/excel\_utils.py}\\{\scriptsize Excel 操作工具 (Excel utilities)}} , tier=file]
+    [ {\textbf{styling.py}\\{\scriptsize Path: utils/styling.py}\\{\scriptsize 樣式相關工具 (Styling utilities)}} , tier=file]
+    [ {\textbf{validation.py}\\{\scriptsize Path: utils/validation.py}\\{\scriptsize 資料驗證工具 (Data validation utilities)}} , tier=file]
+    [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: utils/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+  ]
+]
+\end{forest}
+
+\end{CJK}
+\end{document} 
