@@ -65,6 +65,14 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         # Ensure necessary columns for styling exist with defaults
         if 'overtime' not in df_to_display.columns: df_to_display['overtime'] = False
         if 'is_correct' not in df_to_display.columns: df_to_display['is_correct'] = True # Assume correct if missing for styling
+        if 'is_invalid' not in df_to_display.columns: df_to_display['is_invalid'] = False # Ensure invalid column exists
+        
+        # 如果存在手動標記的無效項，合併到is_invalid
+        if 'is_manually_invalid' in df_to_display.columns:
+            df_to_display['is_invalid'] = df_to_display['is_invalid'] | df_to_display['is_manually_invalid']
+            
+        # 確保is_invalid為布林值
+        df_to_display['is_invalid'] = df_to_display['is_invalid'].astype(bool)
 
         styled_df = df_to_display.style.set_properties(**{'text-align': 'left'}) \
                                        .set_table_styles([dict(selector='th', props=[('text-align', 'left')])]) \
@@ -330,7 +338,7 @@ def display_total_results(tab_container):
     # 新增加的部分：嵌入YouTube視頻
     tab_container.subheader("了解級分跟百分位之間的關係")
     tab_container.markdown("""
-    <iframe width="560" height="315" src="htㄐtps://www.youtube.com/embed/MLVT-zxaBkE?si=9SJ68LSrvvii35p-" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/MLVT-zxaBkE?si=9SJ68LSrvvii35p-" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
     """, unsafe_allow_html=True)
 
 # --- Display Results Function (Moved from app.py) ---

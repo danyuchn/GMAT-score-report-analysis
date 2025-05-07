@@ -402,18 +402,7 @@ def main():
                     run_analysis(df_combined_input) # This will update diagnosis_complete and analysis_error
                 
                 if st.session_state.diagnosis_complete:
-                    st.success("分析完成！請切換到「結果查看」標籤查看詳細報告")
-                    # 自動切換到結果標籤
-                    js = """
-                    <script>
-                        function switchToResultsTab() {
-                            const tabs = window.parent.document.querySelectorAll('.stTabs button');
-                            if (tabs.length > 1) tabs[1].click();
-                        }
-                        switchToResultsTab();
-                    </script>
-                    """
-                    st.components.v1.html(js, height=0)
+                    st.success("分析完成！請前往頁首的「結果查看」分頁查看診斷結果。")
             else:
                 # If there's no data, then analysis didn't really "run" in a meaningful way.
                 st.session_state.analysis_run = False 
@@ -426,7 +415,6 @@ def main():
             # Add chat interface here, within the "Results" tab and after displaying results
             if st.session_state.openai_api_key:
                 st.divider()
-                st.subheader("與 AI 對話")
                 display_chat_interface(st.session_state)
         else:
             # 顯示尚未分析的提示

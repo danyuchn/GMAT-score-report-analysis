@@ -32,6 +32,17 @@ def to_excel(df, column_map):
         # 將超時列的數據直接添加到主表的一個隱藏列中，這樣排序時會一起移動
         df_copy['_overtime_for_time'] = df_copy['overtime']
 
+    # 確保無論如何都會導出is_invalid欄位
+    if 'is_invalid' in df_copy.columns and 'is_invalid' not in local_column_map:
+        local_column_map['is_invalid'] = '題目無效?'
+
+    # 合併檢查手動標記的無效項（如果存在）並設置is_invalid
+    if 'is_manually_invalid' in df_copy.columns:
+        if 'is_invalid' not in df_copy.columns:
+            df_copy['is_invalid'] = df_copy['is_manually_invalid']
+        else:
+            df_copy['is_invalid'] = df_copy['is_invalid'] | df_copy['is_manually_invalid']
+
     # Select only columns present in the map keys and rename them
     columns_to_keep = [col for col in local_column_map.keys() if col in df_copy.columns]
     # 添加臨時超時標記列
@@ -102,16 +113,18 @@ def to_excel(df, column_map):
                 row_range = f'A{row}:{chr(ord("A") + len(header_list) - 1)}{row}'
 
                 # 1. 當行的無效項標記為灰色（最高優先順序）
+                # 無效項格式條件判斷同時考慮"True"和True
                 worksheet.conditional_format(row_range, {
                     'type': 'formula',
-                    'criteria': f'=${invalid_col_letter}{row}="True"',
+                    'criteria': f'=OR(${invalid_col_letter}{row}="True",${invalid_col_letter}{row}=TRUE)',
                     'format': invalid_format
                 })
 
                 # 2. 當行的錯題標記為紅色（第二優先順序，僅當不是無效項時）
+                # 同時考慮"False"和False，同時排除無效項
                 worksheet.conditional_format(row_range, {
                     'type': 'formula',
-                    'criteria': f'=AND(${correct_col_letter}{row}="False",${invalid_col_letter}{row}<>"True")',
+                    'criteria': f'=AND(OR(${correct_col_letter}{row}="False",${correct_col_letter}{row}=FALSE),NOT(OR(${invalid_col_letter}{row}="True",${invalid_col_letter}{row}=TRUE)))',
                     'format': error_format
                 })
 
@@ -128,19 +141,24 @@ def to_excel(df, column_map):
             if _overtime_for_time_idx >= 0:
                 worksheet.set_column(_overtime_for_time_idx, _overtime_for_time_idx, None, None, {'hidden': True})
 
-            # 隱藏診斷標籤右側的所有欄位
+            # 將無效標記列顯示而非隱藏
+            invalid_col_idx_letter = chr(ord('A') + invalid_col_idx)
+            worksheet.set_column(f'{invalid_col_idx_letter}:{invalid_col_idx_letter}', 10)  # 設定合適寬度
+
+            # 隱藏診斷標籤右側的所有欄位（除了無效標記列）
             # 找出所有在診斷標籤右側的欄位並隱藏
             for col_idx in range(len(header_list)):
                 # 診斷標籤右側的欄位
                 if col_idx > diagnostic_col_idx:
-                    # 跳過已經隱藏的列
-                    if col_idx == overtime_col_idx or col_idx == _overtime_for_time_idx:
+                    # 跳過已經隱藏的列或無效標記列
+                    if col_idx == overtime_col_idx or col_idx == _overtime_for_time_idx or col_idx == invalid_col_idx:
                         continue
                     worksheet.set_column(col_idx, col_idx, None, None, {'hidden': True})
 
         except (StopIteration, ValueError, IndexError) as e:
             import streamlit as st
             st.warning(f"無法應用 Excel 樣式或隱藏欄位: {e}", icon="⚠️") # Use warning
+            logging.warning(f"Excel樣式應用錯誤: {e}", exc_info=True)
 
     processed_data = output.getvalue()
     return processed_data 
