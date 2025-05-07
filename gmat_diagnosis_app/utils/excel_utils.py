@@ -24,18 +24,18 @@ def to_excel(df, column_map):
     subject = df_copy['Subject'].iloc[0] if 'Subject' in df_copy.columns and not df_copy.empty else None
     local_column_map = column_map.copy()
     
-    # 為V科添加調試信息
+    # 為V科添加調試信息 (只在日誌中記錄)
     if subject == 'V':
         # 調試：輸出原始無效項值（在任何處理之前）
         if 'is_invalid' in df_copy.columns:
-            st.info(f"V科原始is_invalid列值：\n{df_copy['is_invalid'].head(10)}")
-            st.info(f"V科is_invalid列類型: {df_copy['is_invalid'].dtype}")
+            logging.debug(f"V科原始is_invalid列值：\n{df_copy['is_invalid'].head(5)}")
+            logging.debug(f"V科is_invalid列類型: {df_copy['is_invalid'].dtype}")
             # 顯示原始值分布
             try:
                 value_counts = df_copy['is_invalid'].value_counts().to_dict()
-                st.info(f"V科is_invalid原始值分布: {value_counts}")
+                logging.debug(f"V科is_invalid原始值分布: {value_counts}")
             except Exception as e:
-                st.error(f"計算is_invalid值分布時出錯: {e}")
+                logging.error(f"計算is_invalid值分布時出錯: {e}")
                 
         # 強制轉換is_invalid為布爾值（避免任何可能的類型問題）
         if 'is_invalid' in df_copy.columns:
@@ -43,22 +43,22 @@ def to_excel(df, column_map):
             df_copy['is_invalid'] = df_copy['is_invalid'].fillna(False)
             # 然後強制轉換為布爾值
             df_copy['is_invalid'] = df_copy['is_invalid'].astype(bool)
-            # 再次檢查轉換後的值
-            st.info(f"V科轉換後is_invalid列值：\n{df_copy['is_invalid'].head(10)}")
+            # 再次檢查轉換後的值 (只在日誌中記錄)
+            logging.debug(f"V科轉換後is_invalid列值：\n{df_copy['is_invalid'].head(5)}")
             value_counts = df_copy['is_invalid'].value_counts().to_dict()
-            st.info(f"V科is_invalid轉換後值分布: {value_counts}")
+            logging.debug(f"V科is_invalid轉換後值分布: {value_counts}")
     
         # 檢查是否有is_manually_invalid列，並顯示調試信息
         has_manually_invalid = 'is_manually_invalid' in df_copy.columns
         has_invalid = 'is_invalid' in df_copy.columns
         
-        # 添加調試信息
+        # 添加調試信息 (只在日誌中記錄)
         debug_info = f"V科：is_manually_invalid存在: {has_manually_invalid}, is_invalid存在: {has_invalid}"
-        st.info(debug_info)
+        logging.debug(debug_info)
         
         if has_manually_invalid:
             manual_invalid_count = df_copy['is_manually_invalid'].sum()
-            st.info(f"V科手動標記無效項數量: {manual_invalid_count}")
+            logging.debug(f"V科手動標記無效項數量: {manual_invalid_count}")
             
             # 重要修改：確保is_invalid完全以手動標記為準（Excel處理階段）
             if has_invalid:
@@ -71,20 +71,20 @@ def to_excel(df, column_map):
                 # 僅將手動標記的項設為無效
                 df_copy.loc[df_copy['is_manually_invalid'] == True, 'is_invalid'] = True
                 
-                # 檢查重置後的無效項數量
+                # 檢查重置後的無效項數量 (只在日誌中記錄)
                 new_invalid_count = df_copy['is_invalid'].sum()
-                st.info(f"V科僅使用手動標記後，無效項數量從 {orig_invalid_count} 變為 {new_invalid_count}")
+                logging.debug(f"V科僅使用手動標記後，無效項數量從 {orig_invalid_count} 變為 {new_invalid_count}")
                 
                 # 顯示is_manually_invalid為True的所有行的題號
                 manually_invalid_rows = df_copy[df_copy['is_manually_invalid'] == True]
                 if not manually_invalid_rows.empty:
                     manually_invalid_positions = manually_invalid_rows['question_position'].tolist()
-                    st.warning(f"Excel處理階段檢測到手動標記的無效項 (題號): {manually_invalid_positions}")
+                    logging.info(f"Excel處理階段檢測到手動標記的無效項 (題號): {manually_invalid_positions}")
                     
                     # 確認這些行的is_invalid也是True
                     for idx, row in manually_invalid_rows.iterrows():
                         if not row['is_invalid']:
-                            st.error(f"題號 {row['question_position']} 被手動標記為無效，但is_invalid為False！立即修正。")
+                            logging.error(f"題號 {row['question_position']} 被手動標記為無效，但is_invalid為False！立即修正。")
                             # 強制修正
                             df_copy.at[idx, 'is_invalid'] = True
     
@@ -112,25 +112,25 @@ def to_excel(df, column_map):
             if 'is_invalid' in df_copy.columns:
                 invalid_count = df_copy['is_invalid'].sum()
                 manual_count = df_copy['is_manually_invalid'].sum()
-                st.info(f"V科Excel最終確認：無效項數量: {invalid_count}，手動標記數量: {manual_count}")
+                logging.info(f"V科Excel最終確認：無效項數量: {invalid_count}，手動標記數量: {manual_count}")
                 if invalid_count != manual_count:
-                    st.error(f"V科Excel警告：無效項數量與手動標記數量不一致！")
+                    logging.error(f"V科Excel警告：無效項數量與手動標記數量不一致！")
     
     # 所有V科數據的無效項檢查
     if subject == 'V':
         if 'is_invalid' in df_copy.columns:
             invalid_count = df_copy['is_invalid'].sum()
-            st.info(f"V科無效項數量: {invalid_count}")
+            logging.info(f"V科無效項數量: {invalid_count}")
             
             # 顯示所有列名以進行調試
-            st.info(f"V科原始數據列: {list(df_copy.columns)}")
+            logging.info(f"V科原始數據列: {list(df_copy.columns)}")
             
             # 顯示Excel導出前的無效項數量
-            st.info(f"V科Excel導出前無效項數量: {invalid_count}")
+            logging.info(f"V科Excel導出前無效項數量: {invalid_count}")
             
             # 將is_invalid列轉換為文本，並檢查其值分布
             value_counts = df_copy['is_invalid'].astype(str).value_counts().to_dict()
-            st.info(f"V科is_invalid列轉換為文本後值分布: {value_counts}")
+            logging.info(f"V科is_invalid列轉換為文本後值分布: {value_counts}")
     
     # 檢查是否有本地列名映射
     if not local_column_map:
@@ -149,7 +149,7 @@ def to_excel(df, column_map):
     
         # 顯示將要導出到Excel的列
         if subject == 'V':
-            st.info(f"V科Excel導出數據列: {list(df_excel.columns)}")
+            logging.info(f"V科Excel導出數據列: {list(df_excel.columns)}")
     
     # 新增：在寫入Excel前按題號排序
     if 'question_position' in df_excel.columns:
@@ -199,7 +199,7 @@ def to_excel(df, column_map):
         
         # 為V科添加特殊調試 - 顯示無效列索引
         if subject == 'V' and invalid_col_idx is not None:
-            st.info(f"V科無效列索引: {invalid_col_idx}, 列名: {invalid_col_disp}")
+            logging.info(f"V科無效列索引: {invalid_col_idx}, 列名: {invalid_col_disp}")
         
         # Convert column index to Excel column letter
         def get_column_letter(col_idx):
@@ -221,12 +221,12 @@ def to_excel(df, column_map):
                 # 直接從DataFrame中獲取無效項值
                 if 'is_invalid' in df_copy.columns:
                     invalid_values = df_copy['is_invalid'].astype(str).tolist()
-                    st.info(f"V科DataFrame中的無效項值: {invalid_values}")
+                    logging.info(f"V科DataFrame中的無效項值: {invalid_values}")
             except Exception as e:
-                st.error(f"獲取V科無效項值時出錯: {e}")
+                logging.error(f"獲取V科無效項值時出錯: {e}")
             
             # 添加額外調試信息以確認條件格式化邏輯
-            st.info(f"V科Excel設置條件格式化 - 無效項列索引: {invalid_col_idx}, 列字母: {invalid_col_letter}")
+            logging.info(f"V科Excel設置條件格式化 - 無效項列索引: {invalid_col_idx}, 列字母: {invalid_col_letter}")
         
         # 添加條件格式 - 正確/錯誤背景顏色
         worksheet.conditional_format(1, correct_col_idx, len(df_excel)+1, correct_col_idx, 
@@ -281,7 +281,7 @@ def to_excel(df, column_map):
             worksheet.set_column(i, i, max_len)
             
     except Exception as e:
-        st.warning(f"應用Excel格式時出錯 ({sheet_name} 工作表): {e}", icon="⚠️")
+        logging.warning(f"應用Excel格式時出錯 ({sheet_name} 工作表): {e}", icon="⚠️")
     
     writer.close()
     return output.getvalue() 

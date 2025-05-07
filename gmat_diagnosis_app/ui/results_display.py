@@ -12,6 +12,7 @@ from gmat_diagnosis_app.utils.styling import apply_styles
 from gmat_diagnosis_app.utils.excel_utils import to_excel
 from gmat_diagnosis_app.constants.config import SUBJECTS, EXCEL_COLUMN_MAP
 from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
+import logging
 
 # --- Column Display Configuration (Moved from app.py) ---
 COLUMN_DISPLAY_CONFIG = {
@@ -58,31 +59,34 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         # 檢查無效項數據的類型和值
         if 'is_invalid' in df_display.columns:
             invalid_type = df_display['is_invalid'].dtype
-            tab_container.info(f"V科無效項數據類型: {invalid_type}")
+            # 移除調試輸出
+            logging.debug(f"V科無效項數據類型: {invalid_type}")
             
             # 確保無效項是布爾值
             try:
                 df_display['is_invalid'] = df_display['is_invalid'].fillna(False).astype(bool)
-                tab_container.success(f"V科無效項已強制轉換為布爾值")
+                # 移除調試輸出
+                logging.debug("V科無效項已強制轉換為布爾值")
             except Exception as e:
                 tab_container.error(f"轉換無效項時出錯: {e}")
                 
-        tab_container.info(f"V科原始數據列: {list(df_display.columns)}")
+        # 移除調試輸出
+        logging.debug(f"V科原始數據列: {list(df_display.columns)}")
         
         # 重要修改：確保is_invalid完全以手動標記為準
         if 'is_manually_invalid' in df_display.columns:
-            # 先顯示原始無效項和手動標記項的數量
+            # 先顯示原始無效項和手動標記項的數量 (僅在日誌中記錄)
             if 'is_invalid' in df_display.columns:
                 orig_invalid_sum = df_display['is_invalid'].sum()
-                tab_container.info(f"V科原始無效項數量: {orig_invalid_sum}")
+                logging.debug(f"V科原始無效項數量: {orig_invalid_sum}")
             
             manual_invalid_count = df_display['is_manually_invalid'].sum()
-            tab_container.info(f"V科手動標記無效項數量: {manual_invalid_count}")
+            logging.debug(f"V科手動標記無效項數量: {manual_invalid_count}")
             
             # 列出手動標記的題號
             manually_invalid_positions = df_display.loc[df_display['is_manually_invalid'] == True, 'question_position'].tolist()
             if manually_invalid_positions:
-                tab_container.warning(f"手動標記為無效的題號: {manually_invalid_positions}")
+                logging.info(f"手動標記為無效的題號: {manually_invalid_positions}")
             
             # 重要：重置is_invalid列，完全以手動標記為準
             if 'is_invalid' in df_display.columns:
@@ -91,13 +95,13 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
                 # 只將手動標記的項設為True
                 df_display.loc[df_display['is_manually_invalid'] == True, 'is_invalid'] = True
                 
-                # 檢查重置後的無效項數量
+                # 檢查重置後的無效項數量 (僅在日誌中記錄)
                 new_invalid_count = df_display['is_invalid'].sum()
-                tab_container.warning(f"僅使用手動標記後，無效項數量從 {orig_invalid_sum} 變為 {new_invalid_count}")
+                logging.debug(f"僅使用手動標記後，無效項數量從 {orig_invalid_sum} 變為 {new_invalid_count}")
                 
                 # 驗證是否與手動標記一致
                 if new_invalid_count != manual_invalid_count:
-                    tab_container.error(f"錯誤：重置後的無效項數量 ({new_invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
+                    logging.error(f"錯誤：重置後的無效項數量 ({new_invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
     
     # 針對DI科目移除「考察能力」欄位
     if subject == 'DI':
@@ -165,12 +169,12 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         if 'question_position' in df_for_excel.columns:
             df_for_excel = df_for_excel.sort_values(by='question_position').reset_index(drop=True)
 
-        # V科的額外調試信息
+        # V科的額外調試信息 (轉移到日誌)
         if subject == 'V':
-            tab_container.info(f"V科Excel導出數據列: {list(df_for_excel.columns)}")
+            logging.debug(f"V科Excel導出數據列: {list(df_for_excel.columns)}")
             if 'is_invalid' in df_for_excel.columns:
                 orig_invalid_sum = df_for_excel['is_invalid'].sum()
-                tab_container.info(f"V科Excel導出前無效項數量: {orig_invalid_sum}")
+                logging.debug(f"V科Excel導出前無效項數量: {orig_invalid_sum}")
                 
             # 重要修改：確保is_invalid完全以手動標記為準（Excel導出前）
             if 'is_manually_invalid' in df_for_excel.columns:
@@ -179,13 +183,13 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
                 # 僅將手動標記的項設為無效
                 df_for_excel.loc[df_for_excel['is_manually_invalid'] == True, 'is_invalid'] = True
                 
-                tab_container.info(f"V科僅使用手動標記後，Excel導出無效項數量: {df_for_excel['is_invalid'].sum()}")
+                logging.debug(f"V科僅使用手動標記後，Excel導出無效項數量: {df_for_excel['is_invalid'].sum()}")
                 
-                # 驗證手動標記項被正確設置
+                # 驗證手動標記項被正確設置 (僅記錄到日誌)
                 manual_invalid_count = df_for_excel['is_manually_invalid'].sum()
                 invalid_count = df_for_excel['is_invalid'].sum()
                 if manual_invalid_count != invalid_count:
-                    tab_container.error(f"V科Excel導出前無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
+                    logging.error(f"V科Excel導出前無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
 
         # Apply number formatting *before* calling to_excel if needed
         if 'question_difficulty' in df_for_excel.columns:

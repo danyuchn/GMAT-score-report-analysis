@@ -48,12 +48,11 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         if 'is_manually_invalid' in df_v_processed.columns:
             manual_invalid_count = df_v_processed['is_manually_invalid'].sum()
             if manual_invalid_count > 0:
-                st.info(f"V科診斷: 檢測到 {manual_invalid_count} 個手動標記的無效項")
+                # 只在日誌中記錄，不顯示在UI中
                 logging.info(f"V科診斷: 檢測到 {manual_invalid_count} 個手動標記的無效項")
                 
                 # 記錄手動標記的題號
                 manually_invalid_positions = df_v_processed.loc[df_v_processed['is_manually_invalid'] == True, 'question_position'].tolist()
-                st.info(f"手動標記無效的題號: {manually_invalid_positions}")
                 logging.info(f"手動標記無效的題號: {manually_invalid_positions}")
         
         # 重要修改：完全以手動標記為準，不合併自動標記的結果
@@ -68,14 +67,12 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
             # 只將手動標記的項目設為無效
             df_v_processed.loc[df_v_processed['is_manually_invalid'] == True, 'is_invalid'] = True
             
-            # 重新計算無效項數量
+            # 重新計算無效項數量 (僅記錄到日誌，不顯示在UI中)
             invalid_count = df_v_processed['is_invalid'].sum()
-            st.info(f"V科診斷: 僅使用手動標記，無效項數量為 {invalid_count}")
             logging.info(f"V科診斷: 僅使用手動標記，無效項數量為 {invalid_count}")
             
-            # 調試信息：確認是否只有手動標記的項目被設為無效
+            # 調試信息：確認是否只有手動標記的項目被設為無效 (僅記錄到日誌)
             if invalid_count != manual_invalid_count:
-                st.warning(f"警告：無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
                 logging.warning(f"警告：無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
         
         # --- Chapter 0: Initial Setup and Basic Metrics ---
@@ -112,7 +109,8 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         final_invalid_mask_v = df_v_processed['is_invalid']
         if final_invalid_mask_v.any():
             invalid_count = final_invalid_mask_v.sum()
-            st.warning(f"V科診斷: 將為 {invalid_count} 個標記為無效的項目添加無效數據標籤", icon="⚠️")
+            # 減少UI輸出
+            logging.info(f"V科診斷: 將為 {invalid_count} 個標記為無效的項目添加無效數據標籤")
             
             for idx in df_v_processed.index[final_invalid_mask_v]:
                 current_list = df_v_processed.loc[idx, 'diagnostic_params']
@@ -125,8 +123,8 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         v_diagnosis_results = {}
         v_diagnosis_results['invalid_count'] = num_invalid_v_total
         
-        if num_invalid_v_total > 0:
-            st.info(f"V科診斷: 總共有 {num_invalid_v_total} 個項目被標記為無效")
+        # 僅在日誌中記錄
+        logging.info(f"V科診斷: 總共有 {num_invalid_v_total} 個項目被標記為無效")
 
         # --- Filter out invalid data ---
         df_v_processed_full = df_v_processed.copy() # Store potentially modified df before filtering valid
@@ -406,18 +404,18 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
             # 調試信息
             manual_invalid_count = df_v_final['is_manually_invalid'].sum()
             final_invalid_count = df_v_final['is_invalid'].sum()
-            st.info(f"V科診斷: 最終數據集中有 {manual_invalid_count} 個手動標記的無效項，總共 {final_invalid_count} 個無效項")
+            logging.info(f"V科診斷: 最終數據集中有 {manual_invalid_count} 個手動標記的無效項，總共 {final_invalid_count} 個無效項")
         
         # 再次檢查無效項數量
         if 'is_invalid' in df_v_final.columns:
             final_invalid_count = df_v_final['is_invalid'].sum()
             if final_invalid_count > 0:
-                st.success(f"V科診斷: 最終返回數據集中包含 {final_invalid_count} 個無效項")
+                logging.info(f"V科診斷: 最終返回數據集中包含 {final_invalid_count} 個無效項")
             else:
-                st.error(f"V科診斷: 警告！最終返回數據集中沒有無效項，但原始數據集中有 {num_invalid_v_total} 個")
+                logging.error(f"V科診斷: 警告！最終返回數據集中沒有無效項，但原始數據集中有 {num_invalid_v_total} 個")
 
         # Return the final df AFTER dropping the English params col
-        return v_diagnosis_results, v_report_content, df_v_final 
+        return v_diagnosis_results, v_report_content, df_v_final
     except Exception as e:
         logging.error(f"Error in run_v_diagnosis_processed: {e}", exc_info=True)
         return {}, "Verbal (V) 部分診斷過程中發生錯誤。", pd.DataFrame() 

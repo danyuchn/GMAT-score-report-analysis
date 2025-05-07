@@ -20,6 +20,15 @@ def display_chat_interface(session_state):
     if show_chat:
         st.subheader("💬 與 AI 對話 (基於本次報告)")
         
+        # 添加提示信息，告知用戶 AI 可以回答的內容
+        st.info("""
+        AI 助手可以回答有關您的診斷報告和測試數據的問題。您可以詢問：
+        - 關於報告中具體內容的解釋
+        - 關於診斷試算表中的數據分析
+        - 特定題型或難度的表現
+        - 時間分配和準確率的問題
+        """)
+        
         # 確保聊天歷史存在
         if 'chat_history' not in session_state:
             session_state.chat_history = []
@@ -99,7 +108,7 @@ def display_chat_interface(session_state):
         
 def _debug_show_chat_history(session_state):
     """顯示完整的聊天歷史信息（僅用於調試）"""
-    with st.expander("顯示聊天歷史調試信息"):
+    with st.expander("顯示聊天歷史調試信息", expanded=True):
         if session_state.chat_history:
             debug_info = "聊天歷史:\n"
             for i, msg in enumerate(session_state.chat_history):
@@ -110,6 +119,62 @@ def _debug_show_chat_history(session_state):
                     response_id = response_id[:10] + '...'
                 debug_info += f"{i}: [{role}] {content_preview} (response_id: {response_id})\n"
             st.text(debug_info)
+            
+            # 顯示當前上下文摘要
+            st.markdown("##### 當前聊天上下文摘要")
+            try:
+                context = get_chat_context(session_state)
+                
+                # 顯示報告摘要
+                if context["report"]:
+                    report_preview = context["report"][:200] + "..." if len(context["report"]) > 200 else context["report"]
+                    st.text(f"報告文字 ({len(context['report'])} 字符):\n{report_preview}")
+                else:
+                    st.text("沒有報告文字")
+                
+                # 顯示診斷試算表摘要
+                if context["dataframe"] and context["dataframe"] != "(無詳細數據表格)":
+                    df_preview = context["dataframe"].split("\n")[:5]
+                    df_preview = "\n".join(df_preview) + "\n..."
+                    st.text(f"診斷試算表 ({len(context['dataframe'])} 字符):\n{df_preview}")
+                else:
+                    st.text(f"診斷試算表: {context['dataframe']}")
+                    
+                # 新增：顯示錯題和無效題的統計信息
+                if "dataframe" in context and context["dataframe"] != "(無詳細數據表格)":
+                    st.markdown("##### 數據統計")
+                    lines = context["dataframe"].split("\n")
+                    di_lines = [line for line in lines if "| DI " in line]
+                    q_lines = [line for line in lines if "| Q " in line]
+                    v_lines = [line for line in lines if "| V " in line]
+                    
+                    # 分析 DI 部分
+                    di_total = len(di_lines)
+                    di_invalid = len([line for line in di_lines if "| True " in line[:20]])
+                    di_valid = di_total - di_invalid
+                    di_correct = len([line for line in di_lines if "| False " in line[:20] and "| True " in line[20:30]])
+                    di_wrong = di_valid - di_correct
+                    
+                    # 分析 Q 部分
+                    q_total = len(q_lines)
+                    q_invalid = len([line for line in q_lines if "| True " in line[:20]])
+                    q_valid = q_total - q_invalid
+                    q_correct = len([line for line in q_lines if "| False " in line[:20] and "| True " in line[20:30]])
+                    q_wrong = q_valid - q_correct
+                    
+                    # 分析 V 部分
+                    v_total = len(v_lines)
+                    v_invalid = len([line for line in v_lines if "| True " in line[:20]])
+                    v_valid = v_total - v_invalid
+                    v_correct = len([line for line in v_lines if "| False " in line[:20] and "| True " in line[20:30]])
+                    v_wrong = v_valid - v_correct
+                    
+                    # 顯示統計
+                    st.text(f"DI: 總題數={di_total}, 有效題數={di_valid}, 無效題數={di_invalid}, 答對={di_correct}, 答錯={di_wrong}")
+                    st.text(f"Q:  總題數={q_total}, 有效題數={q_valid}, 無效題數={q_invalid}, 答對={q_correct}, 答錯={q_wrong}")
+                    st.text(f"V:  總題數={v_total}, 有效題數={v_valid}, 無效題數={v_invalid}, 答對={v_correct}, 答錯={v_wrong}")
+            except Exception as e:
+                st.text(f"無法獲取上下文摘要: {e}")
         else:
             st.text("目前沒有聊天歷史記錄")
         

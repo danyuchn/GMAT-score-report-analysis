@@ -1,4 +1,6 @@
 import pandas as pd
+import logging
+import re  # 添加 re 模塊導入
 
 from .translation import (
     _translate_di, APPENDIX_A_TRANSLATION_DI, 
@@ -20,6 +22,32 @@ def _generate_di_summary_report(di_results):
     # ch5 = di_results.get('chapter_5', {}) # Ch5 results not directly used in report text
     ch6 = di_results.get('chapter_6', {})
     diagnosed_df = ch3.get('diagnosed_dataframe')
+
+    # 添加調試信息：報告使用的數據框統計
+    if diagnosed_df is not None:
+        total_df = len(diagnosed_df)
+        correct_df = diagnosed_df['is_correct'].sum() if 'is_correct' in diagnosed_df.columns else 0
+        wrong_df = total_df - correct_df
+        logging.info(f"[DI報告追蹤] 報告使用的數據框統計 - 總題數: {total_df}, 答對題數: {correct_df}, 答錯題數: {wrong_df}")
+        
+        # 按維度統計
+        if 'content_domain' in diagnosed_df.columns:
+            domains = diagnosed_df['content_domain'].unique()
+            for domain in domains:
+                domain_df = diagnosed_df[diagnosed_df['content_domain'] == domain]
+                domain_total = len(domain_df)
+                domain_wrong = domain_df['is_correct'].eq(False).sum()
+                logging.info(f"[DI報告追蹤] 領域 {domain} - 總題數: {domain_total}, 錯誤數: {domain_wrong}")
+        
+        if 'question_type' in diagnosed_df.columns:
+            types = diagnosed_df['question_type'].unique()
+            for q_type in types:
+                type_df = diagnosed_df[diagnosed_df['question_type'] == q_type]
+                type_total = len(type_df)
+                type_wrong = type_df['is_correct'].eq(False).sum()
+                logging.info(f"[DI報告追蹤] 題型 {q_type} - 總題數: {type_total}, 錯誤數: {type_wrong}")
+    else:
+        logging.warning("[DI報告追蹤] 報告生成時 diagnosed_df 為空")
 
     # Pre-translate common terms
     math_related_zh = _translate_di('Math Related')
@@ -196,8 +224,13 @@ def _generate_di_summary_report(di_results):
     df_problem = pd.DataFrame() # Re-init for safety
     if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
         df_problem = diagnosed_df[(diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True)].copy()
-
-    if not df_problem.empty:
+        
+        # 添加調試信息：問題數據統計
+        problem_total = len(df_problem)
+        problem_wrong = df_problem['is_correct'].eq(False).sum() if 'is_correct' in df_problem.columns else 0
+        problem_overtime = df_problem['overtime'].sum() if 'overtime' in df_problem.columns else 0
+        logging.info(f"[DI報告追蹤] 問題數據統計 - 總題數: {problem_total}, 錯誤數: {problem_wrong}, 超時數: {problem_overtime}")
+        
         report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
         details_added_2nd_ev = False
         if 'time_performance_category' in df_problem.columns and 'question_type' in df_problem.columns and 'content_domain' in df_problem.columns and 'diagnostic_params' in df_problem.columns:
@@ -274,4 +307,29 @@ def _generate_di_summary_report(di_results):
         report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議。)")
     report_lines.append("")
 
-    return "\n\n".join(report_lines) 
+    # 完成報告，添加調試信息：最終報告內容
+    report_text = "\n\n".join(report_lines)  # 使用雙換行符以保持原有格式
+    
+    # 嘗試從報告文本中提取關鍵數據
+    try:
+        # 查找所有可能包含題數的行
+        total_qs_match = re.search(r'共(\d+)題', report_text)
+        if total_qs_match:
+            total_qs = int(total_qs_match.group(1))
+            logging.info(f"[DI報告追蹤] 從報告中提取的總題數: {total_qs}")
+        
+        # 查找錯誤數
+        error_qs_match = re.search(r'(\d+)題作答錯誤', report_text)
+        if error_qs_match:
+            error_qs = int(error_qs_match.group(1))
+            logging.info(f"[DI報告追蹤] 從報告中提取的錯誤題數: {error_qs}")
+            
+        # 查找無效題數
+        invalid_qs_match = re.search(r'有\s*(\d+)\s*題被標記為無效數據', report_text)
+        if invalid_qs_match:
+            invalid_qs = int(invalid_qs_match.group(1))
+            logging.info(f"[DI報告追蹤] 從報告中提取的無效題數: {invalid_qs}")
+    except Exception as e:
+        logging.error(f"[DI報告追蹤] 從報告中提取數據時出錯: {e}")
+    
+    return report_text 
