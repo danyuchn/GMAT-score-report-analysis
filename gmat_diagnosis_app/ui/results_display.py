@@ -153,20 +153,72 @@ def display_total_results(tab_container):
     # 生成百分位數分析
     tab_container.subheader("分數百分位分析")
     
-    # 通過插值計算百分位數
-    # 總分百分位數近似對應關係 (擬合數據)
+    # 使用 scale-percentile-simulation.ipynb 中更準確的數據集
+    datasets = {
+        'Quantitative': {
+            'color': 'red',
+            'scale': np.array([
+                90, 89, 88, 87, 86, 85, 84, 83, 82, 81,
+                80, 79, 78, 77, 76, 75, 74, 73, 72, 71,
+                70, 69, 68, 67, 66, 65, 64, 63, 62, 61, 60
+            ]),
+            'percentile': np.array([
+                100, 97, 95, 94, 91, 88, 85, 81, 76, 70,
+                64, 57, 50, 43, 37, 32, 26, 22, 19, 15,
+                12, 10, 8, 6, 4, 3, 2, 2, 1, 1, 1
+            ])
+        },
+        'Verbal': {
+            'color': 'blue',
+            'scale': np.array([
+                90, 89, 88, 87, 86, 85, 84, 83, 82, 81,
+                80, 79, 78, 77, 76, 75, 74, 73, 72, 71,
+                70, 69, 68, 67, 66, 65, 64, 63, 62, 61, 60
+            ]),
+            'percentile': np.array([
+                100, 99, 99, 98, 97, 94, 90, 84, 76, 67,
+                57, 48, 39, 31, 23, 18, 13, 10, 7, 5,
+                4, 3, 2, 2, 1, 1, 1, 1, 1, 1, 1
+            ])
+        },
+        'Data Insights': {
+            'color': 'black',
+            'scale': np.array([
+                90, 89, 88, 87, 86, 85, 84, 83, 82, 81,
+                80, 79, 78, 77, 76, 75, 74, 73, 72, 71,
+                70, 69, 68, 67, 66, 65, 64, 63, 62, 61, 60
+            ]),
+            'percentile': np.array([
+                100, 100, 99, 99, 99, 98, 97, 96, 93, 89,
+                84, 77, 70, 63, 54, 48, 42, 36, 31, 26,
+                21, 18, 15, 12, 10, 8, 7, 6, 5, 4, 4
+            ])
+        }
+    }
+    
+    # 函數：根據級分找對應百分位
+    def find_percentile(scale_score, dataset):
+        scale = dataset['scale'][::-1]  # 反轉為升序
+        percentile = dataset['percentile'][::-1]
+    
+        if scale_score < scale[0]:
+            return percentile[0]
+        elif scale_score > scale[-1]:
+            return percentile[-1]
+        else:
+            return np.interp(scale_score, scale, percentile)
+    
+    # 計算百分位數
+    q_percentile = find_percentile(q_score, datasets['Quantitative'])
+    v_percentile = find_percentile(v_score, datasets['Verbal'])
+    di_percentile = find_percentile(di_score, datasets['Data Insights'])
+    
+    # 總分百分位數近似對應關係 (保留原有總分映射)
     total_scores = np.array([800, 770, 740, 710, 680, 650, 620, 590, 560, 530, 500, 450, 400, 350, 300, 250, 200])
     total_percentiles = np.array([99.9, 99, 97, 92, 85, 75, 65, 51, 38, 28, 18, 8, 4, 2, 1, 0.5, 0.1])
     
-    # 各科級分百分位數近似對應關係 (擬合數據)
-    scaled_scores = np.array([90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40])
-    scaled_percentiles = np.array([98, 92, 83, 70, 55, 40, 28, 18, 10, 5, 2])
-    
-    # 插值計算百分位數
+    # 插值計算總分百分位數
     total_percentile = np.interp(total_score, total_scores[::-1], total_percentiles[::-1])
-    q_percentile = np.interp(q_score, scaled_scores[::-1], scaled_percentiles[::-1])
-    v_percentile = np.interp(v_score, scaled_scores[::-1], scaled_percentiles[::-1])
-    di_percentile = np.interp(di_score, scaled_scores[::-1], scaled_percentiles[::-1])
     
     # 創建百分位數DataFrame
     percentile_data = {
@@ -184,8 +236,132 @@ def display_total_results(tab_container):
     # 顯示百分位數表格
     tab_container.dataframe(percentile_df, hide_index=True, use_container_width=True)
     
-    # 生成圖表
-    tab_container.subheader("分數與百分位對應圖")
+    # 模仿 scale-percentile-simulation.ipynb 中的圖表 - 使用兩種圖表方式
+    
+    # 1. 組合圖 - 單一圖表顯示所有科目數據
+    tab_container.subheader("三科分數與百分位對應圖 (組合圖)")
+    
+    candidate_scores = {
+        'Quantitative': q_score,
+        'Verbal': v_score,
+        'Data Insights': di_score
+    }
+    
+    # 創建Plotly圖表
+    fig_combined = go.Figure()
+    
+    # 不同科目的顏色映射
+    colors = {
+        'Quantitative': 'red',
+        'Verbal': 'blue',
+        'Data Insights': 'black'
+    }
+    
+    # 繪製所有科目的百分位曲線
+    for name, dataset in datasets.items():
+        fig_combined.add_trace(
+            go.Scatter(
+                x=dataset['scale'],
+                y=dataset['percentile'],
+                mode='lines+markers',
+                name=name,
+                line=dict(color=colors[name], width=2),
+                marker=dict(size=6, color=colors[name])
+            )
+        )
+        
+        # 添加當前分數點
+        score = candidate_scores[name]
+        percentile = find_percentile(score, dataset)
+        
+        # 在 plotly 中生成切線
+        # 首先準備數據用於插值
+        sorted_scale = dataset['scale'][::-1]  # 反轉為升序
+        sorted_percentile = dataset['percentile'][::-1]
+        
+        # 使用 scipy.interpolate.interp1d 代替 UnivariateSpline，因為我們只需要簡單的插值
+        from scipy.interpolate import interp1d
+        
+        # 計算切線所需的點
+        # 為了計算斜率，我們取點左右的數據點
+        idx = np.searchsorted(sorted_scale, score)
+        if idx > 0 and idx < len(sorted_scale):
+            # 計算相鄰點的斜率來近似切線斜率
+            x_left = sorted_scale[idx-1]
+            y_left = sorted_percentile[idx-1]
+            x_right = sorted_scale[idx+1] if idx+1 < len(sorted_scale) else sorted_scale[idx]
+            y_right = sorted_percentile[idx+1] if idx+1 < len(sorted_percentile) else sorted_percentile[idx]
+            
+            # 計算斜率
+            slope = (y_right - y_left) / (x_right - x_left)
+            
+            # 定義切線範圍 (score ± 5)
+            tangent_range = 5
+            x_min = max(score - tangent_range, sorted_scale[0])
+            x_max = min(score + tangent_range, sorted_scale[-1])
+            x_tangent = np.linspace(x_min, x_max, 50)
+            
+            # 計算切線上的點
+            y_tangent = percentile + slope * (x_tangent - score)
+            
+            # 繪製切線
+            fig_combined.add_trace(
+                go.Scatter(
+                    x=x_tangent,
+                    y=y_tangent,
+                    mode='lines',
+                    line=dict(color=colors[name], dash='dash', width=2),
+                    name=f"{name} 切線",
+                    showlegend=False
+                )
+            )
+        
+        # 添加突出顯示的分數點
+        fig_combined.add_trace(
+            go.Scatter(
+                x=[score],
+                y=[percentile],
+                mode='markers',
+                name=f"{name} 分數",
+                marker=dict(
+                    color=colors[name],
+                    size=15,
+                    symbol='x',
+                    line=dict(color='white', width=2)
+                )
+            )
+        )
+    
+    # 更新圖表布局
+    fig_combined.update_layout(
+        title="GMAT分數與百分位對應關係",
+        xaxis_title="級分",
+        yaxis_title="百分位",
+        xaxis=dict(range=[60, 90], tickmode='linear', tick0=60, dtick=5),
+        yaxis=dict(range=[0, 100], tickmode='linear', tick0=0, dtick=10),
+        template="plotly_white",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        grid=dict(rows=1, columns=1),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(family="Arial", size=12)
+    )
+    
+    # 添加網格線
+    fig_combined.update_xaxes(showgrid=True, gridwidth=1, gridcolor='lightgrey')
+    fig_combined.update_yaxes(showgrid=True, gridwidth=1, gridcolor='lightgrey')
+    
+    # 顯示組合圖
+    tab_container.plotly_chart(fig_combined, use_container_width=True)
+    
+    # 2. 子圖版本 - 保留原有子圖方式但使用更準確的數據
+    tab_container.subheader("分數與百分位對應圖 (子圖)")
     
     # 創建一個包含四個子圖的圖表
     fig = make_subplots(
@@ -227,11 +403,11 @@ def display_total_results(tab_container):
     # 圖表2: Q科級分百分位
     fig.add_trace(
         go.Scatter(
-            x=scaled_scores, 
-            y=scaled_percentiles, 
+            x=datasets['Quantitative']['scale'], 
+            y=datasets['Quantitative']['percentile'], 
             mode='lines+markers',
             name='Q科級分百分位',
-            line=dict(color='green', width=2),
+            line=dict(color='red', width=2),
             marker=dict(size=6)
         ),
         row=1, col=2
@@ -251,11 +427,11 @@ def display_total_results(tab_container):
     # 圖表3: V科級分百分位
     fig.add_trace(
         go.Scatter(
-            x=scaled_scores, 
-            y=scaled_percentiles, 
+            x=datasets['Verbal']['scale'], 
+            y=datasets['Verbal']['percentile'], 
             mode='lines+markers',
             name='V科級分百分位',
-            line=dict(color='purple', width=2),
+            line=dict(color='blue', width=2),
             marker=dict(size=6)
         ),
         row=2, col=1
@@ -267,7 +443,7 @@ def display_total_results(tab_container):
             y=[v_percentile], 
             mode='markers',
             name='當前V科級分',
-            marker=dict(color='red', size=12, symbol='star')
+            marker=dict(color='blue', size=12, symbol='star')
         ),
         row=2, col=1
     )
@@ -275,11 +451,11 @@ def display_total_results(tab_container):
     # 圖表4: DI科級分百分位
     fig.add_trace(
         go.Scatter(
-            x=scaled_scores, 
-            y=scaled_percentiles, 
+            x=datasets['Data Insights']['scale'], 
+            y=datasets['Data Insights']['percentile'], 
             mode='lines+markers',
             name='DI科級分百分位',
-            line=dict(color='orange', width=2),
+            line=dict(color='black', width=2),
             marker=dict(size=6)
         ),
         row=2, col=2
@@ -291,7 +467,7 @@ def display_total_results(tab_container):
             y=[di_percentile], 
             mode='markers',
             name='當前DI科級分',
-            marker=dict(color='red', size=12, symbol='star')
+            marker=dict(color='black', size=12, symbol='star')
         ),
         row=2, col=2
     )
@@ -307,9 +483,9 @@ def display_total_results(tab_container):
     
     # 更新X軸範圍
     fig.update_xaxes(title_text="總分", range=[200, 800], row=1, col=1)
-    fig.update_xaxes(title_text="Q科級分", range=[40, 90], row=1, col=2)
-    fig.update_xaxes(title_text="V科級分", range=[40, 90], row=2, col=1)
-    fig.update_xaxes(title_text="DI科級分", range=[40, 90], row=2, col=2)
+    fig.update_xaxes(title_text="Q科級分", range=[60, 90], row=1, col=2)
+    fig.update_xaxes(title_text="V科級分", range=[60, 90], row=2, col=1)
+    fig.update_xaxes(title_text="DI科級分", range=[60, 90], row=2, col=2)
     
     # 更新Y軸範圍
     fig.update_yaxes(title_text="百分位(%)", range=[0, 100], row=1, col=1)
@@ -322,6 +498,12 @@ def display_total_results(tab_container):
     
     # 顯示圖表
     tab_container.plotly_chart(fig, use_container_width=True)
+    
+    # 更新總分計算公式
+    new_estimated_score = -1005.3296 + 6.7098 * q_score + 6.6404 * v_score + 6.7954 * di_score
+    
+    # 添加總分計算公式說明
+    tab_container.info(f"根據公式計算的預估總分: {new_estimated_score:.2f}，實際總分: {total_score}")
     
     # 添加解釋和分析
     tab_container.subheader("分數解釋")
