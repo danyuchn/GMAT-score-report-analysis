@@ -254,7 +254,14 @@ def get_openai_response(current_chat_history, report_context, dataframe_context,
         for i in range(len(current_chat_history) - 2, -1, -1):
             if current_chat_history[i]["role"] == "assistant":
                 previous_response_id = current_chat_history[i].get("response_id")
-                break
+                if previous_response_id:
+                    logging.info(f"找到前一個回應ID: {previous_response_id[:10]}... (用於保持對話上下文)")
+                    break
+                else:
+                    logging.warning("前一個助手訊息缺少response_id，無法保持對話上下文")
+        
+    if not previous_response_id:
+        logging.info("聊天歷史中找不到有效的前一個response_id，將啟動新對話")
 
     # Construct the input for the API using standard multi-line string and .format()
     input_template = '''You are a GMAT diagnostic assistant. Analyze the provided report summary and detailed data table (excerpt) to answer the user's question accurately and concisely. If the information is not present in the provided context, say so.
@@ -276,13 +283,20 @@ USER QUESTION:
 
     try:
         logging.info(f"Calling OpenAI responses.create with model o4-mini. Previous ID: {previous_response_id}")
-        response = client.responses.create(
-            model="o4-mini", # Using the model from user's example
-            input=api_input,
-            previous_response_id=previous_response_id,
-            # Add other parameters if needed, e.g., temperature, max_tokens based on API docs
-            # max_output_tokens=500, # Example: limit output tokens
-        )
+        
+        # 準備API調用參數
+        api_params = {
+            "model": "o4-mini",  # 使用o4-mini模型
+            "input": api_input,
+        }
+        
+        # 只有在有效的previous_response_id存在時才添加此參數
+        if previous_response_id:
+            api_params["previous_response_id"] = previous_response_id
+        
+        # 實際調用API
+        response = client.responses.create(**api_params)
+        
         logging.info(f"OpenAI response received. Status: {response.status}")
 
         if response.status == 'completed' and response.output:
