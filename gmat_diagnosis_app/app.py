@@ -30,6 +30,7 @@ try:
     # Import custom modules for core logic
     from gmat_diagnosis_app import preprocess_helpers # Ensure the module itself is imported for setup_input_tabs
     # from gmat_diagnosis_app import irt_module as irt # Moved to analysis_orchestrator
+    from gmat_diagnosis_app.irt import probability_correct, item_information, estimate_theta, initialize_question_bank, simulate_cat_exam
     # from gmat_diagnosis_app.diagnostics.v_diagnostic import run_v_diagnosis_processed # Moved
     # from gmat_diagnosis_app.diagnostics.di_diagnostic import run_di_diagnosis_processed # Moved
     # from gmat_diagnosis_app.diagnostics.q_diagnostic import diagnose_q # Moved
@@ -40,6 +41,7 @@ try:
         SUBJECT_SIM_PARAMS, FINAL_DIAGNOSIS_INPUT_COLS, BASE_RENAME_MAP,
         REQUIRED_ORIGINAL_COLS, EXCEL_COLUMN_MAP
     )
+    from gmat_diagnosis_app.constants.thresholds import THRESHOLDS
     # from gmat_diagnosis_app.utils.validation import validate_dataframe
     # from gmat_diagnosis_app.utils.data_processing import process_subject_tab
     # from gmat_diagnosis_app.utils.styling import apply_styles
@@ -54,6 +56,11 @@ try:
     from gmat_diagnosis_app.ui.input_tabs import setup_input_tabs, combine_input_data, display_analysis_button
     from gmat_diagnosis_app.session_manager import init_session_state, reset_session_for_new_upload # Added import
     from gmat_diagnosis_app.analysis_orchestrator import run_analysis # Added import
+    
+    # Import the new analysis helpers
+    from gmat_diagnosis_app.analysis_helpers.time_pressure_analyzer import calculate_time_pressure, calculate_and_apply_invalid_logic
+    from gmat_diagnosis_app.analysis_helpers.simulation_manager import run_simulation, prepare_dataframes_for_diagnosis
+    from gmat_diagnosis_app.analysis_helpers.diagnosis_manager import run_diagnosis, update_session_state_after_analysis
     
 except ImportError as e:
     st.error(f"導入模組時出錯: {e}. 請確保環境設定正確，且 gmat_diagnosis_app 在 Python 路徑中。")
