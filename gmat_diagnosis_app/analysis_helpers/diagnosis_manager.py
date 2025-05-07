@@ -153,8 +153,13 @@ def update_session_state_after_analysis(analysis_success, processed_df, report_d
             st.session_state.diagnosis_complete = False
             st.session_state.analysis_error = True
             st.session_state.error_message = "分析完成但未產生有效數據，請檢查輸入或診斷邏輯。"
+            # 仍然保存存在的theta_plots
+            if theta_plots and isinstance(theta_plots, dict):
+                st.session_state.theta_plots = theta_plots
         elif not analysis_success: # Explicitly failed
             st.session_state.diagnosis_complete = False
             st.session_state.analysis_error = True # Set on failure
             st.session_state.error_message = error_message or "分析未能成功完成，請檢查上方錯誤訊息。" # Preserve specific error if set
-            st.session_state.theta_plots = {}  # Clear plots on error 
+            # 只有在完全失敗時才清空theta_plots，其他情況保留已生成的圖表
+            if not theta_plots or not isinstance(theta_plots, dict):
+                st.session_state.theta_plots = {}  # Clear plots on error only if they don't exist 
