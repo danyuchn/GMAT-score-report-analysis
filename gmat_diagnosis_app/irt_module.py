@@ -1,14 +1,41 @@
+# -*- coding: utf-8 -*-
+"""
+GMAT 診斷應用 IRT 模組 (轉發器)
+此檔案僅作為向後兼容性的轉發器，所有功能已移至 gmat_diagnosis_app.irt 子包
+"""
+
+# 引入新的 irt 子包中的所有內容，以保持與舊引入方式的兼容性
+from gmat_diagnosis_app.irt import (
+    probability_correct,
+    item_information,
+    neg_log_likelihood,
+    estimate_theta,
+    select_next_question,
+    initialize_question_bank,
+    simulate_cat_exam
+)
+
+import logging
+import warnings
+
+# 顯示棄用警告
+warnings.warn(
+    "直接引用 irt_module.py 已棄用，請改用 gmat_diagnosis_app.irt 子包",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+# 設定模組 logger 作為向後兼容
+logger = logging.getLogger(__name__)
+
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.special import expit # Sigmoid function
 from scipy.stats import norm
-import logging # Import logging
 
 # Configure basic logging (this might be better in the main app entry point)
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-logger = logging.getLogger(__name__) # Define module-level logger
 
 def probability_correct(theta, a, b, c):
     """Calculates the probability of a correct response using the 3PL IRT model.
