@@ -138,21 +138,6 @@ def display_total_results(tab_container):
     v_score = st.session_state.v_score
     di_score = st.session_state.di_score
     
-    tab_container.subheader("GMAT 分數分析")
-    
-    # 顯示所選分數
-    if st.session_state.get('score_df') is not None:
-        tab_container.dataframe(st.session_state.score_df, hide_index=True, use_container_width=True)
-    else:
-        score_data = {
-            'Score_Type': ['Total Score', 'Q Scaled Score', 'V Scaled Score', 'DI Scaled Score'],
-            'Score': [total_score, q_score, v_score, di_score]
-        }
-        tab_container.dataframe(pd.DataFrame(score_data), hide_index=True, use_container_width=True)
-    
-    # 生成百分位數分析
-    tab_container.subheader("分數百分位分析")
-    
     # 使用 scale-percentile-simulation.ipynb 中更準確的數據集
     datasets = {
         'Quantitative': {
@@ -220,26 +205,8 @@ def display_total_results(tab_container):
     # 插值計算總分百分位數
     total_percentile = np.interp(total_score, total_scores[::-1], total_percentiles[::-1])
     
-    # 創建百分位數DataFrame
-    percentile_data = {
-        'Score_Type': ['Total Score', 'Q Scaled Score', 'V Scaled Score', 'DI Scaled Score'],
-        'Score': [total_score, q_score, v_score, di_score],
-        'Percentile': [
-            f"{total_percentile:.1f}%", 
-            f"{q_percentile:.1f}%", 
-            f"{v_percentile:.1f}%", 
-            f"{di_percentile:.1f}%"
-        ]
-    }
-    percentile_df = pd.DataFrame(percentile_data)
-    
-    # 顯示百分位數表格
-    tab_container.dataframe(percentile_df, hide_index=True, use_container_width=True)
-    
-    # 模仿 scale-percentile-simulation.ipynb 中的圖表 - 使用兩種圖表方式
-    
-    # 1. 組合圖 - 單一圖表顯示所有科目數據
-    tab_container.subheader("三科分數與百分位對應圖 (組合圖)")
+    # 組合圖 - 單一圖表顯示所有科目數據
+    tab_container.subheader("三科分數與百分位對應圖")
     
     candidate_scores = {
         'Quantitative': q_score,
@@ -360,219 +327,11 @@ def display_total_results(tab_container):
     # 顯示組合圖
     tab_container.plotly_chart(fig_combined, use_container_width=True)
     
-    # 2. 子圖版本 - 保留原有子圖方式但使用更準確的數據
-    tab_container.subheader("分數與百分位對應圖 (子圖)")
-    
-    # 創建一個包含四個子圖的圖表
-    fig = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=(
-            "GMAT 總分百分位分布", 
-            "Q科級分百分位分布", 
-            "V科級分百分位分布", 
-            "DI科級分百分位分布"
-        ),
-        vertical_spacing=0.15,
-        horizontal_spacing=0.1
-    )
-    
-    # 圖表1: 總分百分位
-    fig.add_trace(
-        go.Scatter(
-            x=total_scores, 
-            y=total_percentiles, 
-            mode='lines+markers',
-            name='總分百分位',
-            line=dict(color='blue', width=2),
-            marker=dict(size=6)
-        ),
-        row=1, col=1
-    )
-    # 添加當前總分位置
-    fig.add_trace(
-        go.Scatter(
-            x=[total_score], 
-            y=[total_percentile], 
-            mode='markers',
-            name='當前總分',
-            marker=dict(color='red', size=12, symbol='star')
-        ),
-        row=1, col=1
-    )
-    
-    # 圖表2: Q科級分百分位
-    fig.add_trace(
-        go.Scatter(
-            x=datasets['Quantitative']['scale'], 
-            y=datasets['Quantitative']['percentile'], 
-            mode='lines+markers',
-            name='Q科級分百分位',
-            line=dict(color='red', width=2),
-            marker=dict(size=6)
-        ),
-        row=1, col=2
-    )
-    # 添加當前Q科級分位置
-    fig.add_trace(
-        go.Scatter(
-            x=[q_score], 
-            y=[q_percentile], 
-            mode='markers',
-            name='當前Q科級分',
-            marker=dict(color='red', size=12, symbol='star')
-        ),
-        row=1, col=2
-    )
-    
-    # 圖表3: V科級分百分位
-    fig.add_trace(
-        go.Scatter(
-            x=datasets['Verbal']['scale'], 
-            y=datasets['Verbal']['percentile'], 
-            mode='lines+markers',
-            name='V科級分百分位',
-            line=dict(color='blue', width=2),
-            marker=dict(size=6)
-        ),
-        row=2, col=1
-    )
-    # 添加當前V科級分位置
-    fig.add_trace(
-        go.Scatter(
-            x=[v_score], 
-            y=[v_percentile], 
-            mode='markers',
-            name='當前V科級分',
-            marker=dict(color='blue', size=12, symbol='star')
-        ),
-        row=2, col=1
-    )
-    
-    # 圖表4: DI科級分百分位
-    fig.add_trace(
-        go.Scatter(
-            x=datasets['Data Insights']['scale'], 
-            y=datasets['Data Insights']['percentile'], 
-            mode='lines+markers',
-            name='DI科級分百分位',
-            line=dict(color='black', width=2),
-            marker=dict(size=6)
-        ),
-        row=2, col=2
-    )
-    # 添加當前DI科級分位置
-    fig.add_trace(
-        go.Scatter(
-            x=[di_score], 
-            y=[di_percentile], 
-            mode='markers',
-            name='當前DI科級分',
-            marker=dict(color='black', size=12, symbol='star')
-        ),
-        row=2, col=2
-    )
-    
-    # 更新圖表布局
-    fig.update_layout(
-        height=800,
-        width=800,
-        title_text="GMAT分數與百分位對應關係",
-        showlegend=False,
-        template="plotly_white"
-    )
-    
-    # 更新X軸範圍
-    fig.update_xaxes(title_text="總分", range=[200, 800], row=1, col=1)
-    fig.update_xaxes(title_text="Q科級分", range=[60, 90], row=1, col=2)
-    fig.update_xaxes(title_text="V科級分", range=[60, 90], row=2, col=1)
-    fig.update_xaxes(title_text="DI科級分", range=[60, 90], row=2, col=2)
-    
-    # 更新Y軸範圍
-    fig.update_yaxes(title_text="百分位(%)", range=[0, 100], row=1, col=1)
-    fig.update_yaxes(title_text="百分位(%)", range=[0, 100], row=1, col=2)
-    fig.update_yaxes(title_text="百分位(%)", range=[0, 100], row=2, col=1)
-    fig.update_yaxes(title_text="百分位(%)", range=[0, 100], row=2, col=2)
-    
-    # 保存圖表到session state
-    st.session_state.total_plot = fig
-    
-    # 顯示圖表
-    tab_container.plotly_chart(fig, use_container_width=True)
-    
-    # 更新總分計算公式
-    new_estimated_score = -1005.3296 + 6.7098 * q_score + 6.6404 * v_score + 6.7954 * di_score
-    
-    # 添加總分計算公式說明
-    tab_container.info(f"根據公式計算的預估總分: {new_estimated_score:.2f}，實際總分: {total_score}")
-    
-    # 添加解釋和分析
-    tab_container.subheader("分數解釋")
-    
-    # 根據總分分析
-    if total_score >= 750:
-        score_analysis = "您的總分處於頂尖水平（99%以上），有競爭力申請全球任何商學院。"
-    elif total_score >= 700:
-        score_analysis = "您的總分非常優秀（90%以上），對大多數頂尖商學院有競爭力。"
-    elif total_score >= 650:
-        score_analysis = "您的總分良好（大約70-80%百分位），對許多優秀商學院具有競爭力。"
-    elif total_score >= 600:
-        score_analysis = "您的總分處於中等偏上水平（約50-60%百分位），對部分商學院有競爭力，可考慮提高。"
-    elif total_score >= 550:
-        score_analysis = "您的總分處於中等水平（約30-40%百分位），建議繼續提高以增加申請競爭力。"
-    else:
-        score_analysis = "您的總分有提升空間（低於30%百分位），建議加強備考策略。"
-    
-    tab_container.markdown(f"**總分分析**：{score_analysis}")
-    
-    # 分析各科表現平衡性
-    scores = [q_percentile, v_percentile, di_percentile]
-    max_diff = max(scores) - min(scores)
-    
-    if max_diff > 30:
-        balance_analysis = "您的各科表現差異較大，建議重點提高較弱的科目以獲得更平衡的分數。"
-    elif max_diff > 15:
-        balance_analysis = "您的各科表現有一定差異，可考慮適當平衡各科備考時間。"
-    else:
-        balance_analysis = "您的各科表現相對平衡，這是一個很好的優勢。"
-    
-    tab_container.markdown(f"**平衡性分析**：{balance_analysis}")
-    
-    # 找出最強和最弱科目
-    subject_names = ["Q科", "V科", "DI科"]
-    strongest = subject_names[scores.index(max(scores))]
-    weakest = subject_names[scores.index(min(scores))]
-    
-    tab_container.markdown(f"**優勢科目**：{strongest}（{max(scores):.1f}%百分位）")
-    tab_container.markdown(f"**待提高科目**：{weakest}（{min(scores):.1f}%百分位）")
-    
-    # 提供改進建議
-    tab_container.subheader("提升策略建議")
-    
-    if total_score < 650:
-        tab_container.markdown("""
-        **提升總分策略**:
-        1. 制定全面的備考計劃，涵蓋所有科目
-        2. 增加每周學習時間，確保系統性學習
-        3. 使用官方資源進行練習並熟悉考試
-        4. 考慮參加備考課程或尋求專業輔導
-        """)
-    
-    if min(scores) < 70:
-        tab_container.markdown(f"""
-        **提升{weakest}建議**:
-        1. 診斷具體弱點，找出知識或技能差距
-        2. 專項練習薄弱環節並尋求專門指導
-        3. 增加該科目的練習頻率和時間投入
-        4. 定期評估進步並調整學習策略
-        """)
-    
+    # 新增加的部分：嵌入YouTube視頻
+    tab_container.subheader("了解級分跟百分位之間的關係")
     tab_container.markdown("""
-    **平衡發展建議**:
-    1. 持續練習強勢科目，保持已有優勢
-    2. 適當分配時間，不忽視任何一個科目
-    3. 定期進行模擬測試，確認整體進步
-    4. 在考前保持沉著冷靜，合理安排複習
-    """)
+    <iframe width="560" height="315" src="htㄐtps://www.youtube.com/embed/MLVT-zxaBkE?si=9SJ68LSrvvii35p-" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    """, unsafe_allow_html=True)
 
 # --- Display Results Function (Moved from app.py) ---
 def display_results():
