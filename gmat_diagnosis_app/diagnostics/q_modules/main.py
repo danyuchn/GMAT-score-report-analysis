@@ -133,15 +133,15 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     # Add diagnosis params to each row
     df_diagnosed = diagnose_q_root_causes(df_q, avg_times_by_type, max_diffs_by_skill)
     
+    # 首先處理所有數據的診斷參數翻譯（包括無效數據）
+    if 'diagnostic_params' in df_diagnosed.columns:
+        # 將所有診斷參數從英文代碼轉換為中文標籤
+        df_diagnosed['diagnostic_params_list'] = df_diagnosed['diagnostic_params'].apply(
+            lambda params_list: [get_translation(param) for param in (params_list if isinstance(params_list, list) else [])]
+        )
+
     # For the rest of the analysis, focus on valid data with diagnosis
     df_valid_diagnosed = df_diagnosed[~df_diagnosed['is_invalid']].copy()
-    
-    # Transform diagnostic_params to lists if they're not already
-    if 'diagnostic_params' in df_valid_diagnosed.columns:
-        # Ensure all entries are lists for consistency
-        df_valid_diagnosed['diagnostic_params_list'] = df_valid_diagnosed['diagnostic_params'].apply(
-            lambda x: x if isinstance(x, list) else []
-        )
     
     # --- Chapters 2-6: Internal Diagnosis ---
     internal_diagnosis = diagnose_q_internal(df_valid_diagnosed)
