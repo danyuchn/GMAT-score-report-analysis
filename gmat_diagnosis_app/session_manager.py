@@ -29,6 +29,7 @@ def init_session_state():
         'openai_api_key': None,
         'show_chat': False,
         'chat_history': [], # List of dicts: {"role": "user/assistant", "content": "..."}
+        'chat_history_backup': [], # 備份聊天歷史，確保持久化
         # --- Manual IRT Adjustment Inputs ---
         'q_incorrect_to_correct_qns': '',
         'q_correct_to_incorrect_qns': '',
@@ -40,6 +41,14 @@ def init_session_state():
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+    
+    # 保持聊天歷史持久化
+    if 'chat_history' in st.session_state and 'chat_history_backup' in st.session_state:
+        # 如果備份中有更多消息，使用備份恢復
+        if len(st.session_state.chat_history_backup) > len(st.session_state.chat_history):
+            import logging
+            logging.info(f"從備份恢復聊天歷史 (備份長度: {len(st.session_state.chat_history_backup)}, 當前長度: {len(st.session_state.chat_history)})")
+            st.session_state.chat_history = st.session_state.chat_history_backup.copy()
     
     # Store initial thetas in session state to persist them
     if 'initial_theta_q' not in st.session_state: st.session_state.initial_theta_q = 0.0
@@ -58,11 +67,32 @@ def reset_session_for_new_upload():
     st.session_state.analysis_error = False
     st.session_state.theta_plots = {}
     st.session_state.show_chat = False
+    
+    # 備份當前聊天歷史
+    if 'chat_history' in st.session_state and st.session_state.chat_history:
+        st.session_state.chat_history_backup = st.session_state.chat_history.copy()
+    # 重置聊天歷史
     st.session_state.chat_history = []
+    
     # 不重置分數相關設定
     # st.session_state.total_score
     # st.session_state.q_score
     # st.session_state.v_score
     # st.session_state.di_score
     # 但重置圖表
-    st.session_state.total_plot = None 
+    st.session_state.total_plot = None
+    
+# 添加新函數，專門用於確保聊天歷史持久化
+def ensure_chat_history_persistence():
+    """確保聊天歷史在會話間持久化"""
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+        
+    # 如果備份存在且比當前歷史更長，則恢復備份
+    if 'chat_history_backup' in st.session_state and len(st.session_state.chat_history_backup) > len(st.session_state.chat_history):
+        import logging
+        logging.info(f"恢復聊天歷史: 從備份中恢復了 {len(st.session_state.chat_history_backup)} 條消息")
+        st.session_state.chat_history = st.session_state.chat_history_backup.copy()
+    
+    # 每次調用時都更新備份
+    st.session_state.chat_history_backup = st.session_state.chat_history.copy() 

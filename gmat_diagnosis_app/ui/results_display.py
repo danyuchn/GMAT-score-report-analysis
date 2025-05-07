@@ -11,6 +11,7 @@ from plotly.subplots import make_subplots
 from gmat_diagnosis_app.utils.styling import apply_styles
 from gmat_diagnosis_app.utils.excel_utils import to_excel
 from gmat_diagnosis_app.constants.config import SUBJECTS, EXCEL_COLUMN_MAP
+from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
 
 # --- Column Display Configuration (Moved from app.py) ---
 COLUMN_DISPLAY_CONFIG = {
@@ -45,6 +46,59 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     subject_col_config = col_config.copy()
     subject_excel_map = excel_map.copy()
     
+    # 複製數據框以避免修改原始數據
+    df_display = df_subject.copy()
+    
+    # 確保按題號排序
+    if 'question_position' in df_display.columns:
+        df_display = df_display.sort_values(by='question_position').reset_index(drop=True)
+    
+    # V科的特殊調試
+    if subject == 'V':
+        # 檢查無效項數據的類型和值
+        if 'is_invalid' in df_display.columns:
+            invalid_type = df_display['is_invalid'].dtype
+            tab_container.info(f"V科無效項數據類型: {invalid_type}")
+            
+            # 確保無效項是布爾值
+            try:
+                df_display['is_invalid'] = df_display['is_invalid'].fillna(False).astype(bool)
+                tab_container.success(f"V科無效項已強制轉換為布爾值")
+            except Exception as e:
+                tab_container.error(f"轉換無效項時出錯: {e}")
+                
+        tab_container.info(f"V科原始數據列: {list(df_display.columns)}")
+        
+        # 重要修改：確保is_invalid完全以手動標記為準
+        if 'is_manually_invalid' in df_display.columns:
+            # 先顯示原始無效項和手動標記項的數量
+            if 'is_invalid' in df_display.columns:
+                orig_invalid_sum = df_display['is_invalid'].sum()
+                tab_container.info(f"V科原始無效項數量: {orig_invalid_sum}")
+            
+            manual_invalid_count = df_display['is_manually_invalid'].sum()
+            tab_container.info(f"V科手動標記無效項數量: {manual_invalid_count}")
+            
+            # 列出手動標記的題號
+            manually_invalid_positions = df_display.loc[df_display['is_manually_invalid'] == True, 'question_position'].tolist()
+            if manually_invalid_positions:
+                tab_container.warning(f"手動標記為無效的題號: {manually_invalid_positions}")
+            
+            # 重要：重置is_invalid列，完全以手動標記為準
+            if 'is_invalid' in df_display.columns:
+                # 先全部設為False
+                df_display['is_invalid'] = False
+                # 只將手動標記的項設為True
+                df_display.loc[df_display['is_manually_invalid'] == True, 'is_invalid'] = True
+                
+                # 檢查重置後的無效項數量
+                new_invalid_count = df_display['is_invalid'].sum()
+                tab_container.warning(f"僅使用手動標記後，無效項數量從 {orig_invalid_sum} 變為 {new_invalid_count}")
+                
+                # 驗證是否與手動標記一致
+                if new_invalid_count != manual_invalid_count:
+                    tab_container.error(f"錯誤：重置後的無效項數量 ({new_invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
+    
     # 針對DI科目移除「考察能力」欄位
     if subject == 'DI':
         if 'question_fundamental_skill' in subject_col_config:
@@ -54,8 +108,8 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
 
     # Prepare DataFrame for Display
     # 1. Select columns based on keys in col_config that exist in the data
-    cols_available = [k for k in subject_col_config.keys() if k in df_subject.columns]
-    df_to_display = df_subject[cols_available].copy()
+    cols_available = [k for k in subject_col_config.keys() if k in df_display.columns]
+    df_to_display = df_display[cols_available].copy()
 
     # 2. Define column order for st.dataframe (exclude those with None config value, like 'overtime')
     columns_for_st_display_order = [k for k in cols_available if subject_col_config.get(k) is not None]
@@ -67,9 +121,12 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         if 'is_correct' not in df_to_display.columns: df_to_display['is_correct'] = True # Assume correct if missing for styling
         if 'is_invalid' not in df_to_display.columns: df_to_display['is_invalid'] = False # Ensure invalid column exists
         
-        # 如果存在手動標記的無效項，合併到is_invalid
+        # 重要修改：確保is_invalid完全以手動標記為準（即使在最後的顯示階段）
         if 'is_manually_invalid' in df_to_display.columns:
-            df_to_display['is_invalid'] = df_to_display['is_invalid'] | df_to_display['is_manually_invalid']
+            # 重置is_invalid列
+            df_to_display['is_invalid'] = False
+            # 僅將手動標記的項設為無效
+            df_to_display.loc[df_to_display['is_manually_invalid'] == True, 'is_invalid'] = True
             
         # 確保is_invalid為布林值
         df_to_display['is_invalid'] = df_to_display['is_invalid'].astype(bool)
@@ -103,6 +160,32 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     try:
         # Prepare a copy specifically for Excel export using excel_map
         df_for_excel = df_subject[[k for k in subject_excel_map.keys() if k in df_subject.columns]].copy()
+        
+        # 確保按題號排序
+        if 'question_position' in df_for_excel.columns:
+            df_for_excel = df_for_excel.sort_values(by='question_position').reset_index(drop=True)
+
+        # V科的額外調試信息
+        if subject == 'V':
+            tab_container.info(f"V科Excel導出數據列: {list(df_for_excel.columns)}")
+            if 'is_invalid' in df_for_excel.columns:
+                orig_invalid_sum = df_for_excel['is_invalid'].sum()
+                tab_container.info(f"V科Excel導出前無效項數量: {orig_invalid_sum}")
+                
+            # 重要修改：確保is_invalid完全以手動標記為準（Excel導出前）
+            if 'is_manually_invalid' in df_for_excel.columns:
+                # 重置is_invalid列
+                df_for_excel['is_invalid'] = False
+                # 僅將手動標記的項設為無效
+                df_for_excel.loc[df_for_excel['is_manually_invalid'] == True, 'is_invalid'] = True
+                
+                tab_container.info(f"V科僅使用手動標記後，Excel導出無效項數量: {df_for_excel['is_invalid'].sum()}")
+                
+                # 驗證手動標記項被正確設置
+                manual_invalid_count = df_for_excel['is_manually_invalid'].sum()
+                invalid_count = df_for_excel['is_invalid'].sum()
+                if manual_invalid_count != invalid_count:
+                    tab_container.error(f"V科Excel導出前無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
 
         # Apply number formatting *before* calling to_excel if needed
         if 'question_difficulty' in df_for_excel.columns:
@@ -118,6 +201,8 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         # Ensure 'is_invalid' is also string for conditional formatting in to_excel
         if 'is_invalid' in df_for_excel.columns:
              df_for_excel['is_invalid'] = df_for_excel['is_invalid'].astype(str) # Convert TRUE/FALSE to text
+             if subject == 'V':
+                 tab_container.info(f"V科is_invalid列轉換為文本後值分布: {df_for_excel['is_invalid'].value_counts().to_dict()}")
 
 
         excel_bytes = to_excel(df_for_excel, subject_excel_map) # 使用科目特定的excel_map
@@ -343,68 +428,58 @@ def display_total_results(tab_container):
 
 # --- Display Results Function (Moved from app.py) ---
 def display_results():
-    """Display analysis results in tabs"""
-    st.header("📊 診斷結果")
+    """Displays all diagnostic results in separate tabs."""
+    if not st.session_state.get("diagnosis_complete", False):
+        st.info("尚未執行分析或分析未成功完成。")
+        return
 
-    if st.session_state.analysis_error:
-        st.error(st.session_state.error_message or "分析過程中發生錯誤，請檢查。")
-    elif not st.session_state.diagnosis_complete:
-        st.info("分析正在進行中或尚未完成。請稍候或檢查是否有錯誤提示。")
-    elif st.session_state.processed_df is None or st.session_state.processed_df.empty:
-        st.warning("診斷完成，但沒有可顯示的數據。")
-        if st.session_state.report_dict:
-            st.subheader("診斷摘要")
-            for subject, report_md in st.session_state.report_dict.items():
-                st.markdown(f"### {subject} 科:")
-                st.markdown(report_md, unsafe_allow_html=True)
-    else:
-        st.success("診斷分析已完成！")
-        subjects_with_data = [subj for subj in SUBJECTS if subj in st.session_state.processed_df['Subject'].unique()]
-        if not subjects_with_data:
-            st.warning("處理後的數據中未找到任何有效科目。")
-        else:
-            # 添加Total標籤頁
-            tab_titles = [f"{subj} 科結果" for subj in subjects_with_data]
-            tab_titles.append("Total")  # 添加Total標籤頁
-            
-            show_ai_consolidated_tab = (
-                st.session_state.openai_api_key and
-                st.session_state.diagnosis_complete and
-                st.session_state.ai_consolidated_report
-            )
-            if show_ai_consolidated_tab:
-                tab_titles.append("✨ AI 匯總建議")
+    # Create tabs for Total, Q, V, DI, and AI Chat
+    tab_titles = ["Total (總分與百分位)", "Q 科結果", "V 科結果", "DI 科結果", "💬 AI 即時問答"]
+    
+    if st.session_state.get("consolidated_report_text"):
+        tab_titles.insert(1, "✨ AI 總結建議") # Insert after "Total"
 
-            result_tabs = st.tabs(tab_titles)
+    tabs = st.tabs(tab_titles)
+    
+    current_tab_index = 0
 
-            # 顯示各科目結果
-            for i, subject in enumerate(subjects_with_data):
-                subject_tab = result_tabs[i]
-                with subject_tab:
-                    df_subject = st.session_state.processed_df[st.session_state.processed_df['Subject'] == subject]
-                    report_md = st.session_state.report_dict.get(subject, f"*未找到 {subject} 科的報告。*")
+    # Tab 1: Total Score Analysis
+    with tabs[current_tab_index]:
+        display_total_results(tabs[current_tab_index])
+    current_tab_index += 1
+    
+    # Tab (Optional): AI Consolidated Report
+    if "✨ AI 總結建議" in tab_titles:
+        with tabs[current_tab_index]:
+            tabs[current_tab_index].subheader("AI 智能匯總與建議行動")
+            tabs[current_tab_index].markdown(st.session_state.consolidated_report_text)
+        current_tab_index += 1
 
-                    st.subheader(f"{subject} 科能力估計 (Theta) 走勢")
-                    theta_plot = st.session_state.theta_plots.get(subject)
-                    if theta_plot:
-                        st.plotly_chart(theta_plot, use_container_width=True)
-                    else:
-                        st.info(f"{subject} 科目的 Theta 估計圖表不可用。")
-                    st.divider()
-                    
-                    # Use the global COLUMN_DISPLAY_CONFIG and EXCEL_COLUMN_MAP from this module
-                    display_subject_results(subject, subject_tab, report_md, df_subject, COLUMN_DISPLAY_CONFIG, EXCEL_COLUMN_MAP)
-            
-            # 顯示Total標籤頁結果
-            total_tab_index = len(subjects_with_data)
-            with result_tabs[total_tab_index]:
-                display_total_results(result_tabs[total_tab_index])
+    # Tabs for Q, V, DI
+    for subject in SUBJECTS: # SUBJECTS = ['Q', 'V', 'DI']
+        report_md = st.session_state.report_dict.get(subject, f"未找到 {subject} 科的診斷報告。")
+        df_subject = st.session_state.processed_df[st.session_state.processed_df['Subject'] == subject] if st.session_state.processed_df is not None else pd.DataFrame()
+        
+        subject_tab_title = f"{subject} 科結果"
+        try:
+            actual_tab_index_for_subject = tab_titles.index(subject_tab_title)
+            with tabs[actual_tab_index_for_subject]:
+                display_subject_results(subject, tabs[actual_tab_index_for_subject], report_md, df_subject, COLUMN_DISPLAY_CONFIG, EXCEL_COLUMN_MAP)
+        except ValueError:
+            st.error(f"無法找到分頁 '{subject_tab_title}'。請檢查 tab_titles 配置。")
+            # Fallback or log, current_tab_index will not be incremented for this subject's own tab
 
-            # 顯示AI匯總標籤頁結果
-            if show_ai_consolidated_tab:
-                ai_tab_index = len(subjects_with_data) + 1  # +1是因為Total標籤頁
-                ai_consolidated_tab = result_tabs[ai_tab_index]
-                with ai_consolidated_tab:
-                    st.subheader("AI 匯總練習建議與後續行動")
-                    st.markdown(st.session_state.ai_consolidated_report)
-                    st.caption("此內容由 OpenAI (o4-mini) 模型根據各科報告中的相關部分生成。請務必結合原始報告進行核對。") 
+    # Tab for AI Chat - find its index
+    ai_chat_tab_title = "💬 AI 即時問答"
+    if ai_chat_tab_title in tab_titles:
+        try:
+            ai_chat_tab_index = tab_titles.index(ai_chat_tab_title)
+            with tabs[ai_chat_tab_index]:
+                tabs[ai_chat_tab_index].subheader("與 AI 即時問答")
+                if st.session_state.get('openai_api_key'):
+                    display_chat_interface(st.session_state)
+                else:
+                    tabs[ai_chat_tab_index].info("請在側邊欄輸入 OpenAI API Key 以啟用 AI 問答功能。")
+        except ValueError:
+            # This should not happen if it's in tab_titles
+            st.error(f"無法找到分頁 '{ai_chat_tab_title}'.") 

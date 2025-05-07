@@ -7,6 +7,7 @@ V診斷模塊的主要診斷功能
 
 import pandas as pd
 import logging
+import streamlit as st
 
 from gmat_diagnosis_app.diagnostics.v_modules.constants import INVALID_DATA_TAG_V
 from gmat_diagnosis_app.diagnostics.v_modules.translations import translate_v
@@ -39,6 +40,44 @@ def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
 
 def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time_per_type):
     try:
+        # 添加調試日誌
+        import streamlit as st
+        import logging
+        
+        # 調試檢查手動標記的無效項
+        if 'is_manually_invalid' in df_v_processed.columns:
+            manual_invalid_count = df_v_processed['is_manually_invalid'].sum()
+            if manual_invalid_count > 0:
+                st.info(f"V科診斷: 檢測到 {manual_invalid_count} 個手動標記的無效項")
+                logging.info(f"V科診斷: 檢測到 {manual_invalid_count} 個手動標記的無效項")
+                
+                # 記錄手動標記的題號
+                manually_invalid_positions = df_v_processed.loc[df_v_processed['is_manually_invalid'] == True, 'question_position'].tolist()
+                st.info(f"手動標記無效的題號: {manually_invalid_positions}")
+                logging.info(f"手動標記無效的題號: {manually_invalid_positions}")
+        
+        # 重要修改：完全以手動標記為準，不合併自動標記的結果
+        # 先檢查是否存在手動標記列
+        if 'is_manually_invalid' in df_v_processed.columns:
+            # 不管之前is_invalid的值如何，完全重設為False
+            if 'is_invalid' in df_v_processed.columns:
+                df_v_processed['is_invalid'] = False
+            else:
+                df_v_processed['is_invalid'] = False  # 如果不存在，創建一個全為False的列
+            
+            # 只將手動標記的項目設為無效
+            df_v_processed.loc[df_v_processed['is_manually_invalid'] == True, 'is_invalid'] = True
+            
+            # 重新計算無效項數量
+            invalid_count = df_v_processed['is_invalid'].sum()
+            st.info(f"V科診斷: 僅使用手動標記，無效項數量為 {invalid_count}")
+            logging.info(f"V科診斷: 僅使用手動標記，無效項數量為 {invalid_count}")
+            
+            # 調試信息：確認是否只有手動標記的項目被設為無效
+            if invalid_count != manual_invalid_count:
+                st.warning(f"警告：無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
+                logging.warning(f"警告：無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
+        
         # --- Chapter 0: Initial Setup and Basic Metrics ---
         logging.debug("[V Diag - Entry] Received data. Overtime count: %s", df_v_processed['overtime'].sum())
         logging.debug("[V Diag - Entry] Input df overtime head:\\n%s", df_v_processed[['question_position', 'question_time', 'overtime']].head().to_string())
@@ -72,6 +111,9 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         # --- Add Tag based on FINAL 'is_invalid' status ---
         final_invalid_mask_v = df_v_processed['is_invalid']
         if final_invalid_mask_v.any():
+            invalid_count = final_invalid_mask_v.sum()
+            st.warning(f"V科診斷: 將為 {invalid_count} 個標記為無效的項目添加無效數據標籤", icon="⚠️")
+            
             for idx in df_v_processed.index[final_invalid_mask_v]:
                 current_list = df_v_processed.loc[idx, 'diagnostic_params']
                 # Ensure current_list is a list before appending
@@ -82,6 +124,9 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         num_invalid_v_total = df_v_processed['is_invalid'].sum()
         v_diagnosis_results = {}
         v_diagnosis_results['invalid_count'] = num_invalid_v_total
+        
+        if num_invalid_v_total > 0:
+            st.info(f"V科診斷: 總共有 {num_invalid_v_total} 個項目被標記為無效")
 
         # --- Filter out invalid data ---
         df_v_processed_full = df_v_processed.copy() # Store potentially modified df before filtering valid
@@ -332,6 +377,44 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
             df_v_final['Subject'] = 'V'
 
         logging.debug("Verbal Diagnosis Complete.")
+
+        # 關鍵修改：確保將is_invalid和is_manually_invalid列從原始完整數據集中合併回返回的數據集
+        # 這樣無效數據標記將不會丟失
+        for invalid_col in ['is_invalid', 'is_manually_invalid']:
+            if invalid_col in df_v_processed_full.columns:
+                # 先確保df_v_final中有這個列
+                if invalid_col not in df_v_final.columns:
+                    df_v_final[invalid_col] = False
+                
+                # 遍歷原始完整數據，將標記為True的行找到並更新到最終數據集
+                for idx, row in df_v_processed_full[df_v_processed_full[invalid_col] == True].iterrows():
+                    # 在最終數據集中找到相同題號的行
+                    matching_rows = df_v_final[df_v_final['question_position'] == row['question_position']]
+                    if not matching_rows.empty:
+                        for final_idx in matching_rows.index:
+                            df_v_final.at[final_idx, invalid_col] = True
+                    else:
+                        # 如果最終數據集中沒有這道題，說明它可能是有效數據中被過濾掉的
+                        # 需要添加回來
+                        df_v_final = pd.concat([df_v_final, row.to_frame().T], ignore_index=True)
+        
+        # 再次確保 is_invalid 優先使用手動標記
+        if 'is_manually_invalid' in df_v_final.columns and 'is_invalid' in df_v_final.columns:
+            # 將手動標記的行設置為無效，這比合併更強力，確保手動標記總是優先
+            df_v_final.loc[df_v_final['is_manually_invalid'] == True, 'is_invalid'] = True
+            
+            # 調試信息
+            manual_invalid_count = df_v_final['is_manually_invalid'].sum()
+            final_invalid_count = df_v_final['is_invalid'].sum()
+            st.info(f"V科診斷: 最終數據集中有 {manual_invalid_count} 個手動標記的無效項，總共 {final_invalid_count} 個無效項")
+        
+        # 再次檢查無效項數量
+        if 'is_invalid' in df_v_final.columns:
+            final_invalid_count = df_v_final['is_invalid'].sum()
+            if final_invalid_count > 0:
+                st.success(f"V科診斷: 最終返回數據集中包含 {final_invalid_count} 個無效項")
+            else:
+                st.error(f"V科診斷: 警告！最終返回數據集中沒有無效項，但原始數據集中有 {num_invalid_v_total} 個")
 
         # Return the final df AFTER dropping the English params col
         return v_diagnosis_results, v_report_content, df_v_final 
