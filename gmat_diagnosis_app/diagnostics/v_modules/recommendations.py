@@ -12,7 +12,9 @@ from gmat_diagnosis_app.diagnostics.v_modules.translations import translate_v
 
 def generate_v_recommendations(v_diagnosis_results, exempted_skills):
     """Generates practice recommendations based on V diagnosis results."""
-    recommendations = []
+    output_recommendations = []
+    exemption_recommendations = [] # Initialize here
+    case_recommendations = []
     processed_macro_skills = set()
 
     ch3 = v_diagnosis_results.get('chapter_3', {})
@@ -38,6 +40,22 @@ def generate_v_recommendations(v_diagnosis_results, exempted_skills):
         else:
              print("Warning: Missing columns needed for identifying problem skills in recommendations.")
 
+    # --- Start: Add Exemption Notes --- 
+    exemption_notes_added = False
+    for skill in sorted(list(all_skills_found)): # Iterate over all skills found in data
+        if skill in exempted_skills:
+            skill_display_name = translate_v(skill)
+            exempt_text = f"針對【{skill_display_name}】技能，在本次測試中表現穩定（所有相關題目均正確且未超時），已豁免相關練習建議。"
+            exemption_recommendations.append({
+                'type': 'exemption', 
+                'text': exempt_text, 
+                'skill': skill, 
+                'priority': -1 # Highest priority for exemptions
+            })
+            exemption_notes_added = True
+    if exemption_notes_added and exemption_recommendations: # Add a spacer if exemptions were added
+        exemption_recommendations.append({'type': 'spacer', 'text': ""})
+    # --- End: Add Exemption Notes ---
 
     recommendations_by_skill = {}
     for skill in all_skills_found:
@@ -134,26 +152,69 @@ def generate_v_recommendations(v_diagnosis_results, exempted_skills):
             recommendations_by_skill[skill] = sorted(skill_recs_list, key=lambda x: x['priority'])
 
     # Assemble Final List
-    final_recommendations = []
-    # 首先顯示標記為 SFE 的建議
-    all_skills_sorted = []
-    sfe_skills = []
-    normal_skills = []
-    
-    for skill in recommendations_by_skill:
-        if any(rec['is_sfe'] for rec in recommendations_by_skill[skill] if 'is_sfe' in rec):
-            sfe_skills.append(skill)
-        else:
-            normal_skills.append(skill)
-    
-    # 優先顯示 SFE 標記的技能，之後是普通技能
-    all_skills_sorted = sorted(sfe_skills) + sorted(normal_skills)
-    
-    for skill in all_skills_sorted:
-        recs = recommendations_by_skill[skill]
-        skill_display_name = translate_v(skill) # Translate skill name
-        final_recommendations.append({'type': 'skill_header', 'text': f"--- 技能: {skill_display_name} ---"})
-        final_recommendations.extend(recs)
-        final_recommendations.append({'type': 'spacer', 'text': ""})
+    # The main 'recommendations' list already contains exemption notes if any.
+    # Now, we add skill-specific recommendations (macro or case-aggregated)
+    # and then sort everything together if needed, or just append.
 
-    return final_recommendations 
+    # We will sort skills to ensure SFE-related skills come first, then normal, then macro if not SFE.
+    # However, the current structure adds to recommendations_by_skill then sorts.
+    # Let's adapt to ensure exemptions are at the top, then SFE, then others.
+
+    final_recommendations = []
+    if exemption_recommendations: # Add exemption notes first if they exist
+        final_recommendations.extend(sorted(exemption_recommendations, key=lambda x: x.get('skill', '')))
+        # recommendations list currently holds only exemptions. We clear it to reuse for skill-specific recs or adapt the flow.
+        # For clarity, let's rename the list holding exemption notes.
+        exemption_recommendations = list(exemption_recommendations) # Keep a copy
+        recommendations = [] # Clear for skill-specific processing
+
+    # The rest of the function populates recommendations_by_skill
+    # ... (existing logic for populating recommendations_by_skill) ...
+
+    # Assemble Final List: Start with exemptions, then SFE skills, then normal skills
+    # This part needs to be after recommendations_by_skill is populated.
+    # The original code for assembling final_recommendations is okay, but needs exemptions at the top.
+    
+    # Re-think the final assembly part to integrate exemptions at the top.
+    # The original code for assembling final_recommendations:
+    # final_recommendations = []
+    # all_skills_sorted = [] (sfe_skills + normal_skills)
+    # for skill in all_skills_sorted: ... add header and recs ...
+    # This means exemptions should be added before this loop.
+
+    # Corrected Final Assembly Logic:
+    output_recommendations.extend(exemption_recommendations) # Add sorted exemptions first
+
+    all_skills_for_recs_sorted = []
+    sfe_skills_for_recs = []
+    normal_skills_for_recs = []
+
+    # Use keys from recommendations_by_skill as these are the ones with actual recs
+    skills_with_generated_recs = list(recommendations_by_skill.keys())
+
+    for skill_key in skills_with_generated_recs:
+        # Check if any recommendation for this skill is SFE
+        is_sfe_skill_group = False
+        if skill_key in recommendations_by_skill and recommendations_by_skill[skill_key]:
+             is_sfe_skill_group = any(rec.get('is_sfe', False) for rec in recommendations_by_skill[skill_key])
+        
+        if is_sfe_skill_group:
+            sfe_skills_for_recs.append(skill_key)
+        else:
+            normal_skills_for_recs.append(skill_key)
+    
+    all_skills_for_recs_sorted = sorted(sfe_skills_for_recs) + sorted(normal_skills_for_recs)
+    
+    if all_skills_for_recs_sorted and output_recommendations and output_recommendations[-1].get('type') != 'spacer':
+        # Add a spacer if exemptions were added and we are about to add skill recs
+        if exemption_notes_added:
+             output_recommendations.append({'type': 'spacer', 'text': ""})
+
+    for skill_item in all_skills_for_recs_sorted:
+        recs_for_skill = recommendations_by_skill[skill_item]
+        skill_display_name_item = translate_v(skill_item) 
+        output_recommendations.append({'type': 'skill_header', 'text': f"--- 技能: {skill_display_name_item} ---"})
+        output_recommendations.extend(recs_for_skill)
+        output_recommendations.append({'type': 'spacer', 'text': ""})
+
+    return output_recommendations 

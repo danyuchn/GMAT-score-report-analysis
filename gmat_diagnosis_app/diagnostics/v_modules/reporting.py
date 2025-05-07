@@ -11,7 +11,8 @@ from gmat_diagnosis_app.diagnostics.v_modules.utils import format_rate
 from gmat_diagnosis_app.diagnostics.v_modules.constants import (
     V_PARAM_CATEGORY_ORDER, 
     V_PARAM_TO_CATEGORY,
-    INVALID_DATA_TAG_V
+    INVALID_DATA_TAG_V,
+    V_TOOL_AI_RECOMMENDATIONS # Import the new constant
 )
 
 def generate_v_summary_report(v_diagnosis_results):
@@ -177,12 +178,45 @@ def generate_v_summary_report(v_diagnosis_results):
         sfe_note = f"{sfe_label}" + (f"（涉及技能：{', '.join(sfe_skills_zh)}）" if sfe_skills_zh else "")
         report_lines.append(f"- **尤其需要注意：** {sfe_note}。（註：SFE 指在已掌握技能範圍內的題目失誤）")
 
-    # Summarize top other core issues based on frequency (optional enhancement, simple listing for now)
-    core_issues_params = triggered_params_all - {'FOUNDATIONAL_MASTERY_INSTABILITY_SFE', INVALID_DATA_TAG_V} # Exclude SFE and Invalid Tag
-    if core_issues_params:
+    # Summarize top other core issues based on frequency
+    core_issues_params_to_report = triggered_params_all - {'FOUNDATIONAL_MASTERY_INSTABILITY_SFE', INVALID_DATA_TAG_V, 'BEHAVIOR_EARLY_RUSHING_FLAG_RISK', 'BEHAVIOR_CARELESSNESS_ISSUE', 'BEHAVIOR_GUESSING_HASTY'}
+    
+    if core_issues_params_to_report: # Check if there are any core issues to report after filtering
         report_lines.append("- **主要問題點（根據觸發標籤推斷）：**")
-        report_lines.append("請參考試算表中的診斷標籤") # Replace the detailed list generation
-    elif not sfe_triggered_overall:
+        
+        # Count frequency of each diagnostic parameter
+        param_counts = {}
+        if diagnosed_df_ch3_raw is not None and 'diagnostic_params' in diagnosed_df_ch3_raw.columns:
+            for params_list_for_row in diagnosed_df_ch3_raw['diagnostic_params']:
+                # Ensure it's a list and filter out non-string params if any defensive coding needed
+                actual_params_list = [p for p in params_list_for_row if isinstance(p, str)] if isinstance(params_list_for_row, list) else []
+                for param_code in actual_params_list:
+                    if param_code in core_issues_params_to_report: # Only count relevant core issues
+                        param_counts[param_code] = param_counts.get(param_code, 0) + 1
+        
+        if param_counts: # If there are countable params
+            # Sort params by frequency, then by name for tie-breaking
+            sorted_params = sorted(param_counts.items(), key=lambda item: (-item[1], item[0]))
+            
+            # Group by category for better readability
+            params_by_category = {cat: [] for cat in V_PARAM_CATEGORY_ORDER}
+            params_by_category['Unknown'] = [] # Ensure Unknown category exists
+
+            for param_code, count in sorted_params:
+                category = V_PARAM_TO_CATEGORY.get(param_code, 'Unknown')
+                translated_param = translate_v(param_code)
+                params_by_category.setdefault(category, []).append(f"{translated_param} (出現 {count} 次)")
+
+            for category_key in V_PARAM_CATEGORY_ORDER: # Iterate in predefined order
+                if category_key in params_by_category and params_by_category[category_key]:
+                    translated_category = translate_v(category_key) # Assuming category keys are also translatable if needed
+                    report_lines.append(f"  - **{translated_category}類：**")
+                    for desc in params_by_category[category_key]:
+                        report_lines.append(f"    - {desc}")
+        else: # No countable params found in the dataframe diagnostic_params lists
+             report_lines.append("- 未識別出除SFE或行為模式外的特定核心問題模式。")
+            
+    elif not sfe_triggered_overall: # No core issues and no SFE
         report_lines.append("- 未識別出明顯的核心問題模式（基於錯誤及效率分析）。")
     report_lines.append("")
 
@@ -457,14 +491,35 @@ def generate_v_summary_report(v_diagnosis_results):
 
 
     # 8.3 Qualitative Analysis Suggestion
-    report_lines.append("- **質化分析建議:**")
-    if qualitative_analysis_trigger: # Use the flag set during SFE/Trigger analysis
-         report_lines.append("  - *觸發時機：* 當您對診斷報告指出的錯誤原因感到困惑，或者上述方法仍無法幫您釐清根本問題時（尤其針對耗時過長或涉及複雜推理的題目）。")
-         report_lines.append("  - *建議行動：* 可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**（可以是文字記錄或口述錄音），以便與顧問進行更深入的個案分析，共同找到癥結所在。")
-    else:
-         report_lines.append("  - (本次分析未觸發深入質化分析的特定建議，但若對任何問題點感到困惑，仍可採用此方法。)")
+    report_lines.append("- **質化分析建議：** 當您對診斷報告指出的錯誤原因感到困惑，或上述方法仍無法幫您釐清根本問題時，可以嘗試提供 2-3 個相關題目的詳細解題思路範例（文字或口述錄音），以便與顧問進行更深入的個案分析。")
+    report_lines.append("")
 
-    report_lines.append("\n--- 報告結束 ---")
+    # --- Add Tool/AI Prompt Recommendations based on triggered_params_all ---
+    report_lines.append("- **輔助工具與 AI 提示推薦建議：**")
+    report_lines.append("  為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示。系統會根據您觸發的診斷參數組合，推薦相關的資源。請根據您的具體診斷結果選用。")
+    
+    recommended_tools_info = []
+    # Use triggered_params_all which is a set of unique English codes from Ch3 and Ch5
+    # Make sure triggered_params_all is populated correctly before this point
+    if triggered_params_all: # Check if the set is not empty
+        for param_code in sorted(list(triggered_params_all)):
+            if param_code in V_TOOL_AI_RECOMMENDATIONS: # Use the imported constant
+                param_translation = APPENDIX_A_TRANSLATION_V.get(param_code, param_code) # Use the main translation map
+                tool_list_for_param = V_TOOL_AI_RECOMMENDATIONS[param_code] # Use the imported constant
+                if tool_list_for_param: # If there are recommendations for this param
+                    # Add the parameter it relates to for context
+                    recommended_tools_info.append(f"  - **針對問題「{param_translation}」:**")
+                    for tool_or_prompt in tool_list_for_param:
+                        recommended_tools_info.append(f"    - {tool_or_prompt}")
+    
+    if recommended_tools_info:
+        report_lines.extend(recommended_tools_info)
+    else:
+        report_lines.append("  - 暫無針對性的輔助工具或 AI 提示建議（或未觸發相關診斷參數）。")
+    report_lines.append("")
+    # --- End Tool/AI Prompt Recommendations ---
+
+    report_lines.append("--- 報告結束 ---")
 
     # Final formatting for Chinese punctuation
     final_report_string = "\n".join(report_lines)
@@ -474,3 +529,11 @@ def generate_v_summary_report(v_diagnosis_results):
     final_report_string = final_report_string.replace("...", "…") # Ellipsis
 
     return final_report_string 
+
+# Example of a more detailed diagnostic table generation (conceptual)
+# This would typically be a separate function called by generate_v_summary_report or an external tool
+
+def _generate_detailed_diagnostic_table_v(diagnosed_df):
+    # Filter for error/overtime questions
+    # For each, list: Q#, Type, Skill, Time Perf, Translated Params (grouped by category)
+    pass 

@@ -6,8 +6,9 @@ Q診斷模塊的報告生成功能
 """
 
 import pandas as pd
-from gmat_diagnosis_app.diagnostics.q_modules.translations import get_translation
+from gmat_diagnosis_app.diagnostics.q_modules.translations import get_translation, APPENDIX_A_TRANSLATION
 from gmat_diagnosis_app.diagnostics.q_modules.utils import format_rate, map_difficulty_to_label
+from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMMENDATIONS
 
 
 def generate_report_section1(ch1_results):
@@ -249,7 +250,7 @@ def generate_report_section7(triggered_params_translated, param_to_positions, sk
     return lines
 
 
-def generate_q_summary_report(results, recommendations, df_final):
+def generate_q_summary_report(results, recommendations, df_final, triggered_params_english):
     """
     Generates the summary report for Q section, based on Chapter 8 guidelines.
     Combines all the diagnostics into a comprehensive yet readable report.
@@ -368,6 +369,25 @@ def generate_q_summary_report(results, recommendations, df_final):
     
     for item in summary_items:
         report_parts.append(f"* {item}")
+    
+    # --- Chapter 8: Tool and AI Prompt Recommendations (Added) ---
+    report_parts.append("--- 第八章：輔助工具與 AI 提示推薦建議 ---")
+    recommended_tools_added = False
+    if triggered_params_english: # Check if set is not empty
+        sorted_triggered_params = sorted(list(triggered_params_english))
+        for param_code in sorted_triggered_params:
+            if param_code in Q_TOOL_AI_RECOMMENDATIONS:
+                param_translation = APPENDIX_A_TRANSLATION.get(param_code, param_code)
+                tool_list_for_param = Q_TOOL_AI_RECOMMENDATIONS[param_code]
+                if tool_list_for_param:
+                    report_parts.append(f"* 針對問題「{param_translation}」建議:")
+                    for tool_or_prompt in tool_list_for_param:
+                        report_parts.append(f"  - {tool_or_prompt}")
+                    recommended_tools_added = True
+    
+    if not recommended_tools_added:
+        report_parts.append("* (暫無針對性的輔助工具或 AI 提示建議)")
+    report_parts.append("")
     
     # 組合完整報告
     return "\n".join(report_parts) 

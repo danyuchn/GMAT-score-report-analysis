@@ -44,4 +44,18 @@ def calculate_practice_time_limit(item_time, is_overtime):
     z_raw = np.floor(base_time * 2) / 2
     # 確保不低於目標時間
     z = max(z_raw, target_time)
-    return z 
+    return z
+
+
+def grade_difficulty_q(difficulty):
+    """Grades Q difficulty based on Q-Doc Chapter 2 rules."""
+    difficulty_numeric = pd.to_numeric(difficulty, errors='coerce')
+    if pd.isna(difficulty_numeric): return "未知難度"
+    
+    if difficulty_numeric <= -1: return "低難度 (Low) / 505+"
+    if -1 < difficulty_numeric <= 0: return "中難度 (Mid) / 555+"
+    if 0 < difficulty_numeric <= 1: return "中難度 (Mid) / 605+"
+    if 1 < difficulty_numeric <= 1.5: return "中難度 (Mid) / 655+"
+    if 1.5 < difficulty_numeric <= 1.95: return "高難度 (High) / 705+"
+    if 1.95 < difficulty_numeric <= 2: return "高難度 (High) / 805+"
+    return "未知難度" # Fallback for out of defined range but numeric 

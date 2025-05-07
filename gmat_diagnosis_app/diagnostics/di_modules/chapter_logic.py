@@ -2,7 +2,12 @@ import pandas as pd
 import numpy as np
 import math # Keep math for _check_foundation_override if it moves here later
 
-from .constants import SUSPICIOUS_FAST_MULTIPLIER, CARELESSNESS_THRESHOLD
+from .constants import (
+    SUSPICIOUS_FAST_MULTIPLIER, 
+    CARELESSNESS_THRESHOLD,
+    TOTAL_QUESTIONS_DI, # Import TOTAL_QUESTIONS_DI
+    EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES # Import new constant
+)
 from .translation import _translate_di # Needed later for other functions
 from .utils import _grade_difficulty_di, _format_rate
 
@@ -223,16 +228,15 @@ def _observe_di_patterns(df, avg_times):
     # 2. Early Rushing Risk (遵循核心邏輯文件第四章)
     if 'question_position' in df.columns and 'question_time' in df.columns:
         # 定義前三分之一的題目位置
-        positions = df['question_position'].sort_values().unique()
-        first_third_positions = positions[:max(1, len(positions) // 3)]
-        
-        # 獲取前三分之一題目的平均時間
-        first_third_mask = df['question_position'].isin(first_third_positions)
-        first_third_avg_time = df.loc[first_third_mask, 'question_time'].mean()
-        
-        # 使用 SUSPICIOUS_FAST_MULTIPLIER 判斷過快題目，而非硬編碼的 1.0 分鐘
-        suspicious_fast_threshold = first_third_avg_time * SUSPICIOUS_FAST_MULTIPLIER
-        early_rushing_mask = first_third_mask & df['question_time'].notna() & (df['question_time'] < suspicious_fast_threshold)
+        # 使用 TOTAL_QUESTIONS_DI 作為總題數基數
+        first_third_q_count = TOTAL_QUESTIONS_DI // 3
+        # 篩選出實際在前三分之一位置的題目 (基於 1-indexed question_position)
+        early_rushing_mask = (
+            df['question_position'].notna() &
+            (df['question_position'] <= first_third_q_count) &
+            df['question_time'].notna() &
+            (df['question_time'] < EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES) # 使用絕對閾值
+        )
         early_rushing_questions = df.loc[early_rushing_mask].sort_values('question_position')
         
         if len(early_rushing_questions) > 0:
@@ -309,27 +313,46 @@ def _check_foundation_override(df, type_metrics):
 
 def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
     """Generates practice recommendations based on Chapters 3, 5, and 2 results."""
-    if 'question_type' not in df_diagnosed.columns: return []
+    if 'question_type' not in df_diagnosed.columns or 'content_domain' not in df_diagnosed.columns: # Ensure content_domain also exists
+        return []
 
     question_types_in_data = df_diagnosed['question_type'].unique()
     question_types_valid = [qt for qt in question_types_in_data if pd.notna(qt)]
-    recommendations_by_type = {q_type: [] for q_type in question_types_valid}
+    # Initialize recommendations_by_type properly for all valid types
+    recommendations_by_type = {q_type: [] for q_type in question_types_valid if q_type is not None}
     processed_override_types = set()
 
-    # Exemption Rule
-    exempted_types = set()
+    # Exemption Rule (per type + domain, as per DI Doc Chapter 5)
+    exempted_type_domain_combinations = set()
     if 'is_correct' in df_diagnosed.columns and 'overtime' in df_diagnosed.columns:
-        for q_type in question_types_valid:
-            type_df = df_diagnosed[df_diagnosed['question_type'] == q_type]
-            if not type_df.empty and not ((type_df['is_correct'] == False) | (type_df['overtime'] == True)).any():
-                exempted_types.add(q_type)
+        # Group by type and domain to check exemption status for each combination
+        grouped_for_exemption = df_diagnosed.groupby(['question_type', 'content_domain'], observed=False, dropna=False)
+        for name, group_df in grouped_for_exemption:
+            q_type, domain = name
+            if pd.isna(q_type) or pd.isna(domain): continue # Skip if type or domain is NaN
+
+            # Check if all questions in this group are correct and not overtime
+            if not group_df.empty and not ((group_df['is_correct'] == False) | (group_df['overtime'] == True)).any():
+                exempted_type_domain_combinations.add((q_type, domain))
 
     # Macro Recommendations
     math_related_zh = _translate_di('Math Related') # Translate once
     non_math_related_zh = _translate_di('Non-Math Related') # Translate once
     for q_type, override_info in override_results.items():
         if q_type in recommendations_by_type and override_info.get('override_triggered'):
-            if q_type in exempted_types: continue
+            # Check if ALL domain combinations for this q_type are exempted before skipping macro
+            # This is a subtle point: override is per type, exemption per type+domain.
+            # If a type is overridden, but all its sub-domains are exempted, then the macro rec might be skipped.
+            # Current DI doc implies override is per type, and exemption is per type+domain.
+            # If override is triggered for a type, the macro rec applies to the type as a whole,
+            # unless *all* its constituent type+domain combos are exempt.
+            # For simplicity now, if override is triggered for a type, it generates a macro recommendation for that type.
+            # The case-specific recommendations will later honor the type+domain exemption.
+            # A more complex logic would be: if q_type is overridden, check if all (q_type, domain) in exempted_type_domain_combinations.
+            # For now, proceeding with: if override on type, then macro rec for type.
+            # The original code was: if q_type in exempted_types: continue (where exempted_types was per type)
+            # This is effectively similar if we consider override takes precedence unless the whole type is somehow perfect.
+
             y_agg = override_info.get('Y_agg', '未知難度')
             z_agg = override_info.get('Z_agg')
             z_agg_text = f"{z_agg:.1f} 分鐘" if pd.notna(z_agg) else "未知限時"
@@ -351,7 +374,8 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
                 for name, group_df in grouped_triggers:
                     q_type, domain = name
                     if pd.isna(q_type) or pd.isna(domain): continue
-                    if q_type in processed_override_types or q_type in exempted_types: continue
+                    if q_type in processed_override_types: continue # Already handled by macro
+                    if (q_type, domain) in exempted_type_domain_combinations: continue # Skip exempted type-domain combo
 
                     min_difficulty_score = group_df['question_difficulty'].min()
                     y_grade = _grade_difficulty_di(min_difficulty_score)
@@ -391,12 +415,39 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
 
     # Final Assembly
     final_recommendations = []
-    for q_type in sorted(list(exempted_types)):
-         if q_type in question_types_valid:
-              final_recommendations.append({'type': 'exemption_note', 'text': f"您在 **{q_type}** 題型上表現穩定，所有題目均在時限內正確完成，無需針對性個案練習。", 'question_type': q_type})
+    # Add exemption notes based on type-domain combinations
+    all_type_domain_combos_in_data = set(df_diagnosed.groupby(['question_type', 'content_domain'], observed=False, dropna=False).groups.keys())
+    sorted_exemptions = sorted(list(exempted_type_domain_combinations), key=lambda x: (type_order_final.index(x[0]) if x[0] in type_order_final else 99, x[1]))
 
-    for q_type in question_types_valid:
-        if q_type in exempted_types: continue
+    for q_type, domain in sorted_exemptions:
+        if pd.isna(q_type) or pd.isna(domain): continue
+        exempt_type_zh = _translate_di(q_type)
+        exempt_domain_zh = _translate_di(domain)
+        final_recommendations.append({
+            'type': 'exemption_note',
+            'text': f"**{exempt_domain_zh}** 領域的 **{exempt_type_zh}** 題目表現完美，已豁免練習建議。",
+            'question_type': q_type,
+            'domain': domain
+        })
+
+    for q_type in question_types_valid: # Iterate through valid types found in data
+        # Check if all domain combinations for this q_type are exempted
+        all_domains_for_type_exempted = True
+        # Get all domains present in the data for this specific q_type
+        domains_for_this_q_type = df_diagnosed[df_diagnosed['question_type'] == q_type]['content_domain'].unique()
+        domains_for_this_q_type = [d for d in domains_for_this_q_type if pd.notna(d)]
+
+        if not domains_for_this_q_type: # If no domains for this type (e.g. type only had NaN domains)
+             all_domains_for_type_exempted = False # Treat as not fully exempted
+        else:
+            for domain_for_type in domains_for_this_q_type:
+                if (q_type, domain_for_type) not in exempted_type_domain_combinations:
+                    all_domains_for_type_exempted = False
+                    break
+        
+        if all_domains_for_type_exempted and q_type not in processed_override_types: # If all type+domain are exempt, and no override, skip this type's case recs
+            continue
+            
         type_recs = recommendations_by_type.get(q_type, [])
         if not type_recs: continue
         type_recs.sort(key=lambda rec: 0 if rec['type'] == 'macro' else 1)

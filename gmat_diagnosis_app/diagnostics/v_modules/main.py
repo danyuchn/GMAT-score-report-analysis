@@ -14,7 +14,8 @@ from gmat_diagnosis_app.diagnostics.v_modules.utils import (
     grade_difficulty_v, 
     analyze_dimension, 
     calculate_skill_exemption_status, 
-    calculate_skill_override
+    calculate_skill_override,
+    calculate_metrics_for_group
 )
 from gmat_diagnosis_app.diagnostics.v_modules.analysis import (
     observe_patterns, 
@@ -85,6 +86,38 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         # --- Filter out invalid data ---
         df_v_processed_full = df_v_processed.copy() # Store potentially modified df before filtering valid
         df_v_valid = df_v_processed[~df_v_processed['is_invalid']].copy() # Use the latest df_v
+
+        # --- Chapter 1: RC Reading Comprehension Barrier Inquiry (on valid data) ---
+        df_v_valid['reading_comprehension_barrier_inquiry'] = False
+        # Ensure necessary columns are numeric and exist
+        if 'rc_reading_time' in df_v_valid.columns and 'rc_group_num_questions' in df_v_valid.columns and 'rc_group_id' in df_v_valid.columns:
+            df_v_valid['rc_reading_time'] = pd.to_numeric(df_v_valid['rc_reading_time'], errors='coerce')
+            df_v_valid['rc_group_num_questions'] = pd.to_numeric(df_v_valid['rc_group_num_questions'], errors='coerce')
+
+            rc_barrier_triggered_groups = set()
+            # Iterate over unique RC groups in the valid dataframe
+            # We only care about the first question of each group for its rc_reading_time
+            first_questions_in_groups = df_v_valid[df_v_valid['rc_reading_time'] != 0] # As per verbal_preprocessor, only first Q has non-zero rc_reading_time
+            
+            for idx, row in first_questions_in_groups.iterrows():
+                if row['question_type'] == 'Reading Comprehension':
+                    group_id = row['rc_group_id']
+                    num_q = row['rc_group_num_questions']
+                    reading_time = row['rc_reading_time']
+                    
+                    barrier = False
+                    if pd.notna(num_q) and pd.notna(reading_time):
+                        if (num_q == 3 and reading_time > 2.0) or \
+                           (num_q == 4 and reading_time > 2.5):
+                            barrier = True
+                    
+                    if barrier and pd.notna(group_id): # Check group_id is not NaN
+                        rc_barrier_triggered_groups.add(group_id)
+            
+            if rc_barrier_triggered_groups: # Check if set is not empty before iterating
+                for group_id_to_mark in rc_barrier_triggered_groups:
+                    df_v_valid.loc[df_v_valid['rc_group_id'] == group_id_to_mark, 'reading_comprehension_barrier_inquiry'] = True
+        # --- End RC Reading Comprehension Barrier Inquiry ---
 
         if df_v_valid.empty:
             logging.warning("No V data remaining after excluding invalid entries. Skipping further V diagnosis.")
@@ -161,7 +194,8 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         # --- Populate Chapter 1 Results ---
         v_diagnosis_results['chapter_1'] = {
             'time_pressure_status': v_time_pressure_status,
-            'invalid_questions_excluded': num_invalid_v_total
+            'invalid_questions_excluded': num_invalid_v_total,
+            'reading_comprehension_barrier_inquiry_triggered': df_v_valid['reading_comprehension_barrier_inquiry'].any() if 'reading_comprehension_barrier_inquiry' in df_v_valid else False
         }
         logging.debug("Populated Chapter 1 V results.")
 
@@ -170,7 +204,8 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         # Recalculate valid df based on potentially modified df_v's is_invalid column
         df_valid_v = df_v_valid.copy() # Use the latest df_v
 
-        v_diagnosis_results.setdefault('chapter_2', {})['overall_metrics'] = analyze_dimension(df_valid_v, None)
+        # Correctly calculate overall metrics for Chapter 2
+        v_diagnosis_results.setdefault('chapter_2', {})['overall_metrics'] = calculate_metrics_for_group(df_valid_v)
         v_diagnosis_results.setdefault('chapter_2', {})['by_type'] = analyze_dimension(df_valid_v, 'question_type')
         # Ensure difficulty grading happens on the valid data for Ch2 analysis
         df_valid_v['difficulty_grade'] = df_valid_v['question_difficulty'].apply(grade_difficulty_v)

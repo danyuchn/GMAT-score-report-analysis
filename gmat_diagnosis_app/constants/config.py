@@ -52,7 +52,7 @@ FINAL_DIAGNOSIS_INPUT_COLS = [
     'question_difficulty', 'estimated_ability',
     # Added for V and DI diagnosis and overtime calculation needs
     'rc_group_id', 'rc_reading_time', 'rc_group_total_time', 'rc_group_num_questions', # For Verbal
-    'msr_group_id'                                                                   # For DI
+    'msr_group_id', 'msr_group_total_time', 'msr_reading_time', 'msr_group_num_questions', 'is_first_msr_q' # For DI
 ]
 
 # --- Column Display Configuration ---

@@ -100,16 +100,5 @@ APPENDIX_A_TRANSLATION_V = {
 
 def translate_v(param):
     """Translates V diagnostic parameter/term to Chinese, returning original if not found or explicitly mapped to English."""
-    # Explicitly check for skills to keep in English first
-    skills_to_keep_english = [
-        'Analysis/Critique',
-        'Plan/Construct',
-        'Identify Inferred Idea',
-        'Identify Stated Idea'
-    ]
-    if param in skills_to_keep_english:
-        return param # Return English original
-
-    # Otherwise, use the map (which might also map to English if defined above)
-    # Corrected to use the defined APPENDIX_A_TRANSLATION_V map
+    # Removed special handling for skills_to_keep_english to ensure all translations come from APPENDIX_A_TRANSLATION_V
     return APPENDIX_A_TRANSLATION_V.get(param, param) # Default to original if not in map at all 

@@ -125,8 +125,8 @@ def diagnose_q_internal(df_q_valid_diagnosed):
         return {"chapter2_flags": {}}
 
     # --- Chapter 2: Real vs Pure Analysis ---
-    df_real = df_q_valid_diagnosed[df_q_valid_diagnosed['question_type'] == 'REAL'].copy()
-    df_pure = df_q_valid_diagnosed[df_q_valid_diagnosed['question_type'] == 'PURE'].copy()
+    df_real = df_q_valid_diagnosed[df_q_valid_diagnosed['question_type'] == 'Real'].copy()
+    df_pure = df_q_valid_diagnosed[df_q_valid_diagnosed['question_type'] == 'Pure'].copy()
     num_total_real = len(df_real)
     num_total_pure = len(df_pure)
     num_real_errors = df_real['is_correct'].eq(False).sum()
