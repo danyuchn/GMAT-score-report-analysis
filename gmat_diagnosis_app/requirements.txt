@@ -1,0 +1,10 @@
+streamlit
+pandas
+openai
+numpy
+openpyxl
+XlsxWriter
+scipy
+plotly
+matplotlib
+seaborn 

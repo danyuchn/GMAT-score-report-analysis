@@ -15,12 +15,48 @@ def display_chat_interface(session_state):
     session_state.show_chat = show_chat
 
     if show_chat:
-        st.header("💬 與 AI 對話 (基於本次報告)")
+        st.subheader("💬 與 AI 對話 (基於本次報告)")
+        
+        # 添加自定義CSS，創建固定高度的聊天容器
+        st.markdown("""
+        <style>
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            margin-bottom: 15px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # 創建固定高度的聊天容器
+        chat_container = st.container()
+        
+        # 使用HTML實現固定高度和滾動
+        chat_html = '<div class="chat-container">'
+        
+        # 顯示聊天歷史
+        with chat_container:
+            display_chat_history(session_state)
+            
+            # 在歷史顯示後自動滾動到底部
+            if session_state.chat_history:
+                st.markdown("""
+                <script>
+                    function scrollChatToBottom() {
+                        const chatContainer = document.querySelector('.chat-container');
+                        if (chatContainer) {
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        }
+                    }
+                    setTimeout(scrollChatToBottom, 100);
+                </script>
+                """, unsafe_allow_html=True)
 
-        # Display chat history
-        display_chat_history(session_state)
-
-        # Chat input at the bottom of the main page
+        # Chat input below the fixed container
         handle_chat_input(session_state)
         
 def check_chat_conditions(session_state):
