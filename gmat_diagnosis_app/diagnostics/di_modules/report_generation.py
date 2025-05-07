@@ -6,7 +6,8 @@ from .translation import (
 )
 from .utils import _format_rate
 from .constants import (
-    MAX_ALLOWED_TIME_DI, INVALID_DATA_TAG_DI
+    MAX_ALLOWED_TIME_DI, INVALID_DATA_TAG_DI,
+    DI_TOOL_AI_RECOMMENDATIONS
 )
 
 def _generate_di_summary_report(di_results):
@@ -254,6 +255,23 @@ def _generate_di_summary_report(di_results):
         report_lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
     else: report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
 
-    # Tool/Prompt section was removed earlier
+    # Add Tool/AI Prompt Recommendations
+    report_lines.append("- **輔助工具與 AI 提示推薦建議：**")
+    report_lines.append("  - 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示。系統會根據您觸發的診斷參數組合，推薦相關的資源。請根據您的具體診斷結果選用。")
+    recommended_tools_added = False
+    # Use all_triggered_params which is a set of unique English codes from Ch3 and Ch4
+    # Ensure it exists and is a set
+    current_triggered_params = all_triggered_params if isinstance(all_triggered_params, set) else set()
+
+    for param_code in current_triggered_params: # Iterate over unique triggered English param codes
+        if param_code in DI_TOOL_AI_RECOMMENDATIONS:
+            param_zh = _translate_di(param_code)
+            report_lines.append(f"  - **若診斷涉及【{param_zh}】:**")
+            for rec_item in DI_TOOL_AI_RECOMMENDATIONS[param_code]:
+                report_lines.append(f"    - {rec_item}")
+            recommended_tools_added = True
+    if not recommended_tools_added:
+        report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議。)")
+    report_lines.append("")
 
     return "\n\n".join(report_lines) 

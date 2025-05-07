@@ -94,14 +94,14 @@ def analyze_skill_override(df_q_valid_diagnosed):
                     min_difficulty = valid_difficulties.min()
             
             # 使用從utils導入的函數轉換難度
-            from gmat_diagnosis_app.diagnostics.q_modules.utils import map_difficulty_to_label
+            from .utils import grade_difficulty_q
             
             skill_override_flags[skill] = {
                 'triggered': True,
                 'error_rate': error_rate,
                 'overtime_rate': overtime_rate,
                 'min_difficulty': min_difficulty,
-                'y_agg': map_difficulty_to_label(min_difficulty) if min_difficulty is not None else None,
+                'y_agg': grade_difficulty_q(min_difficulty) if min_difficulty is not None else None,
                 'z_agg': 2.5  # 固定的宏觀限時值
             }
         else:

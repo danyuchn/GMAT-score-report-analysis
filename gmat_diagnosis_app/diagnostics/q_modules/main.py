@@ -59,49 +59,62 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     df_q = df.copy()
     
     # --- Chapter 1: Time Pressure & Data Validity Analysis ---
-    # Calculate total time spent
-    total_time = df_q['question_time'].sum() if 'question_time' in df_q.columns else None
-    time_pressure = False
-    overtime_threshold = OVERTIME_THRESHOLDS[False]  # Default to low pressure threshold
+    # These are now expected to be pre-calculated and passed in or already on df_q
+    # total_time = df_q['question_time'].sum() if 'question_time' in df_q.columns else None
+    # time_pressure = False # This should be an input or derived from df_q if part of a larger pipeline
+    # overtime_threshold = OVERTIME_THRESHOLDS[False] 
     
-    # Check for time pressure
-    if total_time is not None:
-        remaining_time = MAX_ALLOWED_TIME_Q - total_time
-        if remaining_time < TIME_PRESSURE_THRESHOLD_Q:
-            time_pressure = True
-            overtime_threshold = OVERTIME_THRESHOLDS[True]
+    # if total_time is not None:
+    #     remaining_time = MAX_ALLOWED_TIME_Q - total_time
+    #     if remaining_time < TIME_PRESSURE_THRESHOLD_Q:
+    #         time_pressure = True
+    #         overtime_threshold = OVERTIME_THRESHOLDS[True]
     
-    # Mark overtime questions
-    if 'question_time' in df_q.columns:
-        df_q['overtime'] = df_q['question_time'] > overtime_threshold
+    # 'overtime' column is now expected to be pre-calculated by time_analyzer.py
+    # if 'question_time' in df_q.columns:
+    #     df_q['overtime'] = df_q['question_time'] > overtime_threshold
     
-    # Identify suspicious data due to time constraint (usually at the end)
-    invalid_questions = []
-    if 'question_time' in df_q.columns and 'question_position' in df_q.columns:
-        positions = df_q['question_position'].unique()
-        if len(positions) >= 3:
-            # Get the avg time of first 1/3 of questions
-            first_third = max(1, len(positions) // 3)
-            first_positions = sorted(positions)[:first_third]
-            first_third_times = df_q[df_q['question_position'].isin(first_positions)]['question_time']
-            if not first_third_times.empty:
-                avg_first_third_time = first_third_times.mean()
-                
-                # Mark as invalid if time < threshold or suspicious compared to earlier questions
-                suspicious_threshold = avg_first_third_time * SUSPICIOUS_FAST_MULTIPLIER
-                
-                for idx, row in df_q.iterrows():
-                    time = row.get('question_time')
-                    if pd.notna(time):
-                        is_too_fast = time < INVALID_TIME_THRESHOLD_MINUTES
-                        is_suspicious = time < suspicious_threshold
-                        
-                        if is_too_fast or (is_suspicious and time_pressure):
-                            df_q.at[idx, 'is_invalid'] = True
-                            invalid_questions.append(row['question_position'])
+    # 'is_invalid' column is now expected to be pre-calculated by analysis_orchestrator.py
+    # invalid_questions = []
+    # if 'question_time' in df_q.columns and 'question_position' in df_q.columns:
+    #     positions = df_q['question_position'].unique()
+    #     if len(positions) >= 3:
+    #         first_third = max(1, len(positions) // 3)
+    #         first_positions = sorted(positions)[:first_third]
+    #         first_third_times = df_q[df_q['question_position'].isin(first_positions)]['question_time']
+    #         if not first_third_times.empty:
+    #             avg_first_third_time = first_third_times.mean()
+    #             suspicious_threshold = avg_first_third_time * SUSPICIOUS_FAST_MULTIPLIER
+    #             for idx, row in df_q.iterrows():
+    #                 time = row.get('question_time')
+    #                 if pd.notna(time):
+    #                     is_too_fast = time < INVALID_TIME_THRESHOLD_MINUTES
+    #                     is_suspicious = time < suspicious_threshold
+    #                     if is_too_fast or (is_suspicious and time_pressure): # Incorrect: time_pressure use for invalid marking
+    #                         df_q.at[idx, 'is_invalid'] = True
+    #                         invalid_questions.append(row['question_position'])
     
-    df_q['is_invalid'] = df_q.get('is_invalid', False)
-    
+    # Ensure 'is_invalid' and 'overtime' columns exist as they are used downstream
+    if 'is_invalid' not in df_q.columns:
+        df_q['is_invalid'] = False # Default to False if not present
+    else:
+        df_q['is_invalid'] = df_q['is_invalid'].fillna(False)
+        
+    if 'overtime' not in df_q.columns:
+        df_q['overtime'] = False # Default to False if not present
+    else:
+        df_q['overtime'] = df_q['overtime'].fillna(False)
+
+    # This part needs to be adapted based on how time_pressure is passed or determined for Q
+    # For now, assuming it might be part of st.session_state or a direct param if this func is called in isolation.
+    # For robust integration, time_pressure for Q should be an input.
+    # Let's assume a placeholder `q_time_pressure_status` is available for now for overtime_threshold selection if needed by other parts
+    # However, the `overtime` column itself should already be correctly populated.
+    q_time_pressure_status = df_q.attrs.get('time_pressure_q', False) # Example: get from df attributes if set by orchestrator
+    # The invalid_questions list for chapter1_results also needs to be sourced differently if this logic is removed.
+    # It should ideally come from where 'is_invalid' is determined.
+    num_invalid_q = df_q['is_invalid'].sum()
+
     # --- Process the Valid Data ---
     df_valid = df_q[~df_q['is_invalid']].copy()
     
@@ -186,9 +199,9 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     # --- Chapter 7: Generate Recommendations ---
     q_diagnosis_results = {
         'chapter1_results': {
-            'time_pressure_status': time_pressure,
-            'overtime_threshold_used': overtime_threshold,
-            'invalid_questions_excluded': len(invalid_questions)
+            'time_pressure_status': q_time_pressure_status, # This needs to be correctly sourced
+            'overtime_threshold_used': OVERTIME_THRESHOLDS[q_time_pressure_status], # This also needs correct pressure status
+            'invalid_questions_excluded': num_invalid_q
         },
         'chapter2_flags': ch2_flags,
         'chapter2_summary': ch2_summary,
@@ -198,7 +211,8 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
         'chapter6_skill_override': ch6_skill_override
     }
     
-    recommendations = generate_q_recommendations(q_diagnosis_results)
+    # Pass df_valid_diagnosed to generate_q_recommendations for exemption logic
+    recommendations = generate_q_recommendations(q_diagnosis_results, df_valid_diagnosed)
     
     # --- Chapter 8: Generate Report Sections --- 
     report_sections = []
@@ -222,7 +236,7 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     # Generate summary report if requested
     summary_report = None
     if include_summary_report:
-        summary_report = generate_q_summary_report(q_diagnosis_results, recommendations, df_diagnosed)
+        summary_report = generate_q_summary_report(q_diagnosis_results, recommendations, df_diagnosed, triggered_params)
     
     # Prepare the results dictionary
     results = {
@@ -236,8 +250,8 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     if include_summaries:
         results['diagnostic_summary'] = {
             'triggered_params': list(triggered_params),
-            'time_pressure_status': time_pressure,
-            'overtime_threshold': overtime_threshold,
+            'time_pressure_status': q_time_pressure_status,
+            'overtime_threshold': OVERTIME_THRESHOLDS[q_time_pressure_status],
             'sfe_triggered': sfe_triggered,
             'sfe_skills': list(sfe_skills_involved) if sfe_skills_involved else [],
             'skill_override': ch6_skill_override

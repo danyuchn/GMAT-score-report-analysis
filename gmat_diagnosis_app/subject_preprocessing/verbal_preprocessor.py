@@ -15,9 +15,20 @@ def _calculate_rc_times(df_v_grouped):
     # Get the index of the first question per group
     # Need to handle groups where all q_pos_numeric might be NaN
     first_q_indices = []
+    # Store first question time and other questions' times for each group
+    group_data_for_reading_time = {}
+
     for name, group in df_v_grouped.groupby('rc_group_id', dropna=False):
         if group['q_pos_numeric'].notna().any():
-            first_q_indices.append(group['q_pos_numeric'].idxmin())
+            first_q_idx = group['q_pos_numeric'].idxmin()
+            first_q_indices.append(first_q_idx)
+            first_q_time = group.loc[first_q_idx, 'question_time']
+            other_qs_time = group.loc[group.index != first_q_idx, 'question_time']
+            group_data_for_reading_time[name] = {
+                'first_q_time': first_q_time,
+                'other_qs_times': other_qs_time,
+                'first_q_idx': first_q_idx
+            }
         # else: group has no valid question_position, reading time will be NaN/0 later
 
     # Create a boolean series for first questions
@@ -27,11 +38,24 @@ def _calculate_rc_times(df_v_grouped):
 
     # Assign reading time (time of first question) to all questions in the group
     # Using a map or join approach for clarity if transform is complex
-    reading_time_map = {}
-    if first_q_indices:
-        reading_time_map = df_v_grouped.loc[is_first_q].set_index('rc_group_id')['question_time'].to_dict()
+    # Initialize rc_reading_time with NaN or 0
+    df_v_grouped['rc_reading_time'] = 0.0 # Initialize with a numeric type
+
+    for group_id, data in group_data_for_reading_time.items():
+        first_q_time = data['first_q_time']
+        other_qs_times = data['other_qs_times']
+        first_q_idx = data['first_q_idx']
+
+        calculated_rc_reading_time = first_q_time
+        if not other_qs_times.empty:
+            avg_other_qs_time = other_qs_times.mean()
+            # Ensure reading time is not negative, though document doesn't specify this, it's practical.
+            # However, strict adherence to doc: calculated_rc_reading_time = first_q_time - avg_other_qs_time
+            calculated_rc_reading_time = first_q_time - avg_other_qs_time
+        
+        # Assign calculated reading time only to the first question of the group
+        df_v_grouped.loc[first_q_idx, 'rc_reading_time'] = calculated_rc_reading_time
     
-    df_v_grouped['rc_reading_time'] = df_v_grouped['rc_group_id'].map(reading_time_map)
     df_v_grouped['rc_reading_time'] = pd.to_numeric(df_v_grouped['rc_reading_time'], errors='coerce').fillna(0)
 
     # Calculate total time for each RC group.

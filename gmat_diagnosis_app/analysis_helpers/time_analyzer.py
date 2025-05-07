@@ -7,37 +7,77 @@ from gmat_diagnosis_app.constants.thresholds import THRESHOLDS # Import THRESHOL
 def _calculate_overtime_q(df_q, pressure, thresholds):
     """Calculates overtime mask for Q section."""
     threshold = thresholds['OVERTIME_PRESSURE'] if pressure else thresholds['OVERTIME_NO_PRESSURE']
-    is_overtime = df_q['q_time_numeric'] > threshold
+    # Only calculate overtime for valid questions
+    valid_rows_mask = df_q.get('is_invalid', pd.Series(False, index=df_q.index)) == False
+    is_overtime = pd.Series(False, index=df_q.index) # Initialize with False
+    # Apply overtime logic only to valid rows
+    is_overtime.loc[valid_rows_mask] = (df_q.loc[valid_rows_mask, 'q_time_numeric'] > threshold)
     return is_overtime.fillna(False)
 
 def _calculate_overtime_di(df_di, pressure, thresholds):
     """Calculates overtime mask for DI section."""
     overtime_mask = pd.Series(False, index=df_di.index)
-    overtime_thresholds = thresholds['OVERTIME']
-    msr_target_times = overtime_thresholds['MSR_TARGET']
+    # Ensure q_time_numeric exists, if not, create it from question_time
+    if 'q_time_numeric' not in df_di.columns:
+        df_di['q_time_numeric'] = pd.to_numeric(df_di['question_time'], errors='coerce')
 
-    msr_group_overtime_map = {}
-    if 'msr_group_id' in df_di.columns:
-        msr_groups = df_di[df_di['question_type'] == 'MSR'].groupby('msr_group_id', dropna=True)
-        for group_id, group_df in msr_groups:
-             group_total_time = group_df['q_time_numeric'].sum(skipna=True)
-             target_time = msr_target_times['pressure'] if pressure else msr_target_times['no_pressure']
-             msr_group_overtime_map[group_id] = group_total_time > target_time
+    overtime_thresholds_config = thresholds['OVERTIME'] # This is THRESHOLDS['DI']['OVERTIME']
+    msr_target_times = overtime_thresholds_config.get('MSR_TARGET', {})
+    msr_individual_threshold = overtime_thresholds_config.get('MSR_INDIVIDUAL_THRESHOLD', 1.5) # Default from DI Doc if not in JSON
+
+    # --- MSR Group Overtime --- 
+    msr_group_overtime_flags = pd.Series(False, index=df_di.index)
+    if 'msr_group_id' in df_di.columns and 'msr_group_total_time' in df_di.columns:
+        # Iterate over unique group_ids for MSR questions to apply group logic once per group
+        unique_msr_groups = df_di.loc[(df_di['question_type'] == 'MSR') & (df_di['msr_group_id'].notna()), 'msr_group_id'].unique()
+        for group_id in unique_msr_groups:
+            group_data = df_di[(df_di['msr_group_id'] == group_id) & (df_di['question_type'] == 'MSR')]
+            if group_data.empty: continue
+
+            actual_group_total_time = group_data['msr_group_total_time'].iloc[0] # Assuming consistent within group post-preprocessing
+            target_time_for_group = msr_target_times.get('pressure' if pressure else 'no_pressure', 6.0 if pressure else 7.0) # Default from DI Doc
+
+            if actual_group_total_time > target_time_for_group:
+                msr_group_overtime_flags.loc[group_data.index] = True
     else:
-        warnings.warn("DI overtime: Missing 'msr_group_id' column, cannot calculate MSR group overtime.", UserWarning, stacklevel=3)
+        warnings.warn("DI overtime: Missing 'msr_group_id' or 'msr_group_total_time' column. Cannot calculate MSR group overtime.", UserWarning, stacklevel=3)
 
-    for q_type, type_thresholds in overtime_thresholds.items():
-        if q_type == 'MSR_TARGET': continue
+    # --- MSR Individual Question Overtime ---
+    msr_individual_overtime_flags = pd.Series(False, index=df_di.index)
+    msr_mask_for_individual = (df_di['question_type'] == 'MSR')
+    if msr_mask_for_individual.any() and 'msr_reading_time' in df_di.columns and 'msr_group_id' in df_di.columns:
+        df_di['adjusted_msr_time'] = df_di['q_time_numeric']
+        # msr_reading_time is non-zero ONLY for the first question of each group (from di_preprocessor)
+        first_q_msr_mask = msr_mask_for_individual & df_di['msr_group_id'].notna() & (df_di['msr_reading_time'] != 0)
+        df_di.loc[first_q_msr_mask, 'adjusted_msr_time'] = df_di.loc[first_q_msr_mask, 'q_time_numeric'] - df_di.loc[first_q_msr_mask, 'msr_reading_time']
+        
+        is_msr_ind_overtime = (df_di['adjusted_msr_time'] > msr_individual_threshold).fillna(False)
+        msr_individual_overtime_flags.loc[msr_mask_for_individual & is_msr_ind_overtime] = True
+    # else: warnings.warn for missing msr_reading_time could be added if strict notification is needed.
+
+    # --- Combine MSR Overtime flags ---
+    final_msr_overtime = msr_group_overtime_flags | msr_individual_overtime_flags
+    overtime_mask.loc[df_di['question_type'] == 'MSR'] = final_msr_overtime[df_di['question_type'] == 'MSR']
+
+    # --- Non-MSR Question Types Overtime (DS, TPA, GT) ---
+    for q_type, type_thresholds_map in overtime_thresholds_config.items():
+        if q_type in ['MSR_TARGET', 'MSR_INDIVIDUAL_THRESHOLD']: continue # Skip MSR specific config keys handled above
+        
         type_mask = (df_di['question_type'] == q_type)
         if not type_mask.any(): continue
-        threshold = type_thresholds['pressure'] if pressure else type_thresholds['no_pressure']
-        is_type_overtime = (df_di['q_time_numeric'] > threshold).fillna(False)
-        overtime_mask.loc[type_mask & is_type_overtime] = True
+        
+        # Ensure type_thresholds_map is a dict (e.g., {'pressure': 2.0, 'no_pressure': 2.5})
+        if isinstance(type_thresholds_map, dict):
+            threshold_value = type_thresholds_map.get('pressure' if pressure else 'no_pressure')
+            if threshold_value is not None:
+                is_type_overtime = (df_di['q_time_numeric'] > threshold_value).fillna(False)
+                overtime_mask.loc[type_mask & is_type_overtime] = True
+            # else: warnings.warn for missing pressure/no_pressure key in threshold_value
+        # else: warnings.warn for type_thresholds_map not being a dict for a given q_type
 
-    msr_mask = (df_di['question_type'] == 'MSR')
-    if msr_mask.any() and 'msr_group_id' in df_di.columns:
-         is_msr_group_overtime = df_di['msr_group_id'].map(msr_group_overtime_map).fillna(False)
-         overtime_mask.loc[msr_mask & is_msr_group_overtime] = True
+    if 'adjusted_msr_time' in df_di.columns: # Clean up temp column from df_di (which is a copy)
+        df_di.drop(columns=['adjusted_msr_time'], inplace=True, errors='ignore')
+        
     return overtime_mask
 
 def _calculate_overtime_v(df_v, pressure, thresholds):
@@ -48,7 +88,11 @@ def _calculate_overtime_v(df_v, pressure, thresholds):
     rc_ind_threshold = overtime_thresholds['RC_INDIVIDUAL']
     rc_group_targets = overtime_thresholds['RC_GROUP_TARGET']
 
-    rc_cols_present = all(c in df_v.columns for c in ['rc_group_id', 'rc_group_total_time', 'rc_reading_time'])
+    # Ensure q_time_numeric exists, if not, create it from question_time
+    if 'q_time_numeric' not in df_v.columns:
+        df_v['q_time_numeric'] = pd.to_numeric(df_v['question_time'], errors='coerce')
+
+    rc_cols_present = all(c in df_v.columns for c in ['rc_group_id', 'rc_group_total_time', 'rc_reading_time', 'rc_group_num_questions']) # Added rc_group_num_questions for completeness
     if not rc_cols_present:
         warnings.warn("Verbal overtime: Missing preprocessed RC columns. RC overtime calculation will be skipped.", UserWarning, stacklevel=3)
 
@@ -60,8 +104,29 @@ def _calculate_overtime_v(df_v, pressure, thresholds):
 
     rc_mask = (df_v['question_type'] == 'Reading Comprehension')
     if rc_mask.any() and rc_cols_present:
-        # Individual RC Question Overtime (simple)
-        is_rc_ind_overtime = (df_v['q_time_numeric'] > rc_ind_threshold).fillna(False)
+        # Adjusted RC individual question time calculation
+        # Initialize adjusted_rc_time with original question_time
+        df_v['adjusted_rc_time'] = df_v['q_time_numeric']
+        
+        # Identify first questions in each RC group
+        # Assuming rc_reading_time is non-zero only for the first question of a group as per prior correction
+        # or that it holds the value to be subtracted for the first question.
+        # A more robust way is to check question_position within the group if available and sorted.
+        # For now, relying on rc_reading_time structure from verbal_preprocessor.py
+        # A common approach for identifying first question of a group:
+        # df_v['is_first_in_rc_group'] = df_v.groupby('rc_group_id')['question_position'].transform(lambda x: x == x.min())
+        # However, question_position might not be globally unique or perfectly ordered if df_v is a slice.
+        # The verbal_preprocessor.py stores rc_reading_time specifically on the first question.
+        # So, if rc_reading_time > 0, it implies it is the first question and has the value to subtract.
+        
+        # To correctly identify the first question for subtraction based on our verbal_preprocessor logic for rc_reading_time:
+        # rc_reading_time is non-zero ONLY for the first question of each group.
+        first_q_rc_mask = (df_v['question_type'] == 'Reading Comprehension') & df_v['rc_group_id'].notna() & (df_v['rc_reading_time'] != 0)      
+        
+        df_v.loc[first_q_rc_mask, 'adjusted_rc_time'] = df_v.loc[first_q_rc_mask, 'q_time_numeric'] - df_v.loc[first_q_rc_mask, 'rc_reading_time']
+        
+        # Individual RC Question Overtime based on adjusted_rc_time
+        is_rc_ind_overtime = (df_v['adjusted_rc_time'] > rc_ind_threshold).fillna(False) # rc_ind_threshold is 2.0 mins as per doc
         overtime_mask.loc[rc_mask & is_rc_ind_overtime] = True
 
         # RC Group Overtime (based on precalculated group times)
@@ -82,7 +147,12 @@ def _calculate_overtime_v(df_v, pressure, thresholds):
                 # RC Group overtime is defined as actual total time > target + 1 min buffer
                 if group_total_time > (target_time_for_group + 1.0):
                     overtime_mask.loc[group_data.index] = True # Mark all questions in this group as overtime
-    return overtime_mask
+
+    # Clean up temp column from df_v (which is a copy)
+    if 'adjusted_rc_time' in df_v.columns:
+        df_v.drop(columns=['adjusted_rc_time'], inplace=True, errors='ignore')
+    
+    return overtime_mask # Ensure the function returns the calculated mask
 
 def calculate_overtime(df, time_pressure_status_map):
     """
@@ -108,7 +178,9 @@ def calculate_overtime(df, time_pressure_status_map):
 
     df_with_overtime = df.copy()
     df_with_overtime['overtime'] = False
-    df_with_overtime['q_time_numeric'] = pd.to_numeric(df_with_overtime['question_time'], errors='coerce')
+    # Create q_time_numeric once on the main copy we are modifying
+    if 'q_time_numeric' not in df_with_overtime.columns: # Add if not exists
+      df_with_overtime['q_time_numeric'] = pd.to_numeric(df_with_overtime['question_time'], errors='coerce')
 
     for section, section_thresholds in THRESHOLDS.items():
         section_mask = (df_with_overtime['Subject'] == section)
@@ -129,5 +201,8 @@ def calculate_overtime(df, time_pressure_status_map):
         # Update the main dataframe's 'overtime' column for the current section
         df_with_overtime.loc[section_mask, 'overtime'] = section_overtime_mask
 
-    df_with_overtime.drop(columns=['q_time_numeric'], inplace=True, errors='ignore')
+    # Clean up the temporary q_time_numeric column from the main df_with_overtime
+    if 'q_time_numeric' in df_with_overtime.columns:
+        df_with_overtime.drop(columns=['q_time_numeric'], inplace=True, errors='ignore')
+        
     return df_with_overtime 

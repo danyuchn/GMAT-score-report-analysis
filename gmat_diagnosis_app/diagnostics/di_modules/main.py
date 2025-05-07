@@ -8,7 +8,8 @@ from .constants import (
     INVALID_TIME_THRESHOLD_MINUTES, OVERTIME_THRESHOLDS, SUSPICIOUS_FAST_MULTIPLIER
 )
 from .utils import (
-    _calculate_msr_metrics, _analyze_dimension, _grade_difficulty_di
+    # _calculate_msr_metrics, # Removed import
+    _analyze_dimension, _grade_difficulty_di
 )
 from .translation import (
     _translate_di # Only translation function needed directly in main logic?
@@ -48,14 +49,14 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             df_to_return = pd.DataFrame(columns=empty_cols)
             if 'Subject' not in df_to_return.columns:
                 df_to_return['Subject'] = 'DI'
-            logging.info("[run_di_diagnosis_logic] Input DataFrame is empty.") # Updated function name in log
+            logging.info("[run_di_diagnosis_logic] Input DataFrame is empty.")
             return {}, report_str, df_to_return
 
         df_di = df_di_processed.copy()
-        logging.debug(f"[run_di_diagnosis_logic] Starting diagnosis. Input df shape: {df_di.shape}") # Updated function name
+        logging.debug(f"[run_di_diagnosis_logic] Starting diagnosis. Input df shape: {df_di.shape}")
 
         # --- Chapter 0: Derivative Data Calculation & Basic Prep ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 0: Basic Prep") # Updated function name
+        logging.debug("[run_di_diagnosis_logic] Chapter 0: Basic Prep")
         df_di['question_time'] = pd.to_numeric(df_di['question_time'], errors='coerce')
         if 'question_position' not in df_di.columns: df_di['question_position'] = range(len(df_di))
         else: df_di['question_position'] = pd.to_numeric(df_di['question_position'], errors='coerce')
@@ -63,16 +64,16 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         else: df_di['is_correct'] = df_di['is_correct'].astype(bool)
         if 'question_type' not in df_di.columns: df_di['question_type'] = 'Unknown Type'
         if 'msr_group_id' not in df_di.columns:
-            logging.warning("[run_di_diagnosis_logic] 'msr_group_id' column missing. MSR metrics will be NaN.") # Updated name
+            logging.warning("[run_di_diagnosis_logic] 'msr_group_id' column missing. MSR metrics will be NaN.")
             df_di['msr_group_id'] = np.nan # Ensure column exists even if empty
         if 'is_invalid' not in df_di.columns:
             df_di['is_invalid'] = False
 
-        df_di = _calculate_msr_metrics(df_di) # Imported from utils
-        logging.debug(f"[run_di_diagnosis_logic] After _calculate_msr_metrics, df shape: {df_di.shape}") # Updated name
+        # df_di = _calculate_msr_metrics(df_di) # Removed call, MSR metrics are now expected from preprocessor
+        # logging.debug(f"[run_di_diagnosis_logic] After _calculate_msr_metrics, df shape: {df_di.shape}") # Updated name
 
         # --- Chapter 1: Time Strategy & Validity ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 1: Time Strategy & Validity") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Chapter 1: Time Strategy & Validity")
         total_test_time_di = df_di['question_time'].sum(skipna=True) # Ensure NaNs are skipped
         time_diff = MAX_ALLOWED_TIME_DI - total_test_time_di
 
@@ -116,7 +117,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
                 
                 # 記錄新標記的無效題目數量
                 num_newly_invalid = invalid_mask.sum()
-                logging.debug(f"[run_di_diagnosis_logic] Marked {num_newly_invalid} additional questions as invalid due to time pressure and hasty responses.") # Updated name
+                logging.debug(f"[run_di_diagnosis_logic] Marked {num_newly_invalid} additional questions as invalid due to time pressure and hasty responses.")
         
         num_invalid_questions_total = df_di['is_invalid'].sum()
         di_diagnosis_results['invalid_count'] = num_invalid_questions_total
@@ -124,23 +125,23 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         # Initialize diagnostic_params if needed
         if 'diagnostic_params' not in df_di.columns:
             try:
-                logging.debug(f"[run_di_diagnosis_logic] Initializing 'diagnostic_params'. df_di shape: {df_di.shape}, length of list: {len(df_di)}") # Updated name
+                logging.debug(f"[run_di_diagnosis_logic] Initializing 'diagnostic_params'. df_di shape: {df_di.shape}, length of list: {len(df_di)}")
                 df_di['diagnostic_params'] = [[] for _ in range(len(df_di))]
             except Exception as e:
-                logging.error(f"[run_di_diagnosis_logic] Error initializing 'diagnostic_params': {e}", exc_info=True) # Updated name
+                logging.error(f"[run_di_diagnosis_logic] Error initializing 'diagnostic_params': {e}", exc_info=True)
                 raise e
         else:
             try:
-                logging.debug(f"[run_di_diagnosis_logic] Ensuring 'diagnostic_params' is list. df_di shape: {df_di.shape}") # Updated name
+                logging.debug(f"[run_di_diagnosis_logic] Ensuring 'diagnostic_params' is list. df_di shape: {df_di.shape}")
                 df_di['diagnostic_params'] = df_di['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, set, tuple)) else [])
             except Exception as e:
-                logging.error(f"[run_di_diagnosis_logic] Error ensuring 'diagnostic_params' is list: {e}", exc_info=True) # Updated name
+                logging.error(f"[run_di_diagnosis_logic] Error ensuring 'diagnostic_params' is list: {e}", exc_info=True)
                 raise e
 
         # Add invalid tag
         final_invalid_mask_di = df_di['is_invalid']
         if final_invalid_mask_di.any():
-            logging.debug(f"[run_di_diagnosis_logic] Updating 'diagnostic_params' for invalid rows. df_di shape: {df_di.shape}, number invalid: {final_invalid_mask_di.sum()}") # Updated name
+            logging.debug(f"[run_di_diagnosis_logic] Updating 'diagnostic_params' for invalid rows. df_di shape: {df_di.shape}, number invalid: {final_invalid_mask_di.sum()}")
             for idx in df_di.index[final_invalid_mask_di]:
                 try:
                     current_list = df_di.loc[idx, 'diagnostic_params']
@@ -149,15 +150,15 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
                         current_list.append(INVALID_DATA_TAG_DI)
                     df_di.loc[idx, 'diagnostic_params'] = current_list
                 except Exception as e:
-                    logging.error(f"[run_di_diagnosis_logic] Error updating 'diagnostic_params' for invalid row index {idx}: {e}", exc_info=True) # Updated name
+                    logging.error(f"[run_di_diagnosis_logic] Error updating 'diagnostic_params' for invalid row index {idx}: {e}", exc_info=True)
                     continue
 
         # --- Mark Overtime (Vectorized Approach) ---
         try:
-            logging.debug(f"[run_di_diagnosis_logic] Initializing 'overtime' column. df_di shape: {df_di.shape}") # Updated name
+            logging.debug(f"[run_di_diagnosis_logic] Initializing 'overtime' column. df_di shape: {df_di.shape}")
             df_di['overtime'] = False
         except Exception as e:
-            logging.error(f"[run_di_diagnosis_logic] Error initializing 'overtime': {e}", exc_info=True) # Updated name
+            logging.error(f"[run_di_diagnosis_logic] Error initializing 'overtime': {e}", exc_info=True)
             raise e
 
         thresholds = OVERTIME_THRESHOLDS[di_time_pressure_status]
@@ -182,7 +183,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         
         overall_overtime_mask = tpa_over_mask | gt_over_mask | ds_over_mask | msr_over_mask
         df_di.loc[overall_overtime_mask, 'overtime'] = True
-        logging.debug(f"[run_di_diagnosis_logic] Overtime calculated. Count: {df_di['overtime'].sum()}") # Updated name
+        logging.debug(f"[run_di_diagnosis_logic] Overtime calculated. Count: {df_di['overtime'].sum()}")
 
         # Store Chapter 1 results
         di_diagnosis_results['chapter_1'] = {
@@ -195,10 +196,10 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
 
         # Create filtered dataset
         df_di_filtered = df_di[~df_di['is_invalid']].copy()
-        logging.debug(f"[run_di_diagnosis_logic] Created df_di_filtered. Shape: {df_di_filtered.shape}") # Updated name
+        logging.debug(f"[run_di_diagnosis_logic] Created df_di_filtered. Shape: {df_di_filtered.shape}")
 
         # --- Chapter 2: Multidimensional Performance Analysis ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 2: Performance Analysis") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Chapter 2: Performance Analysis")
         domain_analysis = {}
         type_analysis = {}
         difficulty_analysis = {}
@@ -210,7 +211,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
 
         if not df_di_filtered.empty:
             if 'content_domain' in df_di_filtered.columns:
-                domain_analysis = _analyze_dimension(df_di_filtered, 'content_domain') # Imported
+                domain_analysis = _analyze_dimension(df_di_filtered, 'content_domain')
                 math_metrics = domain_analysis.get('Math Related', {})
                 non_math_metrics = domain_analysis.get('Non-Math Related', {})
                 math_errors = math_metrics.get('errors', 0)
@@ -229,11 +230,11 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
                      domain_comparison_tags['slow_non_math_related'] = non_math_overtime > math_overtime
 
             if 'question_type' in df_di_filtered.columns:
-                type_analysis = _analyze_dimension(df_di_filtered, 'question_type') # Imported
+                type_analysis = _analyze_dimension(df_di_filtered, 'question_type')
 
             if 'question_difficulty' in df_di_filtered.columns:
-                df_di_filtered['difficulty_grade'] = df_di_filtered['question_difficulty'].apply(_grade_difficulty_di) # Imported
-                difficulty_analysis = _analyze_dimension(df_di_filtered, 'difficulty_grade') # Imported
+                df_di_filtered['difficulty_grade'] = df_di_filtered['question_difficulty'].apply(_grade_difficulty_di)
+                difficulty_analysis = _analyze_dimension(df_di_filtered, 'difficulty_grade')
 
         di_diagnosis_results['chapter_2'] = {
             'by_domain': domain_analysis,
@@ -241,10 +242,10 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             'by_difficulty': difficulty_analysis,
             'domain_comparison_tags': domain_comparison_tags
         }
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 2.") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Completed Chapter 2.")
 
         # --- Chapter 3: Root Cause Diagnosis ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 3: Root Cause Diagnosis") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Chapter 3: Root Cause Diagnosis")
         if not df_di_filtered.empty and 'question_type' in df_di_filtered.columns:
             avg_time_per_type = df_di_filtered.groupby('question_type')['question_time'].mean().to_dict()
             max_correct_difficulty_per_combination = pd.DataFrame()
@@ -258,51 +259,51 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             if 'time_performance_category' not in df_di_filtered.columns:
                 df_di_filtered['time_performance_category'] = 'Unknown'
 
-            df_di_filtered = _diagnose_root_causes(df_di_filtered, avg_time_per_type, max_correct_difficulty_per_combination, thresholds) # Imported
+            df_di_filtered = _diagnose_root_causes(df_di_filtered, avg_time_per_type, max_correct_difficulty_per_combination, thresholds)
 
             di_diagnosis_results['chapter_3'] = {
                 'diagnosed_dataframe': df_di_filtered.copy(),
                 'avg_time_per_type_minutes': avg_time_per_type,
                 'max_correct_difficulty': max_correct_difficulty_per_combination.to_dict() if not max_correct_difficulty_per_combination.empty else {}
             }
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 3.") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Completed Chapter 3.")
 
         # --- Chapter 4: Special Pattern Observation ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 4: Special Patterns") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Chapter 4: Special Patterns")
         avg_times_ch3 = di_diagnosis_results.get('chapter_3', {}).get('avg_time_per_type_minutes', {})
         df_ch3_diagnosed = di_diagnosis_results['chapter_3']['diagnosed_dataframe']
         df_for_ch4 = df_ch3_diagnosed.copy()
-        pattern_analysis_results = _observe_di_patterns(df_for_ch4, avg_times_ch3) # Imported
+        pattern_analysis_results = _observe_di_patterns(df_for_ch4, avg_times_ch3)
         di_diagnosis_results['chapter_4'] = pattern_analysis_results
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 4.") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Completed Chapter 4.")
 
         # --- Chapter 5: Foundation Ability Override Rule ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 5: Override Rule") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Chapter 5: Override Rule")
         type_analysis_ch2 = di_diagnosis_results.get('chapter_2', {}).get('by_type', {})
-        override_analysis = _check_foundation_override(df_for_ch4, type_analysis_ch2) # Imported
+        override_analysis = _check_foundation_override(df_for_ch4, type_analysis_ch2)
         di_diagnosis_results['chapter_5'] = override_analysis
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 5.") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Completed Chapter 5.")
 
         # --- Chapter 6: Practice Planning & Recommendations ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 6: Recommendations") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Chapter 6: Recommendations")
         diagnosed_df_ch4_ch5 = df_for_ch4
         domain_tags_ch2 = di_diagnosis_results.get('chapter_2', {}).get('domain_comparison_tags', {})
         override_analysis_ch5 = di_diagnosis_results.get('chapter_5', {})
 
         recommendations = []
         if not diagnosed_df_ch4_ch5.empty:
-            recommendations = _generate_di_recommendations(diagnosed_df_ch4_ch5, override_analysis_ch5, domain_tags_ch2) # Imported
+            recommendations = _generate_di_recommendations(diagnosed_df_ch4_ch5, override_analysis_ch5, domain_tags_ch2)
         di_diagnosis_results['chapter_6'] = {'recommendations_list': recommendations}
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 6.") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Completed Chapter 6.")
 
         # --- Chapter 7: Summary Report Generation ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 7: Summary Report") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Chapter 7: Summary Report")
         di_diagnosis_results['chapter_3']['diagnosed_dataframe'] = diagnosed_df_ch4_ch5.copy()
-        report_str = _generate_di_summary_report(di_diagnosis_results) # Imported
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 7 (Report Generation).") # Updated name
+        report_str = _generate_di_summary_report(di_diagnosis_results)
+        logging.debug("[run_di_diagnosis_logic] Completed Chapter 7 (Report Generation).")
 
         # --- Final DataFrame Preparation ---
-        logging.debug("[run_di_diagnosis_logic] Final DataFrame Preparation") # Updated name
+        logging.debug("[run_di_diagnosis_logic] Final DataFrame Preparation")
         df_base = df_di.copy()
         diagnostic_cols_to_merge = [] 
         if diagnosed_df_ch4_ch5 is not None and not diagnosed_df_ch4_ch5.empty:
@@ -332,7 +333,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
                 lambda x: list(x) if isinstance(x, (list, tuple, set)) else ([] if pd.isna(x) else [x] if isinstance(x, str) else [])
             )
             df_to_return['diagnostic_params_list_chinese'] = df_to_return['diagnostic_params'].apply(
-                lambda params_list: _translate_di(params_list) # Imported from translation
+                lambda params_list: _translate_di(params_list)
             )
             if 'diagnostic_params' in df_to_return.columns: df_to_return = df_to_return.drop(columns=['diagnostic_params'])
             if 'diagnostic_params_list_chinese' in df_to_return.columns: df_to_return = df_to_return.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'})
@@ -359,7 +360,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
              df_to_return['Subject'] = 'DI'
 
         if 'overtime' not in df_to_return.columns:
-            logging.warning("[run_di_diagnosis_logic] 'overtime' column missing before return. Initializing to False.") # Updated name
+            logging.warning("[run_di_diagnosis_logic] 'overtime' column missing before return. Initializing to False.")
             df_to_return['overtime'] = False
 
         cols_to_fill_na = ['is_sfe', 'time_performance_category']
@@ -373,18 +374,18 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         else:
             df_to_return['is_invalid'] = False
 
-        logging.debug(f"[run_di_diagnosis_logic] Final df_di shape before return: {df_to_return.shape}") # Updated name
-        logging.debug(f"[run_di_diagnosis_logic] Columns: {df_to_return.columns.tolist()}") # Updated name
+        logging.debug(f"[run_di_diagnosis_logic] Final df_di shape before return: {df_to_return.shape}")
+        logging.debug(f"[run_di_diagnosis_logic] Columns: {df_to_return.columns.tolist()}")
         if 'diagnostic_params_list' in df_to_return.columns:
-             logging.debug(f"[run_di_diagnosis_logic] diagnostic_params_list head:\n{df_to_return['diagnostic_params_list'].head().to_string()}") # Updated name
+             logging.debug(f"[run_di_diagnosis_logic] diagnostic_params_list head:\n{df_to_return['diagnostic_params_list'].head().to_string()}")
         else:
-             logging.debug("[run_di_diagnosis_logic] 'diagnostic_params_list' column not found before return.") # Updated name
+             logging.debug("[run_di_diagnosis_logic] 'diagnostic_params_list' column not found before return.")
 
-        logging.debug(f"[run_di_diagnosis_logic] Diagnosis successful. Returning df shape: {df_to_return.shape}") # Updated name
+        logging.debug(f"[run_di_diagnosis_logic] Diagnosis successful. Returning df shape: {df_to_return.shape}")
         return di_diagnosis_results, report_str, df_to_return
 
     except Exception as e: # --- Catch All Exceptions ---
-        logging.error(f"[run_di_diagnosis_logic] Unhandled exception during DI diagnosis: {e}", exc_info=True) # Updated name
+        logging.error(f"[run_di_diagnosis_logic] Unhandled exception during DI diagnosis: {e}", exc_info=True)
         df_to_return = pd.DataFrame(columns=empty_cols)
         if 'Subject' not in df_to_return.columns:
             df_to_return['Subject'] = 'DI'

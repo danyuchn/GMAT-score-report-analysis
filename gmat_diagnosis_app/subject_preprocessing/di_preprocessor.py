@@ -27,23 +27,98 @@ def _identify_msr_groups(df_di_subset):
     return df_di_subset
 
 def preprocess_di_data(df):
-    """Applies preprocessing specific to DI data, primarily MSR grouping."""
+    """Applies preprocessing specific to DI data, primarily MSR grouping and time calculations."""
     df_processed = df.copy()
     di_mask = (df_processed['Subject'] == 'DI')
     if not di_mask.any():
-        if 'msr_group_id' not in df_processed.columns: # Ensure column exists
-            df_processed['msr_group_id'] = pd.Series(dtype='object') 
+        # Ensure MSR specific columns exist even if no DI data, similar to verbal_preprocessor
+        for col in ['msr_group_id', 'msr_group_total_time', 'msr_group_num_questions', 'msr_reading_time', 'is_first_msr_q']:
+            if col not in df_processed.columns:
+                df_processed[col] = pd.Series(dtype='object' if col == 'msr_group_id' else 'float64')
         return df_processed
 
     df_di_subset = df_processed[di_mask].copy() 
+    df_di_subset['question_time'] = pd.to_numeric(df_di_subset['question_time'], errors='coerce') # Ensure numeric for sum
     df_di_subset = _identify_msr_groups(df_di_subset)
-    df_processed.update(df_di_subset) 
 
-    if 'msr_group_id' not in df_processed.columns: # Ensure column exists after update
-         df_processed['msr_group_id'] = pd.Series(dtype='object')
-    elif df_processed['msr_group_id'].isna().all() and not df_di_subset.empty:
-        # If all are NaN after processing DI rows, it means no MSR groups were identified or DI was empty.
-        # This is fine, just ensure the column type is consistent if it was all NaNs.
-        pass 
+    # Calculate MSR group total time, number of questions, and reading time
+    if 'msr_group_id' in df_di_subset.columns and df_di_subset['msr_group_id'].notna().any():
+        msr_rows_mask = df_di_subset['msr_group_id'].notna() & (df_di_subset['question_type'] == 'Multi-source reasoning')
+        if msr_rows_mask.any():
+            df_msr_part = df_di_subset[msr_rows_mask].copy()
+            df_msr_part['question_position'] = pd.to_numeric(df_msr_part['question_position'], errors='coerce') # Ensure numeric for idxmin
+            
+            # Group Total Time
+            group_total_time_map = df_msr_part.groupby('msr_group_id')['question_time'].sum().to_dict()
+            df_msr_part['msr_group_total_time'] = df_msr_part['msr_group_id'].map(group_total_time_map)
+            
+            # Group Num Questions
+            group_num_questions_map = df_msr_part.groupby('msr_group_id').size().to_dict()
+            df_msr_part['msr_group_num_questions'] = df_msr_part['msr_group_id'].map(group_num_questions_map)
 
+            # MSR Reading Time
+            df_msr_part['msr_reading_time'] = 0.0 # Initialize
+            first_q_indices_msr = []
+            group_data_for_reading_time_msr = {}
+
+            for name, group in df_msr_part.groupby('msr_group_id', dropna=False):
+                if group['question_position'].notna().any() and len(group) >= 2: # Only if group has at least 2 questions
+                    first_q_idx_msr = group['question_position'].idxmin()
+                    first_q_indices_msr.append(first_q_idx_msr)
+                    first_q_time_msr = group.loc[first_q_idx_msr, 'question_time']
+                    other_qs_time_msr = group.loc[group.index != first_q_idx_msr, 'question_time']
+                    
+                    calculated_msr_reading_time = first_q_time_msr
+                    if not other_qs_time_msr.empty:
+                        avg_other_qs_time_msr = other_qs_time_msr.mean()
+                        calculated_msr_reading_time = first_q_time_msr - avg_other_qs_time_msr
+                    
+                    df_msr_part.loc[first_q_idx_msr, 'msr_reading_time'] = calculated_msr_reading_time
+            
+            df_msr_part['msr_reading_time'] = pd.to_numeric(df_msr_part['msr_reading_time'], errors='coerce').fillna(0)
+
+            # Add is_first_msr_q flag
+            df_msr_part['is_first_msr_q'] = False
+            if first_q_indices_msr: # Check if list is not empty
+                # Ensure indices are valid for df_msr_part before trying to loc
+                valid_first_q_indices = [idx for idx in first_q_indices_msr if idx in df_msr_part.index]
+                if valid_first_q_indices:
+                    df_msr_part.loc[valid_first_q_indices, 'is_first_msr_q'] = True
+
+            # Update the DI subset with new columns
+            df_di_subset.update(df_msr_part)
+
+    df_processed.update(df_di_subset)
+
+    # Ensure standard MSR columns exist in the main df and initialize them correctly.
+    msr_numeric_cols = ['msr_group_total_time', 'msr_group_num_questions', 'msr_reading_time']
+    msr_bool_cols = ['is_first_msr_q']
+    msr_object_cols = ['msr_group_id']
+
+    for col in msr_numeric_cols:
+        if col not in df_processed.columns:
+            df_processed[col] = 0.0  # Initialize with 0.0 for all rows
+        else:
+            # Ensure correct dtype and fill NaNs if column already existed
+            df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').fillna(0.0)
+            
+    for col in msr_bool_cols:
+        if col not in df_processed.columns:
+            df_processed[col] = False  # Initialize with False for all rows
+        else:
+            # Ensure correct dtype and fill NaNs
+            try:
+                df_processed[col] = df_processed[col].astype(bool) # Attempt direct cast
+            except ValueError: # Handle potential mixed types or uncastable values
+                df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').notna() # Example: 0/1 to False/True
+            df_processed[col] = df_processed[col].fillna(False)
+
+    for col in msr_object_cols: # e.g., msr_group_id
+        if col not in df_processed.columns:
+            df_processed[col] = pd.NA # Or np.nan, or a placeholder string like "N/A"
+        else:
+            # If it exists, just ensure it's not all NaNs if a placeholder is preferred for full NaNs.
+            # df_processed[col] = df_processed[col].fillna(pd.NA) # Default fillna for object is usually fine
+            pass # Allow existing NaNs or values
+            
     return df_processed 

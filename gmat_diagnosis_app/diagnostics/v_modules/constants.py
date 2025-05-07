@@ -129,4 +129,64 @@ V_PARAM_TO_CATEGORY = {
     'BEHAVIOR_CARELESSNESS_ISSUE': 'Behavioral',
     'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': 'Behavioral',
     'BEHAVIOR_GUESSING_HASTY': 'Behavioral'
+}
+
+# --- V Tool and AI Prompt Recommendations ---
+# Based on gmat-v-score-logic-dustin-v1.4.md Chapter 8
+V_TOOL_AI_RECOMMENDATIONS = {
+    # CR - Reasoning / Specific Type
+    'CR_REASONING_CHAIN_ERROR': ["Tool: Dustin_GMAT_CR_Chain_Argument_Evaluation.md", "AI: Verbal-related/05_evaluate_explanation.md, Verbal-related/06_boldface_SOP.md"],
+    'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY': ["Tool: Dustin_GMAT_CR_Core_Issue_Identifier.md", "AI: Verbal-related/01_basic_explanation.md"],
+    'CR_METHOD_TYPE_SPECIFIC_ERROR': [ # This is a general key; specific tool/AI might depend on the actual type mentioned in diagnosis.
+        "Tool: (If Boldface) Dustin_GMAT_CR_Boldface_Interactive_Tutor.md",
+        "Tool: (If Argument Construction) Dustin_GMAT_CR_Role_Argument_Construction.md",
+        "AI: Verbal-related/01_basic_explanation.md, Verbal-related/05_evaluate_explanation.md, Verbal-related/06_boldface_SOP.md (If Boldface)"
+    ],
+    'CR_REASONING_ABSTRACTION_DIFFICULTY': ["Tool: Dustin_GMAT_Textbook_Explainer.md", "AI: Verbal-related/07_logical_term_explained.md, Verbal-related/09_complex_sentence_rewrite.md"],
+    'CR_READING_BASIC_OMISSION': ["AI: Verbal-related/01_basic_explanation.md"],
+    'CR_READING_DIFFICULTY_STEM': ["AI: Verbal-related/01_basic_explanation.md, Verbal-related/07_logical_term_explained.md, Verbal-related/09_complex_sentence_rewrite.md"],
+    'CR_READING_TIME_EXCESSIVE': ["AI: Verbal-related/02_quick_cr_tpa_tricks.md, Verbal-related/03_quick_rc_tricks.md"],
+    'CR_QUESTION_UNDERSTANDING_MISINTERPRETATION': ["AI: Verbal-related/01_basic_explanation.md, Verbal-related/07_logical_term_explained.md"],
+    'CR_REASONING_PREDICTION_ERROR': ["AI: Verbal-related/01_basic_explanation.md, Verbal-related/05_evaluate_explanation.md"],
+    'CR_REASONING_TIME_EXCESSIVE': ["AI: Verbal-related/02_quick_cr_tpa_tricks.md, Verbal-related/05_evaluate_explanation.md"],
+    'CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY': ["AI: Verbal-related/07_logical_term_explained.md, Verbal-related/01_basic_explanation.md"],
+    'CR_AC_ANALYSIS_RELEVANCE_ERROR': ["AI: Verbal-related/05_evaluate_explanation.md, Verbal-related/06_boldface_SOP.md"],
+    'CR_AC_ANALYSIS_DISTRACTOR_CONFUSION': ["Tool: Dustin_GMAT_Verbal_Distractor_Mocker.md", "AI: Verbal-related/01_basic_explanation.md, Verbal-related/07_logical_term_explained.md"],
+    'CR_AC_ANALYSIS_TIME_EXCESSIVE': ["AI: Verbal-related/02_quick_cr_tpa_tricks.md, Verbal-related/06_boldface_SOP.md"],
+    'CR_METHOD_PROCESS_DEVIATION': ["AI: Verbal-related/05_evaluate_explanation.md, Verbal-related/06_boldface_SOP.md"],
+
+    # RC - Reading Comprehension
+    'RC_READING_SPEED_SLOW_FOUNDATIONAL': ["Tool: Dustin_GMAT_Chunk_Reading_Coach.md", "AI: Verbal-related/03_quick_rc_tricks.md"],
+    # Explicitly adding RC_READING_COMPREHENSION_BARRIER based on its inclusion in the reporting code and potential relation to reading speed
+    'RC_READING_COMPREHENSION_BARRIER': ["Tool: Dustin_GMAT_Chunk_Reading_Coach.md", "AI: Verbal-related/03_quick_rc_tricks.md"],
+    'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY': ["Tool: Dustin_GMAT_Sentence_Cracker.md", "AI: Verbal-related/09_complex_sentence_rewrite.md, Verbal-related/01_basic_explanation.md"],
+    'RC_READING_DOMAIN_KNOWLEDGE_GAP': ["AI: Verbal-related/01_basic_explanation.md, Verbal-related/08_source_passage_rewrite.md"],
+    'RC_READING_VOCAB_BOTTLENECK': ["Tool: Dustin_GMAT_Core_Vocab_Master.md", "AI: Verbal-related/09_complex_sentence_rewrite.md, Verbal-related/01_basic_explanation.md"],
+    'RC_READING_PRECISION_INSUFFICIENT': ["Tool: Dustin_GMAT_Close_Reading_Coach.md", "AI: Verbal-related/01_basic_explanation.md, Verbal-related/03_quick_rc_tricks.md"],
+    'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY': ["Tool: Dustin_GMAT_RC_Passage_Analyzer.md", "AI: Verbal-related/04_mindmap_passage.md, Verbal-related/03_quick_rc_tricks.md"],
+    'RC_READING_INFO_LOCATION_ERROR': ["AI: Verbal-related/03_quick_rc_tricks.md, Verbal-related/04_mindmap_passage.md"],
+    'RC_READING_KEYWORD_LOGIC_OMISSION': ["AI: Verbal-related/01_basic_explanation.md, Verbal-related/03_quick_rc_tricks.md"],
+    'RC_METHOD_INEFFICIENT_READING': ["AI: Verbal-related/03_quick_rc_tricks.md, Verbal-related/04_mindmap_passage.md"],
+    'RC_QUESTION_UNDERSTANDING_MISINTERPRETATION': ["AI: Verbal-related/01_basic_explanation.md, Verbal-related/07_logical_term_explained.md"],
+    'RC_LOCATION_ERROR_INEFFICIENCY': ["AI: Verbal-related/03_quick_rc_tricks.md"],
+    'RC_LOCATION_TIME_EXCESSIVE': ["AI: Verbal-related/03_quick_rc_tricks.md, Verbal-related/04_mindmap_passage.md"],
+    'RC_REASONING_INFERENCE_WEAKNESS': ["AI: Verbal-related/01_basic_explanation.md, Verbal-related/05_evaluate_explanation.md"],
+    'RC_REASONING_TIME_EXCESSIVE': ["AI: Verbal-related/03_quick_rc_tricks.md, Verbal-related/05_evaluate_explanation.md"],
+    'RC_AC_ANALYSIS_DIFFICULTY': ["AI: Verbal-related/01_basic_explanation.md, Verbal-related/07_logical_term_explained.md"],
+    'RC_AC_ANALYSIS_TIME_EXCESSIVE': ["AI: Verbal-related/03_quick_rc_tricks.md"],
+    'RC_METHOD_TYPE_SPECIFIC_ERROR': ["AI: Verbal-related/01_basic_explanation.md (general), specific RC type tricks if available"],
+
+    # Foundational Mastery / Efficiency / Behavioral
+    'FOUNDATIONAL_MASTERY_INSTABILITY_SFE': ["AI: Verbal-related/01_basic_explanation.md (priority)"],
+    'EFFICIENCY_BOTTLENECK_READING': ["Tool: Dustin_GMAT_Chunk_Reading_Coach.md", "AI: Verbal-related/03_quick_rc_tricks.md"],
+    'EFFICIENCY_BOTTLENECK_REASONING': ["AI: Verbal-related/02_quick_cr_tpa_tricks.md, Verbal-related/05_evaluate_explanation.md"],
+    'EFFICIENCY_BOTTLENECK_LOCATION': ["AI: Verbal-related/03_quick_rc_tricks.md"],
+    'EFFICIENCY_BOTTLENECK_AC_ANALYSIS': ["AI: Verbal-related/02_quick_cr_tpa_tricks.md (CR), Verbal-related/03_quick_rc_tricks.md (RC)"],
+    'BEHAVIOR_CARELESSNESS_ISSUE': ["Tool: Dustin_GMAT_Verbal_Distractor_Mocker.md", "AI: Verbal-related/05_evaluate_explanation.md, Verbal-related/01_basic_explanation.md"],
+    'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': ["AI: Verbal-related/05_evaluate_explanation.md"],
+    'BEHAVIOR_GUESSING_HASTY': ["AI: Verbal-related/01_basic_explanation.md"],
+
+    # Generic/Fallback recommendations for broader categories if specific param not hit
+    # These are conceptual and would require a different lookup logic if implemented.
+    # For now, the mapping is direct parameter to recommendation.
 } 

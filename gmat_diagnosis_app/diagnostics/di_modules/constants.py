@@ -30,3 +30,122 @@ SUSPICIOUS_FAST_MULTIPLIER = 0.5  # 用於計算相對於前三分之一平均�
 
 # 添加粗心閾值（核心邏輯文件第四章）
 CARELESSNESS_THRESHOLD = 0.25  # 快錯率超過25%判定為粗心 
+
+# 添加前期過快題目絕對時間閾值 (核心邏輯文件第四章)
+EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES = 1.0 # 分鐘 
+
+# --- DI Tool and AI Prompt Recommendations (from DI Doc Chapter 7) ---
+DI_TOOL_AI_RECOMMENDATIONS = {
+    'DI_READING_COMPREHENSION_ERROR': [
+        "Tool: Dustin_GMAT_Core_Sentence_Cracker.md", 
+        "Tool: Dustin_GMAT_Close_Reading_Coach.md", 
+        "Tool: Dustin_GMAT_Chunk_Reading_Coach.md",
+        "AI Prompt: Verbal-related/01_basic_explanation.md", 
+        "AI Prompt: Verbal-related/03_quick_rc_tricks.md", 
+        "AI Prompt: Verbal-related/09_complex_sentence_rewrite.md", 
+        "AI Prompt: DI-related/03_msr_info_flow.md", 
+        "AI Prompt: DI-related/04_custom_SOP.md"
+    ],
+    'DI_GRAPH_TABLE_INTERPRETATION_ERROR': [
+        "AI Prompt: Quant-related/01_basic_explanation.md", 
+        "AI Prompt: Quant-related/04_problem_pattern.md", 
+        "AI Prompt: DI-related/02_quick_g&t_tricks.md"
+    ],
+    'DI_DATA_EXTRACTION_ERROR': [
+        "AI Prompt: Quant-related/01_basic_explanation.md", 
+        "AI Prompt: DI-related/02_quick_g&t_tricks.md"
+    ],
+    'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR': [
+        "AI Prompt: Verbal-related/01_basic_explanation.md", 
+        "AI Prompt: Verbal-related/03_quick_rc_tricks.md", 
+        "AI Prompt: DI-related/03_msr_info_flow.md"
+    ],
+    'DI_CONCEPT_APPLICATION_ERROR': [
+        "Tool: Dustin_GMAT_Textbook_Explainer.md", 
+        "Tool: Dustin_GMAT_Q_Question_Classifier.md",
+        "AI Prompt: Quant-related/01_basic_explanation.md", 
+        "AI Prompt: Quant-related/03_test_math_concepts.md", 
+        "AI Prompt: Quant-related/05_variant_questions.md"
+    ],
+    'DI_LOGICAL_REASONING_ERROR': [
+        "Tool: Dustin_GMAT_DI_Non-math_DS_Simulator.md",
+        "Tool: Dustin_GMAT_Textbook_Explainer.md",
+        "AI Prompt: Verbal-related/01_basic_explanation.md", 
+        "AI Prompt: Verbal-related/02_quick_cr_tpa_tricks.md", 
+        "AI Prompt: Verbal-related/05_evaluate_explanation.md", 
+        "AI Prompt: Verbal-related/07_logical_term_explained.md"
+    ],
+    'DI_CALCULATION_ERROR': [
+        "AI Prompt: Quant-related/01_basic_explanation.md", 
+        "AI Prompt: Quant-related/02_quick_math_tricks.md"
+    ],
+    'DI_MULTI_SOURCE_INTEGRATION_ERROR': [
+        "Tool: Dustin_GMAT_Chunk_Reading_Coach.md",
+        "AI Prompt: Verbal-related/04_mindmap_passage.md", 
+        "AI Prompt: Verbal-related/01_basic_explanation.md", 
+        "AI Prompt: DI-related/03_msr_info_flow.md", 
+        "AI Prompt: DI-related/04_custom_SOP.md"
+    ],
+    'DI_MSR_READING_COMPREHENSION_BARRIER': [
+        "Tool: Dustin_GMAT_Core_Sentence_Cracker.md", 
+        "Tool: Dustin_GMAT_Chunk_Reading_Coach.md",
+        "AI Prompt: Verbal-related/03_quick_rc_tricks.md", 
+        "AI Prompt: Verbal-related/01_basic_explanation.md", 
+        "AI Prompt: DI-related/03_msr_info_flow.md", 
+        "AI Prompt: Verbal-related/09_complex_sentence_rewrite.md"
+    ],
+    'DI_QUESTION_TYPE_SPECIFIC_ERROR': [
+        "Tool: Dustin_GMAT_DI_Non-math_DS_Simulator.md",
+        "AI Prompt: (Select based on specific type, e.g., DI-related/02_quick_g&t_tricks.md (GT), DI-related/03_msr_info_flow.md (MSR))"
+    ],
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': [
+        "Tool: Dustin_GMAT_Textbook_Explainer.md",
+        "AI Prompt: Quant-related/01_basic_explanation.md",
+        "AI Prompt: Quant-related/03_test_math_concepts.md",
+        "AI Prompt: Quant-related/05_variant_questions.md"
+    ],
+    'DI_EFFICIENCY_BOTTLENECK_READING': [
+        "Tool: Dustin_GMAT_Core_Sentence_Cracker.md", 
+        "Tool: Dustin_GMAT_Close_Reading_Coach.md", 
+        "Tool: Dustin_GMAT_Chunk_Reading_Coach.md",
+        "AI Prompt: Verbal-related/03_quick_rc_tricks.md", 
+        "AI Prompt: DI-related/03_msr_info_flow.md", 
+        "AI Prompt: DI-related/04_custom_SOP.md"
+    ],
+    'DI_EFFICIENCY_BOTTLENECK_CONCEPT': [
+        "AI Prompt: Quant-related/02_quick_math_tricks.md", 
+        "AI Prompt: Quant-related/04_problem_pattern.md"
+    ],
+    'DI_EFFICIENCY_BOTTLENECK_CALCULATION': [
+        "AI Prompt: Quant-related/02_quick_math_tricks.md"
+    ],
+    'DI_EFFICIENCY_BOTTLENECK_LOGIC': [
+        "AI Prompt: Verbal-related/02_quick_cr_tpa_tricks.md", 
+        "AI Prompt: Verbal-related/05_evaluate_explanation.md"
+    ],
+    'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE': [
+        "Tool: GMAT_Terminator_DI_Review.md",
+        "AI Prompt: Quant-related/02_quick_math_tricks.md", 
+        "AI Prompt: DI-related/02_quick_g&t_tricks.md"
+    ],
+    'DI_EFFICIENCY_BOTTLENECK_INTEGRATION': [
+        "Tool: GMAT_Terminator_DI_Review.md",
+        "Tool: Dustin_GMAT_Chunk_Reading_Coach.md",
+        "AI Prompt: Verbal-related/03_quick_rc_tricks.md", 
+        "AI Prompt: Verbal-related/04_mindmap_passage.md", 
+        "AI Prompt: DI-related/03_msr_info_flow.md", 
+        "AI Prompt: DI-related/04_custom_SOP.md"
+    ],
+    'BEHAVIOR_CARELESSNESS_ISSUE': [
+        "AI Prompt: Quant-related/01_basic_explanation.md",
+        "AI Prompt: Verbal-related/05_evaluate_explanation.md"
+    ],
+    'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': [
+        "AI Prompt: Quant-related/02_quick_math_tricks.md",
+        "AI Prompt: Verbal-related/05_evaluate_explanation.md"
+    ],
+    'DI_CARELESSNESS_DETAIL_OMISSION': [
+        "AI Prompt: Quant-related/01_basic_explanation.md",
+        "AI Prompt: Verbal-related/05_evaluate_explanation.md"
+    ]
+}
