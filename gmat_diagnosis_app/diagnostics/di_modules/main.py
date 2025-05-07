@@ -53,6 +53,19 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             return {}, report_str, df_to_return
 
         df_di = df_di_processed.copy()
+        
+        # 添加調試日誌：記錄原始數據
+        total_questions = len(df_di)
+        logging.info(f"[DI數據追蹤] 原始數據總題數: {total_questions}")
+        if 'is_correct' in df_di.columns:
+            correct_count = df_di['is_correct'].sum()
+            wrong_count = total_questions - correct_count
+            logging.info(f"[DI數據追蹤] 原始數據答對題數: {correct_count}, 答錯題數: {wrong_count}")
+        if 'is_invalid' in df_di.columns:
+            invalid_count = df_di['is_invalid'].sum()
+            valid_count = total_questions - invalid_count
+            logging.info(f"[DI數據追蹤] 原始數據有效題數: {valid_count}, 無效題數: {invalid_count}")
+            
         logging.debug(f"[run_di_diagnosis_logic] Starting diagnosis. Input df shape: {df_di.shape}")
 
         # --- Chapter 0: Derivative Data Calculation & Basic Prep ---
@@ -68,6 +81,9 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             df_di['msr_group_id'] = np.nan # Ensure column exists even if empty
         if 'is_invalid' not in df_di.columns:
             df_di['is_invalid'] = False
+            
+        # 添加調試日誌：數據類型轉換後的狀態
+        logging.info(f"[DI數據追蹤] 數據類型轉換後 - 總題數: {len(df_di)}, 答對題數: {df_di['is_correct'].sum()}, 答錯題數: {(~df_di['is_correct']).sum()}, 無效題數: {df_di['is_invalid'].sum()}")
 
         # df_di = _calculate_msr_metrics(df_di) # Removed call, MSR metrics are now expected from preprocessor
         # logging.debug(f"[run_di_diagnosis_logic] After _calculate_msr_metrics, df shape: {df_di.shape}") # Updated name
@@ -196,6 +212,14 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
 
         # Create filtered dataset
         df_di_filtered = df_di[~df_di['is_invalid']].copy()
+        
+        # 添加調試日誌：篩選有效數據後的狀態
+        valid_total = len(df_di_filtered)
+        valid_correct = df_di_filtered['is_correct'].sum()
+        valid_wrong = valid_total - valid_correct
+        logging.info(f"[DI數據追蹤] 篩選有效數據後 - 有效題數: {valid_total}, 答對題數: {valid_correct}, 答錯題數: {valid_wrong}")
+        logging.info(f"[DI數據追蹤] 這些數據將用於生成報告")
+        
         logging.debug(f"[run_di_diagnosis_logic] Created df_di_filtered. Shape: {df_di_filtered.shape}")
 
         # --- Chapter 2: Multidimensional Performance Analysis ---
@@ -300,7 +324,17 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         logging.debug("[run_di_diagnosis_logic] Chapter 7: Summary Report")
         di_diagnosis_results['chapter_3']['diagnosed_dataframe'] = diagnosed_df_ch4_ch5.copy()
         report_str = _generate_di_summary_report(di_diagnosis_results)
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 7 (Report Generation).")
+        logging.debug("[run_di_diagnosis_logic] Completed Chapter 7.")
+        
+        # 添加調試日誌：最終返回的數據統計
+        if df_to_return.empty:
+            df_to_return = df_di.copy()
+        final_total = len(df_to_return)
+        final_valid = len(df_to_return[~df_to_return['is_invalid']])
+        final_correct = df_to_return[df_to_return['is_correct']].shape[0]
+        final_valid_correct = df_to_return[(df_to_return['is_correct']) & (~df_to_return['is_invalid'])].shape[0]
+        final_valid_wrong = final_valid - final_valid_correct
+        logging.info(f"[DI數據追蹤] 最終返回數據 - 總題數: {final_total}, 有效題數: {final_valid}, 有效題中答對: {final_valid_correct}, 有效題中答錯: {final_valid_wrong}")
 
         # --- Final DataFrame Preparation ---
         logging.debug("[run_di_diagnosis_logic] Final DataFrame Preparation")

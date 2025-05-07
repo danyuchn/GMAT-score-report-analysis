@@ -198,30 +198,60 @@ def _get_dataframe_context(session_state, max_rows=50):
     """Converts the processed dataframe to a string format (markdown) for context."""
     if session_state.processed_df is not None and not session_state.processed_df.empty:
         df_context = session_state.processed_df.copy()
-        # Optionally select/rename columns for clarity in context
-        # For now, let's convert a sample to markdown
+        logging.info(f"準備轉換診斷試算表，原始列數: {len(df_context)}, 列名: {', '.join(df_context.columns)}")
+        
         try:
+            # 選擇關鍵列以提高可讀性，排除不必要的列
+            important_cols = [
+                'qnum', 'subject', 'content_classification', 'difficulty_classification', 
+                'time_classification', 'is_invalid', 'is_correct', 'time_spent',
+                'difficulty_code'
+            ]
+            
+            # 只保留存在於 DataFrame 中的列
+            cols_to_use = [col for col in important_cols if col in df_context.columns]
+            
+            # 添加其他可能有用的列（但優先使用上面定義的關鍵列）
+            for col in df_context.columns:
+                if col not in cols_to_use and col not in ['diagnostic_params_list', 'raw_content']:
+                    cols_to_use.append(col)
+            
+            logging.info(f"選擇的列: {', '.join(cols_to_use)}")
+            
+            # 如果有列可用，則使用這些列；否則使用所有列
+            if cols_to_use:
+                df_context = df_context[cols_to_use]
+            
             # Convert boolean columns to Yes/No for better readability for the LLM
             bool_cols = df_context.select_dtypes(include=bool).columns
             for col in bool_cols:
                 df_context[col] = df_context[col].map({True: 'Yes', False: 'No'})
+                logging.info(f"已將布爾列 '{col}' 轉換為 Yes/No 格式")
 
             # Convert list column to string
             if 'diagnostic_params_list' in df_context.columns:
                 df_context['diagnostic_params_list'] = df_context['diagnostic_params_list'].apply(
                     lambda x: ', '.join(map(str, x)) if isinstance(x, list) else str(x)
                 )
+                logging.info("已將 'diagnostic_params_list' 列轉換為字符串格式")
 
             # Limit rows to avoid excessive context length
             if len(df_context) > max_rows:
+                logging.info(f"數據行數超過限制 ({len(df_context)} > {max_rows})，只取前 {max_rows} 行")
                 df_context_str = df_context.head(max_rows).to_markdown(index=False)
-                df_context_str += f"\n... (只顯示前 {max_rows} 行)"
+                df_context_str += f"\n... (只顯示前 {max_rows} 行，共 {len(df_context)} 行)"
             else:
+                logging.info(f"轉換全部 {len(df_context)} 行數據為 markdown 格式")
                 df_context_str = df_context.to_markdown(index=False)
+            
+            logging.info(f"成功轉換診斷試算表，輸出長度約 {len(df_context_str)} 字符")
             return df_context_str
         except Exception as e:
-            logging.error(f"Error converting dataframe to markdown context: {e}")
-            return "(無法轉換詳細數據表格)"
+            error_msg = f"Error converting dataframe to markdown context: {e}"
+            logging.error(error_msg, exc_info=True)
+            return f"(無法轉換詳細數據表格: {str(e)})"
+    
+    logging.warning("診斷試算表為空或不存在")
     return "(無詳細數據表格)"
 
 def get_openai_response(current_chat_history, report_context, dataframe_context, api_key):
@@ -240,26 +270,7 @@ def get_openai_response(current_chat_history, report_context, dataframe_context,
         raise ValueError("OpenAI API Key is missing.")
 
     client = openai.OpenAI(api_key=api_key)
-
-    chat_system_prompt = f"""You are a helpful GMAT diagnostic assistant.
-Your primary goal is to answer questions based SOLELY on the provided GMAT diagnostic report and detailed data table.
-Do NOT use any external knowledge or make assumptions beyond what is in the context.
-If the answer cannot be found in the provided report or data, state that clearly.
-
-**Provided Context:**
-
-```
-### Report
-{report_context}
-
-### Data Details
-{dataframe_context}
-```
-
-Answer questions about the GMAT diagnostic results in a direct, helpful, and accurate manner. 
-If answering in Chinese, use traditional Chinese characters (繁體中文).
-"""
-
+    
     # 準備用於構建對話的輸入文本
     input_text = ""
     
@@ -273,7 +284,43 @@ If answering in Chinese, use traditional Chinese characters (繁體中文).
     # 顯示最新訊息記錄
     latest_message = current_chat_history[-1]["content"] if current_chat_history else None
     logging.info(f"準備發送至 OpenAI 的最新訊息: {latest_message[:30]}...")
-    
+
+    # 檢查上下文內容的有效性
+    report_context_valid = bool(report_context and report_context.strip())
+    dataframe_context_valid = bool(dataframe_context and dataframe_context.strip())
+
+    logging.info(f"報告上下文有效: {report_context_valid}, 長度: {len(report_context) if report_context_valid else 0}")
+    logging.info(f"診斷試算表上下文有效: {dataframe_context_valid}, 長度: {len(dataframe_context) if dataframe_context_valid else 0}")
+
+    # 如果診斷試算表內容為空，添加警告
+    if not dataframe_context_valid:
+        logging.warning("診斷試算表內容為空，AI回應可能不完整")
+        dataframe_context = "(診斷試算表數據不可用)"
+
+    # 構建系統指令和對話歷史
+    chat_system_prompt = f"""You are a helpful GMAT diagnostic assistant.
+Your primary goal is to answer questions based SOLELY on the provided GMAT diagnostic report and detailed data table.
+Do NOT use any external knowledge or make assumptions beyond what is in the context.
+If the answer cannot be found in the provided report or data, state that clearly.
+
+**IMPORTANT**: You have access to both text reports and a diagnostic spreadsheet data table. Please analyze both to provide comprehensive answers.
+
+**Provided Context:**
+
+```markdown
+### Report
+{report_context}
+```
+
+```markdown
+### Diagnostic Data Table (診斷試算表)
+{dataframe_context}
+```
+
+Answer questions about the GMAT diagnostic results in a direct, helpful, and accurate manner. 
+If answering in Chinese, use traditional Chinese characters (繁體中文).
+"""
+
     # 構建系統指令和對話歷史
     input_text = f"System: {chat_system_prompt}\n\n"
     
@@ -288,20 +335,31 @@ If answering in Chinese, use traditional Chinese characters (繁體中文).
             input_text += f"Assistant: {content}\n\n"
 
     try:
-        logging.info(f"調用 OpenAI responses.create API，previous_response_id: {previous_response_id[:10]}... 如果有的話")
+        # 修復：檢查previous_response_id是否為None
+        log_info = "調用 OpenAI responses.create API"
+        if previous_response_id:
+            log_info += f"，previous_response_id: {previous_response_id[:10]}..."
+        logging.info(log_info)
         
         # 設定API呼叫參數
         api_params = {
-            "model": "gpt-4.1-turbo",  # 可以根據需要調整模型
+            "model": "o4-mini",  # 使用o4-mini模型
             "input": input_text,
-            "temperature": 0.7,
             "store": True,  # 存儲對話歷史
+            "max_output_tokens": 4000,  # 增加輸出標記的最大數量
         }
         
         # 如果存在前一個回應ID，加入previous_response_id參數
         if previous_response_id:
             api_params["previous_response_id"] = previous_response_id
             
+        # 記錄完整的input_text長度，用於調試
+        logging.info(f"發送至OpenAI的input_text總長度: {len(input_text)} 字符")
+        
+        # 記錄最後的用戶訊息與診斷試算表長度比較
+        if latest_message:
+            logging.info(f"用戶最新訊息長度: {len(latest_message)} 字符，診斷試算表長度: {len(dataframe_context) if dataframe_context_valid else 0} 字符")
+        
         # 調用responses API
         response = client.responses.create(**api_params)
         
@@ -323,7 +381,8 @@ If answering in Chinese, use traditional Chinese characters (繁體中文).
                 
             # 獲取response_id以便下次對話使用
             response_id = response.id
-            logging.info(f"成功獲取OpenAI回應，ID: {response_id[:10]}...")
+            # 修復：安全記錄ID
+            logging.info(f"成功獲取OpenAI回應，ID: {response_id[:10] if response_id else 'N/A'}...")
             
             return response_text.strip(), response_id
             
