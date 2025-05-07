@@ -37,6 +37,11 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     # This line renders the markdown report with wrapping
     tab_container.markdown(report_md if report_md else f"未找到 {subject} 科的診斷報告。", unsafe_allow_html=True) # Added unsafe_allow_html=True just in case AI uses basic HTML
 
+    # 顯示theta折線圖（如果存在）
+    if 'theta_plots' in st.session_state and subject in st.session_state.theta_plots:
+        tab_container.subheader(f"{subject} 科能力值 (Theta) 變化圖")
+        tab_container.plotly_chart(st.session_state.theta_plots[subject], use_container_width=True)
+    
     tab_container.subheader(f"{subject} 科詳細數據 (含診斷標籤)")
 
     if df_subject is None or df_subject.empty:
