@@ -6,9 +6,13 @@
 import streamlit as st
 import logging
 from gmat_diagnosis_app.services.openai_service import get_chat_context, get_openai_response
+from gmat_diagnosis_app.session_manager import ensure_chat_history_persistence
 
 def display_chat_interface(session_state):
     """顯示聊天界面，處理訊息交換"""
+    # 確保聊天歷史持久化
+    ensure_chat_history_persistence()
+    
     # Check conditions to show chat
     show_chat = check_chat_conditions(session_state)
     session_state.show_chat = show_chat
@@ -19,9 +23,12 @@ def display_chat_interface(session_state):
         # 確保聊天歷史存在
         if 'chat_history' not in session_state:
             session_state.chat_history = []
+            st.info("已初始化新的聊天歷史")
+        else:
+            st.info(f"當前聊天歷史包含 {len(session_state.chat_history)} 條消息")
         
-        # Debug: 顯示現有聊天歷史中的response_id (僅在調試時打開)
-        # _debug_show_response_ids(session_state)
+        # Debug: 顯示現有聊天歷史中的response_id (用於調試)
+        _debug_show_chat_history(session_state)
         
         # 添加自定義CSS，創建固定高度的聊天容器
         st.markdown("""
@@ -90,14 +97,21 @@ def display_chat_interface(session_state):
         # 聊天輸入在固定容器下方
         handle_chat_input(session_state)
         
-def _debug_show_response_ids(session_state):
-    """顯示聊天歷史中的response_id（僅用於調試）"""
-    if session_state.chat_history:
-        debug_info = "聊天歷史中的response_ids:\n"
-        for i, msg in enumerate(session_state.chat_history):
-            if msg['role'] == 'assistant' and 'response_id' in msg:
-                debug_info += f"{i}: {msg['response_id'][:10]}...\n"
-        st.text(debug_info)
+def _debug_show_chat_history(session_state):
+    """顯示完整的聊天歷史信息（僅用於調試）"""
+    with st.expander("顯示聊天歷史調試信息"):
+        if session_state.chat_history:
+            debug_info = "聊天歷史:\n"
+            for i, msg in enumerate(session_state.chat_history):
+                role = msg.get('role', 'unknown')
+                content_preview = msg.get('content', '')[:30] + '...' if len(msg.get('content', '')) > 30 else msg.get('content', '')
+                response_id = msg.get('response_id', 'N/A')
+                if response_id != 'N/A' and len(response_id) > 10:
+                    response_id = response_id[:10] + '...'
+                debug_info += f"{i}: [{role}] {content_preview} (response_id: {response_id})\n"
+            st.text(debug_info)
+        else:
+            st.text("目前沒有聊天歷史記錄")
         
 def check_chat_conditions(session_state):
     """檢查是否滿足顯示聊天的條件"""
@@ -120,14 +134,28 @@ def display_chat_history(session_state):
 def handle_chat_input(session_state):
     """處理用戶輸入和AI回應"""
     if prompt := st.chat_input("針對報告和數據提問..."):
+        # 添加用戶消息到歷史前先備份
+        current_history = session_state.chat_history.copy()
+        
         # 添加用戶消息到歷史
         session_state.chat_history.append({"role": "user", "content": prompt})
+        
+        # 更新備份
+        if hasattr(st.session_state, 'chat_history_backup'):
+            st.session_state.chat_history_backup = session_state.chat_history.copy()
+        
+        # 調試輸出
+        st.info(f"添加用戶消息前歷史長度: {len(current_history)}")
+        st.info(f"添加用戶消息後歷史長度: {len(session_state.chat_history)}")
         
         # 準備上下文並呼叫OpenAI
         with st.spinner("AI思考中..."):
             try:
                 # 獲取上下文
                 context = get_chat_context(session_state)
+                
+                # 顯示調試信息
+                st.info(f"發送至API的聊天歷史長度: {len(session_state.chat_history)}")
                 
                 # 呼叫OpenAI - 確保傳遞完整聊天歷史以獲取previous_response_id
                 logging.info(f"準備調用OpenAI，聊天歷史長度: {len(session_state.chat_history)}")
@@ -140,6 +168,7 @@ def handle_chat_input(session_state):
                 
                 # 明確記錄response_id的獲取
                 logging.info(f"已獲得OpenAI回應，response_id: {response_id[:10]}... (長度:{len(response_id) if response_id else 0})")
+                st.success(f"AI回應已生成，ID: {response_id[:8]}...")
 
                 # 添加AI回應到歷史，確保包含response_id
                 session_state.chat_history.append({
@@ -147,6 +176,16 @@ def handle_chat_input(session_state):
                     "content": ai_response_text,
                     "response_id": response_id  # 儲存ID用於下一次對話
                 })
+                
+                # 再次更新備份
+                if hasattr(st.session_state, 'chat_history_backup'):
+                    st.session_state.chat_history_backup = session_state.chat_history.copy()
+                
+                # 顯示更新後的聊天歷史長度
+                st.info(f"更新後的聊天歷史長度: {len(session_state.chat_history)}")
+                
+                # 確保聊天歷史在會話狀態中直接更新
+                st.session_state.chat_history = session_state.chat_history
                 
                 # 使用JavaScript重新加載頁面以更新聊天並滾動到底部
                 st.rerun()
@@ -156,5 +195,16 @@ def handle_chat_input(session_state):
                 logging.error(f"OpenAI調用錯誤: {e}", exc_info=True)
                 # 添加錯誤訊息到歷史，沒有response_id
                 session_state.chat_history.append({"role": "assistant", "content": error_message})
+                
+                # 確保聊天歷史在會話狀態中直接更新
+                st.session_state.chat_history = session_state.chat_history
+                
+                # 更新備份
+                if hasattr(st.session_state, 'chat_history_backup'):
+                    st.session_state.chat_history_backup = session_state.chat_history.copy()
+                
                 st.error(error_message)
-                st.rerun() 
+                st.rerun()
+                
+    # 確保每次執行時都檢查並保存聊天歷史
+    ensure_chat_history_persistence() 

@@ -225,7 +225,7 @@ def _get_dataframe_context(session_state, max_rows=50):
     return "(無詳細數據表格)"
 
 def get_openai_response(current_chat_history, report_context, dataframe_context, api_key):
-    """Gets response from OpenAI using the responses endpoint and handles conversation history.
+    """Gets response from OpenAI using the responses API and handles conversation history.
 
     Args:
         current_chat_history (list): The current chat history list.
@@ -241,97 +241,127 @@ def get_openai_response(current_chat_history, report_context, dataframe_context,
 
     client = openai.OpenAI(api_key=api_key)
 
-    # Find the last user prompt
-    last_user_prompt = ""
-    if current_chat_history and current_chat_history[-1]["role"] == "user":
-        last_user_prompt = current_chat_history[-1]["content"]
-    else:
-        raise ValueError("Could not find the last user prompt in history.")
+    chat_system_prompt = f"""You are a helpful GMAT diagnostic assistant.
+Your primary goal is to answer questions based SOLELY on the provided GMAT diagnostic report and detailed data table.
+Do NOT use any external knowledge or make assumptions beyond what is in the context.
+If the answer cannot be found in the provided report or data, state that clearly.
 
-    # Find the previous response ID from the last assistant message
+**Provided Context:**
+
+```
+### Report
+{report_context}
+
+### Data Details
+{dataframe_context}
+```
+
+Answer questions about the GMAT diagnostic results in a direct, helpful, and accurate manner. 
+If answering in Chinese, use traditional Chinese characters (繁體中文).
+"""
+
+    # 準備用於構建對話的輸入文本
+    input_text = ""
+    
+    # 找出最後一條 assistant 消息的 response_id（如果存在）
     previous_response_id = None
-    if len(current_chat_history) > 1:
-        for i in range(len(current_chat_history) - 2, -1, -1):
-            if current_chat_history[i]["role"] == "assistant":
-                previous_response_id = current_chat_history[i].get("response_id")
-                if previous_response_id:
-                    logging.info(f"找到前一個回應ID: {previous_response_id[:10]}... (用於保持對話上下文)")
-                    break
-                else:
-                    logging.warning("前一個助手訊息缺少response_id，無法保持對話上下文")
-        
-    if not previous_response_id:
-        logging.info("聊天歷史中找不到有效的前一個response_id，將啟動新對話")
-
-    # Construct the input for the API using standard multi-line string and .format()
-    input_template = '''You are a GMAT diagnostic assistant. Analyze the provided report summary and detailed data table (excerpt) to answer the user's question accurately and concisely. If the information is not present in the provided context, say so.
-
-REPORT SUMMARY:
-{report}
-
-DETAILED DATA EXCERPT:
-{data}
-
-USER QUESTION:
-{prompt}
-'''
-    api_input = input_template.format(
-        report=report_context,
-        data=dataframe_context,
-        prompt=last_user_prompt
-    )
+    for message in reversed(current_chat_history):
+        if message["role"] == "assistant" and "response_id" in message:
+            previous_response_id = message["response_id"]
+            break
+    
+    # 顯示最新訊息記錄
+    latest_message = current_chat_history[-1]["content"] if current_chat_history else None
+    logging.info(f"準備發送至 OpenAI 的最新訊息: {latest_message[:30]}...")
+    
+    # 構建系統指令和對話歷史
+    input_text = f"System: {chat_system_prompt}\n\n"
+    
+    # 添加對話歷史（最多取最近10條，避免過長）
+    history_start_idx = max(0, len(current_chat_history) - 11)  # 保留最多10輪對話
+    for i, msg in enumerate(current_chat_history[history_start_idx:], start=history_start_idx):
+        role = msg["role"]
+        content = msg["content"]
+        if role == "user":
+            input_text += f"User: {content}\n\n"
+        elif role == "assistant":
+            input_text += f"Assistant: {content}\n\n"
 
     try:
-        logging.info(f"Calling OpenAI responses.create with model o4-mini. Previous ID: {previous_response_id}")
+        logging.info(f"調用 OpenAI responses.create API，previous_response_id: {previous_response_id[:10]}... 如果有的話")
         
-        # 準備API調用參數
+        # 設定API呼叫參數
         api_params = {
-            "model": "o4-mini",  # 使用o4-mini模型
-            "input": api_input,
+            "model": "gpt-4.1-turbo",  # 可以根據需要調整模型
+            "input": input_text,
+            "temperature": 0.7,
+            "store": True,  # 存儲對話歷史
         }
         
-        # 只有在有效的previous_response_id存在時才添加此參數
+        # 如果存在前一個回應ID，加入previous_response_id參數
         if previous_response_id:
             api_params["previous_response_id"] = previous_response_id
-        
-        # 實際調用API
+            
+        # 調用responses API
         response = client.responses.create(**api_params)
         
-        logging.info(f"OpenAI response received. Status: {response.status}")
-
-        if response.status == 'completed' and response.output:
-            # Extract text from the first output message content
+        # 記錄回應狀態
+        logging.info(f"OpenAI API 回應狀態: {response.status}")
+        
+        if response.status == "completed" and response.output:
+            # 提取回應文本
             response_text = ""
-            # Iterate through the output list to find the message block
-            message_block = None
-            for item in response.output:
-                if hasattr(item, 'type') and item.type == 'message':
-                    message_block = item
-                    break # Found the message block
+            for output_item in response.output:
+                if hasattr(output_item, 'type') and output_item.type == 'message':
+                    for content_item in output_item.content:
+                        if hasattr(content_item, 'type') and content_item.type == 'output_text':
+                            response_text += content_item.text
 
-            if message_block and hasattr(message_block, 'content') and message_block.content:
-                for content_block in message_block.content:
-                    # Ensure the content_block itself has a type attribute before checking
-                    if hasattr(content_block, 'type') and content_block.type == 'output_text':
-                        response_text += content_block.text
-
-            if not response_text:
-                 # --- Log the output structure before raising error ---
-                 logging.error(f"OpenAI response completed but no text found after iterating. Response output structure: {response.output}")
-                 # --- End Log ---
-                 raise ValueError("OpenAI response completed but contained no text output after iterating.")
-
-            return response_text.strip(), response.id
-        elif response.status == 'error':
-             error_details = response.error if response.error else "Unknown error"
-             raise Exception(f"OpenAI API error: {error_details}")
+            if not response_text.strip():
+                logging.error("OpenAI返回空回應")
+                raise ValueError("AI未提供有效的回應")
+                
+            # 獲取response_id以便下次對話使用
+            response_id = response.id
+            logging.info(f"成功獲取OpenAI回應，ID: {response_id[:10]}...")
+            
+            return response_text.strip(), response_id
+            
+        elif response.status == "error":
+            error_detail = response.error.get("message", "未知錯誤") if response.error else "未知錯誤"
+            logging.error(f"OpenAI API錯誤: {error_detail}")
+            raise ValueError(f"AI回應錯誤: {error_detail}")
+            
         else:
-             # --- Log the output structure before raising error ---
-             logging.error(f"OpenAI response status not completed or output empty. Status: {response.status}. Response output structure: {response.output}")
-             # --- End Log ---
-             raise Exception(f"OpenAI response status was not 'completed' or output was empty. Status: {response.status}")
-
+            logging.error(f"無法處理的OpenAI回應狀態: {response.status}")
+            raise ValueError("獲取AI回應時發生未知錯誤")
+            
+    except openai.AuthenticationError:
+        error_msg = "OpenAI API密鑰無效"
+        logging.error(error_msg)
+        raise ValueError(error_msg)
+        
+    except openai.RateLimitError:
+        error_msg = "OpenAI API請求頻率過高，請稍後再試"
+        logging.error(error_msg)
+        raise ValueError(error_msg)
+        
+    except openai.APIConnectionError as e:
+        error_msg = f"連接OpenAI API時出錯: {e}"
+        logging.error(error_msg)
+        raise ValueError(error_msg)
+        
+    except openai.APITimeoutError:
+        error_msg = "OpenAI API請求超時"
+        logging.error(error_msg)
+        raise ValueError(error_msg)
+        
+    except openai.BadRequestError as e:
+        error_msg = f"OpenAI API請求無效: {e}"
+        logging.error(error_msg)
+        raise ValueError(error_msg)
+        
     except Exception as e:
-        logging.error(f"Error calling OpenAI responses API: {e}", exc_info=True)
-        # Re-raise the exception to be caught by the sidebar UI
-        raise e 
+        error_msg = f"與OpenAI API通訊時發生未知錯誤: {e}"
+        logging.error(error_msg, exc_info=True)
+        raise ValueError(error_msg) 

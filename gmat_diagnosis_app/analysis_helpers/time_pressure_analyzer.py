@@ -214,4 +214,9 @@ def calculate_and_apply_invalid_logic(df_input, time_pressure_map_param, subject
                 if is_abnormally_fast and not df_output.loc[original_idx, 'is_invalid']:
                     df_output.loc[original_idx, 'is_invalid'] = True
 
+    # After all automatic invalid logic, merge manual invalid flags
+    if 'is_manually_invalid' in df_output.columns:
+        df_output['is_manually_invalid'] = df_output['is_manually_invalid'].fillna(False).astype(bool)
+        df_output['is_invalid'] = df_output['is_invalid'] | df_output['is_manually_invalid']
+
     return df_output, calculated_avg_times, calculated_ft_avg_times 

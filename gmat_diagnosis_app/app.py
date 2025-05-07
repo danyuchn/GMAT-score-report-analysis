@@ -45,7 +45,7 @@ try:
     # from gmat_diagnosis_app.utils.validation import validate_dataframe
     # from gmat_diagnosis_app.utils.data_processing import process_subject_tab
     # from gmat_diagnosis_app.utils.styling import apply_styles
-    # from gmat_diagnosis_app.utils.excel_utils import to_excel
+    from gmat_diagnosis_app.utils.excel_utils import to_excel
     from gmat_diagnosis_app.services.openai_service import (
         summarize_report_with_openai, generate_ai_consolidated_report,
         get_chat_context, get_openai_response
@@ -54,7 +54,7 @@ try:
     from gmat_diagnosis_app.ui.results_display import display_results, display_subject_results
     from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
     from gmat_diagnosis_app.ui.input_tabs import setup_input_tabs, combine_input_data, display_analysis_button
-    from gmat_diagnosis_app.session_manager import init_session_state, reset_session_for_new_upload # Added import
+    from gmat_diagnosis_app.session_manager import init_session_state, reset_session_for_new_upload, ensure_chat_history_persistence
     from gmat_diagnosis_app.analysis_orchestrator import run_analysis # Added import
     
     # Import the new analysis helpers
@@ -175,6 +175,9 @@ def main():
     
     # Initialize session state
     init_session_state()
+    
+    # 額外確保聊天歷史持久化
+    ensure_chat_history_persistence()
 
     # Initialize the success message flag for sample data pasting if it doesn't exist
     if 'sample_data_pasted_success' not in st.session_state:
@@ -411,11 +414,6 @@ def main():
     with main_tabs[1]:  # 結果查看標籤頁
         if st.session_state.get("diagnosis_complete", False):
             display_results()
-            
-            # Add chat interface here, within the "Results" tab and after displaying results
-            if st.session_state.openai_api_key:
-                st.divider()
-                display_chat_interface(st.session_state)
         else:
             # 顯示尚未分析的提示
             st.info("尚未執行分析。請先在「數據輸入與分析」標籤中上傳數據並執行分析。")
