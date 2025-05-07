@@ -132,6 +132,10 @@ def to_excel(df, column_map):
             value_counts = df_copy['is_invalid'].astype(str).value_counts().to_dict()
             logging.info(f"V科is_invalid列轉換為文本後值分布: {value_counts}")
     
+    # 處理難度欄位，保留2位小數
+    if 'question_difficulty' in df_copy.columns:
+        df_copy['question_difficulty'] = df_copy['question_difficulty'].apply(lambda x: round(float(x), 2) if pd.notnull(x) else x)
+    
     # 檢查是否有本地列名映射
     if not local_column_map:
         df_excel = df_copy
@@ -172,13 +176,15 @@ def to_excel(df, column_map):
     incorrect_text_format = workbook.add_format({'color': ERROR_FONT_COLOR})  # 紅色文字，用於錯誤答案
     overtime_format = workbook.add_format({'color': OVERTIME_FONT_COLOR, 'bold': True})  # Blue text
     invalid_format = workbook.add_format({'color': INVALID_FONT_COLOR})  # Dark gray text
+    difficulty_format = workbook.add_format({'num_format': '0.00'})  # 難度格式：兩位小數
     
     try:
         # Find columns by *display* names (values in column_map)
         correct_col_disp = next(v for k, v in local_column_map.items() if k == 'is_correct')
         time_col_disp = next(v for k, v in local_column_map.items() if k == 'question_time')
-        overtime_col_disp = next(v for k, v in local_column_map.items() if k == 'overtime') # Name of the overtime flag column
+        overtime_col_disp = next((v for k, v in local_column_map.items() if k == 'overtime'), None)  # Name of the overtime flag column
         invalid_col_disp = None
+        difficulty_col_disp = next((v for k, v in local_column_map.items() if k == 'question_difficulty'), None)
         
         # 嘗試獲取無效項列名
         try:
@@ -197,6 +203,8 @@ def to_excel(df, column_map):
         correct_col_idx = header_list.index(correct_col_disp)
         time_col_idx = header_list.index(time_col_disp)
         invalid_col_idx = header_list.index(invalid_col_disp) if invalid_col_disp in header_list else None
+        overtime_col_idx = header_list.index(overtime_col_disp) if overtime_col_disp in header_list else None
+        difficulty_col_idx = header_list.index(difficulty_col_disp) if difficulty_col_disp in header_list else None
         
         # 為V科添加特殊調試 - 顯示無效列索引
         if subject == 'V' and invalid_col_idx is not None:
@@ -214,6 +222,7 @@ def to_excel(df, column_map):
         correct_col_letter = get_column_letter(correct_col_idx)
         time_col_letter = get_column_letter(time_col_idx)
         invalid_col_letter = get_column_letter(invalid_col_idx) if invalid_col_idx is not None else None
+        overtime_col_letter = get_column_letter(overtime_col_idx) if overtime_col_idx is not None else None
         
         # 為V科添加特殊調試 - 列出所有數據的is_invalid值
         if subject == 'V' and invalid_col_idx is not None:
@@ -251,6 +260,33 @@ def to_excel(df, column_map):
                                           {'type': 'formula',
                                            'criteria': f'={correct_col_letter}2="False"',
                                            'format': incorrect_text_format})
+        
+        # 新增：為超時項添加藍色文字格式（在時間列）
+        if overtime_col_letter and time_col_idx is not None:
+            for row in range(1, len(df_excel) + 1):
+                worksheet.conditional_format(
+                    f"{time_col_letter}{row+1}",
+                    {'type': 'formula',
+                     'criteria': f'=OR({overtime_col_letter}{row+1}=TRUE, {overtime_col_letter}{row+1}="TRUE", {overtime_col_letter}{row+1}="True", {overtime_col_letter}{row+1}="true")',
+                     'format': overtime_format})
+        
+        # 如果沒有overtime列但有_overtime_for_time，使用隱藏欄位
+        elif 'overtime' in df_copy.columns and '_overtime_for_time' in df_excel.columns:
+            # 找到隱藏的overtime標記
+            overtime_hidden_idx = header_list.index('_overtime_for_time')
+            overtime_hidden_letter = get_column_letter(overtime_hidden_idx)
+            
+            for row in range(1, len(df_excel) + 1):
+                worksheet.conditional_format(
+                    f"{time_col_letter}{row+1}",
+                    {'type': 'formula',
+                     'criteria': f'=OR({overtime_hidden_letter}{row+1}=TRUE, {overtime_hidden_letter}{row+1}="TRUE", {overtime_hidden_letter}{row+1}="True", {overtime_hidden_letter}{row+1}="true")',
+                     'format': overtime_format})
+        
+        # 設置難度列的數字格式（兩位小數）
+        if difficulty_col_idx is not None:
+            # 為整個難度列應用數字格式
+            worksheet.set_column(difficulty_col_idx, difficulty_col_idx, None, difficulty_format)
         
         # 添加完整的無效項條件格式
         if invalid_col_letter:
