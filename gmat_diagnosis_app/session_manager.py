@@ -17,6 +17,14 @@ def init_session_state():
         'validation_errors': {}, # Store validation errors per subject
         'data_source_types': {}, # Store how data was loaded ('File Upload' or 'Pasted Data')
         'theta_plots': {}, # Store plots for display
+        # --- Total Score State ---
+        'total_score': 505, # 默認總分505
+        'q_score': 75, # 默認Q科級分75
+        'v_score': 75, # 默認V科級分75
+        'di_score': 75, # 默認DI科級分75
+        'score_df': None, # 存儲分數DataFrame
+        'total_data': None, # 存儲Total頁籤的數據
+        'total_plot': None, # 存儲Total頁籤的圖表
         # --- AI Chat State ---
         'openai_api_key': None,
         'show_chat': False,
@@ -50,4 +58,11 @@ def reset_session_for_new_upload():
     st.session_state.analysis_error = False
     st.session_state.theta_plots = {}
     st.session_state.show_chat = False
-    st.session_state.chat_history = [] 
+    st.session_state.chat_history = []
+    # 不重置分數相關設定
+    # st.session_state.total_score
+    # st.session_state.q_score
+    # st.session_state.v_score
+    # st.session_state.di_score
+    # 但重置圖表
+    st.session_state.total_plot = None 

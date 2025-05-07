@@ -71,6 +71,90 @@ except ImportError as e:
 # --- Display Results Function ---
 # display_results moved to ui.results_display.py
 
+# Callback function for loading sample data
+def load_sample_data_callback():
+    """Sets session state for sample data to be pasted into text areas."""
+    sample_q_data = """Question	Response Time (Minutes)	Performance	Content Domain	Question Type	Fundamental Skills
+1	2.3	Correct	Algebra	REAL	Equal/Unequal/ALG
+2	4.8	Correct	Algebra	REAL	Rates/Ratio/Percent
+3	1.3	Correct	Arithmetic	REAL	Equal/Unequal/ALG
+4	2.2	Incorrect	Arithmetic	REAL	Value/Order/Factors
+5	0.8	Correct	Arithmetic	REAL	Rates/Ratio/Percent
+6	3.5	Correct	Algebra	REAL	Rates/Ratio/Percent
+7	1.5	Correct	Algebra	REAL	Equal/Unequal/ALG
+8	1.5	Correct	Arithmetic	REAL	Rates/Ratio/Percent
+9	1.3	Correct	Arithmetic	REAL	Counting/Sets/Series/Prob/Stats
+10	5.4	Correct	Arithmetic	REAL	Counting/Sets/Series/Prob/Stats
+11	2.6	Incorrect	Algebra	PURE	Equal/Unequal/ALG
+12	4.3	Correct	Arithmetic	PURE	Rates/Ratio/Percent
+13	1.6	Incorrect	Arithmetic	PURE	Counting/Sets/Series/Prob/Stats
+14	0.9	Correct	Arithmetic	REAL	Counting/Sets/Series/Prob/Stats
+15	0.7	Correct	Algebra	PURE	Value/Order/Factors
+16	4.6	Correct	Algebra	PURE	Value/Order/Factors
+17	2.1	Correct	Algebra	PURE	Counting/Sets/Series/Prob/Stats
+18	0.7	Correct	Arithmetic	PURE	Equal/Unequal/ALG
+19	0.7	Correct	Arithmetic	PURE	Rates/Ratio/Percent
+20	0.8	Incorrect	Arithmetic	PURE	Value/Order/Factors
+21	0.9	Correct	Arithmetic	PURE	Value/Order/Factors"""
+
+    sample_v_data = """Question	Response Time (Minutes)	Performance	Content Domain	Question Type	Fundamental Skills
+1	1.5	Correct	N/A	Critical Reasoning	Plan/Construct
+2	3.6	Correct	N/A	Critical Reasoning	Plan/Construct
+3	3	Correct	N/A	Reading Comprehension	Identify Stated Idea
+4	1	Incorrect	N/A	Reading Comprehension	Identify Inferred Idea
+5	3.7	Incorrect	N/A	Reading Comprehension	Identify Inferred Idea
+6	1.7	Incorrect	N/A	Critical Reasoning	Analysis/Critique
+7	2.7	Correct	N/A	Reading Comprehension	Identify Inferred Idea
+8	1	Correct	N/A	Reading Comprehension	Identify Stated Idea
+9	1.6	Correct	N/A	Reading Comprehension	Identify Inferred Idea
+10	2.2	Correct	N/A	Critical Reasoning	Plan/Construct
+11	4.4	Correct	N/A	Reading Comprehension	Identify Inferred Idea
+12	0.6	Correct	N/A	Reading Comprehension	Identify Stated Idea
+13	2.3	Correct	N/A	Reading Comprehension	Identify Inferred Idea
+14	0.6	Correct	N/A	Reading Comprehension	Identify Stated Idea
+15	2.4	Incorrect	N/A	Critical Reasoning	Analysis/Critique
+16	2.3	Incorrect	N/A	Critical Reasoning	Analysis/Critique
+17	2.8	Incorrect	N/A	Critical Reasoning	Plan/Construct
+18	1.3	Correct	N/A	Critical Reasoning	Analysis/Critique
+19	0.7	Correct	N/A	Critical Reasoning	Analysis/Critique
+20	1.9	Incorrect	N/A	Critical Reasoning	Analysis/Critique
+21	1.4	Incorrect	N/A	Critical Reasoning	Analysis/Critique
+22	1	Correct	N/A	Critical Reasoning	Plan/Construct
+23	1.2	Incorrect	N/A	Critical Reasoning	Plan/Construct"""
+
+    sample_di_data = """Question	Response Time (Minutes)	Performance	Content Domain	Question Type	Fundamental Skills
+1	1.5	Correct	Math Related	Data Sufficiency	N/A
+2	1.8	Correct	Math Related	Data Sufficiency	N/A
+3	3.1	Correct	Non-Math Related	Two-part analysis	N/A
+4	4.2	Correct	Math Related	Multi-source reasoning	N/A
+5	1.9	Incorrect	Non-Math Related	Multi-source reasoning	N/A
+6	1	Incorrect	Math Related	Multi-source reasoning	N/A
+7	3.7	Incorrect	Non-Math Related	Data Sufficiency	N/A
+8	2.5	Incorrect	Non-Math Related	Graph and Table	N/A
+9	5.9	Correct	Non-Math Related	Two-part analysis	N/A
+10	2.7	Incorrect	Math Related	Graph and Table	N/A
+11	2.1	Incorrect	Math Related	Data Sufficiency	N/A
+12	1.7	Incorrect	Math Related	Data Sufficiency	N/A
+13	2.8	Correct	Non-Math Related	Graph and Table	N/A
+14	1.5	Incorrect	Math Related	Data Sufficiency	N/A
+15	2	Incorrect	Non-Math Related	Graph and Table	N/A
+16	1.2	Incorrect	Non-Math Related	Data Sufficiency	N/A
+17	0.4	Incorrect	Math Related	Two-part analysis	N/A
+18	3.5	Incorrect	Math Related	Graph and Table	N/A
+19	0.1	Incorrect	Math Related	Two-part analysis	N/A
+20	1.2	Incorrect	Math Related	Graph and Table	N/A"""
+
+    st.session_state.q_paster = sample_q_data
+    st.session_state.v_paster = sample_v_data
+    st.session_state.di_paster = sample_di_data
+    
+    if 'example_data_loaded' in st.session_state:
+        del st.session_state['example_data_loaded']
+    if 'example_data' in st.session_state:
+        del st.session_state['example_data']
+    
+    st.session_state.sample_data_pasted_success = True
+
 # --- Main Application ---
 def main():
     """Main application entry point"""
@@ -84,6 +168,10 @@ def main():
     
     # Initialize session state
     init_session_state()
+
+    # Initialize the success message flag for sample data pasting if it doesn't exist
+    if 'sample_data_pasted_success' not in st.session_state:
+        st.session_state.sample_data_pasted_success = False
     
     # 頁面標題與簡介區
     col1, col2 = st.columns([5, 1])
@@ -96,13 +184,13 @@ def main():
     
     with main_tabs[0]:  # 數據輸入與分析標籤頁
         # 簡短使用指引（核心步驟）
-        with st.expander("快速使用指南 👉", expanded=True):
+        with st.expander("快速使用指南 👉", expanded=False):
             st.markdown("""
             1. **準備數據**: 確保有Quantitative、Verbal和Data Insights三科目的數據
-            2. **輸入數據**: 在下方三個標籤中分別上傳或貼上數據
-            3. **檢查預覽**: 確認數據正確並標記無效題目
+            2. **輸入數據**: 在下方四個標籤中分別上傳或貼上數據，以及在Total頁籤中調整分數
+            3. **檢查預覽**: 確認數據正確並標記無效題目（時間壓力下倉促做題或猜題）
             4. **設定參數**: 在側邊欄調整分析參數（可選）
-            5. **開始分析**: 點擊綠色分析按鈕
+            5. **開始分析**: 點擊紅色分析按鈕
             """)
             
         # --- Disclaimer & Tutorial Links ---
@@ -236,6 +324,42 @@ def main():
         # --- Data Input Section ---
         input_dfs, validation_errors, data_source_types = setup_input_tabs(preprocess_helpers)
         
+        # 檢查是否需要顯示範例數據
+        if st.session_state.get('example_data_loaded', False) and st.session_state.get('example_data'):
+            # 注入範例數據到input_dfs
+            for subject in SUBJECTS:
+                if subject in st.session_state['example_data']:
+                    if input_dfs.get(subject) is None:  # 只有在尚未輸入數據時才注入
+                        example_df = st.session_state['example_data'][subject].copy()
+                        # 添加必要的列
+                        example_df['is_manually_invalid'] = False
+                        example_df['Subject'] = subject
+                        
+                        # 重設索引以避免潛在的索引問題
+                        example_df = example_df.reset_index(drop=True)
+                        
+                        # 將原始數據重命名為標準化列名
+                        rename_map = BASE_RENAME_MAP.copy()
+                        if 'Question' in example_df.columns:
+                            rename_map['Question'] = 'question_position'
+                        if 'Response Time (Minutes)' in example_df.columns:
+                            rename_map['Response Time (Minutes)'] = 'question_time'
+                        if 'Performance' in example_df.columns:
+                            rename_map['Performance'] = 'is_correct'
+                            # 轉換Performance列為is_correct
+                            example_df['is_correct'] = example_df['Performance'].apply(
+                                lambda x: x == 'Correct' if isinstance(x, str) else bool(x)
+                            )
+                        
+                        example_df.rename(columns=rename_map, inplace=True)
+                        
+                        input_dfs[subject] = example_df
+                        validation_errors[subject] = []
+                        data_source_types[subject] = "範例數據"
+            
+            # 清除標誌，避免重複加載
+            st.session_state['example_data_loaded'] = False
+        
         # Store in session state
         st.session_state.input_dfs = input_dfs
         st.session_state.validation_errors = validation_errors
@@ -291,6 +415,12 @@ def main():
     with main_tabs[1]:  # 結果查看標籤頁
         if st.session_state.get("diagnosis_complete", False):
             display_results()
+            
+            # Add chat interface here, within the "Results" tab and after displaying results
+            if st.session_state.openai_api_key:
+                st.divider()
+                st.subheader("與 AI 對話")
+                display_chat_interface(st.session_state)
         else:
             # 顯示尚未分析的提示
             st.info("尚未執行分析。請先在「數據輸入與分析」標籤中上傳數據並執行分析。")
@@ -306,8 +436,22 @@ def main():
     # --- Sidebar Settings ---
     st.sidebar.subheader("分析設定")
     
+    # 添加範例數據導入功能
+    with st.sidebar.expander("📊 範例數據", expanded=True):
+        st.markdown("### 範例數據導入")
+        st.markdown("點擊下方按鈕導入範例做題數據，方便體驗系統功能")
+        
+        st.button("一鍵導入範例數據", 
+                  key="load_sample_data_pasted", 
+                  use_container_width=True,
+                  on_click=load_sample_data_callback) # Use on_click callback
+
+        if st.session_state.get('sample_data_pasted_success', False):
+            st.success("範例數據已成功填入各科目的文本框！請檢查「數據輸入與分析」頁面。")
+            st.session_state.sample_data_pasted_success = False # Reset flag
+            
     # OpenAI設定區塊（移到上方更明顯的位置）
-    with st.sidebar.expander("🤖 AI功能設定", expanded=True):
+    with st.sidebar.expander("🤖 AI功能設定", expanded=False):
         api_key_input = st.text_input(
             "輸入您的 OpenAI API Key 啟用 AI 問答：",
             type="password",
@@ -396,11 +540,6 @@ def main():
                 placeholder="例: 2,7,12",
                 key="di_c_to_i_input"
             )
-    
-    # 在頁尾添加聊天界面
-    if st.session_state.diagnosis_complete and st.session_state.openai_api_key:
-        st.divider()
-        display_chat_interface(st.session_state)
     
     # 頁尾信息
     st.markdown("---")
