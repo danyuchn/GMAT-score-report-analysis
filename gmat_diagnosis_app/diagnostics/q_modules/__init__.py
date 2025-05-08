@@ -9,6 +9,7 @@ from gmat_diagnosis_app.diagnostics.q_modules.analysis import diagnose_q_root_ca
 from gmat_diagnosis_app.diagnostics.q_modules.behavioral import analyze_behavioral_patterns, analyze_skill_override
 from gmat_diagnosis_app.diagnostics.q_modules.recommendations import generate_q_recommendations
 from gmat_diagnosis_app.diagnostics.q_modules.reporting import generate_q_summary_report
+from gmat_diagnosis_app.diagnostics.q_modules.ai_prompts import generate_q_ai_tool_recommendations
 
 __all__ = [
     'diagnose_q_main',
@@ -17,5 +18,6 @@ __all__ = [
     'analyze_behavioral_patterns',
     'analyze_skill_override',
     'generate_q_recommendations',
-    'generate_q_summary_report'
+    'generate_q_summary_report',
+    'generate_q_ai_tool_recommendations'
 ] 

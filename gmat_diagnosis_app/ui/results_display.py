@@ -497,6 +497,17 @@ def display_results():
             if st.session_state.original_processed_df is None:
                 tabs[edit_tab_index].info("沒有可供編輯的診斷數據。請先成功執行一次分析。")
             else:
+                # 檢查是否需要重置
+                if "reset_editable_df_requested" in st.session_state and st.session_state.reset_editable_df_requested:
+                    # 執行重置邏輯
+                    st.session_state.editable_diagnostic_df = st.session_state.original_processed_df.copy(deep=True)
+                    st.session_state._editable_df_source = st.session_state.original_processed_df
+                    tabs[edit_tab_index].success("已重設為原始標籤。")
+                    if 'generated_ai_prompts_for_edit_tab' in st.session_state:
+                        del st.session_state['generated_ai_prompts_for_edit_tab']
+                    # 重置標記
+                    st.session_state.reset_editable_df_requested = False
+                
                 # Initialize edited_df in session_state if it doesn't exist or if we need to reset
                 if 'editable_diagnostic_df' not in st.session_state or st.session_state.original_processed_df is not st.session_state.get('_editable_df_source'):
                     st.session_state.editable_diagnostic_df = st.session_state.original_processed_df.copy()
@@ -561,7 +572,8 @@ def display_results():
                     column_config=final_editor_column_config,
                     use_container_width=True,
                     num_rows="fixed", 
-                    key="diagnosis_label_editor" 
+                    key="diagnosis_label_editor",
+                    on_change=None  # 明確設置on_change為None，避免自動回調
                 )
 
                 if edited_df_subset_from_editor is not None:
@@ -581,62 +593,58 @@ def display_results():
                                 updated_full_df[col_name] = edited_df_subset_from_editor[col_name]
                     
                     st.session_state.editable_diagnostic_df = updated_full_df
-                    st.session_state.ai_prompts_need_regeneration = True
+                    # 不要在這裡設置標記，而是在用戶點擊按鈕時才設置
+                    # st.session_state.ai_prompts_need_regeneration = True
 
                 col1, col2 = tabs[edit_tab_index].columns(2)
-                if col1.button("↺ 重設為原始標籤", key="reset_editable_df"):
-                    st.session_state.editable_diagnostic_df = st.session_state.original_processed_df.copy()
-                    st.session_state.ai_prompts_need_regeneration = False # No need to regenerate if reset
-                    if 'generated_ai_prompts_for_edit_tab' in st.session_state:
-                        del st.session_state['generated_ai_prompts_for_edit_tab'] # Clear previous prompts
-                    st.experimental_rerun()
+                if col1.button("↺ 重設為原始標籤", key="reset_button"):
+                    # 設置重置標記，下次渲染時執行重置邏輯
+                    st.session_state.reset_editable_df_requested = True
+                    st.session_state.ai_prompts_need_regeneration = False
+                    st.rerun()
 
                 if col2.button("✓ 套用變更並更新AI建議", key="apply_editable_df", type="primary"):
-                    # The editor already updated st.session_state.editable_diagnostic_df
-                    # So, we just need to flag for regeneration
+                    # 只有在用戶明確點擊套用按鈕時才設置標記和生成AI提示
                     st.session_state.ai_prompts_need_regeneration = True
                     tabs[edit_tab_index].success("變更已套用！AI建議將在下方更新。")
-                    # We will handle regeneration and display below
-                
-                # Display AI Prompts if regeneration is needed or already generated
-                if st.session_state.get('ai_prompts_need_regeneration', False) or 'generated_ai_prompts_for_edit_tab' in st.session_state:
+                    # 不需要重新載入頁面，所以不需要st.experimental_rerun()
+
+                # 顯示AI提示區塊
+                # 只有在需要重新生成時才生成，已有的提示直接顯示
+                if st.session_state.get('ai_prompts_need_regeneration', False):
                     with st.spinner("正在根據您的編輯生成AI建議..."):
-                        # --- TODO: Call new AI prompt generation functions here --- 
-                        # These functions will take st.session_state.editable_diagnostic_df as input
-                        # For now, using placeholders. These need to be implemented in respective diagnostic modules.
-                        
+                        # 調用新實現的AI提示生成功能
                         q_prompts = ""
                         v_prompts = ""
                         di_prompts = ""
 
                         df_to_generate_prompts = st.session_state.editable_diagnostic_df
 
-                        # Placeholder: Simulate calling the actual functions when they are ready
+                        # 調用實際的AI提示生成功能
                         # Q Prompts
-                        # from gmat_diagnosis_app.diagnostics.q_modules.ai_prompts import generate_q_ai_tool_recommendations 
-                        # q_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'Q']
-                        # if not q_df_subject.empty: q_prompts = generate_q_ai_tool_recommendations(q_df_subject)
+                        from gmat_diagnosis_app.diagnostics import generate_q_ai_tool_recommendations
+                        q_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'Q']
+                        if not q_df_subject.empty: 
+                            q_prompts = generate_q_ai_tool_recommendations(q_df_subject)
                         
-                        # V Prompts - similar structure
-                        # from gmat_diagnosis_app.diagnostics.v_modules.ai_prompts import generate_v_ai_tool_recommendations
-                        # v_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'V']
-                        # if not v_df_subject.empty: v_prompts = generate_v_ai_tool_recommendations(v_df_subject)
+                        # V Prompts
+                        from gmat_diagnosis_app.diagnostics import generate_v_ai_tool_recommendations
+                        v_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'V']
+                        if not v_df_subject.empty: 
+                            v_prompts = generate_v_ai_tool_recommendations(v_df_subject)
 
-                        # DI Prompts - similar structure
-                        # from gmat_diagnosis_app.diagnostics.di_modules.ai_prompts import generate_di_ai_tool_recommendations
-                        # di_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'DI']
-                        # if not di_df_subject.empty: di_prompts = generate_di_ai_tool_recommendations(di_df_subject)
-
-                        # For demonstration, using mock data
-                        q_prompts = "Q科AI建議 (基於編輯):\n- 工具A: ...\n- 提示B: ..."
-                        v_prompts = "V科AI建議 (基於編輯):\n- 工具C: ...\n- 提示D: ..."
-                        di_prompts = "DI科AI建議 (基於編輯):\n- 工具E: ...\n- 提示F: ..."
+                        # DI Prompts
+                        from gmat_diagnosis_app.diagnostics import generate_di_ai_tool_recommendations
+                        di_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'DI']
+                        if not di_df_subject.empty: 
+                            di_prompts = generate_di_ai_tool_recommendations(di_df_subject)
 
                         all_prompts = f"### AI 工具與提示建議 (基於您的編輯)\n\n**Quantitative (Q) 科目:**\n{q_prompts if q_prompts else '(無特定建議)'}\n\n**Verbal (V) 科目:**\n{v_prompts if v_prompts else '(無特定建議)'}\n\n**Data Insights (DI) 科目:**\n{di_prompts if di_prompts else '(無特定建議)'}"
                         
                         st.session_state.generated_ai_prompts_for_edit_tab = all_prompts
                         st.session_state.ai_prompts_need_regeneration = False # Reset flag after generation
                     
+                # 如果有已生成的AI提示，則顯示
                 if 'generated_ai_prompts_for_edit_tab' in st.session_state:
                     tabs[edit_tab_index].markdown(st.session_state.generated_ai_prompts_for_edit_tab)
 
