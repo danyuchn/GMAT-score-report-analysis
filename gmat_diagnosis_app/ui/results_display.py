@@ -34,138 +34,107 @@ COLUMN_DISPLAY_CONFIG = {
 def display_subject_results(subject, tab_container, report_md, df_subject, col_config, excel_map):
     """Displays the diagnosis report, styled DataFrame, and download button for a subject."""
     tab_container.subheader(f"{subject} 科診斷報告")
-    # This line renders the markdown report with wrapping
-    tab_container.markdown(report_md if report_md else f"未找到 {subject} 科的診斷報告。", unsafe_allow_html=True) # Added unsafe_allow_html=True just in case AI uses basic HTML
-
-    # 顯示theta折線圖（如果存在）
-    if 'theta_plots' in st.session_state and subject in st.session_state.theta_plots:
-        tab_container.subheader(f"{subject} 科能力值 (Theta) 變化圖")
-        tab_container.plotly_chart(st.session_state.theta_plots[subject], use_container_width=True)
     
-    tab_container.subheader(f"{subject} 科詳細數據 (含診斷標籤)")
-
-    if df_subject is None or df_subject.empty:
-        tab_container.write(f"沒有找到 {subject} 科的詳細數據可供顯示。")
-        return
-
-    # 複製配置以進行科目特定調整
-    subject_col_config = col_config.copy()
-    subject_excel_map = excel_map.copy()
+    # 準備數據表格 (對所有科目通用)
+    styled_df = None
+    df_to_display = None
+    columns_for_st_display_order = []
     
-    # 複製數據框以避免修改原始數據
-    df_display = df_subject.copy()
-    
-    # 確保按題號排序
-    if 'question_position' in df_display.columns:
-        df_display = df_display.sort_values(by='question_position').reset_index(drop=True)
-    
-    # V科或DI科的特殊處理
-    if subject in ['V', 'DI']:
+    if df_subject is not None and not df_subject.empty:
+        # 準備表格顯示前的數據處理
+        subject_col_config = col_config.copy()
+        subject_excel_map = excel_map.copy()
+        
+        # 複製數據框以避免修改原始數據
+        df_display = df_subject.copy()
+        
+        # 確保按題號排序
+        if 'question_position' in df_display.columns:
+            df_display = df_display.sort_values(by='question_position').reset_index(drop=True)
+        
+        # 科目特殊處理
+        if subject == 'DI':
+            # 針對DI科目移除「考察能力」欄位
+            if 'question_fundamental_skill' in subject_col_config:
+                del subject_col_config['question_fundamental_skill']
+            if 'question_fundamental_skill' in subject_excel_map:
+                del subject_excel_map['question_fundamental_skill']
+        
         # 檢查無效項數據的類型和值
         if 'is_invalid' in df_display.columns:
             invalid_type = df_display['is_invalid'].dtype
-            # 移除調試輸出
             logging.debug(f"{subject}科無效項數據類型: {invalid_type}")
             
             # 確保無效項是布爾值
             try:
                 df_display['is_invalid'] = df_display['is_invalid'].fillna(False).astype(bool)
-                # 移除調試輸出
-                logging.debug(f"{subject}科無效項已強制轉換為布爾值")
             except Exception as e:
                 tab_container.error(f"轉換無效項時出錯: {e}")
-                
-        # 移除調試輸出
-        logging.debug(f"{subject}科原始數據列: {list(df_display.columns)}")
         
         # 重要修改：確保is_invalid完全以手動標記為準
         if 'is_manually_invalid' in df_display.columns:
-            # 先顯示原始無效項和手動標記項的數量 (僅在日誌中記錄)
-            if 'is_invalid' in df_display.columns:
-                orig_invalid_sum = df_display['is_invalid'].sum()
-                logging.debug(f"{subject}科原始無效項數量: {orig_invalid_sum}")
-            
-            manual_invalid_count = df_display['is_manually_invalid'].sum()
-            logging.debug(f"{subject}科手動標記無效項數量: {manual_invalid_count}")
-            
-            # 列出手動標記的題號
-            manually_invalid_positions = df_display.loc[df_display['is_manually_invalid'] == True, 'question_position'].tolist()
-            if manually_invalid_positions:
-                logging.info(f"{subject}科手動標記為無效的題號: {manually_invalid_positions}")
-            
-            # 重要：重置is_invalid列，完全以手動標記為準
             if 'is_invalid' in df_display.columns:
                 # 先全部設為False
                 df_display['is_invalid'] = False
                 # 只將手動標記的項設為True
                 df_display.loc[df_display['is_manually_invalid'] == True, 'is_invalid'] = True
-                
-                # 檢查重置後的無效項數量 (僅在日誌中記錄)
-                new_invalid_count = df_display['is_invalid'].sum()
-                logging.debug(f"{subject}科僅使用手動標記後，無效項數量從 {orig_invalid_sum} 變為 {new_invalid_count}")
-                
-                # 驗證是否與手動標記一致
-                if new_invalid_count != manual_invalid_count:
-                    logging.error(f"錯誤：{subject}科重置後的無效項數量 ({new_invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
 
-    # 針對DI科目移除「考察能力」欄位
-    if subject == 'DI':
-        if 'question_fundamental_skill' in subject_col_config:
-            del subject_col_config['question_fundamental_skill']
-        if 'question_fundamental_skill' in subject_excel_map:
-            del subject_excel_map['question_fundamental_skill']
+        # 準備數據框顯示
+        cols_available = [k for k in subject_col_config.keys() if k in df_display.columns]
+        df_to_display = df_display[cols_available].copy()
+        columns_for_st_display_order = [k for k in cols_available if subject_col_config.get(k) is not None]
 
-    # Prepare DataFrame for Display
-    # 1. Select columns based on keys in col_config that exist in the data
-    cols_available = [k for k in subject_col_config.keys() if k in df_display.columns]
-    df_to_display = df_display[cols_available].copy()
-
-    # 2. Define column order for st.dataframe (exclude those with None config value, like 'overtime')
-    columns_for_st_display_order = [k for k in cols_available if subject_col_config.get(k) is not None]
-
-    # 3. Display styled DataFrame
-    try:
-        # Ensure necessary columns for styling exist with defaults
+        # 確保必要的列存在
         if 'overtime' not in df_to_display.columns: df_to_display['overtime'] = False
-        if 'is_correct' not in df_to_display.columns: df_to_display['is_correct'] = True # Assume correct if missing for styling
-        if 'is_invalid' not in df_to_display.columns: df_to_display['is_invalid'] = False # Ensure invalid column exists
+        if 'is_correct' not in df_to_display.columns: df_to_display['is_correct'] = True
+        if 'is_invalid' not in df_to_display.columns: df_to_display['is_invalid'] = False
         
-        # 重要修改：確保is_invalid完全以手動標記為準（即使在最後的顯示階段）
+        # 再次確保is_invalid以手動標記為準
         if 'is_manually_invalid' in df_to_display.columns:
-            # 重置is_invalid列
             df_to_display['is_invalid'] = False
-            # 僅將手動標記的項設為無效
             df_to_display.loc[df_to_display['is_manually_invalid'] == True, 'is_invalid'] = True
             
         # 確保is_invalid為布林值
         df_to_display['is_invalid'] = df_to_display['is_invalid'].astype(bool)
-
-        styled_df = df_to_display.style.set_properties(**{'text-align': 'left'}) \
-                                       .set_table_styles([dict(selector='th', props=[('text-align', 'left')])]) \
-                                       .apply(apply_styles, axis=1)
-
-        tab_container.dataframe(
-            styled_df,
-            column_config=subject_col_config,
-            column_order=columns_for_st_display_order,
-            hide_index=True,
-            use_container_width=True
-        )
-    except Exception as e:
-        tab_container.error(f"無法應用樣式或顯示 {subject} 科數據: {e}")
-        # Fallback: Display without styling, only showing configured columns
+        
         try:
-             tab_container.dataframe(
-                 df_to_display[columns_for_st_display_order], # Use only displayable columns
-                 column_config=subject_col_config,
-                 hide_index=True,
-                 use_container_width=True
-             )
-        except Exception as fallback_e:
-             tab_container.error(f"顯示回退數據時也發生錯誤: {fallback_e}")
+            styled_df = df_to_display.style.set_properties(**{'text-align': 'left'}) \
+                                   .set_table_styles([dict(selector='th', props=[('text-align', 'left')])]) \
+                                   .apply(apply_styles, axis=1)
+        except Exception as e:
+            logging.error(f"應用樣式時出錯: {e}")
+            styled_df = None
+    
+    # 1. 首先顯示數據表格 (所有科目)
+    tab_container.subheader(f"{subject} 科詳細數據 (含診斷標籤)")
+    if styled_df is not None:
+        try:
+            tab_container.dataframe(
+                styled_df,
+                column_config=subject_col_config,
+                column_order=columns_for_st_display_order,
+                hide_index=True,
+                use_container_width=True
+            )
+        except Exception as e:
+            tab_container.error(f"顯示表格時出錯: {e}")
+            tab_container.info("無法顯示數據表格：數據處理過程中出錯。")
+    else:
+        tab_container.info("無法顯示數據表格：數據為空或處理過程中出錯。")
+    
+    # 2. 顯示theta折線圖（如果存在）
+    if 'theta_plots' in st.session_state and subject in st.session_state.theta_plots:
+        tab_container.subheader(f"{subject} 科能力值 (Theta) 變化圖")
+        tab_container.plotly_chart(st.session_state.theta_plots[subject], use_container_width=True)
+    
+    # 3. 最後顯示診斷報告
+    if report_md:
+        tab_container.subheader(f"{subject} 科診斷報告詳情")
+        tab_container.markdown(report_md, unsafe_allow_html=True)
+    else:
+        tab_container.info(f"未找到 {subject} 科的診斷報告。")
 
-
-    # 4. Download Button
+    # 4. Download Button (一樣為所有科目顯示下載按鈕)
     try:
         # Prepare a copy specifically for Excel export using excel_map
         df_for_excel = df_subject[[k for k in subject_excel_map.keys() if k in df_subject.columns]].copy()
@@ -199,51 +168,52 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
             manual_invalid_count = df_for_excel['is_manually_invalid'].sum()
             invalid_count = df_for_excel['is_invalid'].sum()
             if manual_invalid_count != invalid_count:
-                logging.error(f"{subject}科Excel導出前無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
-
+                logging.error(f"錯誤：{subject}科Excel導出前，無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
+        
         # Apply number formatting *before* calling to_excel if needed
         if 'question_difficulty' in df_for_excel.columns:
             df_for_excel['question_difficulty'] = pd.to_numeric(df_for_excel['question_difficulty'], errors='coerce')
         if 'question_time' in df_for_excel.columns:
             df_for_excel['question_time'] = pd.to_numeric(df_for_excel['question_time'], errors='coerce')
             
-        # Convert bools to string representation for Excel output clarity (所有科目統一處理)
+        # Convert boolean columns to strings for Excel export
         if 'is_correct' in df_for_excel.columns:
             df_for_excel['is_correct'] = df_for_excel['is_correct'].astype(str) # Convert TRUE/FALSE to text
         if 'is_sfe' in df_for_excel.columns:
             df_for_excel['is_sfe'] = df_for_excel['is_sfe'].astype(str)
             
-        # 確保is_invalid被轉換為字符串，並添加到excel_map中
+        # Handle is_invalid specifically since we *just* processed it
         if 'is_invalid' in df_for_excel.columns:
             df_for_excel['is_invalid'] = df_for_excel['is_invalid'].astype(str) # Convert TRUE/FALSE to text
-            if 'is_invalid' not in subject_excel_map:
-                subject_excel_map['is_invalid'] = '是否無效'
-                logging.info(f"為{subject}科添加is_invalid列映射: {subject_excel_map['is_invalid']}")
             
-            # 所有科目顯示值分布
+        # Final validation just to be sure we're exporting valid data
+        # Ensures consistent, expectable log output for is_invalid
+        try:
             value_counts = df_for_excel['is_invalid'].value_counts().to_dict()
-            tab_container.info(f"{subject}科is_invalid列轉換為文本後值分布: {value_counts}")
-        else:
-            tab_container.warning(f"{subject}科Excel導出時缺少is_invalid列，可能導致無效項樣式無法正確應用")
-
-        # 檢查是否有任何無效項，如果沒有則提醒用戶
+            logging.debug(f"{subject}科Excel導出直前，is_invalid值分佈: {value_counts}")
+        except Exception as e:
+            logging.warning(f"計算{subject}科is_invalid分佈時出錯: {e}")
+            
+        # Calculate & display final invalid count in log
         invalid_count = (df_for_excel['is_invalid'] == 'True').sum() if 'is_invalid' in df_for_excel.columns else 0
-        if invalid_count == 0:
-            tab_container.info(f"{subject}科沒有標記為無效的題目")
-        else:
-            tab_container.info(f"{subject}科有 {invalid_count} 題標記為無效")
-
+        logging.info(f"{subject}科Excel導出包含 {invalid_count} 個無效題目")
+        
+        # Generate Excel and offer for download - Use function from excel_utils
         excel_bytes = to_excel(df_for_excel, subject_excel_map) # 使用科目特定的excel_map
-
+        
+        # Offer download button for Excel file - provide bytes to streamlit
+        today_str = pd.Timestamp.now().strftime('%Y%m%d')
         tab_container.download_button(
-            label=f"下載 {subject} 科詳細數據 (Excel)",
+            f"下載 {subject} 科詳細數據 (Excel)",
             data=excel_bytes,
-            file_name=f"gmat_diag_{subject}_detailed_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"download_excel_{subject}"
+            file_name=f"{today_str}_GMAT_{subject}_detailed_data.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     except Exception as e:
-        tab_container.error(f"無法生成 {subject} 科的 Excel 下載文件: {e}") 
+        tab_container.error(f"準備Excel下載時出錯: {e}")
+        import traceback
+        logging.error(f"詳細錯誤: {traceback.format_exc()}")
+        tab_container.info(f"如有需要，請聯繫管理員並提供以上錯誤信息。")
 
 def display_total_results(tab_container):
     """顯示Total分數的百分位數和圖表分析"""
