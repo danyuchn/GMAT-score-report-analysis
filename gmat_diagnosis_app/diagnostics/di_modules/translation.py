@@ -35,6 +35,7 @@ APPENDIX_A_TRANSLATION_DI = {
     'Unknown Domain': "未知領域",
     # Time Pressure
     'High': "高", 'Low': "低", 'Unknown': "未知",
+    'True': "有時間壓力", 'False': "無時間壓力",
     # Question Types
     'Data Sufficiency': 'Data Sufficiency', 'Two-part analysis': 'Two-part analysis',
     'Multi-source reasoning': 'Multi-source reasoning', 'Graph and Table': 'Graph and Table',
@@ -85,5 +86,7 @@ def _translate_di(param):
         return [APPENDIX_A_TRANSLATION_DI.get(p, str(p)) for p in param if isinstance(p, str)]
     elif isinstance(param, str):
          return APPENDIX_A_TRANSLATION_DI.get(param, param)
+    elif isinstance(param, bool):
+         return APPENDIX_A_TRANSLATION_DI.get(str(param), str(param))
     else:
          return str(param) 

@@ -95,7 +95,7 @@ def _generate_di_summary_report(di_results):
     sfe_code = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'
 
     # 1. 開篇總結
-    report_lines.append("**1. 開篇總結（時間策略與有效性）**")
+    report_lines.append("**開篇總結（時間策略與有效性）**")
     tp_status = _translate_di(ch1.get('time_pressure', 'Unknown')) # Use translated status directly
     total_time = ch1.get('total_test_time_minutes', 0)
     time_diff = ch1.get('time_difference_minutes', 0)
@@ -106,7 +106,7 @@ def _generate_di_summary_report(di_results):
     report_lines.append("")
 
     # 2. 表現概覽
-    report_lines.append("**2. 表現概覽（內容領域對比）**")
+    report_lines.append("**表現概覽（內容領域對比）**")
     domain_tags = ch2.get('domain_comparison_tags', {})
     if domain_tags.get('significant_diff_error') or domain_tags.get('significant_diff_overtime'):
         if domain_tags.get('poor_math_related'): report_lines.append(f"- **{math_related_zh}** 領域的 **錯誤率** 明顯更高。")
@@ -117,7 +117,7 @@ def _generate_di_summary_report(di_results):
     report_lines.append("")
 
     # 3. 核心問題分析
-    report_lines.append("**3. 核心問題分析**")
+    report_lines.append("**核心問題分析**")
     if sfe_triggered and diagnosed_df is not None and 'is_sfe' in diagnosed_df.columns:
         sfe_rows = diagnosed_df[diagnosed_df['is_sfe'] == True]
         if not sfe_rows.empty:
@@ -136,13 +136,28 @@ def _generate_di_summary_report(di_results):
     if not param_counts_all.empty:
         top_other_params_codes = param_counts_all[param_counts_all.index != sfe_code].head(2).index.tolist()
     if top_other_params_codes:
-        report_lines.append("- **其他主要問題點：**")
+        report_lines.append("- **高頻潛在問題點：**")
         for param_code in top_other_params_codes: report_lines.append(f"  - {_translate_di(param_code)}")
     elif not sfe_triggered: report_lines.append("- 未識別出明顯的核心問題模式。")
+    
+    # DI 科詳細數據預覽表（從報告末尾移動到這裡）
+    report_lines.append("")
+    if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
+        # 移除原有的詳細分析顯示，僅保留標題，不再顯示具體的分析內容
+        df_problem = diagnosed_df[(diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True)].copy()
+        
+        # 添加調試信息：問題數據統計
+        problem_total = len(df_problem)
+        problem_wrong = df_problem['is_correct'].eq(False).sum() if 'is_correct' in df_problem.columns else 0
+        problem_overtime = df_problem['overtime'].sum() if 'overtime' in df_problem.columns else 0
+        logging.info(f"[DI報告追蹤] 問題數據統計 - 總題數: {problem_total}, 錯誤數: {problem_wrong}, 超時數: {problem_overtime}")
+    else:
+        report_lines.append("- (無問題數據可供分析)")
+    
     report_lines.append("")
 
     # 4. 特殊模式觀察
-    report_lines.append("**4. 特殊模式觀察**")
+    report_lines.append("**特殊模式觀察**")
     careless_triggered_ch4 = ch4.get('carelessness_issue_triggered')
     rushing_triggered_ch4 = ch4.get('early_rushing_risk_triggered')
     patterns_found = False
@@ -158,122 +173,24 @@ def _generate_di_summary_report(di_results):
     report_lines.append("")
 
     # 6. 練習建議
-    report_lines.append("**6. 練習建議**")
+    report_lines.append("**練習建議**")
     recommendations = ch6.get('recommendations_list', [])
-    if not recommendations: report_lines.append("- 根據當前分析，暫無特別的練習建議。請保持全面複習。")
+    if not recommendations: 
+        report_lines.append("- 根據當前分析，暫無特別的練習建議。請保持全面複習。")
     else:
-        for i, rec in enumerate(recommendations): report_lines.append(f"{i+1}. {rec.get('text', '無建議內容')}")
+        # 改回條列式呈現，不使用表格
+        for i, rec in enumerate(recommendations): 
+            report_lines.append(f"- {rec.get('text', '無建議內容')}")
     report_lines.append("")
 
     # 7. 後續行動指引
-    report_lines.append("**7. 後續行動指引**")
-    report_lines.append("- **引導反思：**")
-    reflection_prompts = []
-    # Define Helper Functions Locally (can be moved outside if preferred)
-    def get_pos_context_str_di(param_keys):
-        positions = set().union(*[param_to_positions.get(key, set()) for key in param_keys if isinstance(key, str)])
-        return f"（涉及題號：{sorted(list(positions))}）" if positions else ""
-    def get_relevant_domains_di(param_keys):
-        relevant_positions = set().union(*[param_to_positions.get(key, set()) for key in param_keys if isinstance(key, str)])
-        relevant_domains_set = {_translate_di(domain) for domain, positions in domain_to_positions.items() if not relevant_positions.isdisjoint(positions)}
-        return sorted(list(relevant_domains_set))
-    # Define DI Reflection Parameter Lists (using English codes)
-    reading_interpretation_params_di = ['DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR']
-    concept_logic_params_di = ['DI_CONCEPT_APPLICATION_ERROR', 'DI_LOGICAL_REASONING_ERROR', 'DI_QUESTION_TYPE_SPECIFIC_ERROR']
-    data_handling_calc_params_di = ['DI_DATA_EXTRACTION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_CALCULATION_ERROR']
-    msr_specific_params_di = ['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_MSR_READING_COMPREHENSION_BARRIER', 'DI_MSR_SINGLE_Q_BOTTLENECK']
-    efficiency_params_di = ['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION', 'DI_EFFICIENCY_BOTTLENECK_LOGIC', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_INTEGRATION']
-    carelessness_params_di = ['DI_CARELESSNESS_DETAIL_OMISSION', 'DI_BEHAVIOR_CARELESSNESS_ISSUE']
-    # Generate Reflection Prompts
-    active_concept_logic = [p for p in concept_logic_params_di if p in all_triggered_params]
-    if active_concept_logic or sfe_triggered:
-        keys = active_concept_logic + ([sfe_code] if sfe_triggered else [])
-        domains = get_relevant_domains_di(keys)
-        ctx = f" [`{'，'.join(domains)}`] " if domains else " "
-        reflection_prompts.append(f"  - 回想一下，在做錯的{ctx}題目時，具體是卡在哪個數學概念、邏輯關係或題目要求上？是完全沒思路，理解錯誤，還是知道方法但應用出錯？" + get_pos_context_str_di(keys))
-    active_reading = [p for p in reading_interpretation_params_di if p in all_triggered_params]
-    if active_reading:
-        domains = get_relevant_domains_di(active_reading)
-        ctx = f" [`{'，'.join(domains)}`] " if domains else " "
-        reflection_prompts.append(f"  - 對於做錯/慢的{ctx}題目，是文字資訊、圖表解讀有困難，還是無法準確理解問題要求？" + get_pos_context_str_di(active_reading))
-    active_data = [p for p in data_handling_calc_params_di if p in all_triggered_params]
-    if active_data:
-        domains = get_relevant_domains_di(active_data)
-        ctx = f" [`{'，'.join(domains)}`] " if domains else " "
-        reflection_prompts.append(f"  - 在處理{ctx}題目時，是提取數據、整合信息出錯，還是計算過程容易失誤？" + get_pos_context_str_di(active_data))
-    active_msr = [p for p in msr_specific_params_di if p in all_triggered_params]
-    if active_msr:
-        reflection_prompts.append(f"  - 對於 MSR 題目，是多源資訊的整合理解有困難，還是閱讀材料或回答單題耗時過長？" + get_pos_context_str_di(active_msr))
-    active_efficiency = [p for p in efficiency_params_di if p in all_triggered_params]
-    if active_efficiency:
-        domains = get_relevant_domains_di(active_efficiency)
-        ctx = f" [`{'，'.join(domains)}`] " if domains else " "
-        reflection_prompts.append(f"  - 回想耗時過長的{ctx}題目，主要瓶頸是在閱讀、理解、思考、整合還是計算？" + get_pos_context_str_di(active_efficiency))
-    active_careless = [p for p in carelessness_params_di if p in all_triggered_params]
-    if active_careless: reflection_prompts.append("  - 回想一下，是否存在因為看錯字、忽略細節、誤解圖表或計算粗心導致的失誤？" + get_pos_context_str_di(active_careless))
-    if not reflection_prompts: reflection_prompts.append("  - （本次分析未觸發典型的反思問題，建議結合練習計劃進行）")
-    report_lines.extend(reflection_prompts)
+    report_lines.append("**後續行動指引**")
+    report_lines.append("- **二級證據參考建議（如考場回憶失效）：**")
 
-    # Qualitative Analysis Suggestion
-    if any(p in all_triggered_params for p in ['DI_LOGICAL_REASONING_ERROR', 'DI_READING_COMPREHENSION_ERROR']):
-        report_lines.append("- **質化分析建議：**")
-        report_lines.append("  - 如果您對報告中指出的某些問題（尤其是非數學相關的邏輯或閱讀理解錯誤）仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。")
-
-    # Second Evidence Suggestion
-    report_lines.append("- **二級證據參考建議：**")
-    df_problem = pd.DataFrame() # Re-init for safety
+        # Second Evidence Suggestion
     if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
-        df_problem = diagnosed_df[(diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True)].copy()
+        report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您按照以上指引查看近期的練習記錄，整理相關錯題或超時題目。")
         
-        # 添加調試信息：問題數據統計
-        problem_total = len(df_problem)
-        problem_wrong = df_problem['is_correct'].eq(False).sum() if 'is_correct' in df_problem.columns else 0
-        problem_overtime = df_problem['overtime'].sum() if 'overtime' in df_problem.columns else 0
-        logging.info(f"[DI報告追蹤] 問題數據統計 - 總題數: {problem_total}, 錯誤數: {problem_wrong}, 超時數: {problem_overtime}")
-        
-        report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
-        details_added_2nd_ev = False
-        if 'time_performance_category' in df_problem.columns and 'question_type' in df_problem.columns and 'content_domain' in df_problem.columns and 'diagnostic_params' in df_problem.columns:
-            performance_order = ['Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 'Slow & Correct', 'Fast & Correct', 'Normal Time & Correct', 'Unknown']
-            try: # Add try-except for robustness of groupby
-                grouped_by_performance = df_problem.groupby('time_performance_category')
-                for perf_en in performance_order:
-                    if perf_en == 'Fast & Correct': continue # Skip Fast & Correct
-                    if perf_en in grouped_by_performance.groups:
-                        group_df = grouped_by_performance.get_group(perf_en)
-                        if not group_df.empty:
-                            perf_zh = _translate_di(perf_en)
-                            types_zh = sorted([_translate_di(t) for t in group_df['question_type'].dropna().unique()])
-                            domains_zh = sorted([_translate_di(d) for d in group_df['content_domain'].dropna().unique()])
-                            report_lines.append(f"  - **{perf_zh}：** 需關注題型：【{', '.join(types_zh)}】；涉及領域：【{', '.join(domains_zh)}】。")
-
-                            # Categorize parameters within the group
-                            all_eng_codes_in_group = set().union(*[s for s in group_df['diagnostic_params'] if isinstance(s, list)])
-                            all_eng_codes_in_group.discard(INVALID_DATA_TAG_DI) # Remove invalid tag from categorization
-
-                            labels_by_category = {category: [] for category in DI_PARAM_CATEGORY_ORDER}
-                            for code_en in all_eng_codes_in_group:
-                                category = DI_PARAM_TO_CATEGORY.get(code_en, 'Unknown')
-                                labels_by_category[category].append(code_en)
-
-                            label_parts_data = []
-                            for category in DI_PARAM_CATEGORY_ORDER:
-                                category_eng_codes = labels_by_category.get(category, [])
-                                if category_eng_codes:
-                                    category_zh = _translate_di(category)
-                                    category_labels_zh = sorted([_translate_di(code) for code in category_eng_codes])
-                                    label_parts_data.append((category_zh, category_labels_zh))
-
-                            if label_parts_data:
-                                report_lines.append("    注意相關問題點：")
-                                for category_zh, sorted_labels_zh in label_parts_data:
-                                    report_lines.append(f"      - 【{category_zh}：{'、'.join(sorted_labels_zh)}】")
-                            details_added_2nd_ev = True
-            except Exception:
-                 # Log error if needed, prevent report generation from crashing
-                 report_lines.append("  - （分組分析時出現內部錯誤）")
-                 details_added_2nd_ev = True # Mark as detail attempted
-
         # Report core issues again
         core_issue_texts = []
         if sfe_triggered: core_issue_texts.append(_translate_di(sfe_code))
@@ -282,13 +199,94 @@ def _generate_di_summary_report(di_results):
         filtered_core_issues = [issue for issue in core_issue_texts if issue != _translate_di(INVALID_DATA_TAG_DI)]
         if filtered_core_issues:
              report_lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題：【{', '.join(filtered_core_issues)}】。")
-             details_added_2nd_ev = True
-
-        if not details_added_2nd_ev: report_lines.append("  - （本次分析未聚焦到特定的問題類型或領域）")
         report_lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
-    else: report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
+    else: 
+        report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
+    
+    # 基於數據動態生成引導反思
+    reflection_prompts = []
+    
+    # 確保有可用的數據
+    if diagnosed_df is not None and not diagnosed_df.empty:
+        # 只對有問題的題目(錯誤或超時)進行分析以生成反思建議
+        problem_df = diagnosed_df[(diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True)].copy()
+        
+        # 確保必要的列存在
+        required_cols = ['question_type', 'content_domain', 'time_performance_category', 'diagnostic_params']
+        if all(col in problem_df.columns for col in required_cols) and not problem_df.empty:
+            # 根據時間表現分組分析
+            time_perf_groups = problem_df.groupby('time_performance_category')
+            
+            # 對每種時間表現進行分析
+            for time_perf, group in time_perf_groups:
+                # 跳過正確且正常用時的組（如果有的話）
+                if time_perf == 'Normal Time & Correct' or time_perf == 'Fast & Correct':
+                    continue
+                
+                # 獲取該組中的題型和領域
+                q_types = group['question_type'].dropna().unique()
+                domains = group['content_domain'].dropna().unique()
+                
+                # 翻譯時間表現、題型和領域
+                time_perf_zh = _translate_di(time_perf)
+                q_types_zh = [_translate_di(qt) for qt in q_types]
+                domains_zh = [_translate_di(d) for d in domains]
+                
+                # 獲取該組的所有診斷參數
+                all_diagnostic_params = []
+                for params_list in group['diagnostic_params']:
+                    if isinstance(params_list, list):
+                        all_diagnostic_params.extend(params_list)
+                
+                # 修改：不再只取前3個參數，而是按類別分組顯示所有診斷參數
+                if all_diagnostic_params:
+                    # 去除重複的診斷參數
+                    unique_params = list(set(all_diagnostic_params))
+                    
+                    # 按類別分組
+                    params_by_category = {}
+                    for param in unique_params:
+                        category = DI_PARAM_TO_CATEGORY.get(param, 'Unknown')
+                        if category not in params_by_category:
+                            params_by_category[category] = []
+                        params_by_category[category].append(param)
+                    
+                    # 生成按類別分組的診斷參數文本
+                    params_text_parts = []
+                    for category, params in params_by_category.items():
+                        # 翻譯類別和參數
+                        category_zh = _translate_di(category)
+                        params_zh = [_translate_di(p) for p in params]
+                        
+                        # 以inline block格式添加
+                        params_text_parts.append(f"【{category_zh}：{', '.join(params_zh)}】")
+                    
+                    # 按類別行列出 - 修改為使用Markdown列表確保換行
+                    params_text = ""
+                    for part in params_text_parts:
+                        params_text += f"\n      - {part}"
+                    
+                    # 生成引導反思提示
+                    prompt = f"  - 找尋【{', '.join(domains_zh)}】【{', '.join(q_types_zh)}】的考前做題紀錄，找尋【{time_perf_zh}】的題目，檢討並反思自己是否有：{params_text}\n      等問題。"
+                    reflection_prompts.append(prompt)
+        
+    # 如果沒有生成任何反思提示，添加默認提示
+    if not reflection_prompts:
+        reflection_prompts.append("  - 找尋考前做題紀錄中的錯題和超時題，按照【題型】【內容領域】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。")
+    
+    # 添加到報告中
+    report_lines.extend(reflection_prompts)
 
-    # Add Tool/AI Prompt Recommendations
+
+
+    # Qualitative Analysis Suggestion (移動到二級證據後面)
+    if any(p in all_triggered_params for p in ['DI_LOGICAL_REASONING_ERROR', 'DI_READING_COMPREHENSION_ERROR']):
+        report_lines.append("")  
+        report_lines.append("- **質化分析建議：**")
+        report_lines.append("  - 如果您對報告中指出的某些問題仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。")
+
+    # Add Tool/AI Prompt Recommendations (使用代碼註釋方式隱藏)
+    """
     report_lines.append("- **輔助工具與 AI 提示推薦建議：**")
     report_lines.append("  - 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示。系統會根據您觸發的診斷參數組合，推薦相關的資源。請根據您的具體診斷結果選用。")
     recommended_tools_added = False
@@ -306,6 +304,7 @@ def _generate_di_summary_report(di_results):
     if not recommended_tools_added:
         report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議。)")
     report_lines.append("")
+    """
 
     # 完成報告，添加調試信息：最終報告內容
     report_text = "\n\n".join(report_lines)  # 使用雙換行符以保持原有格式
