@@ -75,7 +75,8 @@ def preprocess_di_data(df):
                     
                     df_msr_part.loc[first_q_idx_msr, 'msr_reading_time'] = calculated_msr_reading_time
             
-            df_msr_part['msr_reading_time'] = pd.to_numeric(df_msr_part['msr_reading_time'], errors='coerce').fillna(0)
+            df_msr_part['msr_reading_time'] = pd.to_numeric(df_msr_part['msr_reading_time'], errors='coerce')
+            df_msr_part['msr_reading_time'] = df_msr_part['msr_reading_time'].replace({pd.NA: 0, None: 0, np.nan: 0}).infer_objects(copy=False)
 
             # Add is_first_msr_q flag
             df_msr_part['is_first_msr_q'] = False
@@ -100,7 +101,8 @@ def preprocess_di_data(df):
             df_processed[col] = 0.0  # Initialize with 0.0 for all rows
         else:
             # Ensure correct dtype and fill NaNs if column already existed
-            df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').fillna(0.0)
+            df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce')
+            df_processed[col] = df_processed[col].replace({pd.NA: 0.0, None: 0.0, np.nan: 0.0}).infer_objects(copy=False)
             
     for col in msr_bool_cols:
         if col not in df_processed.columns:
@@ -111,7 +113,7 @@ def preprocess_di_data(df):
                 df_processed[col] = df_processed[col].astype(bool) # Attempt direct cast
             except ValueError: # Handle potential mixed types or uncastable values
                 df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').notna() # Example: 0/1 to False/True
-            df_processed[col] = df_processed[col].fillna(False)
+            df_processed[col] = df_processed[col].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
 
     for col in msr_object_cols: # e.g., msr_group_id
         if col not in df_processed.columns:

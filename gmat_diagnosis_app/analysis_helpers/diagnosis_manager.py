@@ -88,7 +88,15 @@ def run_diagnosis(df_final_for_diagnosis, time_pressure_map):
         # Combine results *after* loop
         valid_diagnosed_dfs = [df for df in all_diagnosed_dfs if df is not None and not df.empty]
         if valid_diagnosed_dfs:
-            st.session_state.processed_df = pd.concat(valid_diagnosed_dfs, ignore_index=True)
+            # 確保在合併前篩選掉空的或全NA的列，以避免警告
+            filtered_dfs = []
+            for df in valid_diagnosed_dfs:
+                # 移除全NA的列
+                df_filtered = df.dropna(axis=1, how='all')
+                # 確保所有列的數據類型相容
+                filtered_dfs.append(df_filtered)
+                
+            st.session_state.processed_df = pd.concat(filtered_dfs, ignore_index=True)
             st.session_state.report_dict = temp_report_dict
 
             # Generate Consolidated AI Report
@@ -117,7 +125,17 @@ def run_diagnosis(df_final_for_diagnosis, time_pressure_map):
             st.session_state.report_dict = temp_report_dict  # Still show error reports
             analysis_success = False
             
-        return pd.concat(valid_diagnosed_dfs, ignore_index=True) if valid_diagnosed_dfs else pd.DataFrame(), temp_report_dict, consolidated_report, analysis_success
+        # 修改第120行的pd.concat
+        if valid_diagnosed_dfs:
+            # 同樣確保在合併前篩選掉空的或全NA的列
+            filtered_dfs = []
+            for df in valid_diagnosed_dfs:
+                df_filtered = df.dropna(axis=1, how='all')
+                filtered_dfs.append(df_filtered)
+            
+            return pd.concat(filtered_dfs, ignore_index=True), temp_report_dict, consolidated_report, analysis_success
+        else:
+            return pd.DataFrame(), temp_report_dict, consolidated_report, analysis_success
 
     except Exception as e:
         st.error(f"診斷過程中發生未預期錯誤: {e}")

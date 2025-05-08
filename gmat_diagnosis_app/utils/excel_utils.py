@@ -85,16 +85,22 @@ def to_excel(df, column_map):
     sheet_name = f"{subject}" if subject else "Data"
     
     # 預處理DataFrame中的NaN值
-    for col in df_excel.columns:
-        # 將NaN值替換為空字符串
-        if df_excel[col].dtype != 'object' and pd.api.types.is_numeric_dtype(df_excel[col].dtype):
-            df_excel[col] = df_excel[col].fillna(0)  # 數值列用0填充
-        else:
-            df_excel[col] = df_excel[col].fillna("")  # 其他列用空字符串填充
-        
-        # 將列表類型的值轉換為字符串
-        if any(isinstance(x, list) for x in df_excel[col].dropna()):
-            df_excel[col] = df_excel[col].apply(lambda x: str(x) if isinstance(x, list) else x)
+    with pd.option_context('future.no_silent_downcasting', True):
+        for col in df_excel.columns:
+            # 將NaN值替換為空字符串
+            if df_excel[col].dtype != 'object' and pd.api.types.is_numeric_dtype(df_excel[col].dtype):
+                # 使用with context方式避免FutureWarning
+                df_excel[col] = df_excel[col].replace({pd.NA: 0, None: 0, np.nan: 0})
+            else:
+                # 使用with context方式避免FutureWarning
+                df_excel[col] = df_excel[col].replace({pd.NA: "", None: "", np.nan: ""})
+            
+            # 允許推斷更合適的類型
+            df_excel[col] = df_excel[col].infer_objects(copy=False)
+            
+            # 將列表類型的值轉換為字符串
+            if any(isinstance(x, list) for x in df_excel[col].dropna()):
+                df_excel[col] = df_excel[col].apply(lambda x: str(x) if isinstance(x, list) else x)
     
     # 寫入數據
     df_excel.to_excel(writer, sheet_name=sheet_name, index=False)

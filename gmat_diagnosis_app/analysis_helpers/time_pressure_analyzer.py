@@ -125,7 +125,7 @@ def calculate_and_apply_invalid_logic(df_input, time_pressure_map_param, subject
     if 'is_invalid' not in df_output.columns:
         df_output['is_invalid'] = False
     else:
-        df_output['is_invalid'] = df_output['is_invalid'].fillna(False).astype(bool)
+        df_output['is_invalid'] = df_output['is_invalid'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False).astype(bool)
 
     calculated_avg_times = {}
     calculated_ft_avg_times = {}
@@ -216,7 +216,7 @@ def calculate_and_apply_invalid_logic(df_input, time_pressure_map_param, subject
 
     # After all automatic invalid logic, merge manual invalid flags
     if 'is_manually_invalid' in df_output.columns:
-        df_output['is_manually_invalid'] = df_output['is_manually_invalid'].fillna(False).astype(bool)
+        df_output['is_manually_invalid'] = df_output['is_manually_invalid'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False).astype(bool)
         df_output['is_invalid'] = df_output['is_invalid'] | df_output['is_manually_invalid']
 
     return df_output, calculated_avg_times, calculated_ft_avg_times 

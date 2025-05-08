@@ -55,7 +55,7 @@ def _calculate_and_apply_invalid_logic(df_input, time_pressure_map_param, subjec
     if 'is_invalid' not in df_output.columns:
         df_output['is_invalid'] = False
     else:
-        df_output['is_invalid'] = df_output['is_invalid'].fillna(False).astype(bool)
+        df_output['is_invalid'] = df_output['is_invalid'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False).astype(bool)
 
     calculated_avg_times = {}
     calculated_ft_avg_times = {}
