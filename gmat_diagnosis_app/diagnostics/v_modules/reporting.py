@@ -302,315 +302,140 @@ def generate_v_summary_report(v_diagnosis_results):
     report_lines.append("")
 
 
-    # --- Section 7: 練習計劃呈現 ---
-    report_lines.append("**練習計劃**")
-    if ch7:
-        for rec in ch7:
-             rec_type = rec.get('type')
-             rec_text = rec.get('text', '')
-             if rec_type in ['skill_header', 'spacer']:
-                 # 確保skill_header類型的內容正確換行
-                 if rec_type == 'skill_header' and rec_text.startswith('---'):
-                     # 在skill_header前添加空行
-                     report_lines.append("")
-                 report_lines.append(rec_text)
-             elif rec_type in ['macro', 'case', 'case_aggregated', 'behavioral']: # Include case_aggregated
-                 report_lines.append(f"- {rec_text}")
+    # --- Section 7: 練習建議與後續行動 --- (練習建議部分已移至 recommendations.py)
+    report_lines.append("**練習建議與後續行動**")
+    
+    # 練習建議 (從 chapter_7_recommendations 中獲取)
+    practice_recommendations = v_diagnosis_results.get('chapter_7_recommendations', [])
+    if practice_recommendations:
+        for rec in practice_recommendations:
+            report_lines.append(f"- {rec}")
     else:
-        report_lines.append("- 無具體練習建議生成（可能因所有技能均豁免或無觸發項）。")
+        report_lines.append("- 本次分析未產生具體的練習建議。請參考整體診斷和反思部分。")
     report_lines.append("")
 
-    # --- Section 8: 後續行動指引 ---
-    report_lines.append("**後續行動指引**")
-
-    # Data Prep for Mapping (needs English codes)
-    param_to_positions_v = {}
-    skill_to_positions_v = {}
-    v_translation_dict = APPENDIX_A_TRANSLATION_V
-
-    if diagnosed_df_ch3_raw is not None and not diagnosed_df_ch3_raw.empty:
-         param_col_eng = 'diagnostic_params' # Use the English param column name
-         if param_col_eng in diagnosed_df_ch3_raw.columns:
-             # Ensure necessary mapping columns exist
-             map_cols = ['question_position', 'question_fundamental_skill']
-             if all(col in diagnosed_df_ch3_raw.columns for col in map_cols):
-                 for index, row in diagnosed_df_ch3_raw.iterrows():
-                     pos = row.get('question_position')
-                     skill = row.get('question_fundamental_skill', 'Unknown Skill')
-                     eng_params = row.get(param_col_eng, [])
-                     # Ensure eng_params is a list and pos is valid number
-                     if not isinstance(eng_params, list): eng_params = []
-                     if pos is not None and pd.notna(pos):
-                          try:
-                              pos = int(pos) # Ensure positions are integers for sorting
-                              if skill != 'Unknown Skill':
-                                  skill_to_positions_v.setdefault(skill, set()).add(pos)
-                              for p in eng_params:
-                                  if isinstance(p, str): # Only map string params
-                                      param_to_positions_v.setdefault(p, set()).add(pos)
-                          except (ValueError, TypeError):
-                              continue # Skip if position cannot be converted to int
-
-                 # Convert sets to sorted lists
-                 for param in param_to_positions_v: param_to_positions_v[param] = sorted(list(param_to_positions_v[param]))
-                 for skill in skill_to_positions_v: skill_to_positions_v[skill] = sorted(list(skill_to_positions_v[skill]))
-
-    # 8.1 Reflection Prompts
-    report_lines.append("- **引導反思：**")
-    reflection_prompts_v = []
-
-    # 收集所有相關數據
-    diagnostic_data = {}  # 結構: {skill: {time_perf: {category: [params]}}}
-    
-    # 從診斷數據中獲取信息
-    if diagnosed_df_ch3_raw is not None and not diagnosed_df_ch3_raw.empty:
-        # 確保必要的列存在
-        needed_cols = ['question_fundamental_skill', 'time_performance_category', 'diagnostic_params']
-        if all(col in diagnosed_df_ch3_raw.columns for col in needed_cols):
-            # 先收集所有參數
-            all_params_by_skill_time = {}  # {skill: {time_perf: [params]}}
-            
-            for _, row in diagnosed_df_ch3_raw.iterrows():
-                skill = row.get('question_fundamental_skill', 'Unknown Skill')
-                if skill == 'Unknown Skill':
-                    continue
-                    
-                time_perf = row.get('time_performance_category', '')
-                if not time_perf:
-                    continue
-                
-                params = row.get('diagnostic_params', [])
-                if not isinstance(params, list) or not params:
-                    continue
-                
-                # 初始化嵌套字典
-                if skill not in all_params_by_skill_time:
-                    all_params_by_skill_time[skill] = {}
-                if time_perf not in all_params_by_skill_time[skill]:
-                    all_params_by_skill_time[skill][time_perf] = []
-                
-                # 添加參數
-                for param in params:
-                    if isinstance(param, str) and param != INVALID_DATA_TAG_V:
-                        all_params_by_skill_time[skill][time_perf].append(param)
-            
-            # 按類別分組參數
-            for skill, time_perfs in all_params_by_skill_time.items():
-                if skill not in diagnostic_data:
-                    diagnostic_data[skill] = {}
-                
-                for time_perf, params in time_perfs.items():
-                    if time_perf not in diagnostic_data[skill]:
-                        diagnostic_data[skill][time_perf] = {}
-                    
-                    # 按類別分組
-                    for param in params:
-                        category = V_PARAM_TO_CATEGORY.get(param, 'Unknown')
-                        if category not in diagnostic_data[skill][time_perf]:
-                            diagnostic_data[skill][time_perf][category] = []
-                        if param not in diagnostic_data[skill][time_perf][category]:
-                            diagnostic_data[skill][time_perf][category].append(param)
-    
-    # 按前綴分組（額外分組邏輯，針對更細的前綴進行分組）
-    def group_by_prefix(params):
-        prefix_groups = {}
-        for param in params:
-            # 獲取參數的前綴（例如RC_READING, CR_REASONING等）
-            prefix = param.split('_')[0] if '_' in param else ''
-            if prefix and len(prefix) >= 2:  # 確保前綴有意義
-                prefix_key = f"{prefix}_"
-                if prefix_key not in prefix_groups:
-                    prefix_groups[prefix_key] = []
-                prefix_groups[prefix_key].append(param)
+    # 後續行動 (二級證據收集與質化分析)
+    report_lines.append("**後續行動建議**")
+    if secondary_evidence_trigger:
+        report_lines.append("- **二級證據收集:** 為進一步確認問題，建議回顧近期（2-4週內）的練習記錄：")
+        # Focus on SFE skills if SFE triggered
+        focus_areas = []
+        if sfe_triggered_overall and sfe_skills_involved:
+            # 保持技能名為英文
+            sfe_skills_display_行動 = sorted(list(sfe_skills_involved))
+            focus_areas.append(f"  - 特別關注與SFE相關的技能 ({', '.join(sfe_skills_display_行動)}) 的錯題和慢題。")
         
-        # 如果沒有合適的前綴分組，返回原始參數列表
-        if not prefix_groups:
-            return [params]
-        
-        return list(prefix_groups.values())
-    
-    # 生成反思提示
-    for skill in sorted(diagnostic_data.keys()):
-        for time_perf in sorted(diagnostic_data[skill].keys()):
-            time_perf_translated = translate_v(time_perf)
-            
-            # 按類別順序整理診斷標籤
-            reflection_parts = []
-            reflection_parts.append(f"- 找尋【{skill}】的考前做題紀錄，針對【{time_perf_translated}】的題目，檢討並反思自己是否有：")
-            
-            # 按分類整理診斷標籤
-            for category in V_PARAM_CATEGORY_ORDER:
-                if category in diagnostic_data[skill][time_perf]:
-                    category_params = diagnostic_data[skill][time_perf][category]
-                    
-                    # 按前綴進一步分組
-                    for group in group_by_prefix(category_params):
-                        translated_params = [translate_v(param) for param in group]
-                        reflection_parts.append(f"  - {', '.join(translated_params)}")
-            
-            reflection_prompts_v.append("\n".join(reflection_parts))
-    
-    if not reflection_prompts_v:
-        reflection_prompts_v.append("- 找尋【考前做題紀錄】，檢討並反思自己是否有上述問題。")
-    
-    # 添加到報告
-    for prompt in reflection_prompts_v:
-        prompt_lines = prompt.split("\n")
-        for line in prompt_lines:
-            report_lines.append(line)
-    
-    # 添加引導文字
-    report_lines.append("")
-    report_lines.append("- 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
-    report_lines.append("")
-
-
-    # 8.2 Second Evidence Suggestion
-    '''
-    report_lines.append("- **二級證據參考建議：**")
-    df_problem = pd.DataFrame() # Re-initialize to ensure clean state
-    # Use the potentially modified df from Ch3 results
-    diagnosed_df_for_2nd_ev = ch3.get('diagnosed_dataframe')
-
-    # Check necessary columns exist before filtering
-    cols_for_2nd_ev_filter = ['is_correct', 'overtime', 'is_invalid'] # Ensure is_invalid exists
-    if diagnosed_df_for_2nd_ev is not None and not diagnosed_df_for_2nd_ev.empty and \
-       all(col in diagnosed_df_for_2nd_ev.columns for col in cols_for_2nd_ev_filter):
-        # --- MODIFICATION START ---
-        # Filter for rows that are incorrect OR overtime AND ARE NOT INVALID
-        problem_mask = (
-            ((diagnosed_df_for_2nd_ev['is_correct'] == False) | (diagnosed_df_for_2nd_ev.get('overtime', False) == True)) &
-            (diagnosed_df_for_2nd_ev['is_invalid'] == False) # Explicitly exclude invalid rows
-        )
-        # --- MODIFICATION END ---
-        df_problem = diagnosed_df_for_2nd_ev[problem_mask].copy()
-
-    if not df_problem.empty:
-        # This logic will now only operate on the filtered df_problem (valid data)
-        report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
-        details_added_2nd_ev = False
-        # Check necessary columns for grouping and analysis exist
-        cols_for_2nd_ev_analysis = ['time_performance_category', 'question_type', 'question_fundamental_skill', 'diagnostic_params']
-        if all(col in df_problem.columns for col in cols_for_2nd_ev_analysis):
-            performance_order_en = ['Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 'Slow & Correct'] # Relevant categories for problems
-            df_problem['time_performance_category'] = df_problem['time_performance_category'].fillna('Unknown')
-
-            try:
-                # Group by performance category
-                grouped_by_performance = df_problem.groupby('time_performance_category') # Use observed=False if pandas allows
-
-                for perf_en in performance_order_en:
-                    if perf_en in grouped_by_performance.groups:
-                        group_df = grouped_by_performance.get_group(perf_en)
-                        if not group_df.empty:
-                            perf_zh = translate_v(perf_en)
-                            # Get unique types and skills, translate skills for display
-                            types_in_group = sorted(group_df['question_type'].dropna().unique())
-                            skills_in_group = sorted(group_df['question_fundamental_skill'].dropna().unique())
-                            skills_display_zh = sorted([translate_v(s) for s in skills_in_group if s != 'Unknown Skill'])
-
-                            # Get all unique English codes for this group from 'diagnostic_params'
-                            all_eng_codes_in_group = set()
-                            param_eng_col = 'diagnostic_params' # Use the English code column
-                            for labels_list in group_df[param_eng_col]:
-                                if isinstance(labels_list, list):
-                                    # Add only string parameters, exclude invalid tag
-                                    all_eng_codes_in_group.update(p for p in labels_list if isinstance(p, str) and p != INVALID_DATA_TAG_V)
-
-                            # Categorize English codes and translate for display
-                            labels_by_category = {category: [] for category in V_PARAM_CATEGORY_ORDER}
-                            for code_en in all_eng_codes_in_group:
-                                category = V_PARAM_TO_CATEGORY.get(code_en, 'Unknown')
-                                labels_by_category[category].append(code_en)
-
-                            label_parts_data = []
-                            for category in V_PARAM_CATEGORY_ORDER:
-                                category_eng_codes = labels_by_category.get(category, [])
-                                if category_eng_codes:
-                                    category_zh = translate_v(category)
-                                    # Translate the English codes to Chinese for display
-                                    category_labels_zh = sorted([translate_v(code) for code in category_eng_codes])
-                                    label_parts_data.append((category_zh, category_labels_zh))
-
-                            # Format Report Lines
-                            report_lines.append(f"  - **{perf_zh}：** 需關注題型：【{', '.join(types_in_group)}】；涉及技能：【{', '.join(skills_display_zh)}】。")
-                            if label_parts_data:
-                                report_lines.append("    注意相關問題點：")
-                                for category_zh, sorted_labels_zh in label_parts_data:
-                                    report_lines.append(f"      - 【{category_zh}：{'、'.join(sorted_labels_zh)}】")
-                            details_added_2nd_ev = True
-            except Exception as e:
-                 # Log error if needed, prevent report generation from crashing
-                 print(f"Error during 2nd evidence grouping: {e}")
-                 report_lines.append("  - （分組分析時出現內部錯誤）")
-                 details_added_2nd_ev = True
-
-        # Report core issues summary (using triggered_params_all calculated earlier)
-        core_issue_codes_to_report = set()
-        if 'FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in triggered_params_all:
-             core_issue_codes_to_report.add('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-
-        # Get top 2 other frequent params (optional enhancement, simplified for now)
-        # For simplicity, just list all triggered params grouped by category
-        if triggered_params_all:
-             other_core_issues = triggered_params_all - {'FOUNDATIONAL_MASTERY_INSTABILITY_SFE', INVALID_DATA_TAG_V}
-             if other_core_issues:
-                 translated_core_issues = sorted([translate_v(code) for code in other_core_issues])
-                 report_lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題，例如：【{', '.join(translated_core_issues[:5])}...】。") # Show top 5 for brevity
-                 details_added_2nd_ev = True
-
-        if not details_added_2nd_ev:
-             report_lines.append("  - （本次分析未聚焦到特定的問題類型或技能以供二級證據分析）")
+        # Add other secondary evidence triggers if any (e.g., specific time_cat issues)
+        # This can be expanded based on `secondary_evidence_trigger` logic if more granularity is needed.
+        if not focus_areas: # If SFE didn't trigger specific skills or no SFE
+            focus_areas.append("  - 整理所有錯題和慢題，注意是否存在重複出現的題型、技能或錯誤模式。")
+        report_lines.extend(focus_areas)
         report_lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
     else:
-        report_lines.append("  - (本次分析未發現需要二級證據深入探究的有效問題點)")
-    '''
-
-
-    # 8.3 Qualitative Analysis Suggestion
-    report_lines.append("- **質化分析建議：** 當您對診斷報告指出的錯誤原因感到困惑，或上述方法仍無法幫您釐清根本問題時，可以嘗試提供 2-3 個相關題目的詳細解題思路範例（文字或口述錄音），以便與顧問進行更深入的個案分析。")
+        report_lines.append("- 本次分析未明確觸發二級證據收集。若仍有疑慮，可主動回顧近期練習。")
     report_lines.append("")
 
-    # --- Add Tool/AI Prompt Recommendations based on triggered_params_all ---
-    '''
-    report_lines.append("- **輔助工具與 AI 提示推薦建議：**")
-    report_lines.append("  為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示。系統會根據您觸發的診斷參數組合，推薦相關的資源。請根據您的具體診斷結果選用。")
-    
-    recommended_tools_info = []
-    # Use triggered_params_all which is a set of unique English codes from Ch3 and Ch5
-    # Make sure triggered_params_all is populated correctly before this point
-    if triggered_params_all: # Check if the set is not empty
-        for param_code in sorted(list(triggered_params_all)):
-            if param_code in V_TOOL_AI_RECOMMENDATIONS: # Use the imported constant
-                param_translation = APPENDIX_A_TRANSLATION_V.get(param_code, param_code) # Use the main translation map
-                tool_list_for_param = V_TOOL_AI_RECOMMENDATIONS[param_code] # Use the imported constant
-                if tool_list_for_param: # If there are recommendations for this param
-                    # Add the parameter it relates to for context
-                    recommended_tools_info.append(f"  - **針對問題「{param_translation}」:**")
-                    for tool_or_prompt in tool_list_for_param:
-                        recommended_tools_info.append(f"    - {tool_or_prompt}")
-    
-    if recommended_tools_info:
-        report_lines.extend(recommended_tools_info)
+    if qualitative_analysis_trigger:
+        report_lines.append("- **質化分析建議:** 若對診斷報告指出的錯誤原因感到困惑，或上述方法仍無法釐清根本問題：")
+        # Identify focus skills for qualitative analysis
+        qual_focus_skills_set = set()
+        # Based on the logic for qualitative_analysis_trigger, identify the skills/types involved.
+        # This is a simplified version. A more detailed implementation would trace back the exact triggers.
+        if diagnosed_df_ch3_raw is not None and 'question_fundamental_skill' in diagnosed_df_ch3_raw.columns:
+            triggered_rows_for_qual = diagnosed_df_ch3_raw[diagnosed_df_ch3_raw.apply(
+                lambda row: row.get('time_performance_category', 'Unknown') in ['Normal Time & Wrong', 'Slow & Wrong', 'Slow & Correct'], axis=1
+            )]
+            if not triggered_rows_for_qual.empty:
+                qual_focus_skills_set.update(triggered_rows_for_qual['question_fundamental_skill'].dropna().unique())
+        
+        qual_focus_display = "某些題目" # Default
+        if qual_focus_skills_set:
+            # 保持技能名為英文
+            qual_focus_skills_sorted = sorted(list(s for s in qual_focus_skills_set if s!= 'Unknown Skill'))
+            if qual_focus_skills_sorted:
+                 qual_focus_display = f"涉及 **{', '.join(qual_focus_skills_sorted)}** 等技能的題目"
+
+        report_lines.append(f"  - 建議提供 2-3 題您在 {qual_focus_display} 上「典型錯誤」或「耗時過久」的詳細解題思路（文字/錄音），以便與顧問進行更深入的個案分析。")
     else:
-        report_lines.append("  - 暫無針對性的輔助工具或 AI 提示建議（或未觸發相關診斷參數）。")
+        report_lines.append("- 本次分析未明確觸發質化分析。若對特定問題有深入探討需求，可主動整理案例。")
     report_lines.append("")
-    '''
-    # --- End Tool/AI Prompt Recommendations ---
 
-    report_lines.append("--- 報告結束 ---")
+    # --- Section 8: Tool and AI Prompt Recommendations (COMMENTED OUT - to be replaced by new function) ---
+    # """
+    # report_lines.append("- **輔助工具與 AI 提示推薦建議：**")
+    # report_lines.append("  - 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示。系統會根據您觸發的診斷參數組合，推薦相關的資源。請根據您的具體診斷結果選用。")
+    # recommended_tools_added = False
+    # # Use all_triggered_params_all which is a set of unique English codes from Ch3 and Ch5
+    # # Ensure it exists and is a set
+    # current_triggered_params_v = triggered_params_all if isinstance(triggered_params_all, set) else set()
 
-    # Final formatting for Chinese punctuation
-    final_report_string = "\n".join(report_lines)
-    final_report_string = final_report_string.replace(":", "：").replace("(", "（").replace(")", "）").replace("[", "【").replace("]", "】").replace(",", "，").replace(";", "；")
-    final_report_string = final_report_string.replace("； ", "；")
-    final_report_string = final_report_string.replace("： ", "：")
-    final_report_string = final_report_string.replace("...", "…") # Ellipsis
+    # for param_code in current_triggered_params_v:
+    #     if param_code in V_TOOL_AI_RECOMMENDATIONS:
+    #         param_zh = translate_v(param_code)
+    #         report_lines.append(f"  - **若診斷涉及【{param_zh}】:**")
+    #         for rec_item in V_TOOL_AI_RECOMMENDATIONS[param_code]:
+    #             report_lines.append(f"    - {rec_item}")
+    #         recommended_tools_added = True
+            
+    # if not recommended_tools_added:
+    #     report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議。)")
+    # report_lines.append("")
+    # """
+    
+    return "\n".join(report_lines)
 
-    return final_report_string 
+# New function for AI tool recommendations based on edited data
+def generate_v_ai_tool_recommendations(diagnosed_df_v_subject):
+    """Generates AI tool and prompt recommendations based on edited V diagnostic data."""
+    recommendation_lines = []
+    
+    if diagnosed_df_v_subject is None or diagnosed_df_v_subject.empty:
+        return "  - (V科無數據可生成AI建議。)"
 
-# Example of a more detailed diagnostic table generation (conceptual)
-# This would typically be a separate function called by generate_v_summary_report or an external tool
+    if 'diagnostic_params_list' not in diagnosed_df_v_subject.columns:
+        return "  - (V科數據缺少 'diagnostic_params_list' 欄位，無法生成AI建議。)"
+
+    all_triggered_param_codes = set()
+    if 'is_sfe' in diagnosed_df_v_subject.columns and diagnosed_df_v_subject['is_sfe'].any():
+        all_triggered_param_codes.add("V_SFE_GENERAL_ADVICE_CODE") # Example SFE code for V
+
+    for param_list in diagnosed_df_v_subject['diagnostic_params_list']:
+        if isinstance(param_list, list):
+            for param_text_or_code in param_list:
+                all_triggered_param_codes.add(str(param_text_or_code))
+    
+    all_triggered_param_codes = {code for code in all_triggered_param_codes if code and str(code).strip()}
+
+    if not all_triggered_param_codes:
+        recommendation_lines.append("  - (根據您的V科編輯，未觸發特定的工具或 AI 提示建議。)")
+        return "\n".join(recommendation_lines)
+
+    try:
+        # from .constants import V_TOOL_AI_RECOMMENDATIONS # Ensure this exists
+        # from .translations import translate_v # For display name if codes are English
+        pass # Assuming V_TOOL_AI_RECOMMENDATIONS is in scope
+    except ImportError:
+        return "  - (AI建議配置缺失，無法生成V科建議。)"
+
+    recommendation_lines.append("  --- V 科目 AI 輔助建議 ---")
+    
+    recommended_tools_added_for_v = False
+    for param_code_or_text in sorted(list(all_triggered_param_codes)):
+        if param_code_or_text in V_TOOL_AI_RECOMMENDATIONS:
+            display_name = param_code_or_text # Or translate_v(param_code_or_text) if it's a code
+            recommendation_lines.append(f"  - **若診斷涉及【{display_name}】:**")
+            for rec_item in V_TOOL_AI_RECOMMENDATIONS[param_code_or_text]:
+                recommendation_lines.append(f"    - {rec_item}")
+            recommended_tools_added_for_v = True
+            
+    if not recommended_tools_added_for_v:
+        recommendation_lines.append("  - (根據您的V科編輯，未觸發特定的工具或 AI 提示建議。)")
+    
+    return "\n".join(recommendation_lines)
+
+
+# --- Helper function to group parameters by category for detailed table ---
+# (This function seems to be related to detailed table generation, not summary report)
 
 def _generate_detailed_diagnostic_table_v(diagnosed_df):
     # Filter for error/overtime questions

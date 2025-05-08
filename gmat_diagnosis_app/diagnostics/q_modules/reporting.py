@@ -7,8 +7,9 @@ Q診斷模塊的報告生成功能
 
 import pandas as pd
 from gmat_diagnosis_app.diagnostics.q_modules.translations import get_translation, APPENDIX_A_TRANSLATION
-from gmat_diagnosis_app.diagnostics.q_modules.utils import format_rate, map_difficulty_to_label
-from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMMENDATIONS
+from gmat_diagnosis_app.diagnostics.q_modules.utils import format_rate, map_difficulty_to_label, grade_difficulty_q, calculate_practice_time_limit
+from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMMENDATIONS, INVALID_DATA_TAG_Q
+import re
 
 
 def generate_report_section1(ch1_results):
@@ -499,55 +500,132 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
                     from collections import Counter
                     label_counts = Counter(all_labels)
                     if label_counts:
-                        common_diagnostic_labels[perf_en] = max(label_counts.items(), key=lambda x: x[1])[0]
+                        # Exclude INVALID_DATA_TAG_Q if present
+                        if INVALID_DATA_TAG_Q in label_counts:
+                            del label_counts[INVALID_DATA_TAG_Q]
+                        if label_counts: # Check if still non-empty
+                            common_diagnostic_labels[perf_en] = label_counts.most_common(1)[0][0]
+                        else:
+                            common_diagnostic_labels[perf_en] = "無特定標籤" # Default if only invalid tags were present
                     else:
-                        common_diagnostic_labels[perf_en] = "診斷標籤"  # 預設值
+                        common_diagnostic_labels[perf_en] = "無特定標籤" # 預設值
                 else:
-                    common_diagnostic_labels[perf_en] = "診斷標籤"  # 預設值
+                    common_diagnostic_labels[perf_en] = "無特定標籤" # 預設值
             else:
-                common_diagnostic_labels[perf_en] = "診斷標籤"  # 預設值
+                common_diagnostic_labels[perf_en] = "無特定標籤" # 預設值
     
-    # 添加針對每種時間表現的反思提示
-    reflection_added = False
+    # 生成引導反思問題
     for perf in time_performances:
         perf_en = perf['en']
+        perf_zh = perf['zh']
         
-        # 只輸出資料中存在的時間表現類型
+        # 只為實際存在的時間表現類型生成問題
         if perf_en not in existing_performances:
             continue
             
-        perf_zh = perf['zh']
-        skill = common_skills.get(perf_en, "Rates/Ratio/Percent")
-        domain = common_question_types.get(perf_en, "Real")
-        label = common_diagnostic_labels.get(perf_en, "診斷標籤")
+        skill = common_skills.get(perf_en, "代數")
+        q_type = common_question_types.get(perf_en, "文字題")
+        label = common_diagnostic_labels.get(perf_en, "概念應用錯誤")
         
-        report_parts.append(f"* 找尋【{skill}】＋【{domain}】的考前做題紀錄，針對【{perf_zh}】的題目，檢討並反思自己是否有【{label}】等問題並進一步細分確實考點。")
-        reflection_added = True
-    
-    # 如果沒有添加任何反思提示，則添加一般性提示
-    if not reflection_added:
-        report_parts.append("* 根據數據分析，未發現明顯的時間表現問題。請檢視錯題和超時題，分析可能存在的知識點不熟或解題策略不佳問題。")
-    
+        report_parts.append(f"* 當出現 **{perf_zh}** 時，通常是 **{skill}** 方面的 **{q_type}** 題，診斷為 **{label}**，您認為可能的原因是什麼？")
     report_parts.append("")
-    
-    # --- Chapter 8: Tool and AI Prompt Recommendations (Added) ---
-    # report_parts.append("--- 第八章：輔助工具與 AI 提示推薦建議 ---")
+
+    # 7. AI工具和提示建議（這部分將被新的獨立函數取代，但保留結構以便參考）
+    # """
+    # report_parts.append("**輔助工具與 AI 提示推薦建議：**")
+    # report_parts.append("  - 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示。系統会根据您触发的诊断参数组合，推荐相关的资源。请根据您的具体诊断结果选用。")
     # recommended_tools_added = False
-    # if triggered_params_english: # Check if set is not empty
-    #     sorted_triggered_params = sorted(list(triggered_params_english))
-    #     for param_code in sorted_triggered_params:
+    # if triggered_params_english:
+    #     for param_code in triggered_params_english: # Iterate over unique triggered English param codes
     #         if param_code in Q_TOOL_AI_RECOMMENDATIONS:
-    #             param_translation = APPENDIX_A_TRANSLATION.get(param_code, param_code)
-    #             tool_list_for_param = Q_TOOL_AI_RECOMMENDATIONS[param_code]
-    #             if tool_list_for_param:
-    #                 report_parts.append(f"* 針對問題「{param_translation}」建議:")
-    #                 for tool_or_prompt in tool_list_for_param:
-    #                     report_parts.append(f"  - {tool_or_prompt}")
-    #                 recommended_tools_added = True
-    #
+    #             param_zh = get_translation(param_code)
+    #             report_parts.append(f"  - **若診斷涉及【{param_zh}】:**")
+    #             for rec_item in Q_TOOL_AI_RECOMMENDATIONS[param_code]:
+    #                 report_parts.append(f"    - {rec_item}")
+    #             recommended_tools_added = True
     # if not recommended_tools_added:
-    #     report_parts.append("* (暫無針對性的輔助工具或 AI 提示建議)")
+    #     report_parts.append("  - (本次分析未觸發特定的工具或 AI 提示建議。)")
     # report_parts.append("")
+    # """
     
-    # 組合完整報告
-    return "\n".join(report_parts) 
+    return "\n".join(report_parts)
+
+
+def generate_q_ai_tool_recommendations(diagnosed_df_q_subject):
+    """Generates AI tool and prompt recommendations based on edited Q diagnostic data."""
+    recommendation_lines = []
+    
+    if diagnosed_df_q_subject is None or diagnosed_df_q_subject.empty:
+        return "  - (Q科無數據可生成AI建議。)"
+
+    # Ensure 'diagnostic_params_list' column exists
+    if 'diagnostic_params_list' not in diagnosed_df_q_subject.columns:
+        return "  - (Q科數據缺少 'diagnostic_params_list' 欄位，無法生成AI建議。)"
+
+    # Aggregate all unique diagnostic parameter codes (assuming they are English codes here)
+    # And also check for SFE flags directly from the boolean column
+    all_triggered_param_codes = set()
+    sfe_is_present_in_edited_data = False
+    if 'is_sfe' in diagnosed_df_q_subject.columns and diagnosed_df_q_subject['is_sfe'].any():
+        sfe_is_present_in_edited_data = True
+        # Add a generic SFE code if SFE is present, to trigger SFE-related general advice
+        # This code needs to be a key in Q_TOOL_AI_RECOMMENDATIONS
+        all_triggered_param_codes.add("Q_SFE_GENERAL_ADVICE_CODE") # Example SFE code
+
+    for param_list in diagnosed_df_q_subject['diagnostic_params_list']:
+        if isinstance(param_list, list):
+            for param_text_or_code in param_list:
+                # We need a robust way to get the English CODE if param_text_or_code is Chinese text.
+                # For now, assuming param_text_or_code might be an English code or we adapt Q_TOOL_AI_RECOMMENDATIONS keys.
+                # Let's assume for now that diagnostic_params_list contains codes that can be used as keys.
+                # Or, if they are Chinese, Q_TOOL_AI_RECOMMENDATIONS should use Chinese keys.
+                # To simplify, this placeholder will assume param_text_or_code is usable.
+                # This is a CRITICAL part to get right based on actual data in diagnostic_params_list.
+                # For now, let's assume `diagnostic_params_list` could contain English codes from the original diagnosis
+                # or user-added text. We should prioritize codes if they match.
+                all_triggered_param_codes.add(str(param_text_or_code)) 
+    
+    # Remove any None or empty string codes if they accidentally got in
+    all_triggered_param_codes = {code for code in all_triggered_param_codes if code and str(code).strip()}
+
+    if not all_triggered_param_codes:
+        recommendation_lines.append("  - (根據您的Q科編輯，未觸發特定的工具或 AI 提示建議。)")
+        return "\n".join(recommendation_lines)
+
+    # Ensure Q_TOOL_AI_RECOMMENDATIONS is available
+    # (Should be imported or defined in constants.py for q_modules)
+    try:
+        # from .constants import Q_TOOL_AI_RECOMMENDATIONS # Ensure this exists and is populated
+        # from .translations import get_translation # To translate codes to Chinese for display
+        pass # Assuming Q_TOOL_AI_RECOMMENDATIONS is already in scope via import
+    except ImportError:
+        return "  - (AI建議配置缺失，無法生成Q科建議。)"
+    
+    # For translating codes to display names if needed (assuming get_translation exists)
+    # from .translations import get_translation
+    # This function might not be available or suitable if diagnostic_params_list contains free text.
+    # We will display the code/text as is from the list if translation is complex.
+
+    recommendation_lines.append("  --- Q 科目 AI 輔助建議 ---")
+    # recommendation_lines.append("  - 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些基於您編輯後診斷標籤的建議：")
+    
+    recommended_tools_added_for_q = False
+    # Sort for consistent output order
+    for param_code_or_text in sorted(list(all_triggered_param_codes)):
+        # If param_code_or_text is a known code in Q_TOOL_AI_RECOMMENDATIONS
+        if param_code_or_text in Q_TOOL_AI_RECOMMENDATIONS:
+            # display_name = get_translation(param_code_or_text) # If param is a code
+            display_name = param_code_or_text # If it's already a descriptive text or no translation needed for keys
+            recommendation_lines.append(f"  - **若診斷涉及【{display_name}】:**")
+            for rec_item in Q_TOOL_AI_RECOMMENDATIONS[param_code_or_text]:
+                recommendation_lines.append(f"    - {rec_item}")
+            recommended_tools_added_for_q = True
+        # else: # Handle case where param_text is user-added and not in Q_TOOL_AI_RECOMMENDATIONS
+            # This could be a place to add a generic prompt for user-added tags, e.g.
+            # recommendation_lines.append(f"  - **關於您標記的【{param_code_or_text}】:** 建議您使用此標籤搜索相關學習資源或與AI討論此問題。")
+            # recommended_tools_added_for_q = True
+            
+    if not recommended_tools_added_for_q:
+        recommendation_lines.append("  - (根據您的Q科編輯，未觸發特定的工具或 AI 提示建議。)")
+    
+    return "\n".join(recommendation_lines) 

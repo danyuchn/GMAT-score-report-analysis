@@ -36,7 +36,10 @@ def init_session_state():
         'v_incorrect_to_correct_qns': '',
         'v_correct_to_incorrect_qns': '',
         'di_incorrect_to_correct_qns': '',
-        'di_correct_to_incorrect_qns': ''
+        'di_correct_to_incorrect_qns': '',
+        # --- Editable Diagnosis Labels State ---
+        'original_processed_df': None, # Backup of the original processed_df
+        'ai_prompts_need_regeneration': False # Flag to indicate if AI prompts need to be regenerated
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -68,6 +71,10 @@ def reset_session_for_new_upload():
     st.session_state.theta_plots = {}
     st.session_state.show_chat = False
     
+    # Reset editable diagnosis states
+    st.session_state.original_processed_df = None
+    st.session_state.ai_prompts_need_regeneration = False
+    
     # 備份當前聊天歷史
     if 'chat_history' in st.session_state and st.session_state.chat_history:
         st.session_state.chat_history_backup = st.session_state.chat_history.copy()
@@ -95,4 +102,34 @@ def ensure_chat_history_persistence():
         st.session_state.chat_history = st.session_state.chat_history_backup.copy()
     
     # 每次調用時都更新備份
-    st.session_state.chat_history_backup = st.session_state.chat_history.copy() 
+    st.session_state.chat_history_backup = st.session_state.chat_history.copy()
+
+# Helper function to update session state after analysis (called from diagnosis_manager.py)
+# This is not part of the original file, but it's a good place to ensure original_processed_df is set.
+# We'll call this from diagnosis_manager.py instead of directly modifying session state there.
+def set_analysis_results(processed_df, report_dict, final_thetas, theta_plots, consolidated_report):
+    st.session_state.processed_df = processed_df
+    if processed_df is not None:
+        st.session_state.original_processed_df = processed_df.copy() # Save a copy for reset
+    else:
+        st.session_state.original_processed_df = None
+    st.session_state.report_dict = report_dict
+    st.session_state.final_thetas = final_thetas
+    st.session_state.theta_plots = theta_plots
+    st.session_state.consolidated_report_text = consolidated_report # Assuming this holds the text for display
+    st.session_state.diagnosis_complete = True
+    st.session_state.error_message = None
+    st.session_state.analysis_error = False
+    st.balloons()
+
+def set_analysis_error(error_message, theta_plots=None):
+    st.session_state.diagnosis_complete = False
+    st.session_state.analysis_error = True
+    st.session_state.error_message = error_message
+    if theta_plots and isinstance(theta_plots, dict):
+        st.session_state.theta_plots = theta_plots
+    else:
+        st.session_state.theta_plots = {}
+    # Ensure processed_df related states are cleared on error
+    st.session_state.processed_df = None
+    st.session_state.original_processed_df = None 

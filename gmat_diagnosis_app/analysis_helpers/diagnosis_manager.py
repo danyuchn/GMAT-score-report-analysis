@@ -13,6 +13,8 @@ from gmat_diagnosis_app.diagnostics.v_diagnostic import run_v_diagnosis_processe
 from gmat_diagnosis_app.diagnostics.di_diagnostic import run_di_diagnosis_processed
 from gmat_diagnosis_app.diagnostics.q_diagnostic import diagnose_q
 from gmat_diagnosis_app.services.openai_service import summarize_report_with_openai, generate_ai_consolidated_report
+# Import the new helper functions from session_manager
+from gmat_diagnosis_app.session_manager import set_analysis_results, set_analysis_error
 
 def run_diagnosis(df_final_for_diagnosis, time_pressure_map):
     """
@@ -139,27 +141,23 @@ def update_session_state_after_analysis(analysis_success, processed_df, report_d
         None
     """
     if analysis_success and processed_df is not None and not processed_df.empty:
-        st.session_state.diagnosis_complete = True
-        st.session_state.error_message = None
-        st.session_state.analysis_error = False # Explicitly set on success
-        st.session_state.processed_df = processed_df
-        st.session_state.report_dict = report_dict
-        st.session_state.final_thetas = final_thetas
-        st.session_state.theta_plots = theta_plots
-        st.session_state.consolidated_report = consolidated_report
-        st.balloons()  # Celebrate success
+        # Call the new helper function to set results
+        set_analysis_results(
+            processed_df=processed_df,
+            report_dict=report_dict,
+            final_thetas=final_thetas,
+            theta_plots=theta_plots,
+            consolidated_report=consolidated_report
+        )
     else:
+        error_msg_to_pass = error_message
         if analysis_success and (processed_df is None or processed_df.empty): # Succeeded but no data
-            st.session_state.diagnosis_complete = False
-            st.session_state.analysis_error = True
-            st.session_state.error_message = "分析完成但未產生有效數據，請檢查輸入或診斷邏輯。"
-            # 仍然保存存在的theta_plots
-            if theta_plots and isinstance(theta_plots, dict):
-                st.session_state.theta_plots = theta_plots
+            error_msg_to_pass = "分析完成但未產生有效數據，請檢查輸入或診斷邏輯。"
         elif not analysis_success: # Explicitly failed
-            st.session_state.diagnosis_complete = False
-            st.session_state.analysis_error = True # Set on failure
-            st.session_state.error_message = error_message or "分析未能成功完成，請檢查上方錯誤訊息。" # Preserve specific error if set
-            # 只有在完全失敗時才清空theta_plots，其他情況保留已生成的圖表
-            if not theta_plots or not isinstance(theta_plots, dict):
-                st.session_state.theta_plots = {}  # Clear plots on error only if they don't exist 
+            error_msg_to_pass = error_message or "分析未能成功完成，請檢查上方錯誤訊息。" # Preserve specific error if set
+        
+        # Call the new helper function to set error
+        set_analysis_error(
+            error_message=error_msg_to_pass,
+            theta_plots=theta_plots # Pass theta_plots to preserve them if they exist
+        ) 

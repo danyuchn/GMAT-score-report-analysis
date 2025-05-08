@@ -12,6 +12,9 @@ from gmat_diagnosis_app.utils.styling import apply_styles
 from gmat_diagnosis_app.utils.excel_utils import to_excel
 from gmat_diagnosis_app.constants.config import SUBJECTS, EXCEL_COLUMN_MAP
 from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
+from gmat_diagnosis_app.diagnostics.q_modules.reporting import generate_q_summary_report # Placeholder for actual Q AI prompt function
+from gmat_diagnosis_app.diagnostics.di_modules.report_generation import _generate_di_summary_report # Placeholder
+from gmat_diagnosis_app.diagnostics.v_modules.reporting import generate_v_summary_report # Placeholder
 import logging
 
 # --- Column Display Configuration (Moved from app.py) ---
@@ -427,15 +430,22 @@ def display_total_results(tab_container):
 # --- Display Results Function (Moved from app.py) ---
 def display_results():
     """Displays all diagnostic results in separate tabs."""
-    if not st.session_state.get("diagnosis_complete", False):
-        st.info("尚未執行分析或分析未成功完成。")
+    if not st.session_state.get("diagnosis_complete", False) and not st.session_state.get("original_processed_df") :
+        st.info("尚未執行分析或分析未成功完成。請先上傳數據並執行分析。")
         return
 
-    # Create tabs for Total, Q, V, DI, and AI Chat
-    tab_titles = ["Total (總分與百分位)", "Q 科結果", "V 科結果", "DI 科結果", "💬 AI 即時問答"]
-    
+    tab_titles = ["Total (總分與百分位)"]
     if st.session_state.get("consolidated_report_text"):
-        tab_titles.insert(1, "✨ AI 總結建議") # Insert after "Total"
+        tab_titles.append("✨ AI 總結建議")
+    
+    # Add subject result tabs
+    tab_titles.extend([f"{subject} 科結果" for subject in SUBJECTS])
+    
+    # Add the new Edit tab
+    tab_titles.append("🔧 編輯診斷標籤 & 更新AI建議")
+    
+    # Add AI Chat tab last
+    tab_titles.append("💬 AI 即時問答")
 
     tabs = st.tabs(tab_titles)
     
@@ -450,34 +460,201 @@ def display_results():
     if "✨ AI 總結建議" in tab_titles:
         with tabs[current_tab_index]:
             tabs[current_tab_index].subheader("AI 智能匯總與建議行動")
-            tabs[current_tab_index].markdown(st.session_state.consolidated_report_text)
+            # Make sure to use consolidated_report_text, which is set by set_analysis_results
+            report_text_to_display = st.session_state.get("consolidated_report_text", "AI總結報告生成中或不可用。")
+            tabs[current_tab_index].markdown(report_text_to_display)
         current_tab_index += 1
 
     # Tabs for Q, V, DI
-    for subject in SUBJECTS: # SUBJECTS = ['Q', 'V', 'DI']
+    for subject in SUBJECTS: 
         report_md = st.session_state.report_dict.get(subject, f"未找到 {subject} 科的診斷報告。")
-        df_subject = st.session_state.processed_df[st.session_state.processed_df['Subject'] == subject] if st.session_state.processed_df is not None else pd.DataFrame()
+        # Use original_processed_df if processed_df is None (e.g. after an error)
+        df_for_subject_display = st.session_state.processed_df if st.session_state.processed_df is not None else st.session_state.original_processed_df
+        
+        df_subject = pd.DataFrame()
+        if df_for_subject_display is not None and not df_for_subject_display.empty:
+            df_subject = df_for_subject_display[df_for_subject_display['Subject'] == subject]
         
         subject_tab_title = f"{subject} 科結果"
+        # Find the correct index for the subject tab
         try:
             actual_tab_index_for_subject = tab_titles.index(subject_tab_title)
             with tabs[actual_tab_index_for_subject]:
                 display_subject_results(subject, tabs[actual_tab_index_for_subject], report_md, df_subject, COLUMN_DISPLAY_CONFIG, EXCEL_COLUMN_MAP)
         except ValueError:
-            st.error(f"無法找到分頁 '{subject_tab_title}'。請檢查 tab_titles 配置。")
-            # Fallback or log, current_tab_index will not be incremented for this subject's own tab
+            # This case should ideally not be reached if tab_titles is constructed correctly
+            st.error(f"無法找到分頁 '{subject_tab_title}'。Tab配置: {tab_titles}")
+            # Do not increment current_tab_index here, as it might mess up subsequent tab indexing if used linearly.
+            # Instead, rely on finding index directly.
+
+    # Tab for Editing Diagnostic Labels
+    edit_tab_title = "🔧 編輯診斷標籤 & 更新AI建議"
+    try:
+        edit_tab_index = tab_titles.index(edit_tab_title)
+        with tabs[edit_tab_index]:
+            tabs[edit_tab_index].subheader("編輯診斷標籤並更新AI工具/提示建議")
+            
+            if st.session_state.original_processed_df is None:
+                tabs[edit_tab_index].info("沒有可供編輯的診斷數據。請先成功執行一次分析。")
+            else:
+                # Initialize edited_df in session_state if it doesn't exist or if we need to reset
+                if 'editable_diagnostic_df' not in st.session_state or st.session_state.original_processed_df is not st.session_state.get('_editable_df_source'):
+                    st.session_state.editable_diagnostic_df = st.session_state.original_processed_df.copy()
+                    st.session_state._editable_df_source = st.session_state.original_processed_df # Track source to detect reset needs
+
+                # Define user-requested columns and their display order
+                user_requested_internal_names = [
+                    "Subject", "question_position", "is_correct", "question_time",
+                    "question_type", "content_domain", "question_fundamental_skill",
+                    "is_invalid", "time_performance_category", "diagnostic_params_list"
+                ]
+                
+                # Create a DataFrame view for the editor with only these columns, in this order.
+                # Make sure all these columns actually exist in the editable_diagnostic_df.
+                # If a column is missing, this will raise a KeyError, which is good for debugging.
+                # Alternatively, one could filter `user_requested_internal_names` to only include
+                # columns that are actually present in `st.session_state.editable_diagnostic_df.columns`.
+                cols_to_display = [col for col in user_requested_internal_names if col in st.session_state.editable_diagnostic_df.columns]
+                df_for_editor = st.session_state.editable_diagnostic_df[cols_to_display].copy()
+
+                # Prepare 'diagnostic_params_list' for TextColumn: convert list to comma-separated string
+                if 'diagnostic_params_list' in df_for_editor.columns:
+                    def format_tags_for_text_editor(tags_list):
+                        if isinstance(tags_list, list):
+                            # Filter out None or empty strings from list before joining
+                            return ", ".join(str(tag).strip() for tag in tags_list if tag and str(tag).strip())
+                        if pd.isna(tags_list) or tags_list is None:
+                            return "" # Return empty string for NaN/None
+                        # If it's already a string (e.g., from previous edit), just return it after stripping
+                        return str(tags_list).strip()
+                    df_for_editor['diagnostic_params_list'] = df_for_editor['diagnostic_params_list'].apply(format_tags_for_text_editor)
+
+                # Define column configurations for the data_editor, tailored to the new view
+                editor_column_config = {
+                    "Subject": st.column_config.TextColumn("科目", disabled=True),
+                    "question_position": st.column_config.NumberColumn("題號", help="題目在該科目中的順序", disabled=True),
+                    "is_correct": st.column_config.CheckboxColumn("答對", help="該題是否回答正確", disabled=True),
+                    "question_time": st.column_config.NumberColumn("用時", help="該題作答用時(分鐘)", format="%.2f", disabled=True),
+                    "question_type": st.column_config.TextColumn("題型", disabled=True),
+                    "content_domain": st.column_config.TextColumn("內容領域", disabled=True),
+                    "question_fundamental_skill": st.column_config.TextColumn("考察能力", disabled=True),
+                    "is_invalid": st.column_config.CheckboxColumn("標記無效", help="該題是否被標記為無效", disabled=True),
+                    "time_performance_category": st.column_config.SelectboxColumn(
+                        "時間表現",
+                        help="點擊編輯以選擇時間表現分類",
+                        options=["Slow & Wrong", "Slow & Right", "Normal & Wrong", "Normal & Right", "Fast & Wrong", "Fast & Right", "N/A"],
+                        required=True
+                    ),
+                    "diagnostic_params_list": st.column_config.TextColumn(
+                        "診斷標籤 (逗號分隔)",
+                        help="請用逗號 (,) 分隔多個標籤。例如：標籤1,標籤2,標籤3",
+                        width="large"
+                    )
+                }
+                
+                final_editor_column_config = {k: v for k, v in editor_column_config.items() if k in df_for_editor.columns}
+
+                tabs[edit_tab_index].markdown("**說明:** 在下方表格中修改「診斷標籤」或「時間表現」。對於「診斷標籤」，請用逗號分隔多個標籤。完成後點擊「套用變更」按鈕。")
+                
+                edited_df_subset_from_editor = tabs[edit_tab_index].data_editor(
+                    df_for_editor,
+                    column_config=final_editor_column_config,
+                    use_container_width=True,
+                    num_rows="fixed", 
+                    key="diagnosis_label_editor" 
+                )
+
+                if edited_df_subset_from_editor is not None:
+                    updated_full_df = st.session_state.editable_diagnostic_df.copy()
+                    
+                    for col_name in edited_df_subset_from_editor.columns:
+                        if col_name in updated_full_df.columns:
+                            if col_name == 'diagnostic_params_list':
+                                # Convert comma-separated string back to list of strings
+                                def parse_tags_from_text_editor(tags_str):
+                                    if pd.isna(tags_str) or not isinstance(tags_str, str) or not tags_str.strip():
+                                        return []
+                                    return [tag.strip() for tag in tags_str.split(',') if tag.strip()]
+                                
+                                updated_full_df[col_name] = edited_df_subset_from_editor[col_name].apply(parse_tags_from_text_editor)
+                            else:
+                                updated_full_df[col_name] = edited_df_subset_from_editor[col_name]
+                    
+                    st.session_state.editable_diagnostic_df = updated_full_df
+                    st.session_state.ai_prompts_need_regeneration = True
+
+                col1, col2 = tabs[edit_tab_index].columns(2)
+                if col1.button("↺ 重設為原始標籤", key="reset_editable_df"):
+                    st.session_state.editable_diagnostic_df = st.session_state.original_processed_df.copy()
+                    st.session_state.ai_prompts_need_regeneration = False # No need to regenerate if reset
+                    if 'generated_ai_prompts_for_edit_tab' in st.session_state:
+                        del st.session_state['generated_ai_prompts_for_edit_tab'] # Clear previous prompts
+                    st.experimental_rerun()
+
+                if col2.button("✓ 套用變更並更新AI建議", key="apply_editable_df", type="primary"):
+                    # The editor already updated st.session_state.editable_diagnostic_df
+                    # So, we just need to flag for regeneration
+                    st.session_state.ai_prompts_need_regeneration = True
+                    tabs[edit_tab_index].success("變更已套用！AI建議將在下方更新。")
+                    # We will handle regeneration and display below
+                
+                # Display AI Prompts if regeneration is needed or already generated
+                if st.session_state.get('ai_prompts_need_regeneration', False) or 'generated_ai_prompts_for_edit_tab' in st.session_state:
+                    with st.spinner("正在根據您的編輯生成AI建議..."):
+                        # --- TODO: Call new AI prompt generation functions here --- 
+                        # These functions will take st.session_state.editable_diagnostic_df as input
+                        # For now, using placeholders. These need to be implemented in respective diagnostic modules.
+                        
+                        q_prompts = ""
+                        v_prompts = ""
+                        di_prompts = ""
+
+                        df_to_generate_prompts = st.session_state.editable_diagnostic_df
+
+                        # Placeholder: Simulate calling the actual functions when they are ready
+                        # Q Prompts
+                        # from gmat_diagnosis_app.diagnostics.q_modules.ai_prompts import generate_q_ai_tool_recommendations 
+                        # q_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'Q']
+                        # if not q_df_subject.empty: q_prompts = generate_q_ai_tool_recommendations(q_df_subject)
+                        
+                        # V Prompts - similar structure
+                        # from gmat_diagnosis_app.diagnostics.v_modules.ai_prompts import generate_v_ai_tool_recommendations
+                        # v_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'V']
+                        # if not v_df_subject.empty: v_prompts = generate_v_ai_tool_recommendations(v_df_subject)
+
+                        # DI Prompts - similar structure
+                        # from gmat_diagnosis_app.diagnostics.di_modules.ai_prompts import generate_di_ai_tool_recommendations
+                        # di_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'DI']
+                        # if not di_df_subject.empty: di_prompts = generate_di_ai_tool_recommendations(di_df_subject)
+
+                        # For demonstration, using mock data
+                        q_prompts = "Q科AI建議 (基於編輯):\n- 工具A: ...\n- 提示B: ..."
+                        v_prompts = "V科AI建議 (基於編輯):\n- 工具C: ...\n- 提示D: ..."
+                        di_prompts = "DI科AI建議 (基於編輯):\n- 工具E: ...\n- 提示F: ..."
+
+                        all_prompts = f"### AI 工具與提示建議 (基於您的編輯)\n\n**Quantitative (Q) 科目:**\n{q_prompts if q_prompts else '(無特定建議)'}\n\n**Verbal (V) 科目:**\n{v_prompts if v_prompts else '(無特定建議)'}\n\n**Data Insights (DI) 科目:**\n{di_prompts if di_prompts else '(無特定建議)'}"
+                        
+                        st.session_state.generated_ai_prompts_for_edit_tab = all_prompts
+                        st.session_state.ai_prompts_need_regeneration = False # Reset flag after generation
+                    
+                if 'generated_ai_prompts_for_edit_tab' in st.session_state:
+                    tabs[edit_tab_index].markdown(st.session_state.generated_ai_prompts_for_edit_tab)
+
+    except ValueError:
+        # This case should ideally not be reached if tab_titles is constructed correctly
+        st.error(f"無法找到分頁 '{edit_tab_title}'。Tab配置: {tab_titles}")
+        
 
     # Tab for AI Chat - find its index
     ai_chat_tab_title = "💬 AI 即時問答"
-    if ai_chat_tab_title in tab_titles:
-        try:
-            ai_chat_tab_index = tab_titles.index(ai_chat_tab_title)
-            with tabs[ai_chat_tab_index]:
-                tabs[ai_chat_tab_index].subheader("與 AI 即時問答")
-                if st.session_state.get('openai_api_key'):
-                    display_chat_interface(st.session_state)
-                else:
-                    tabs[ai_chat_tab_index].info("請在側邊欄輸入 OpenAI API Key 以啟用 AI 問答功能。")
-        except ValueError:
-            # This should not happen if it's in tab_titles
-            st.error(f"無法找到分頁 '{ai_chat_tab_title}'.") 
+    try:
+        ai_chat_tab_index = tab_titles.index(ai_chat_tab_title)
+        with tabs[ai_chat_tab_index]:
+            tabs[ai_chat_tab_index].subheader("與 AI 即時問答")
+            if st.session_state.get('openai_api_key'):
+                display_chat_interface(st.session_state)
+            else:
+                tabs[ai_chat_tab_index].info("請在側邊欄輸入 OpenAI API Key 以啟用 AI 問答功能。")
+    except ValueError:
+        # This should not happen if it's in tab_titles
+        st.error(f"無法找到分頁 '{ai_chat_tab_title}'.") 
