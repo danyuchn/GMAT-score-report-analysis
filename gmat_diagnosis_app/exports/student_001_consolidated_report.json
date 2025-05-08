@@ -1,0 +1,577 @@
+{
+  "student_id": "student_001",
+  "report_generation_timestamp": "2025-05-08T13:24:24.593659",
+  "data_summary": {
+    "total_performance_records": 126,
+    "total_subjective_reports": 9
+  },
+  "section_stats": {
+    "Q": {
+      "student_id": "student_001",
+      "gmat_section": "Q",
+      "total_tests": 3,
+      "total_questions_answered": 45,
+      "total_correct_answers": 21,
+      "overall_accuracy": 0.4666666666666667,
+      "avg_test_accuracy": 0.4666666666666666,
+      "test_instances": [
+        {
+          "test_instance_id": "student_001_Q_20250601_test1",
+          "test_date": "2025-06-01",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996
+        },
+        {
+          "test_instance_id": "student_001_Q_20250515_test1",
+          "test_date": "2025-05-15",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996
+        },
+        {
+          "test_instance_id": "student_001_Q_20250501_test1",
+          "test_date": "2025-05-01",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996
+        }
+      ]
+    },
+    "DI": {
+      "student_id": "student_001",
+      "gmat_section": "DI",
+      "total_tests": 3,
+      "total_questions_answered": 36,
+      "total_correct_answers": 15,
+      "overall_accuracy": 0.4166666666666667,
+      "avg_test_accuracy": 0.4166666666666667,
+      "test_instances": [
+        {
+          "test_instance_id": "student_001_DI_20250601_test1",
+          "test_date": "2025-06-01",
+          "total_questions": 12,
+          "correct_count": 5,
+          "accuracy": 0.4166666666666667,
+          "avg_question_time_minutes": 4.492500000000001
+        },
+        {
+          "test_instance_id": "student_001_DI_20250515_test1",
+          "test_date": "2025-05-15",
+          "total_questions": 12,
+          "correct_count": 5,
+          "accuracy": 0.4166666666666667,
+          "avg_question_time_minutes": 4.490833333333334
+        },
+        {
+          "test_instance_id": "student_001_DI_20250501_test1",
+          "test_date": "2025-05-01",
+          "total_questions": 12,
+          "correct_count": 5,
+          "accuracy": 0.4166666666666667,
+          "avg_question_time_minutes": 4.490833333333334
+        }
+      ]
+    },
+    "V": {
+      "student_id": "student_001",
+      "gmat_section": "V",
+      "total_tests": 3,
+      "total_questions_answered": 45,
+      "total_correct_answers": 21,
+      "overall_accuracy": 0.4666666666666667,
+      "avg_test_accuracy": 0.4666666666666666,
+      "test_instances": [
+        {
+          "test_instance_id": "student_001_V_20250601_test1",
+          "test_date": "2025-06-01",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996
+        },
+        {
+          "test_instance_id": "student_001_V_20250515_test1",
+          "test_date": "2025-05-15",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996
+        },
+        {
+          "test_instance_id": "student_001_V_20250501_test1",
+          "test_date": "2025-05-01",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996
+        }
+      ]
+    }
+  },
+  "time_pressure_analysis": {
+    "student_id": "student_001",
+    "with_pressure": {
+      "count": 9,
+      "total_questions": 126,
+      "correct_count": 57,
+      "avg_question_time": 3.8403968253968253,
+      "section_counts": {
+        "Q": 3,
+        "DI": 3,
+        "V": 3
+      },
+      "accuracy": 0.4523809523809524
+    },
+    "without_pressure": {
+      "count": 0,
+      "total_questions": 0,
+      "correct_count": 0,
+      "avg_question_time": 0,
+      "section_counts": {
+        "Q": 0,
+        "DI": 0,
+        "V": 0
+      },
+      "accuracy": 0
+    },
+    "comparison": {
+      "analysis_complete": false,
+      "message": "Insufficient data for comparison (need tests both with and without time pressure)"
+    }
+  },
+  "strengths_weaknesses": {
+    "Q": {
+      "student_id": "student_001",
+      "gmat_section": "Q",
+      "analysis_complete": true,
+      "total_questions": 45,
+      "skills_analysis": {
+        "Geometry": {
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        "Word Problems": {
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        "Algebra": {
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        "Arithmetic": {
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        }
+      },
+      "question_types_analysis": {
+        "DS": {
+          "correct": 12,
+          "total": 24,
+          "accuracy": 0.5
+        },
+        "PS": {
+          "correct": 9,
+          "total": 21,
+          "accuracy": 0.42857142857142855
+        }
+      },
+      "difficulty_analysis": {
+        "easy": {
+          "correct": 15,
+          "total": 21,
+          "accuracy": 0.7142857142857143
+        },
+        "medium": {
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        "hard": {
+          "correct": 0,
+          "total": 12,
+          "accuracy": 0.0
+        }
+      },
+      "top_strengths": [
+        {
+          "skill": "Geometry",
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        {
+          "skill": "Word Problems",
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        {
+          "skill": "Algebra",
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        }
+      ],
+      "top_weaknesses": [
+        {
+          "skill": "Arithmetic",
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        },
+        {
+          "skill": "Geometry",
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        {
+          "skill": "Word Problems",
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        }
+      ]
+    },
+    "DI": {
+      "student_id": "student_001",
+      "gmat_section": "DI",
+      "analysis_complete": true,
+      "total_questions": 36,
+      "skills_analysis": {
+        "Science": {
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        },
+        "Social Science": {
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        },
+        "Math Related": {
+          "correct": 6,
+          "total": 9,
+          "accuracy": 0.6666666666666666
+        },
+        "Business": {
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        }
+      },
+      "question_types_analysis": {
+        "Inference": {
+          "correct": 9,
+          "total": 12,
+          "accuracy": 0.75
+        },
+        "Calculation": {
+          "correct": 0,
+          "total": 12,
+          "accuracy": 0.0
+        },
+        "Real": {
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        }
+      },
+      "difficulty_analysis": {
+        "easy": {
+          "correct": 9,
+          "total": 15,
+          "accuracy": 0.6
+        },
+        "medium": {
+          "correct": 6,
+          "total": 9,
+          "accuracy": 0.6666666666666666
+        },
+        "hard": {
+          "correct": 0,
+          "total": 12,
+          "accuracy": 0.0
+        }
+      },
+      "top_strengths": [
+        {
+          "skill": "Math Related",
+          "correct": 6,
+          "total": 9,
+          "accuracy": 0.6666666666666666
+        },
+        {
+          "skill": "Science",
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        },
+        {
+          "skill": "Social Science",
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        }
+      ],
+      "top_weaknesses": [
+        {
+          "skill": "Science",
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        },
+        {
+          "skill": "Social Science",
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        },
+        {
+          "skill": "Business",
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        }
+      ]
+    },
+    "V": {
+      "student_id": "student_001",
+      "gmat_section": "V",
+      "analysis_complete": true,
+      "total_questions": 45,
+      "skills_analysis": {
+        "Reading": {
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        "Argument Analysis": {
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        "Grammar": {
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        "Logic": {
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        }
+      },
+      "question_types_analysis": {
+        "RC": {
+          "correct": 12,
+          "total": 15,
+          "accuracy": 0.8
+        },
+        "SC": {
+          "correct": 0,
+          "total": 15,
+          "accuracy": 0.0
+        },
+        "CR": {
+          "correct": 9,
+          "total": 15,
+          "accuracy": 0.6
+        }
+      },
+      "difficulty_analysis": {
+        "easy": {
+          "correct": 15,
+          "total": 21,
+          "accuracy": 0.7142857142857143
+        },
+        "medium": {
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        "hard": {
+          "correct": 0,
+          "total": 12,
+          "accuracy": 0.0
+        }
+      },
+      "top_strengths": [
+        {
+          "skill": "Reading",
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        {
+          "skill": "Argument Analysis",
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        {
+          "skill": "Grammar",
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        }
+      ],
+      "top_weaknesses": [
+        {
+          "skill": "Logic",
+          "correct": 3,
+          "total": 9,
+          "accuracy": 0.3333333333333333
+        },
+        {
+          "skill": "Reading",
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        },
+        {
+          "skill": "Argument Analysis",
+          "correct": 6,
+          "total": 12,
+          "accuracy": 0.5
+        }
+      ]
+    }
+  },
+  "progress_analysis": {
+    "Q": {
+      "student_id": "student_001",
+      "gmat_section": "Q",
+      "analysis_complete": true,
+      "progress_data": [
+        {
+          "test_instance_id": "student_001_Q_20250501_test1",
+          "test_date": "2025-05-01",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996,
+          "avg_difficulty": 3.1333333333333333
+        },
+        {
+          "test_instance_id": "student_001_Q_20250515_test1",
+          "test_date": "2025-05-15",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996,
+          "avg_difficulty": 3.1333333333333333
+        },
+        {
+          "test_instance_id": "student_001_Q_20250601_test1",
+          "test_date": "2025-06-01",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996,
+          "avg_difficulty": 3.1333333333333333
+        }
+      ],
+      "trend_analysis": {
+        "accuracy_trend": "stable",
+        "accuracy_change": 0.0,
+        "time_trend": "stable",
+        "time_change": 0.0,
+        "num_tests_analyzed": 3,
+        "date_range": "2025-05-01 to 2025-06-01"
+      }
+    },
+    "DI": {
+      "student_id": "student_001",
+      "gmat_section": "DI",
+      "analysis_complete": true,
+      "progress_data": [
+        {
+          "test_instance_id": "student_001_DI_20250501_test1",
+          "test_date": "2025-05-01",
+          "total_questions": 12,
+          "correct_count": 5,
+          "accuracy": 0.4166666666666667,
+          "avg_question_time_minutes": 4.490833333333334,
+          "avg_difficulty": 3.1666666666666665
+        },
+        {
+          "test_instance_id": "student_001_DI_20250515_test1",
+          "test_date": "2025-05-15",
+          "total_questions": 12,
+          "correct_count": 5,
+          "accuracy": 0.4166666666666667,
+          "avg_question_time_minutes": 4.490833333333334,
+          "avg_difficulty": 3.1666666666666665
+        },
+        {
+          "test_instance_id": "student_001_DI_20250601_test1",
+          "test_date": "2025-06-01",
+          "total_questions": 12,
+          "correct_count": 5,
+          "accuracy": 0.4166666666666667,
+          "avg_question_time_minutes": 4.492500000000001,
+          "avg_difficulty": 3.1666666666666665
+        }
+      ],
+      "trend_analysis": {
+        "accuracy_trend": "stable",
+        "accuracy_change": 0.0,
+        "time_trend": "declining",
+        "time_change": 0.0016666666666669272,
+        "num_tests_analyzed": 3,
+        "date_range": "2025-05-01 to 2025-06-01"
+      }
+    },
+    "V": {
+      "student_id": "student_001",
+      "gmat_section": "V",
+      "analysis_complete": true,
+      "progress_data": [
+        {
+          "test_instance_id": "student_001_V_20250501_test1",
+          "test_date": "2025-05-01",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996,
+          "avg_difficulty": 3.1333333333333333
+        },
+        {
+          "test_instance_id": "student_001_V_20250515_test1",
+          "test_date": "2025-05-15",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996,
+          "avg_difficulty": 3.1333333333333333
+        },
+        {
+          "test_instance_id": "student_001_V_20250601_test1",
+          "test_date": "2025-06-01",
+          "total_questions": 15,
+          "correct_count": 7,
+          "accuracy": 0.4666666666666667,
+          "avg_question_time_minutes": 3.5799999999999996,
+          "avg_difficulty": 3.1333333333333333
+        }
+      ],
+      "trend_analysis": {
+        "accuracy_trend": "stable",
+        "accuracy_change": 0.0,
+        "time_trend": "stable",
+        "time_change": 0.0,
+        "num_tests_analyzed": 3,
+        "date_range": "2025-05-01 to 2025-06-01"
+      }
+    }
+  }
+}

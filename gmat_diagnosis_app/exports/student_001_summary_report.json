@@ -1,0 +1,11 @@
+{
+  "student_id": "student_001",
+  "export_timestamp": "2025-05-08T13:24:24.590617",
+  "total_performance_records": 126,
+  "total_subjective_reports": 9,
+  "sections_taken": {
+    "Q": 45,
+    "DI": 36,
+    "V": 45
+  }
+}
