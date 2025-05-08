@@ -52,11 +52,11 @@ APPENDIX_A_TRANSLATION_V = {
     'BEHAVIOR_CARELESSNESS_ISSUE': "行為模式: 粗心問題 (快而錯比例高)",
     'BEHAVIOR_GUESSING_HASTY': "行為模式: 過快疑似猜題/倉促",
 
-    # --- VDOC Defined Core Fundamental Skills ---
-    'Plan/Construct': "計劃/構建",
-    'Identify Stated Idea': "識別陳述信息",
-    'Identify Inferred Idea': "識別推斷信息",
-    'Analysis/Critique': "分析/批判",
+    # --- VDOC Defined Core Fundamental Skills --- 保持英文不翻譯
+    'Plan/Construct': "Plan/Construct",
+    'Identify Stated Idea': "Identify Stated Idea",
+    'Identify Inferred Idea': "Identify Inferred Idea",
+    'Analysis/Critique': "Analysis/Critique",
 
     # --- Internal Codes ---
     "Low / 505+": "低難度 (Low) / 505+",
