@@ -237,7 +237,7 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         # --- Populate Chapter 1 Results ---
         v_diagnosis_results['chapter_1'] = {
             'time_pressure_status': v_time_pressure_status,
-            'invalid_questions_excluded': num_invalid_v_total,
+            'invalid_count': num_invalid_v_total,
             'reading_comprehension_barrier_inquiry_triggered': df_v_valid['reading_comprehension_barrier_inquiry'].any() if 'reading_comprehension_barrier_inquiry' in df_v_valid else False
         }
         logging.debug("Populated Chapter 1 V results.")
