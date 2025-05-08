@@ -98,12 +98,12 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     if 'is_invalid' not in df_q.columns:
         df_q['is_invalid'] = False # Default to False if not present
     else:
-        df_q['is_invalid'] = df_q['is_invalid'].fillna(False)
+        df_q['is_invalid'] = df_q['is_invalid'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
         
     if 'overtime' not in df_q.columns:
         df_q['overtime'] = False # Default to False if not present
     else:
-        df_q['overtime'] = df_q['overtime'].fillna(False)
+        df_q['overtime'] = df_q['overtime'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
 
     # This part needs to be adapted based on how time_pressure is passed or determined for Q
     # For now, assuming it might be part of st.session_state or a direct param if this func is called in isolation.

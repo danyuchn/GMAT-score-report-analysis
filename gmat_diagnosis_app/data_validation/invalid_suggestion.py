@@ -4,6 +4,7 @@ import pandas as pd
 import math
 import warnings
 from gmat_diagnosis_app.constants.thresholds import THRESHOLDS # Import THRESHOLDS
+import numpy as np
 
 def _suggest_invalid_last_third(pos_series, time_series, total_q, fraction, threshold):
     """Helper to check for invalid questions in the last fraction."""
@@ -34,7 +35,7 @@ def suggest_invalid_questions(df, time_pressure_status_map):
     if 'is_manually_invalid' not in df_processed.columns:
         df_processed['is_manually_invalid'] = False
     else:
-        df_processed['is_manually_invalid'] = df_processed['is_manually_invalid'].fillna(False).astype(bool)
+        df_processed['is_manually_invalid'] = df_processed['is_manually_invalid'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False).astype(bool)
         
         # 添加調試信息 - 記錄任何手動標記的無效項
         manually_invalid_count = df_processed['is_manually_invalid'].sum()
@@ -82,12 +83,12 @@ def suggest_invalid_questions(df, time_pressure_status_map):
                 fraction = section_thresholds['LAST_THIRD_FRACTION']
                 auto_invalid_section_mask = _suggest_invalid_last_third(
                     q_pos_series.dropna(), q_time_series.dropna(), total_q, fraction, threshold
-                ).reindex(indices).fillna(False)
+                ).reindex(indices).replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
         elif section == 'V':
              if time_pressure:
                  threshold = section_thresholds['INVALID_HASTY_MIN']
                  is_fast = q_time_series < threshold
-                 auto_invalid_section_mask = is_fast.fillna(False)
+                 auto_invalid_section_mask = is_fast.replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
 
         df_processed.loc[indices[eligible_for_auto], 'is_auto_suggested_invalid'] = auto_invalid_section_mask[eligible_for_auto]
 

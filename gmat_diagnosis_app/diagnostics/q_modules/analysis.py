@@ -28,13 +28,18 @@ def diagnose_q_root_causes(df, avg_times, max_diffs):
 
     # --- Vectorized Calculations for is_sfe and time_performance_category ---
     # 計算每個題目對應題型的平均時間
-    df['avg_time_for_type'] = df['question_type'].map(avg_times).fillna(2.0)
+    df['avg_time_for_type'] = df['question_type'].map(avg_times)
+    # 使用replace方法處理NaN值，避免FutureWarning
+    df['avg_time_for_type'] = df['avg_time_for_type'].replace({pd.NA: 2.0, None: 2.0, np.nan: 2.0}).infer_objects(copy=False)
+    
+    # 取得數值型態的時間
     numeric_time = pd.to_numeric(df['question_time'], errors='coerce')
     
-    # 判斷是否相對快速（使用0.75乘數，與核心邏輯文件第三章一致）
-    df['is_relatively_fast'] = (numeric_time < (df['avg_time_for_type'] * 0.75)).fillna(False)
-    # 判斷是否超時
-    df['is_slow'] = df['overtime'].fillna(False)
+    # 判斷是否为相对较快
+    df['is_relatively_fast'] = (numeric_time < (df['avg_time_for_type'] * 0.75)).replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
+    
+    # 判断是否缓慢
+    df['is_slow'] = df['overtime'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
 
     # 設定時間表現分類
     conditions = [
@@ -54,12 +59,14 @@ def diagnose_q_root_causes(df, avg_times, max_diffs):
 
     # 判斷是否特殊關注錯誤(SFE)：
     # 該題的難度低於該學生在該技能上已正確完成的最高難度
-    df['max_correct_diff_for_skill'] = df['question_fundamental_skill'].map(max_diffs).fillna(-np.inf)
+    df['max_correct_diff_for_skill'] = df['question_fundamental_skill'].map(max_diffs)
+    # 使用replace方法處理NaN值，避免FutureWarning
+    df['max_correct_diff_for_skill'] = df['max_correct_diff_for_skill'].replace({pd.NA: -np.inf, None: -np.inf, np.nan: -np.inf}).infer_objects(copy=False)
     numeric_diff = pd.to_numeric(df['question_difficulty'], errors='coerce')
     df['is_sfe'] = (
         (df['is_correct'] == False) & (df['is_invalid'] == False) &
         (numeric_diff.notna()) & (numeric_diff < df['max_correct_diff_for_skill'])
-    ).fillna(False)
+    ).replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
 
     # --- Parameter Assignment using Dictionary Lookup (Loop still needed for combining logic) ---
     all_diagnostic_params = []

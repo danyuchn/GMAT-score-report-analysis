@@ -56,7 +56,8 @@ def select_next_question(theta, remaining_questions_df):
         # Handle potential NaN/Inf results robustly
         if information.isnull().any() or np.isinf(information).any():
              logger.warning("NaN or Inf encountered during item information calculation. Treating as zero information.")
-             information = information.fillna(0.0).replace([np.inf, -np.inf], 0.0)
+             information = information.replace({pd.NA: 0.0, None: 0.0, np.nan: 0.0}).infer_objects(copy=False)
+             information = information.replace([np.inf, -np.inf], 0.0).infer_objects(copy=False)
 
     except (TypeError, ValueError) as e:
         # Catch errors from float conversion or item_information itself

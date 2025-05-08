@@ -56,16 +56,19 @@ def _calculate_rc_times(df_v_grouped):
         # Assign calculated reading time only to the first question of the group
         df_v_grouped.loc[first_q_idx, 'rc_reading_time'] = calculated_rc_reading_time
     
-    df_v_grouped['rc_reading_time'] = pd.to_numeric(df_v_grouped['rc_reading_time'], errors='coerce').fillna(0)
+    df_v_grouped['rc_reading_time'] = pd.to_numeric(df_v_grouped['rc_reading_time'], errors='coerce')
+    df_v_grouped['rc_reading_time'] = df_v_grouped['rc_reading_time'].replace({pd.NA: 0, None: 0, np.nan: 0}).infer_objects(copy=False)
 
     # Calculate total time for each RC group.
     group_total_time_map = df_v_grouped.groupby('rc_group_id')['question_time'].sum().to_dict()
     df_v_grouped['rc_group_total_time'] = df_v_grouped['rc_group_id'].map(group_total_time_map)
-    df_v_grouped['rc_group_total_time'] = pd.to_numeric(df_v_grouped['rc_group_total_time'], errors='coerce').fillna(0)
+    df_v_grouped['rc_group_total_time'] = pd.to_numeric(df_v_grouped['rc_group_total_time'], errors='coerce')
+    df_v_grouped['rc_group_total_time'] = df_v_grouped['rc_group_total_time'].replace({pd.NA: 0, None: 0, np.nan: 0}).infer_objects(copy=False)
 
     # Calculate number of questions in each RC group
     group_num_questions_map = df_v_grouped.groupby('rc_group_id').size().to_dict()
-    df_v_grouped['rc_group_num_questions'] = df_v_grouped['rc_group_id'].map(group_num_questions_map).fillna(0)
+    df_v_grouped['rc_group_num_questions'] = df_v_grouped['rc_group_id'].map(group_num_questions_map)
+    df_v_grouped['rc_group_num_questions'] = df_v_grouped['rc_group_num_questions'].replace({pd.NA: 0, None: 0, np.nan: 0}).infer_objects(copy=False)
     
     df_v_grouped.drop(columns=['q_pos_numeric'], inplace=True, errors='ignore')
     return df_v_grouped

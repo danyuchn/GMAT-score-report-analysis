@@ -70,7 +70,11 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
             
             # 確保無效項是布爾值
             try:
-                df_display['is_invalid'] = df_display['is_invalid'].fillna(False).astype(bool)
+                # 使用with context避免FutureWarning
+                with pd.option_context('future.no_silent_downcasting', True):
+                    df_display['is_invalid'] = df_display['is_invalid'].replace({pd.NA: False, None: False})
+                    df_display['is_invalid'] = df_display['is_invalid'].infer_objects(copy=False)
+                df_display['is_invalid'] = df_display['is_invalid'].astype(bool)
             except Exception as e:
                 tab_container.error(f"轉換無效項時出錯: {e}")
         

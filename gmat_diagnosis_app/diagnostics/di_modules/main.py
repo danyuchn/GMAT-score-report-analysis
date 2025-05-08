@@ -376,14 +376,21 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
 
         if 'time_performance_category' not in df_to_return.columns:
             df_to_return['time_performance_category'] = 'Unknown'
-        df_to_return['time_performance_category'] = df_to_return['time_performance_category'].fillna('Unknown').infer_objects(copy=False).replace('', 'Unknown')
+        # 使用with context避免FutureWarning
+        with pd.option_context('future.no_silent_downcasting', True):
+            df_to_return['time_performance_category'] = df_to_return['time_performance_category'].replace({pd.NA: 'Unknown', None: 'Unknown', np.nan: 'Unknown', '': 'Unknown'})
+            df_to_return['time_performance_category'] = df_to_return['time_performance_category'].infer_objects(copy=False)  # 允許推斷更合適的類型
+        
         if 'is_invalid' in df_to_return.columns:
             invalid_mask = df_to_return['is_invalid'] == True
             if invalid_mask.any():
                 df_to_return.loc[invalid_mask, 'time_performance_category'] = 'Invalid/Excluded'
 
         if 'is_sfe' in df_to_return.columns:
-            df_to_return['is_sfe'] = df_to_return['is_sfe'].fillna(False).infer_objects(copy=False)
+            # 使用with context避免FutureWarning
+            with pd.option_context('future.no_silent_downcasting', True):
+                df_to_return['is_sfe'] = df_to_return['is_sfe'].replace({pd.NA: False, None: False, np.nan: False})
+                df_to_return['is_sfe'] = df_to_return['is_sfe'].infer_objects(copy=False)  # 允許推斷更合適的類型
             df_to_return['is_sfe'] = df_to_return['is_sfe'].astype(bool)
         else:
             df_to_return['is_sfe'] = False
@@ -399,9 +406,18 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
 
         cols_to_fill_na = ['is_sfe', 'time_performance_category']
         fill_values = {'is_sfe': False, 'time_performance_category': 'Invalid/Excluded'}
-        for col in cols_to_fill_na:
-            if col in df_to_return.columns:
-                df_to_return[col] = df_to_return[col].fillna(fill_values.get(col, 'Unknown')).infer_objects(copy=False)
+        # 使用with context避免FutureWarning
+        with pd.option_context('future.no_silent_downcasting', True):
+            for col in cols_to_fill_na:
+                if col in df_to_return.columns:
+                    fill_value = fill_values.get(col, 'Unknown')
+                    # 使用替代方法避免FutureWarning
+                    if fill_value == False:
+                        df_to_return[col] = df_to_return[col].replace({pd.NA: False, None: False, np.nan: False})
+                    else:
+                        df_to_return[col] = df_to_return[col].replace({pd.NA: fill_value, None: fill_value, np.nan: fill_value, '': fill_value})
+                    # 允許推斷更合適的類型
+                    df_to_return[col] = df_to_return[col].infer_objects(copy=False)
 
         if 'is_invalid' in df_to_return.columns:
             df_to_return['is_invalid'] = df_to_return['is_invalid'].astype(bool)
