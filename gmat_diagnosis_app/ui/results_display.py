@@ -553,7 +553,7 @@ def display_results():
                     "time_performance_category": st.column_config.SelectboxColumn(
                         "時間表現",
                         help="點擊編輯以選擇時間表現分類",
-                        options=["Slow & Wrong", "Slow & Right", "Normal & Wrong", "Normal & Right", "Fast & Wrong", "Fast & Right", "N/A"],
+                        options=["Slow & Wrong", "Slow & Correct", "Normal Time & Wrong", "Normal Time & Correct", "Fast & Wrong", "Fast & Correct", "N/A"],
                         required=True
                     ),
                     "diagnostic_params_list": st.column_config.TextColumn(
@@ -606,8 +606,95 @@ def display_results():
                 if col2.button("✓ 套用變更並更新AI建議", key="apply_editable_df", type="primary"):
                     # 只有在用戶明確點擊套用按鈕時才設置標記和生成AI提示
                     st.session_state.ai_prompts_need_regeneration = True
+                    st.session_state.changes_saved = True  # 標記變更已儲存
                     tabs[edit_tab_index].success("變更已套用！AI建議將在下方更新。")
                     # 不需要重新載入頁面，所以不需要st.experimental_rerun()
+
+                # 新增下載試算表按鈕
+                if 'changes_saved' not in st.session_state:
+                    st.session_state.changes_saved = False
+                
+                if tabs[edit_tab_index].button("📥 下載修改後的試算表", key="download_edited_file"):
+                    if st.session_state.changes_saved:
+                        try:
+                            # 準備導出數據
+                            df_to_export = st.session_state.editable_diagnostic_df.copy()
+                            
+                            # 使用與預覽顯示相同的列顯示順序
+                            user_display_columns = [
+                                "Subject", "question_position", "is_correct", "question_time",
+                                "question_type", "content_domain", "question_fundamental_skill",
+                                "is_invalid", "time_performance_category", "diagnostic_params_list"
+                            ]
+                            
+                            # 確保所有列都存在，並按照顯示順序排列
+                            cols_to_export = [col for col in user_display_columns if col in df_to_export.columns]
+                            df_to_export = df_to_export[cols_to_export]
+                            
+                            # 處理特定列格式
+                            # 確保診斷標籤列是字符串格式，與預覽一致
+                            if 'diagnostic_params_list' in df_to_export.columns:
+                                df_to_export['diagnostic_params_list'] = df_to_export['diagnostic_params_list'].apply(
+                                    lambda x: ", ".join(x) if isinstance(x, list) else x
+                                )
+                            
+                            # 轉換布爾型列為字符串
+                            if 'is_correct' in df_to_export.columns:
+                                df_to_export['is_correct'] = df_to_export['is_correct'].astype(str)
+                            if 'is_sfe' in df_to_export.columns:
+                                df_to_export['is_sfe'] = df_to_export['is_sfe'].astype(str)
+                            if 'is_invalid' in df_to_export.columns:
+                                df_to_export['is_invalid'] = df_to_export['is_invalid'].astype(str)
+                            
+                            # 數值格式處理
+                            if 'question_difficulty' in df_to_export.columns:
+                                df_to_export['question_difficulty'] = pd.to_numeric(df_to_export['question_difficulty'], errors='coerce')
+                                df_to_export['question_difficulty'] = df_to_export['question_difficulty'].map(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
+                            if 'question_time' in df_to_export.columns:
+                                df_to_export['question_time'] = pd.to_numeric(df_to_export['question_time'], errors='coerce')
+                                df_to_export['question_time'] = df_to_export['question_time'].map(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
+                            
+                            # 準備列名映射，與顯示的欄位標題保持一致
+                            columns_map = {
+                                "Subject": "科目",
+                                "question_position": "題號",
+                                "is_correct": "答對",
+                                "question_time": "用時(分)",
+                                "question_type": "題型",
+                                "content_domain": "內容領域",
+                                "question_fundamental_skill": "考察能力",
+                                "is_invalid": "標記無效",
+                                "time_performance_category": "時間表現",
+                                "diagnostic_params_list": "診斷標籤"
+                            }
+                            
+                            # 重命名列以符合顯示
+                            df_to_export = df_to_export.rename(columns=columns_map)
+                            
+                            # 使用to_excel函數從excel_utils模組
+                            from gmat_diagnosis_app.utils.excel_utils import to_excel
+                            
+                            # 使用自定義的列映射
+                            custom_excel_map = {col: col for col in df_to_export.columns}
+                            
+                            # 生成Excel並提供下載
+                            excel_bytes = to_excel(df_to_export, custom_excel_map)
+                            
+                            # 提供下載按鈕
+                            today_str = pd.Timestamp.now().strftime('%Y%m%d')
+                            tabs[edit_tab_index].download_button(
+                                "點擊下載Excel檔案",
+                                data=excel_bytes,
+                                file_name=f"{today_str}_GMAT_edited_diagnostic_data.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key="download_excel_button"
+                            )
+                        except Exception as e:
+                            tabs[edit_tab_index].error(f"準備Excel下載時出錯: {e}")
+                            import traceback
+                            logging.error(f"詳細錯誤: {traceback.format_exc()}")
+                    else:
+                        tabs[edit_tab_index].warning("請先點擊「套用變更並更新AI建議」按鈕儲存變更，然後再下載試算表。")
 
                 # 顯示AI提示區塊
                 # 只有在需要重新生成時才生成，已有的提示直接顯示
