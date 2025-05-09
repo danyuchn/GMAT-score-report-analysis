@@ -249,7 +249,16 @@ def generate_v_summary_report(v_diagnosis_results):
             
             # 替換瓶頸為fundamental skill，保持英文
             # bottleneck = translate_v(slow_data.get('dominant_bottleneck_type', 'N/A'))
-            fundamental_skill = slow_data.get('primary_skill', 'Unknown Skill')
+            # fundamental_skill = slow_data.get('primary_skill', 'Unknown Skill') # OLD LINE
+
+            # NEW LOGIC to determine fundamental_skill based on skill_breakdown_slow
+            skill_breakdown = slow_data.get('skill_breakdown_slow', {})
+            if skill_breakdown:
+                # Find the skill (key) with the maximum count (value)
+                fundamental_skill = max(skill_breakdown, key=skill_breakdown.get)
+            else:
+                fundamental_skill = 'Unknown Skill'
+            # END NEW LOGIC
             
             report_lines.append(f"- {type_name}：{count} 題正確但慢（佔比 {rate}）。平均難度 {avg_diff}，平均耗時 {avg_time} 分鐘。相關技能：{fundamental_skill}。")
             slow_correct_found = True
@@ -302,14 +311,34 @@ def generate_v_summary_report(v_diagnosis_results):
     report_lines.append("")
 
 
-    # --- Section 7: 練習建議與後續行動 --- (練習建議部分已移至 recommendations.py)
+    # --- Section 7: 練習建議與後續行動 ---
     report_lines.append("**練習建議與後續行動**")
     
-    # 練習建議 (從 chapter_7_recommendations 中獲取)
-    practice_recommendations = v_diagnosis_results.get('chapter_7_recommendations', [])
+    practice_recommendations = ch7 
     if practice_recommendations:
         for rec in practice_recommendations:
-            report_lines.append(f"- {rec}")
+            if isinstance(rec, dict):
+                text_to_display = rec.get('text')
+                rec_type = rec.get('type')
+
+                if rec_type == 'spacer':
+                    # For spacers, if their text is empty or None, add a blank line.
+                    # Otherwise, format their text (though spacers usually have empty text).
+                    if text_to_display:
+                        report_lines.append(f"- {text_to_display}")
+                    else:
+                        report_lines.append("")
+                elif text_to_display is not None:
+                    # For other types, display their text with a dash, 
+                    # unless the text itself is empty, in which case, maybe a blank line or skip.
+                    # For now, if text_to_display is an empty string for non-spacer, it will be "- "
+                    report_lines.append(f"- {text_to_display}")
+                else:
+                    # Fallback for dictionary items not matching expected structure (e.g., no 'text' key)
+                    report_lines.append(f"- {str(rec)}") # Display raw dict as before
+            else:
+                # If rec is not a dictionary (e.g., already a string)
+                report_lines.append(f"- {str(rec)}")
     else:
         report_lines.append("- 本次分析未產生具體的練習建議。請參考整體診斷和反思部分。")
     report_lines.append("")
@@ -368,13 +397,91 @@ def generate_v_summary_report(v_diagnosis_results):
     # 添加引導反思
     report_lines.append("- **引導反思:**")
     
-    # 添加單一統一格式的引導反思，與DI模組保持一致
-    if skills_list:
-        unified_reflection = f"  - 找尋【內容領域】【{skills_text}】的考前做題紀錄，找尋【{time_perf_text}】的題目，檢討並反思自己是否有：【{labels_text}】等問題。"
+    # NEW LOGIC FOR GUIDED REFLECTION
+    # Replace the old unified_reflection logic
+    if skills_list and time_performances_list: # Check if we have data for detailed breakdown
+        # 過濾掉不需要顯示的時間表現類別
+        filtered_time_performances = [perf for perf in time_performances_list if perf not in ['Fast & Correct', 'Normal Time & Correct']]
+        
+        # 分類診斷標籤
+        categorized_labels = {}
+        for label in diagnostic_labels_list:
+            # 嘗試從標籤名稱獲取類別
+            category = None
+            if "CR 推理障礙" in label:
+                category = "CR 推理障礙"
+            elif "CR 方法應用" in label:
+                category = "CR 方法應用"
+            elif "CR 選項辨析" in label:
+                category = "CR 選項辨析"
+            elif "CR 閱讀理解" in label:
+                category = "CR 閱讀理解"
+            elif "CR 題目理解" in label:
+                category = "CR 題目理解"
+            elif "RC 閱讀理解" in label:
+                category = "RC 閱讀理解"
+            elif "RC方法" in label:
+                category = "RC方法"
+            elif "基礎掌握" in label:
+                category = "基礎掌握"
+            elif "效率問題" in label:
+                category = "效率問題"
+            elif "數據無效" in label:
+                category = "數據無效"
+            elif "行為模式" in label:
+                category = "行為模式"
+            else:
+                category = "其他問題"
+            
+            if category not in categorized_labels:
+                categorized_labels[category] = []
+            categorized_labels[category].append(label)
+        
+        # 標籤類別的顯示順序
+        category_order = [
+            "CR 推理障礙", "CR 方法應用", "CR 選項辨析", "CR 閱讀理解", "CR 題目理解",
+            "RC 閱讀理解", "RC方法", "基礎掌握", "效率問題", "數據無效", "行為模式", "其他問題"
+        ]
+        
+        for skill in skills_list:
+            for time_perf in filtered_time_performances:
+                # 添加基礎反思行
+                base_reflection_line = f"  - 找尋【{skill}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並反思自己是否有："
+                report_lines.append(base_reflection_line)
+                
+                # 分類添加診斷標籤
+                if categorized_labels:
+                    # 確保空行
+                    report_lines.append("")
+                    
+                    # 按類別順序顯示標籤
+                    for category in category_order:
+                        if category in categorized_labels and categorized_labels[category]:
+                            # 建立該類別的行，先添加類別名稱（不帶方括號）
+                            category_line = f"    {category}"
+                            
+                            # 添加該類別下的所有標籤，每個標籤用方括號括起來
+                            for label in categorized_labels[category]:
+                                # 去掉類別前綴，只顯示具體問題
+                                label_suffix = label.replace(f"{category}: ", "").replace(f"{category}:", "")
+                                if label_suffix == label:  # 如果沒有變化，使用原標籤
+                                    category_line += f"【{label}】"
+                                else:
+                                    category_line += f"【{label_suffix}】"
+                            
+                            # 添加完整的類別行到報告中
+                            report_lines.append(category_line)
+                            report_lines.append("")  # 每個類別後添加空行
+                else:
+                    report_lines.append("")
+                    report_lines.append("    潛在的系統性問題。")
+                
+                # 添加結尾
+                report_lines.append("    等問題。")
+                report_lines.append("")
     else:
-        unified_reflection = "  - 找尋考前做題紀錄中的錯題和超時題，按照【題型】【內容領域】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。"
-    
-    report_lines.append(unified_reflection)
+        # Fallback to the original generic message if not enough data for detailed breakdown
+        report_lines.append("  - 找尋考前做題紀錄中的錯題和超時題，按照【題型】【內容領域】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。")
     
     # 添加二級證據參考建議
     report_lines.append("")
