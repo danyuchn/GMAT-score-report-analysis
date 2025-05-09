@@ -195,7 +195,7 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         logging.info(f"【DEBUG追蹤】{subject}科Excel導出前數據行數: {len(df_for_excel)}")
         
         # 根據 excel_map 篩選列（在 is_invalid 更新之後）
-        df_for_excel = df_for_excel[[k for k in subject_excel_map.keys() if k in df_for_excel.columns]].copy()
+        df_for_excel = df_for_excel[[k for k in excel_map.keys() if k in df_for_excel.columns]].copy()
         
         # 確保按題號排序
         if 'question_position' in df_for_excel.columns:
@@ -277,7 +277,7 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
                 
         # Generate Excel and offer for download - Use function from excel_utils
         logging.info(f"【DEBUG追蹤】{subject}科調用to_excel函數進行Excel生成")
-        excel_bytes = to_excel(df_for_excel, subject_excel_map) # 使用科目特定的excel_map
+        excel_bytes = to_excel(df_for_excel, excel_map) # 使用科目特定的excel_map
         logging.info(f"【DEBUG追蹤】{subject}科Excel生成完成，大小: {len(excel_bytes)} 字節")
         
         # Offer download button for Excel file - provide bytes to streamlit
