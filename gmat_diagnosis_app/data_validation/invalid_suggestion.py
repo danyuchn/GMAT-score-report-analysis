@@ -93,15 +93,6 @@ def suggest_invalid_questions(df, time_pressure_status_map):
         df_processed.loc[indices[eligible_for_auto], 'is_auto_suggested_invalid'] = auto_invalid_section_mask[eligible_for_auto]
 
     df_processed['is_invalid'] = df_processed['is_manually_invalid'] | df_processed['is_auto_suggested_invalid']
-    
-    # 再次添加調試信息，確認最終的is_invalid狀態
-    try:
-        import streamlit as st
-        final_invalid_count = df_processed['is_invalid'].sum()
-        if final_invalid_count > 0:
-            st.info(f"最終標記為無效的項目總數: {final_invalid_count}")
-    except Exception as e:
-        print(f"顯示最終無效項調試信息時出錯: {e}")
         
     df_processed.drop(columns=['q_time_numeric', 'q_pos_numeric'], inplace=True, errors='ignore')
     return df_processed 

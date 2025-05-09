@@ -29,7 +29,6 @@ def _generate_di_summary_report(di_results, with_details=True):
         invalid_rows = diagnosed_df.get('is_invalid', pd.Series(False, index=diagnosed_df.index)).sum()
         manual_invalid_rows = diagnosed_df.get('is_manually_invalid', pd.Series(False, index=diagnosed_df.index)).sum()
         valid_rows = total_rows - invalid_rows
-        logging.info(f"[DI報告] 數據行統計：總數 {total_rows}, 有效 {valid_rows}, 無效 {invalid_rows}, 手動標記無效 {manual_invalid_rows}")
         
         # 按維度統計
         if 'content_domain' in diagnosed_df.columns:
@@ -38,7 +37,6 @@ def _generate_di_summary_report(di_results, with_details=True):
                 domain_df = diagnosed_df[diagnosed_df['content_domain'] == domain]
                 domain_total = len(domain_df)
                 domain_wrong = domain_df['is_correct'].eq(False).sum()
-                logging.info(f"[DI報告追蹤] 領域 {domain} - 總題數: {domain_total}, 錯誤數: {domain_wrong}")
         
         if 'question_type' in diagnosed_df.columns:
             types = diagnosed_df['question_type'].unique()
@@ -46,9 +44,8 @@ def _generate_di_summary_report(di_results, with_details=True):
                 type_df = diagnosed_df[diagnosed_df['question_type'] == q_type]
                 type_total = len(type_df)
                 type_wrong = type_df['is_correct'].eq(False).sum()
-                logging.info(f"[DI報告追蹤] 題型 {q_type} - 總題數: {type_total}, 錯誤數: {type_wrong}")
     else:
-        logging.warning("[DI報告追蹤] 報告生成時 diagnosed_df 為空")
+        pass # Was logging.warning
 
     # Pre-translate common terms
     math_related_zh = _translate_di('Math Related')
@@ -171,7 +168,6 @@ def _generate_di_summary_report(di_results, with_details=True):
         problem_total = len(df_problem)
         problem_wrong = df_problem['is_correct'].eq(False).sum() if 'is_correct' in df_problem.columns else 0
         problem_overtime = df_problem['overtime'].sum() if 'overtime' in df_problem.columns else 0
-        logging.info(f"[DI報告追蹤] 問題數據統計 - 總題數: {problem_total}, 錯誤數: {problem_wrong}, 超時數: {problem_overtime}")
     else:
         report_lines.append("- (無問題數據可供分析)")
     
@@ -269,7 +265,7 @@ def _generate_di_summary_report(di_results, with_details=True):
                         params_by_category[category].append(param)
                     
                     # 生成引導反思提示
-                    prompt = f"找尋【{domain_zh}】【{q_type_zh}】的考前做題紀錄，找尋【{time_perf_zh}】的題目，檢討並反思自己是否有：\\n"\
+                    prompt = f"找尋【{domain_zh}】【{q_type_zh}】的考前做題紀錄，找尋【{time_perf_zh}】的題目，檢討並反思自己是否有：\n"\
                     
                     # 為每個類別生成標籤文本
                     for category, params in params_by_category.items():
@@ -278,10 +274,10 @@ def _generate_di_summary_report(di_results, with_details=True):
                         params_zh = [_translate_di(p) for p in params]
                         
                         # 按照要求的格式添加
-                        prompt += f"\\n【{category_zh}：{', '.join(params_zh)}】"\
+                        prompt += f"\n【{category_zh}：{', '.join(params_zh)}】"\
                     
                     # 添加結尾
-                    prompt += "\\n\\n等問題。"\
+                    prompt += "\n\n等問題。"\
                     
                     # 將提示添加到列表中
                     reflection_prompts.append(prompt)
@@ -291,7 +287,7 @@ def _generate_di_summary_report(di_results, with_details=True):
         reflection_prompts.append("未發現需要特別反思的問題模式。請繼續保持良好表現。")
     
     # 添加反思提示到報告中
-    report_lines.append("\\n**引導反思提示**\\n")
+    report_lines.append("\n**引導反思提示**\n")
     for prompt in reflection_prompts:
         report_lines.append(f"- {prompt}")
         report_lines.append("")
@@ -332,19 +328,16 @@ def _generate_di_summary_report(di_results, with_details=True):
         total_qs_match = re.search(r'共(\d+)題', report_text)
         if total_qs_match:
             total_qs = int(total_qs_match.group(1))
-            logging.info(f"[DI報告追蹤] 從報告中提取的總題數: {total_qs}")
         
         # 查找錯誤數
         error_qs_match = re.search(r'(\d+)題作答錯誤', report_text)
         if error_qs_match:
             error_qs = int(error_qs_match.group(1))
-            logging.info(f"[DI報告追蹤] 從報告中提取的錯誤題數: {error_qs}")
             
         # 查找無效題數
         invalid_qs_match = re.search(r'有\s*(\d+)\s*題被標記為無效數據', report_text)
         if invalid_qs_match:
             invalid_qs = int(invalid_qs_match.group(1))
-            logging.info(f"[DI報告追蹤] 從報告中提取的無效題數: {invalid_qs}")
     except Exception as e:
         logging.error(f"[DI報告追蹤] 從報告中提取數據時出錯: {e}")
     

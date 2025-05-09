@@ -218,62 +218,24 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         logging.info(f"【DEBUG追蹤】{subject}科Excel導出前is_invalid的數據類型: {invalid_type}")
         
         # UI 直接顯示調試信息（DI科目專用）
-        if subject == 'DI':
-            with tab_container.expander("🔍 調試信息（僅供開發人員使用）", expanded=True):
-                tab_container.markdown(f"**導出前檢查 ({subject} 科):**")
-                tab_container.markdown(f"- 數據行數: {len(df_for_excel)}")
-                tab_container.markdown(f"- is_invalid值類型: {invalid_type}")
-                tab_container.markdown(f"- is_invalid=True的行數: {orig_invalid_sum}")
-                
-                if 'is_manually_invalid' in df_for_excel.columns:
-                    manual_invalid_sum = df_for_excel['is_manually_invalid'].sum() if hasattr(df_for_excel['is_manually_invalid'], 'sum') else 0
-                    tab_container.markdown(f"- is_manually_invalid=True的行數: {manual_invalid_sum}")
-                    
-                    # 顯示被標記為True的行
-                    if manual_invalid_sum > 0:
-                        tab_container.markdown("**手動標記為無效的行:**")
-                        invalid_rows = df_for_excel[df_for_excel['is_manually_invalid'] == True]
-                        for idx, row in invalid_rows.iterrows():
-                            q_pos = row['question_position'] if 'question_position' in row else "未知"
-                            tab_container.markdown(f"- 題號{q_pos}: manually_invalid=True")
-        
         # 重要：確保is_invalid完全以手動標記為準（Excel導出前）
         # 這段邏輯在前面已經處理過了，這裡的日誌是為了確認
         if 'is_manually_invalid' in df_for_excel.columns:
             manual_invalid_sum = df_for_excel['is_manually_invalid'].sum() if hasattr(df_for_excel['is_manually_invalid'], 'sum') else 0
-            logging.info(f"【DEBUG追蹤】{subject}科Excel導出前is_manually_invalid=True的行數: {manual_invalid_sum}")
             
             # 此處不再需要重置，因為在最開始複製和處理df_for_excel時已完成
             # df_for_excel['is_invalid'] = False
-            # logging.info(f"【DEBUG追蹤】{subject}科重置is_invalid後，is_invalid=True的行數: {df_for_excel['is_invalid'].sum()}")
             
             # df_for_excel.loc[df_for_excel['is_manually_invalid'] == True, 'is_invalid'] = True
             
             post_reset_sum = df_for_excel['is_invalid'].sum() if hasattr(df_for_excel['is_invalid'], 'sum') else 0
-            logging.info(f"【DEBUG追蹤】{subject}科（確認）僅使用手動標記後，is_invalid=True的行數: {post_reset_sum}")
             
             # UI 直接顯示處理後的調試信息（DI科目專用）
-            if subject == 'DI':
-                with tab_container.expander("🔍 處理後調試信息", expanded=True):
-                    # tab_container.markdown(f"**重置is_invalid後 ({subject} 科):**")
-                    # tab_container.markdown(f"- is_invalid=True的行數: {df_for_excel['is_invalid'].sum()}")
-                    tab_container.markdown(f"**（確認）僅使用手動標記後 ({subject} 科):**") 
-                    tab_container.markdown(f"- is_invalid=True的行數: {post_reset_sum}")
-                    
-                    # 顯示被標記為True的行
-                    if post_reset_sum > 0:
-                        tab_container.markdown("**最終標記為無效的行:**")
-                        invalid_rows = df_for_excel[df_for_excel['is_invalid'] == True]
-                        for idx, row in invalid_rows.iterrows():
-                            q_pos = row['question_position'] if 'question_position' in row else "未知"
-                            tab_container.markdown(f"- 題號{q_pos}: is_invalid=True")
-            
             # 記錄被標記的行的題號
             if post_reset_sum > 0:
                 invalid_rows = df_for_excel[df_for_excel['is_invalid'] == True]
                 for idx, row in invalid_rows.iterrows():
                     q_pos = row['question_position'] if 'question_position' in row else "未知"
-                    logging.info(f"【DEBUG追蹤】{subject}科Excel中第{idx}行(題號{q_pos})被標記為無效")
             
             # 驗證手動標記項被正確設置 (僅記錄到日誌)
             manual_invalid_count = df_for_excel['is_manually_invalid'].sum() if hasattr(df_for_excel['is_manually_invalid'], 'sum') else 0
@@ -296,46 +258,22 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         # Handle is_invalid specifically since we *just* processed it
         if 'is_invalid' in df_for_excel.columns:
             pre_convert_sum = df_for_excel['is_invalid'].sum() if hasattr(df_for_excel['is_invalid'], 'sum') else "無法計算"
-            logging.info(f"【DEBUG追蹤】{subject}科轉換is_invalid為字符串前，is_invalid=True的行數: {pre_convert_sum}")
             
             df_for_excel['is_invalid'] = df_for_excel['is_invalid'].astype(str) # Convert TRUE/FALSE to text
             
             true_count = (df_for_excel['is_invalid'] == 'True').sum()
-            logging.info(f"【DEBUG追蹤】{subject}科轉換is_invalid為字符串後，is_invalid='True'的行數: {true_count}")
             
-            # UI 直接顯示轉換後的調試信息（DI科目專用）
-            if subject == 'DI':
-                with tab_container.expander("🔍 轉換為字符串後調試信息", expanded=True):
-                    tab_container.markdown(f"**轉換is_invalid為字符串後 ({subject} 科):**")
-                    tab_container.markdown(f"- is_invalid='True'的行數: {true_count}")
-                    tab_container.markdown(f"- is_invalid分佈: {df_for_excel['is_invalid'].value_counts().to_dict()}")
-            
-        # 同樣轉換is_manually_invalid為字符串
-        if 'is_manually_invalid' in df_for_excel.columns:
-            df_for_excel['is_manually_invalid'] = df_for_excel['is_manually_invalid'].astype(str)
-            true_count = (df_for_excel['is_manually_invalid'] == 'True').sum()
-            logging.info(f"【DEBUG追蹤】{subject}科轉換is_manually_invalid為字符串後，is_manually_invalid='True'的行數: {true_count}")
-            
+           
+
         # Final validation just to be sure we're exporting valid data
         # Ensures consistent, expectable log output for is_invalid
         try:
             value_counts = df_for_excel['is_invalid'].value_counts().to_dict()
-            logging.info(f"【DEBUG追蹤】{subject}科Excel導出直前，is_invalid值分佈: {value_counts}")
         except Exception as e:
-            logging.warning(f"計算{subject}科is_invalid分佈時出錯: {e}")
+            pass # Was logging.warning
             
         # Calculate & display final invalid count in log
         invalid_count = (df_for_excel['is_invalid'] == 'True').sum() if 'is_invalid' in df_for_excel.columns else 0
-        logging.info(f"【DEBUG追蹤】{subject}科Excel導出包含 {invalid_count} 個無效題目")
-        
-        # UI 直接顯示最終調試信息
-        if subject == 'DI':
-            with tab_container.expander("🔍 最終檢查", expanded=True):
-                tab_container.markdown(f"**Excel導出前最終檢查 ({subject} 科):**")
-                tab_container.markdown(f"- is_invalid='True'的行數: {invalid_count}")
-                # 添加一個查看數據按鈕
-                if tab_container.button("👁 查看最終數據框"):
-                    tab_container.dataframe(df_for_excel)
                 
         # Generate Excel and offer for download - Use function from excel_utils
         logging.info(f"【DEBUG追蹤】{subject}科調用to_excel函數進行Excel生成")
