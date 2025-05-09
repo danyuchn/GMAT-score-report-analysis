@@ -164,6 +164,8 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
     Applies Chapter 3 diagnostic rules row-by-row.
     Calculates \'overtime\', \'is_sfe\', \'is_relatively_fast\', \'time_performance_category\', and \'diagnostic_params\'.
     MODIFIED: Includes overtime calculation based on time_pressure_status.
+    MODIFIED: Calculates time_performance_category for ALL rows.
+    MODIFIED: Applies SFE and detailed diagnostic_params only to VALID rows.
     """
     if df_v.empty:
         # Initialize columns even for empty df to ensure consistency
@@ -187,11 +189,11 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
 
     max_diff_dict = max_correct_difficulty_per_skill
 
-    all_params = []
-    all_sfe = []
-    all_fast_flags = []
-    all_time_categories = []
-    all_overtime_flags = [] # To store calculated overtime status
+    all_params_list = [] # Renamed to avoid potential conflicts
+    all_sfe_list = []
+    all_fast_flags_list = []
+    all_time_categories_list = []
+    all_overtime_flags_list = []
 
     # Define parameter sets based on MD Ch3 rules
     cr_params_fast_wrong = ['CR_METHOD_PROCESS_DEVIATION', 'CR_METHOD_TYPE_SPECIFIC_ERROR', 'CR_READING_BASIC_OMISSION']
@@ -223,11 +225,11 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
     # --- Iterate and apply rules ---
     for index, row in df_v.iterrows():
         # Initialize for each row
-        current_params = []
+        current_params = [] # For detailed diagnostic tags
         current_is_sfe = False
         current_is_relatively_fast = False
-        current_time_performance_category = 'Unknown'
-        current_is_overtime = False # Calculate overtime status here
+        current_time_performance_category = 'Unknown' # Default, will be calculated for all
+        current_is_overtime = False # Will be calculated for all
 
         # Get row data safely
         q_type = row.get('question_type')
@@ -236,119 +238,141 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
         q_time = row.get('question_time', None)
         is_correct = bool(row.get('is_correct', True))
         is_invalid = bool(row.get('is_invalid', False))
-        # Assume RC group/individual overtime flags are PRE-CALCULATED and stored if needed,
-        # or rely solely on single question time for CR. The code below ONLY handles CR overtime directly.
-        # If RC metrics were calculated externally, 'overtime' column should reflect the combined status.
-        # We will calculate CR overtime here and assume RC overtime is handled externally if needed.
 
-        # 0. Skip processing for invalid rows, but keep their index for assignment
-        if is_invalid:
-            all_params.append(row.get('diagnostic_params', [])) # Keep existing params (might include invalid tag)
-            all_sfe.append(row.get('is_sfe', False))
-            all_fast_flags.append(row.get('is_relatively_fast', False))
-            all_time_categories.append(row.get('time_performance_category', 'Invalid'))
-            all_overtime_flags.append(row.get('overtime', False)) # Keep existing overtime status
-            continue
+        # 1. Calculate Overtime Status (for ALL rows)
+        # This logic determines current_is_overtime based on q_type and thresholds.
+        # It will be used for time_performance_category calculation for all rows.
+        original_row_overtime = bool(row.get('overtime', False)) # Get pre-existing overtime if any
 
-        # 1. Calculate Overtime Status (Only for CR directly here)
-        # --- MODIFICATION: Use full question type names ---
         if q_type == 'Critical Reasoning' and pd.notna(q_time) and q_time > cr_ot_threshold:
             current_is_overtime = True
-        # >>> IMPORTANT: For RC, we assume 'overtime' flag is potentially pre-calculated <<<
-        # >>> RC overtime logic follows MD document Chapter 1:
-        # >>> 1. group_overtime: If group_total_time > (rc_group_target_time + 1.0) minutes
-        # >>>    This should be pre-calculated for all questions in the RC group
-        # >>> 2. individual_overtime: For a single RC question, if adjusted_rc_time > 2.0 minutes
-        # >>>    where adjusted_rc_time excludes reading time for the first question
-        # >>> A RC question is considered 'slow' if either group_overtime or individual_overtime is True
-        elif q_type == 'Reading Comprehension' and 'overtime' in row and bool(row['overtime']):
+        elif q_type == 'Reading Comprehension' and original_row_overtime: # Trust pre-calculated RC overtime
              current_is_overtime = True
-        # --- END MODIFICATION ---
-
-        # 2. Check SFE
-        if not is_correct and pd.notna(q_diff):
-            # Ensure skill exists in dict, otherwise default to -inf
-            max_correct_diff = max_diff_dict.get(q_skill, -np.inf)
-            # Ensure q_diff is numeric before comparison
-            q_diff_numeric = pd.to_numeric(q_diff, errors='coerce')
-            if pd.notna(q_diff_numeric) and q_diff_numeric < max_correct_diff:
-                 current_is_sfe = True
-                 current_params.append('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-
-
-        # 3. Determine Time Flags (Fast/Normal)
-        is_slow = current_is_overtime # 'Slow' is defined by being overtime
-        is_normal_time = False
+        elif original_row_overtime: # If overtime was true from other sources (e.g. preprocessor for other types)
+            current_is_overtime = True
+        # If none of the above, current_is_overtime remains False (its initial value)
+        
+        # 2. Determine Time Flags (Fast/Normal) (for ALL rows)
+        is_slow = current_is_overtime # 'Slow' is defined by being overtime for category assignment
+        is_normal_time = False # Default
         avg_time = avg_time_per_type.get(q_type, np.inf) # Default to infinity if type not found
 
         if pd.notna(q_time) and avg_time != np.inf:
-            if q_time < (avg_time * 0.75):  # 核心邏輯文件定義的相對快閾值
-                                           # 符合 MD 文件第三章中定義的 is_relatively_fast 標準：
-                                           # 快 (`is_relatively_fast`): `question_time` < `average_time_per_type`[該題 `question_type`] * 0.75
+            if q_time < (avg_time * 0.75):  # Relatively fast threshold
                 current_is_relatively_fast = True
-            # Check for guessing threshold
-            if q_time < HASTY_GUESSING_THRESHOLD_MINUTES:
-                 current_params.append('BEHAVIOR_GUESSING_HASTY')
-            # Normal time is neither fast nor slow
+            # Normal time is neither relatively fast nor slow (overtime)
             if not current_is_relatively_fast and not is_slow:
                  is_normal_time = True
+        # If q_time is NaN or avg_time is inf, it won't be fast or normal by this logic;
+        # it remains slow if current_is_overtime is True, otherwise category falls to 'Normal Time' if not fast.
 
-        # 4. Assign Time Performance Category based on calculated flags
+        # 3. Assign Time Performance Category (for ALL rows)
         if is_correct:
             if current_is_relatively_fast: current_time_performance_category = 'Fast & Correct'
-            elif current_is_overtime: current_time_performance_category = 'Slow & Correct' # Use current_is_overtime directly
+            elif is_slow: current_time_performance_category = 'Slow & Correct'
             else: current_time_performance_category = 'Normal Time & Correct'
         else: # Incorrect
             if current_is_relatively_fast: current_time_performance_category = 'Fast & Wrong'
-            elif current_is_overtime: current_time_performance_category = 'Slow & Wrong' # Use current_is_overtime directly
+            elif is_slow: current_time_performance_category = 'Slow & Wrong'
             else: current_time_performance_category = 'Normal Time & Wrong'
+        
+        # For invalid rows, the time_performance_category calculated above is retained.
+        # Specific diagnostic params (SFE, detailed error types) are handled next based on validity.
 
-        # 5. Assign DETAILED Diagnostic Params using the map based on the category
-        # Ensure q_type is valid before lookup
-        # --- MODIFICATION: Handle full question type names ---
-        if q_type == 'Critical Reasoning':
-            valid_q_type = 'CR'
-        elif q_type == 'Reading Comprehension':
-            valid_q_type = 'RC'
+        # Initialize diagnostic_params for current row processing
+        # diagnostic_params from the input row (row.get('diagnostic_params')) are preserved if row is invalid and contains INVALID_DATA_TAG_V
+        processed_diagnostic_params = [] 
+
+        if not is_invalid: 
+            # 4. Check SFE for VALID rows
+            if not is_correct and pd.notna(q_diff):
+                max_correct_diff = max_diff_dict.get(q_skill, -np.inf)
+                q_diff_numeric = pd.to_numeric(q_diff, errors='coerce')
+                if pd.notna(q_diff_numeric) and q_diff_numeric < max_correct_diff:
+                     current_is_sfe = True
+                     processed_diagnostic_params.append('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+
+            # 5. Assign DETAILED Diagnostic Params for VALID rows
+            # Hasty Guessing can apply to valid rows if they are very fast
+            if pd.notna(q_time) and q_time < HASTY_GUESSING_THRESHOLD_MINUTES:
+                 processed_diagnostic_params.append('BEHAVIOR_GUESSING_HASTY')
+
+            valid_q_type_for_map = None
+            if q_type == 'Critical Reasoning': valid_q_type_for_map = 'CR'
+            elif q_type == 'Reading Comprehension': valid_q_type_for_map = 'RC'
+
+            if valid_q_type_for_map:
+                 # Use the time_performance_category calculated for all rows to find relevant detailed params
+                 params_to_add = param_assignment_map.get((valid_q_type_for_map, current_time_performance_category), [])
+                 processed_diagnostic_params.extend(params_to_add)
         else:
-            valid_q_type = None # Keep None for other types or invalid values
-        # --- END MODIFICATION ---
+            # For INVALID rows: current_is_sfe remains False (or its value from row if we decide to preserve it)
+            # diagnostic_params: Preserve existing if it's just the invalid tag, otherwise clear detailed ones.
+            # The INVALID_DATA_TAG_V is typically added in main.py. Here, we ensure no other detailed tags are added for invalid rows.
+            current_is_sfe = bool(row.get('is_sfe', False)) # Preserve SFE if it was somehow set for an invalid row before this
+            existing_row_params = row.get('diagnostic_params', [])
+            if isinstance(existing_row_params, list) and INVALID_DATA_TAG_V in existing_row_params:
+                processed_diagnostic_params = [INVALID_DATA_TAG_V] # Keep only the invalid tag
+            else:
+                # If main.py didn't add it, or params were something else, ensure it has at least this for consistency
+                processed_diagnostic_params = [INVALID_DATA_TAG_V] 
+            # time_performance_category is ALREADY set correctly for invalid rows from step 3.
 
-        if valid_q_type:
-             params_to_add = param_assignment_map.get((valid_q_type, current_time_performance_category), [])
-             current_params.extend(params_to_add)
+        # 6. Final Parameter List Cleanup and Ordering
+        # For valid rows, this combines any pre-existing (e.g. from other behaviors) with newly diagnosed ones.
+        # For invalid rows, it should ideally just be [INVALID_DATA_TAG_V].
+        
+        # Get original params from the input row to merge with processed_diagnostic_params
+        # This is important if other parts of the code (e.g. behavioral analysis) already added tags to `diagnostic_params`
+        original_input_row_params = row.get('diagnostic_params', [])
+        if not isinstance(original_input_row_params, list): original_input_row_params = []
 
-        # 6. Final Parameter List Cleanup
-        # Use existing params if available and add new ones
-        existing_params = row.get('diagnostic_params', [])
-        if not isinstance(existing_params, list): existing_params = []
-        combined_params = existing_params + current_params
-        unique_params = list(dict.fromkeys(combined_params)) # Preserve order somewhat while removing duplicates
+        # Combine: For valid rows, original_input_row_params might have behavioral tags, processed_diagnostic_params has SFE/Ch3 tags.
+        # For invalid rows, original_input_row_params should have INVALID_DATA_TAG_V from main.py, processed_diagnostic_params also has it.
+        temp_combined_params = []
+        if is_invalid:
+            # Ensure INVALID_DATA_TAG_V is present, and ideally only that for invalid rows from this function's perspective
+            temp_combined_params = [INVALID_DATA_TAG_V] 
+            # If original_input_row_params had other tags AND the invalid tag, this simplifies it.
+            # If it only had other tags (undesired for invalid), this corrects it.
+        else: # Valid row
+            temp_combined_params = original_input_row_params + processed_diagnostic_params
+            
+        unique_params = list(dict.fromkeys(temp_combined_params)) # Remove duplicates, preserving order somewhat
 
-        # Ensure SFE is first if present
+        # Specific ordering for SFE and Invalid Tag
         if 'FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in unique_params:
              unique_params.remove('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
              unique_params.insert(0, 'FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-        # Ensure invalid tag is last if present
         if INVALID_DATA_TAG_V in unique_params:
              unique_params.remove(INVALID_DATA_TAG_V)
-             unique_params.append(INVALID_DATA_TAG_V)
-
+             if is_invalid: # For invalid rows, Invalid tag should be the main/only tag from Ch3 perspective
+                 unique_params = [INVALID_DATA_TAG_V]
+             else: # For valid rows, if it somehow got there, put it at the end.
+                 unique_params.append(INVALID_DATA_TAG_V)
+        
         # Append calculated values for this row
-        all_params.append(unique_params)
-        all_sfe.append(current_is_sfe)
-        all_fast_flags.append(current_is_relatively_fast)
-        all_time_categories.append(current_time_performance_category)
-        all_overtime_flags.append(current_is_overtime) # Store calculated overtime
+        all_params_list.append(unique_params)
+        all_sfe_list.append(current_is_sfe)
+        all_fast_flags_list.append(current_is_relatively_fast)
+        all_time_categories_list.append(current_time_performance_category) # This is the key: uses value calculated for all rows
+        all_overtime_flags_list.append(current_is_overtime)
 
     # Assign lists back to DataFrame safely
-    if len(all_params) == len(df_v):
-        df_v['diagnostic_params'] = all_params
-        df_v['is_sfe'] = all_sfe
-        df_v['is_relatively_fast'] = all_fast_flags
-        df_v['time_performance_category'] = all_time_categories
-        df_v['overtime'] = all_overtime_flags # 更新 overtime 狀態以確保一致性
+    if len(all_params_list) == len(df_v):
+        df_v['diagnostic_params'] = all_params_list
+        df_v['is_sfe'] = all_sfe_list
+        df_v['is_relatively_fast'] = all_fast_flags_list
+        df_v['time_performance_category'] = all_time_categories_list # Assign the categories calculated for all rows
+        df_v['overtime'] = all_overtime_flags_list
     else:
-        print("Error: Length mismatch during Chapter 3 rule application. DataFrame not fully updated.")
+        logging.error("Error: Length mismatch during V Ch3 rule application. DataFrame not fully updated.")
+        # Fallback to prevent crash, but data might be inconsistent
+        if 'time_performance_category' not in df_v.columns: df_v['time_performance_category'] = ''
+        # Ensure other columns also exist to prevent downstream errors if update failed
+        if 'diagnostic_params' not in df_v.columns: df_v['diagnostic_params'] = [[] for _ in range(len(df_v))]
+        if 'is_sfe' not in df_v.columns: df_v['is_sfe'] = False
+        if 'is_relatively_fast' not in df_v.columns: df_v['is_relatively_fast'] = False
+        if 'overtime' not in df_v.columns: df_v['overtime'] = False
 
     return df_v 

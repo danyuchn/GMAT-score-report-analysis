@@ -12,7 +12,7 @@ from .constants import (
     DI_TOOL_AI_RECOMMENDATIONS
 )
 
-def _generate_di_summary_report(di_results):
+def _generate_di_summary_report(di_results, with_details=True):
     """Generates the summary report string for the Data Insights section."""
     report_lines = ["---（基於用戶數據與模擬難度分析）---", ""]
     ch1 = di_results.get('chapter_1', {})
@@ -25,10 +25,11 @@ def _generate_di_summary_report(di_results):
 
     # 添加調試信息：報告使用的數據框統計
     if diagnosed_df is not None:
-        total_df = len(diagnosed_df)
-        correct_df = diagnosed_df['is_correct'].sum() if 'is_correct' in diagnosed_df.columns else 0
-        wrong_df = total_df - correct_df
-        logging.info(f"[DI報告追蹤] 報告使用的數據框統計 - 總題數: {total_df}, 答對題數: {correct_df}, 答錯題數: {wrong_df}")
+        total_rows = len(diagnosed_df)
+        invalid_rows = diagnosed_df.get('is_invalid', pd.Series(False, index=diagnosed_df.index)).sum()
+        manual_invalid_rows = diagnosed_df.get('is_manually_invalid', pd.Series(False, index=diagnosed_df.index)).sum()
+        valid_rows = total_rows - invalid_rows
+        logging.info(f"[DI報告] 數據行統計：總數 {total_rows}, 有效 {valid_rows}, 無效 {invalid_rows}, 手動標記無效 {manual_invalid_rows}")
         
         # 按維度統計
         if 'content_domain' in diagnosed_df.columns:
@@ -99,10 +100,23 @@ def _generate_di_summary_report(di_results):
     tp_status = _translate_di(ch1.get('time_pressure', 'Unknown')) # Use translated status directly
     total_time = ch1.get('total_test_time_minutes', 0)
     time_diff = ch1.get('time_difference_minutes', 0)
-    invalid_count = ch1.get('invalid_questions_excluded', 0)
+    # invalid_count_total_effective = ch1.get('invalid_questions_excluded', 0) # This is the total count of effective invalid questions
+
+    manual_invalid_count = 0
+    if diagnosed_df is not None and 'is_manually_invalid' in diagnosed_df.columns:
+        manual_invalid_count = diagnosed_df['is_manually_invalid'].astype(bool).sum()
+
     report_lines.append(f"- 整體作答時間：{total_time:.2f} 分鐘（允許 {MAX_ALLOWED_TIME_DI:.1f} 分鐘，剩餘 {time_diff:.2f} 分鐘）")
     report_lines.append(f"- 時間壓力感知：**{tp_status}**")
-    if invalid_count > 0: report_lines.append(f"- **警告：** 因時間壓力下末段作答過快，有 {invalid_count} 題被標記為無效數據，未納入後續分析。")
+    
+    # 修改警告信息，使其針對手動標記的無效題目
+    if manual_invalid_count > 0: 
+        report_lines.append(f"- **註記：** 您手動標記了 {manual_invalid_count} 題為無效，這些題目已從部分細化分析中排除。")
+    
+    # 可選：如果仍需報告自動規則導致的無效，可以額外添加邏輯。
+    # 例如，可以計算 total_effective_invalid - manual_invalid_count 來得到大致的自動無效數量，
+    # 但需要注意 manual 和 auto 可能有重疊。
+    # 目前根據用戶要求，主要調整上述手動無效的報告。
     report_lines.append("")
 
     # 2. 表現概覽
@@ -119,7 +133,9 @@ def _generate_di_summary_report(di_results):
     # 3. 核心問題分析
     report_lines.append("**核心問題分析**")
     if sfe_triggered and diagnosed_df is not None and 'is_sfe' in diagnosed_df.columns:
-        sfe_rows = diagnosed_df[diagnosed_df['is_sfe'] == True]
+        # 過濾無效題目
+        valid_df = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy()
+        sfe_rows = valid_df[valid_df['is_sfe'] == True]
         if not sfe_rows.empty:
             sfe_domains_involved = set(sfe_rows['content_domain'].dropna()) if 'content_domain' in sfe_rows else set()
             sfe_types_involved = set(sfe_rows['question_type'].dropna()) if 'question_type' in sfe_rows else set()
@@ -134,7 +150,11 @@ def _generate_di_summary_report(di_results):
 
     top_other_params_codes = []
     if not param_counts_all.empty:
-        top_other_params_codes = param_counts_all[param_counts_all.index != sfe_code].head(2).index.tolist()
+        # 確保SFE代碼存在才過濾，否則獲取前2個參數
+        if sfe_code in param_counts_all.index:
+            top_other_params_codes = param_counts_all[param_counts_all.index != sfe_code].head(2).index.tolist()
+        else:
+            top_other_params_codes = param_counts_all.head(2).index.tolist()
     if top_other_params_codes:
         report_lines.append("- **高頻潛在問題點：**")
         for param_code in top_other_params_codes: report_lines.append(f"  - {_translate_di(param_code)}")
@@ -143,8 +163,9 @@ def _generate_di_summary_report(di_results):
     # DI 科詳細數據預覽表（從報告末尾移動到這裡）
     report_lines.append("")
     if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
-        # 移除原有的詳細分析顯示，僅保留標題，不再顯示具體的分析內容
-        df_problem = diagnosed_df[(diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True)].copy()
+        # 只考慮有效題目
+        valid_df = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy()
+        df_problem = valid_df[(valid_df['is_correct'] == False) | (valid_df['overtime'] == True)].copy()
         
         # 添加調試信息：問題數據統計
         problem_total = len(df_problem)
@@ -208,29 +229,26 @@ def _generate_di_summary_report(di_results):
     
     # 確保有可用的數據
     if diagnosed_df is not None and not diagnosed_df.empty:
-        # 只對有問題的題目(錯誤或超時)進行分析以生成反思建議
-        problem_df = diagnosed_df[(diagnosed_df['is_correct'] == False) | (diagnosed_df['overtime'] == True)].copy()
+        # 只對有問題且有效的題目(錯誤或超時)進行分析以生成反思建議
+        valid_df = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy()
+        problem_df = valid_df[(valid_df['is_correct'] == False) | (valid_df['overtime'] == True)].copy()
         
         # 確保必要的列存在
         required_cols = ['question_type', 'content_domain', 'time_performance_category', 'diagnostic_params']
         if all(col in problem_df.columns for col in required_cols) and not problem_df.empty:
-            # 根據時間表現分組分析
-            time_perf_groups = problem_df.groupby('time_performance_category')
+            # 根據三個維度進行分組：時間表現、內容領域、題型
+            combined_groups = problem_df.groupby(['time_performance_category', 'content_domain', 'question_type'])\
             
-            # 對每種時間表現進行分析
-            for time_perf, group in time_perf_groups:
+            # 對每個組合進行分析並生成獨立的反思提示
+            for (time_perf, domain, q_type), group in combined_groups:
                 # 跳過正確且正常用時的組（如果有的話）
-                if time_perf == 'Normal Time & Correct' or time_perf == 'Fast & Correct':
+                if time_perf in ['Normal Time & Correct', 'Fast & Correct']:
                     continue
-                
-                # 獲取該組中的題型和領域
-                q_types = group['question_type'].dropna().unique()
-                domains = group['content_domain'].dropna().unique()
                 
                 # 翻譯時間表現、題型和領域
                 time_perf_zh = _translate_di(time_perf)
-                q_types_zh = [_translate_di(qt) for qt in q_types]
-                domains_zh = [_translate_di(d) for d in domains]
+                q_type_zh = _translate_di(q_type)
+                domain_zh = _translate_di(domain)
                 
                 # 獲取該組的所有診斷參數
                 all_diagnostic_params = []
@@ -238,7 +256,6 @@ def _generate_di_summary_report(di_results):
                     if isinstance(params_list, list):
                         all_diagnostic_params.extend(params_list)
                 
-                # 修改：不再只取前3個參數，而是按類別分組顯示所有診斷參數
                 if all_diagnostic_params:
                     # 去除重複的診斷參數
                     unique_params = list(set(all_diagnostic_params))
@@ -251,33 +268,33 @@ def _generate_di_summary_report(di_results):
                             params_by_category[category] = []
                         params_by_category[category].append(param)
                     
-                    # 生成按類別分組的診斷參數文本
-                    params_text_parts = []
+                    # 生成引導反思提示
+                    prompt = f"找尋【{domain_zh}】【{q_type_zh}】的考前做題紀錄，找尋【{time_perf_zh}】的題目，檢討並反思自己是否有：\\n"\
+                    
+                    # 為每個類別生成標籤文本
                     for category, params in params_by_category.items():
                         # 翻譯類別和參數
                         category_zh = _translate_di(category)
                         params_zh = [_translate_di(p) for p in params]
                         
-                        # 以inline block格式添加
-                        params_text_parts.append(f"【{category_zh}：{', '.join(params_zh)}】")
+                        # 按照要求的格式添加
+                        prompt += f"\\n【{category_zh}：{', '.join(params_zh)}】"\
                     
-                    # 按類別行列出 - 修改為使用Markdown列表確保換行
-                    params_text = ""
-                    for part in params_text_parts:
-                        params_text += f"\n      - {part}"
+                    # 添加結尾
+                    prompt += "\\n\\n等問題。"\
                     
-                    # 生成引導反思提示
-                    prompt = f"  - 找尋【{', '.join(domains_zh)}】【{', '.join(q_types_zh)}】的考前做題紀錄，找尋【{time_perf_zh}】的題目，檢討並反思自己是否有：{params_text}\n      等問題。"
+                    # 將提示添加到列表中
                     reflection_prompts.append(prompt)
         
     # 如果沒有生成任何反思提示，添加默認提示
     if not reflection_prompts:
-        reflection_prompts.append("  - 找尋考前做題紀錄中的錯題和超時題，按照【題型】【內容領域】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。")
+        reflection_prompts.append("未發現需要特別反思的問題模式。請繼續保持良好表現。")
     
-    # 添加到報告中
-    report_lines.extend(reflection_prompts)
-
-
+    # 添加反思提示到報告中
+    report_lines.append("\\n**引導反思提示**\\n")
+    for prompt in reflection_prompts:
+        report_lines.append(f"- {prompt}")
+        report_lines.append("")
 
     # Qualitative Analysis Suggestion (移動到二級證據後面)
     if any(p in all_triggered_params for p in ['DI_LOGICAL_REASONING_ERROR', 'DI_READING_COMPREHENSION_ERROR']):
