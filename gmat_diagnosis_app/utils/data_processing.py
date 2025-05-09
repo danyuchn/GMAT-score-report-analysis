@@ -89,7 +89,7 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
                          # Use a simple threshold diff for the *guess*
                          diff_threshold = 3.0 # Default threshold
                          if subject == 'Q': diff_threshold = 3.0
-                         elif subject == 'DI': diff_threshold = 2.0
+                         elif subject == 'DI': diff_threshold = 3.0
                          elif subject == 'V': diff_threshold = 3.0
                          pressure_guess = (times.max() - times.min()) > diff_threshold
 
