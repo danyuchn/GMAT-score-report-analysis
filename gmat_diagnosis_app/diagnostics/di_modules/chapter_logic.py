@@ -455,6 +455,9 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
 
     # Final Assembly
     final_recommendations = []
+    # 先定義題型排序順序
+    type_order_final = ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
+    
     # Add exemption notes based on type-domain combinations
     all_type_domain_combos_in_data = set(df_diagnosed.groupby(['question_type', 'content_domain'], observed=False, dropna=False).groups.keys())
     sorted_exemptions = sorted(list(exempted_type_domain_combinations), key=lambda x: (type_order_final.index(x[0]) if x[0] in type_order_final else 99, x[1]))
@@ -517,8 +520,6 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
 
         final_recommendations.extend(type_recs)
 
-    type_order_final = ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
-    
     # 多級排序：
     # 1. SFE 聚合建議 (is_sfe=True) 優先級最高 (0)
     # 2. 宏觀建議 (type='macro') 次之 (1)
