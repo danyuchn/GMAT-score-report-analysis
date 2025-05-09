@@ -6,8 +6,6 @@ Q診斷模塊的行為模式分析功能
 """
 
 import pandas as pd
-import numpy as np
-from gmat_diagnosis_app.diagnostics.q_modules.translations import get_translation
 from gmat_diagnosis_app.diagnostics.q_modules.constants import CARELESSNESS_THRESHOLD
 
 

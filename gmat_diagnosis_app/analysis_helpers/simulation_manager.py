@@ -130,17 +130,15 @@ def run_simulation(df_input_for_sim):
         logging.error(f"IRT 模擬過程中出錯: {e}", exc_info=True)
         return {}, {}, {}, {}, False
 
-def prepare_dataframes_for_diagnosis(df_combined_input, all_simulation_histories, final_thetas, 
-                                     time_pressure_map, subject_thresholds, df_combined_input_with_invalids):
+def prepare_dataframes_for_diagnosis(all_simulation_histories, final_thetas, 
+                                     time_pressure_map, df_combined_input_with_invalids):
     """
     Prepare final dataframes for diagnosis by combining simulation results with input data.
     
     Args:
-        df_combined_input (pd.DataFrame): Combined input dataframe.
         all_simulation_histories (dict): Simulation histories by subject.
         final_thetas (dict): Final theta values by subject.
         time_pressure_map (dict): Time pressure status by subject.
-        subject_thresholds (dict): Thresholds by subject.
         df_combined_input_with_invalids (pd.DataFrame): Input dataframe with invalids marked.
         
     Returns:

@@ -6,11 +6,9 @@ V診斷模塊的報告生成功能
 """
 
 import pandas as pd
-from gmat_diagnosis_app.diagnostics.v_modules.translations import translate_v, APPENDIX_A_TRANSLATION_V
+from gmat_diagnosis_app.diagnostics.v_modules.translations import translate_v
 from gmat_diagnosis_app.diagnostics.v_modules.utils import format_rate
 from gmat_diagnosis_app.diagnostics.v_modules.constants import (
-    V_PARAM_CATEGORY_ORDER, 
-    V_PARAM_TO_CATEGORY,
     INVALID_DATA_TAG_V,
     V_TOOL_AI_RECOMMENDATIONS # Import the new constant
 )
@@ -576,13 +574,4 @@ def generate_v_ai_tool_recommendations(diagnosed_df_v_subject):
     if not recommended_tools_added_for_v:
         recommendation_lines.append("  - (根據您的V科編輯，未觸發特定的工具或 AI 提示建議。)")
     
-    return "\n".join(recommendation_lines)
-
-
-# --- Helper function to group parameters by category for detailed table ---
-# (This function seems to be related to detailed table generation, not summary report)
-
-def _generate_detailed_diagnostic_table_v(diagnosed_df):
-    # Filter for error/overtime questions
-    # For each, list: Q#, Type, Skill, Time Perf, Translated Params (grouped by category)
-    pass 
+    return "\n".join(recommendation_lines) 

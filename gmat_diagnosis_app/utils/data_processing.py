@@ -6,10 +6,7 @@
 import io
 import pandas as pd
 import numpy as np
-import re
-import logging
 import streamlit as st
-from gmat_diagnosis_app.constants.config import BASE_RENAME_MAP
 
 def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_bytes, suggest_invalid_questions, validate_dataframe, required_original_cols):
     """Handles data input, cleaning, validation, and standardization for a subject tab."""

@@ -2,7 +2,6 @@
 """Functions for preprocessing Verbal section data, especially RC groups."""
 import pandas as pd
 import numpy as np
-import warnings
 import logging
 
 def _calculate_rc_times(df_v_grouped):

@@ -5,7 +5,6 @@ Q科AI工具與提示建議生成模組
 """
 
 import pandas as pd
-from typing import List, Dict, Any, Optional
 from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMMENDATIONS
 from gmat_diagnosis_app.diagnostics.q_modules.translations import APPENDIX_A_TRANSLATION
 

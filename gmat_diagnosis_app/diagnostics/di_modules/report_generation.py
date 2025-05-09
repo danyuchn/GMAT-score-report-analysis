@@ -3,16 +3,15 @@ import logging
 import re
 
 from .translation import (
-    _translate_di, APPENDIX_A_TRANSLATION_DI,
+    _translate_di,
     DI_PARAM_CATEGORY_ORDER, DI_PARAM_TO_CATEGORY
 )
 from .utils import _format_rate
 from .constants import (
-    MAX_ALLOWED_TIME_DI, INVALID_DATA_TAG_DI,
-    DI_TOOL_AI_RECOMMENDATIONS
+    MAX_ALLOWED_TIME_DI, INVALID_DATA_TAG_DI
 )
 
-def _generate_di_summary_report(di_results, with_details=True):
+def _generate_di_summary_report(di_results):
     """Generates the summary report string for the Data Insights section based on the new structure."""
     report_lines = ["DI 科診斷報告詳情", "---（基於用戶數據與模擬難度分析）---", ""] # Added main title
 
@@ -159,8 +158,8 @@ def _generate_di_summary_report(di_results, with_details=True):
         report_lines.append("* 根據當前分析，暫無特別的練習建議。請保持全面複習。")
     else:
         q_type_map = {
-            "Data Sufficiency": "A", "Two-part Analysis": "B", # Corrected "Two-part analysis"
-            "Multi-source Reasoning": "C", "Graph and Table": "D"
+            "Data Sufficiency": "A", "Two-part analysis": "B", # Corrected "Two-part analysis" to "Two-part analysis"
+            "Multi-source reasoning": "C", "Graph and Table": "D"
         }
         # Sort recommendations to match A, B, C, D if possible based on typical GMAT order
         # This requires knowing the question type within the rec text or structure
@@ -206,8 +205,12 @@ def _generate_di_summary_report(di_results, with_details=True):
             # This part is tricky as rec.get('text') might not always cleanly map to q_type_map keys
             # We'll use the extracted q_type_eng if available for a more stable key
             section_letter = ""
-            if 'q_type_eng' in locals() and q_type_eng in q_type_map: # Use parsed English name
-                section_letter = q_type_map[q_type_eng] + "."
+            q_type_eng_stripped = ""
+            if 'q_type_eng' in locals() and q_type_eng:
+                q_type_eng_stripped = q_type_eng.strip()
+
+            if q_type_eng_stripped and q_type_eng_stripped in q_type_map: # Use parsed English name (stripped)
+                section_letter = q_type_map[q_type_eng_stripped] + "."
             else: # Fallback if q_type_eng couldn't be parsed reliably for mapping
                  # Try to find a keyword in q_type_zh if not already mapped
                 for key_eng, letter in q_type_map.items():

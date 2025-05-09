@@ -8,14 +8,13 @@ import csv
 import os
 import datetime
 import json
-from typing import List, Dict, Any, Union, Optional, Tuple
+from typing import List, Dict, Any
 from collections import defaultdict
 
 # Import the CSV data service module
 from gmat_diagnosis_app.services.csv_data_service import (
     get_all_gmat_performance_records,
     get_all_subjective_report_records,
-    initialize_csv_files,
     GMAT_PERFORMANCE_HEADERS,
     STUDENT_SUBJECTIVE_REPORTS_HEADERS,
     add_gmat_performance_record,

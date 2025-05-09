@@ -7,8 +7,6 @@ This script demonstrates how to use the CSV data services module for GMAT diagno
 import os
 import sys
 import datetime
-import json
-from typing import List, Dict, Any
 
 # Add the current directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,11 +19,7 @@ from gmat_diagnosis_app.services.csv_data_service import (
     get_all_gmat_performance_records,
     get_student_gmat_performance_records,
     get_test_instance_gmat_performance_records,
-    get_student_section_performance_records,
-    update_gmat_performance_records,
-    update_subjective_report_record,
-    delete_gmat_performance_records,
-    delete_subjective_report_record
+    get_student_section_performance_records
 )
 
 # Import the CSV data analysis services

@@ -3,13 +3,10 @@
 Core IRT calculation functions.
 從irt_module.py分離出來的核心計算功能。
 """
-
 import numpy as np
-import pandas as pd
 from scipy.optimize import minimize
-from scipy.special import expit # Sigmoid function
-from scipy.stats import norm
-import logging # Import logging
+from scipy.special import expit  # Sigmoid function
+import logging  # Import logging
 
 # Configure module-level logger
 logger = logging.getLogger(__name__) # Define module-level logger

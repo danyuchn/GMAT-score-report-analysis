@@ -13,10 +13,9 @@ from gmat_diagnosis_app.diagnostics.v_modules.constants import (
     INVALID_DATA_TAG_V,
     V_SKILL_TO_ERROR_CATEGORY
 )
-from gmat_diagnosis_app.diagnostics.v_modules.utils import grade_difficulty_v
 
 
-def observe_patterns(df_v, v_time_pressure_status):
+def observe_patterns(df_v):
     """Observes patterns and behavioral indicators for Chapter 5."""
     analysis = {
         'early_rushing_questions_indices': [],
