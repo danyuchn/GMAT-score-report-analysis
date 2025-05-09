@@ -261,11 +261,6 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
     lines.append("")
     lines.append("* **建議：** 如果您對報告中指出的某些問題仍感困惑，可以嘗試 **提供 2-3 題相關錯題的詳細解題流程跟思路範例** ，供顧問進行更深入的個案分析。") # Example of a long line
     lines.append("")
-
-    print("--- DEBUG: generate_report_section7 lines ---")
-    for idx, line_content_debug in enumerate(lines):
-        print(f"S7_LINE_{idx}: [{line_content_debug}]")
-    print("--- END DEBUG: generate_report_section7 lines ---")
     return lines
 
 
@@ -424,10 +419,6 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     while final_report_lines and not final_report_lines[-1].strip():
         final_report_lines.pop()
         
-    print("--- DEBUG: generate_q_summary_report report_lines ---")
-    for idx, line_content_debug in enumerate(final_report_lines): # Iterate over final_report_lines
-        print(f"FINAL_Q_REPORT_LINE_{idx}: [{line_content_debug}]")
-    print("--- END DEBUG: generate_q_summary_report report_lines ---")
     return "\n".join(final_report_lines) # Ensure this returns a joined string for the UI
 
 
