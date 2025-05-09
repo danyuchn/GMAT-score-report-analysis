@@ -171,48 +171,70 @@ def calculate_and_apply_invalid_logic(df_input, time_pressure_map_param, subject
                 
                 ft_avg_time_for_q_type = ft_avg_time.get(q_type, np.nan)
                 is_abnormally_fast = False
-                if pd.notna(q_time) and q_time < 0.5: 
-                    is_abnormally_fast = True
                 
-                if not is_abnormally_fast and pd.notna(q_time) and q_time < 1.0: 
-                    is_abnormally_fast = True
-                
-                if not is_abnormally_fast and pd.notna(q_time) and pd.notna(ft_avg_time_for_q_type) and ft_avg_time_for_q_type > 0:
-                    if q_time < (ft_avg_time_for_q_type * 0.5):
+                # 對於Q科目，完全依賴time_pressure狀態來判斷無效數據
+                if subject_code == 'Q':
+                    # 嚴格遵循MD文檔規則：
+                    # 1. 絕對過快: question_time < 0.5分鐘
+                    if pd.notna(q_time) and q_time < 0.5:
                         is_abnormally_fast = True
-                
-                if not is_abnormally_fast and subject_code == 'V' and q_type == 'Reading Comprehension':
-                    rc_group_id_val = row.get('rc_group_id')
-                    if pd.notna(rc_group_id_val):
-                        current_rc_group_df = df_output[df_output['rc_group_id'] == rc_group_id_val]
-                        group_total_time = pd.to_numeric(current_rc_group_df['question_time'], errors='coerce').sum()
-                        num_q_in_group = len(current_rc_group_df)
-                        ft_avg_rc_time_v = ft_avg_time.get('Reading Comprehension', np.nan)
+                    
+                    # 2. 絕對倉促: question_time < 1.0分鐘
+                    if not is_abnormally_fast and pd.notna(q_time) and q_time < 1.0:
+                        is_abnormally_fast = True
+                    
+                    # 3&4. 相對單題倉促: question_time < 前期平均時間的50%
+                    if not is_abnormally_fast and pd.notna(q_time) and pd.notna(ft_avg_time_for_q_type) and ft_avg_time_for_q_type > 0:
+                        if q_time < (ft_avg_time_for_q_type * 0.5):
+                            is_abnormally_fast = True
+                    
+                    # 僅在time_pressure為True時才標記為無效（已由外層if is_pressure確保）
+                    if is_abnormally_fast and not df_output.loc[original_idx, 'is_invalid']:
+                        df_output.loc[original_idx, 'is_invalid'] = True
+                # 對其他科目保持原有邏輯
+                else:
+                    if pd.notna(q_time) and q_time < 0.5: 
+                        is_abnormally_fast = True
+                    
+                    if not is_abnormally_fast and pd.notna(q_time) and q_time < 1.0: 
+                        is_abnormally_fast = True
+                    
+                    if not is_abnormally_fast and pd.notna(q_time) and pd.notna(ft_avg_time_for_q_type) and ft_avg_time_for_q_type > 0:
+                        if q_time < (ft_avg_time_for_q_type * 0.5):
+                            is_abnormally_fast = True
+                    
+                    if not is_abnormally_fast and subject_code == 'V' and q_type == 'Reading Comprehension':
+                        rc_group_id_val = row.get('rc_group_id')
+                        if pd.notna(rc_group_id_val):
+                            current_rc_group_df = df_output[df_output['rc_group_id'] == rc_group_id_val]
+                            group_total_time = pd.to_numeric(current_rc_group_df['question_time'], errors='coerce').sum()
+                            num_q_in_group = len(current_rc_group_df)
+                            ft_avg_rc_time_v = ft_avg_time.get('Reading Comprehension', np.nan)
 
-                        if pd.notna(ft_avg_rc_time_v) and ft_avg_rc_time_v > 0 and num_q_in_group > 0:
-                            if group_total_time < (ft_avg_rc_time_v * num_q_in_group * 0.5):
-                                for g_idx in current_rc_group_df.index:
-                                    if g_idx in original_indices_to_check:
-                                        df_output.loc[g_idx, 'is_invalid'] = True
-                                is_abnormally_fast = True
-                
-                elif not is_abnormally_fast and subject_code == 'DI' and q_type == 'MSR':
-                    msr_group_id_val = row.get('msr_group_id')
-                    if pd.notna(msr_group_id_val):
-                        current_msr_group_df = df_output[df_output['msr_group_id'] == msr_group_id_val]
-                        group_total_time_msr = pd.to_numeric(current_msr_group_df['question_time'], errors='coerce').sum()
-                        num_q_in_msr_group = len(current_msr_group_df)
-                        ft_avg_msr_time_di = ft_avg_time.get('MSR', np.nan)
-                        
-                        if pd.notna(ft_avg_msr_time_di) and ft_avg_msr_time_di > 0 and num_q_in_msr_group > 0:
-                            if group_total_time_msr < (ft_avg_msr_time_di * num_q_in_msr_group * 0.5):
-                                for g_idx in current_msr_group_df.index:
-                                    if g_idx in original_indices_to_check:
-                                        df_output.loc[g_idx, 'is_invalid'] = True
-                                is_abnormally_fast = True 
+                            if pd.notna(ft_avg_rc_time_v) and ft_avg_rc_time_v > 0 and num_q_in_group > 0:
+                                if group_total_time < (ft_avg_rc_time_v * num_q_in_group * 0.5):
+                                    for g_idx in current_rc_group_df.index:
+                                        if g_idx in original_indices_to_check:
+                                            df_output.loc[g_idx, 'is_invalid'] = True
+                                    is_abnormally_fast = True
+                    
+                    elif not is_abnormally_fast and subject_code == 'DI' and q_type == 'MSR':
+                        msr_group_id_val = row.get('msr_group_id')
+                        if pd.notna(msr_group_id_val):
+                            current_msr_group_df = df_output[df_output['msr_group_id'] == msr_group_id_val]
+                            group_total_time_msr = pd.to_numeric(current_msr_group_df['question_time'], errors='coerce').sum()
+                            num_q_in_msr_group = len(current_msr_group_df)
+                            ft_avg_msr_time_di = ft_avg_time.get('MSR', np.nan)
+                            
+                            if pd.notna(ft_avg_msr_time_di) and ft_avg_msr_time_di > 0 and num_q_in_msr_group > 0:
+                                if group_total_time_msr < (ft_avg_msr_time_di * num_q_in_msr_group * 0.5):
+                                    for g_idx in current_msr_group_df.index:
+                                        if g_idx in original_indices_to_check:
+                                            df_output.loc[g_idx, 'is_invalid'] = True
+                                    is_abnormally_fast = True 
 
-                if is_abnormally_fast and not df_output.loc[original_idx, 'is_invalid']:
-                    df_output.loc[original_idx, 'is_invalid'] = True
+                    if is_abnormally_fast and not df_output.loc[original_idx, 'is_invalid']:
+                        df_output.loc[original_idx, 'is_invalid'] = True
 
     # After all automatic invalid logic, merge manual invalid flags
     if 'is_manually_invalid' in df_output.columns:
