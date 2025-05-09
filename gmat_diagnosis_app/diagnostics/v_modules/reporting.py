@@ -321,13 +321,13 @@ def generate_v_summary_report(v_diagnosis_results):
         # Focus on SFE skills if SFE triggered
         focus_areas = []
         if sfe_triggered_overall and sfe_skills_involved:
-            # 保持技能名為英文
-            sfe_skills_display_行動 = sorted(list(sfe_skills_involved))
-            focus_areas.append(f"  - 特別關注與SFE相關的技能 ({', '.join(sfe_skills_display_行動)}) 的錯題和慢題。")
+            # Keep skill names in English
+            sfe_skills_display = sorted(list(sfe_skills_involved))
+            focus_areas.append(f"  - 特別關注與SFE相關的技能 ({', '.join(sfe_skills_display)}) 的錯題和慢題。")
         
         # Add other secondary evidence triggers if any (e.g., specific time_cat issues)
         # This can be expanded based on `secondary_evidence_trigger` logic if more granularity is needed.
-        if not focus_areas: # If SFE didn't trigger specific skills or no SFE
+        if not focus_areas:  # If SFE didn't trigger specific skills or no SFE
             focus_areas.append("  - 整理所有錯題和慢題，注意是否存在重複出現的題型、技能或錯誤模式。")
         report_lines.extend(focus_areas)
         report_lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
@@ -422,7 +422,11 @@ def generate_v_ai_tool_recommendations(diagnosed_df_v_subject):
     recommended_tools_added_for_v = False
     for param_code_or_text in sorted(list(all_triggered_param_codes)):
         if param_code_or_text in V_TOOL_AI_RECOMMENDATIONS:
-            display_name = param_code_or_text # Or translate_v(param_code_or_text) if it's a code
+            # 判斷參數名稱，確保使用一致的命名風格
+            # 如果是英文參數碼，則使用 translate_v 函數進行翻譯
+            # 這使參數命名風格與 MD 文件保持一致
+            is_english_code = param_code_or_text.isupper() and '_' in param_code_or_text
+            display_name = translate_v(param_code_or_text) if is_english_code else param_code_or_text
             recommendation_lines.append(f"  - **若診斷涉及【{display_name}】:**")
             for rec_item in V_TOOL_AI_RECOMMENDATIONS[param_code_or_text]:
                 recommendation_lines.append(f"    - {rec_item}")
