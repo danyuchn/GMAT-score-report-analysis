@@ -255,6 +255,12 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
         if q_type == 'Critical Reasoning' and pd.notna(q_time) and q_time > cr_ot_threshold:
             current_is_overtime = True
         # >>> IMPORTANT: For RC, we assume 'overtime' flag is potentially pre-calculated <<<
+        # >>> RC overtime logic follows MD document Chapter 1:
+        # >>> 1. group_overtime: If group_total_time > (rc_group_target_time + 1.0) minutes
+        # >>>    This should be pre-calculated for all questions in the RC group
+        # >>> 2. individual_overtime: For a single RC question, if adjusted_rc_time > 2.0 minutes
+        # >>>    where adjusted_rc_time excludes reading time for the first question
+        # >>> A RC question is considered 'slow' if either group_overtime or individual_overtime is True
         elif q_type == 'Reading Comprehension' and 'overtime' in row and bool(row['overtime']):
              current_is_overtime = True
         # --- END MODIFICATION ---
@@ -277,6 +283,8 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
 
         if pd.notna(q_time) and avg_time != np.inf:
             if q_time < (avg_time * 0.75):  # 核心邏輯文件定義的相對快閾值
+                                           # 符合 MD 文件第三章中定義的 is_relatively_fast 標準：
+                                           # 快 (`is_relatively_fast`): `question_time` < `average_time_per_type`[該題 `question_type`] * 0.75
                 current_is_relatively_fast = True
             # Check for guessing threshold
             if q_time < HASTY_GUESSING_THRESHOLD_MINUTES:

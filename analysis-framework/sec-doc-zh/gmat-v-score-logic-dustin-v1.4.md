@@ -75,6 +75,7 @@
     - 檢查閱讀時間是否偏長：
         - 獲取題組題目數 `num_q_in_group`。
         - 若 (`num_q_in_group` == 3 且 `rc_reading_time` > 2.0 分鐘) 或 (`num_q_in_group` == 4 且 `rc_reading_time` > 2.5 分鐘)，則觸發 `reading_comprehension_barrier_inquiry` = `True`。
+        - 在報告生成階段，若 `reading_comprehension_barrier_inquiry` 被觸發，系統會將 `RC_READING_COMPREHENSION_BARRIER` 診斷參數添加到診斷結果中，用於工具推薦和報告顯示。
     - *說明：此標記提示可能存在基礎閱讀障礙，將在後續章節建議中引用。*
 
 - **識別無效數據 (`is_invalid`)**: 
@@ -654,6 +655,7 @@
 | `RC_READING_PRECISION_INSUFFICIENT`           | RC 閱讀精度不足 (精讀/定位問題)                     |
 | **RC - Reading Method**                       |                                                    |
 | `RC_METHOD_INEFFICIENT_READING`               | RC 閱讀方法: 閱讀方法效率低 (過度精讀)               |
+| `RC_METHOD_TYPE_SPECIFIC_ERROR`               | RC 方法應用: 特定題型方法錯誤/不熟 (需註明題型)       |
 | **RC - Question Understanding**               |                                                    |
 | `RC_QUESTION_UNDERSTANDING_MISINTERPRETATION` | RC 題目理解: 提問焦點把握錯誤                       |
 | **RC - Location Skills**                      |                                                    |

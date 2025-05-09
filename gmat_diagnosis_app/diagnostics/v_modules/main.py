@@ -9,7 +9,7 @@ import pandas as pd
 import logging
 import streamlit as st
 
-from gmat_diagnosis_app.diagnostics.v_modules.constants import INVALID_DATA_TAG_V
+from gmat_diagnosis_app.diagnostics.v_modules.constants import INVALID_DATA_TAG_V, V_SUSPICIOUS_FAST_MULTIPLIER, RC_READING_TIME_THRESHOLD_3Q, RC_READING_TIME_THRESHOLD_4Q
 from gmat_diagnosis_app.diagnostics.v_modules.translations import translate_v
 from gmat_diagnosis_app.diagnostics.v_modules.utils import (
     grade_difficulty_v, 
@@ -150,8 +150,12 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
                     
                     barrier = False
                     if pd.notna(num_q) and pd.notna(reading_time):
-                        if (num_q == 3 and reading_time > 2.0) or \
-                           (num_q == 4 and reading_time > 2.5):
+                        # 使用常量文件中定義的閾值，與 MD 文件中的定義一致
+                        # MD 文件定義：
+                        # - 3題組的閾值是 2.0 分鐘，等同於 RC_READING_TIME_THRESHOLD_3Q
+                        # - 4題組的閾值是 2.5 分鐘，等同於 RC_READING_TIME_THRESHOLD_4Q
+                        if (num_q == 3 and reading_time > RC_READING_TIME_THRESHOLD_3Q) or \
+                           (num_q == 4 and reading_time > RC_READING_TIME_THRESHOLD_4Q):
                             barrier = True
                     
                     if barrier and pd.notna(group_id): # Check group_id is not NaN
@@ -193,8 +197,11 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
             if avg_time is not None and pd.notna(avg_time) and avg_time > 0 and 'question_time' in df_v_valid.columns:
                  valid_time_mask = df_v_valid['question_time'].notna()
                  not_invalid_mask = ~df_v_valid['is_invalid'] # Use latest is_invalid status
+                 # 使用 constants.py 中定義的 V_SUSPICIOUS_FAST_MULTIPLIER 替代硬編碼值 0.5
+                 # 此值對應 MD 文件中第一章 suspiciously_fast 的判定標準
+                 # MD 文件定義：suspiciously_fast = question_time < avg_time * 0.5
                  suspicious_mask = (df_v_valid['question_type'] == q_type) & \
-                                   (df_v_valid['question_time'] < (avg_time * 0.5)) & \
+                                   (df_v_valid['question_time'] < (avg_time * V_SUSPICIOUS_FAST_MULTIPLIER)) & \
                                    valid_time_mask & \
                                    not_invalid_mask
                  df_v_valid.loc[suspicious_mask, 'suspiciously_fast'] = True
