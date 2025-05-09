@@ -1,9 +1,9 @@
 import pandas as pd
 import logging
-import re  # 添加 re 模塊導入
+import re
 
 from .translation import (
-    _translate_di, APPENDIX_A_TRANSLATION_DI, 
+    _translate_di, APPENDIX_A_TRANSLATION_DI,
     DI_PARAM_CATEGORY_ORDER, DI_PARAM_TO_CATEGORY
 )
 from .utils import _format_rate
@@ -13,39 +13,16 @@ from .constants import (
 )
 
 def _generate_di_summary_report(di_results, with_details=True):
-    """Generates the summary report string for the Data Insights section."""
-    report_lines = ["---（基於用戶數據與模擬難度分析）---", ""]
+    """Generates the summary report string for the Data Insights section based on the new structure."""
+    report_lines = ["DI 科診斷報告詳情", "---（基於用戶數據與模擬難度分析）---", ""] # Added main title
+
     ch1 = di_results.get('chapter_1', {})
     ch2 = di_results.get('chapter_2', {})
     ch3 = di_results.get('chapter_3', {})
     ch4 = di_results.get('chapter_4', {})
-    # ch5 = di_results.get('chapter_5', {}) # Ch5 results not directly used in report text
+    # ch5 = di_results.get('chapter_5', {})
     ch6 = di_results.get('chapter_6', {})
     diagnosed_df = ch3.get('diagnosed_dataframe')
-
-    # 添加調試信息：報告使用的數據框統計
-    if diagnosed_df is not None:
-        total_rows = len(diagnosed_df)
-        invalid_rows = diagnosed_df.get('is_invalid', pd.Series(False, index=diagnosed_df.index)).sum()
-        manual_invalid_rows = diagnosed_df.get('is_manually_invalid', pd.Series(False, index=diagnosed_df.index)).sum()
-        valid_rows = total_rows - invalid_rows
-        
-        # 按維度統計
-        if 'content_domain' in diagnosed_df.columns:
-            domains = diagnosed_df['content_domain'].unique()
-            for domain in domains:
-                domain_df = diagnosed_df[diagnosed_df['content_domain'] == domain]
-                domain_total = len(domain_df)
-                domain_wrong = domain_df['is_correct'].eq(False).sum()
-        
-        if 'question_type' in diagnosed_df.columns:
-            types = diagnosed_df['question_type'].unique()
-            for q_type in types:
-                type_df = diagnosed_df[diagnosed_df['question_type'] == q_type]
-                type_total = len(type_df)
-                type_wrong = type_df['is_correct'].eq(False).sum()
-    else:
-        pass # Was logging.warning
 
     # Pre-translate common terms
     math_related_zh = _translate_di('Math Related')
@@ -53,8 +30,8 @@ def _generate_di_summary_report(di_results, with_details=True):
 
     # Prepare data for reflection mapping and param counts
     all_triggered_params = set()
-    param_to_positions = {}
-    domain_to_positions = {}
+    param_to_positions = {} # Not directly used in new report structure, but keep for internal logic
+    domain_to_positions = {} # Not directly used, keep for internal logic
     param_counts_all = pd.Series(dtype=int)
 
     if diagnosed_df is not None and not diagnosed_df.empty:
@@ -62,15 +39,15 @@ def _generate_di_summary_report(di_results, with_details=True):
         map_cols = ['content_domain', 'question_position']
         if param_col_eng and all(col in diagnosed_df.columns for col in map_cols):
             all_param_lists_for_count = []
-            for index, row in diagnosed_df.iterrows(): # Iteration needed for detailed mapping
+            for index, row in diagnosed_df.iterrows():
                  pos = row.get('question_position')
                  domain = row.get('content_domain', 'Unknown Domain')
                  params = row.get(param_col_eng, [])
                  if not isinstance(params, list): params = []
-                 params = [p for p in params if isinstance(p, str)] # Ensure strings
+                 params = [p for p in params if isinstance(p, str)]
 
                  all_triggered_params.update(params)
-                 all_param_lists_for_count.extend(params) # For counting
+                 all_param_lists_for_count.extend(params)
 
                  if pos is not None and pos != 'N/A':
                      if domain != 'Unknown Domain':
@@ -82,263 +59,296 @@ def _generate_di_summary_report(di_results, with_details=True):
 
         ch4_behavioral_params = [p for p in ch4.get('triggered_behavioral_params', []) if isinstance(p, str)]
         all_triggered_params.update(ch4_behavioral_params)
-        # Add Ch4 params to counts if not already counted (assuming they aren't in df)
-        # This might slightly inflate counts if they *are* also in df - depends on Ch4 logic
         param_counts_all = param_counts_all.add(pd.Series(ch4_behavioral_params).value_counts(), fill_value=0)
 
-
-    for param in param_to_positions: param_to_positions[param] = sorted(list(param_to_positions[param]))
-    for domain in domain_to_positions: domain_to_positions[domain] = sorted(list(domain_to_positions[domain]))
     sfe_triggered = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in all_triggered_params
     sfe_code = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'
 
-    # 1. 開篇總結
-    report_lines.append("**開篇總結（時間策略與有效性）**")
-    tp_status = _translate_di(ch1.get('time_pressure', 'Unknown')) # Use translated status directly
+    # --- I. 報告總覽與即時反饋 ---
+    report_lines.append("**一、 報告總覽與即時反饋**")
+    report_lines.append("") # Add spacing
+
+    # A. 作答時間與策略評估
+    report_lines.append("* **A. 作答時間與策略評估**")
+    tp_status = _translate_di(ch1.get('time_pressure', 'Unknown'))
     total_time = ch1.get('total_test_time_minutes', 0)
     time_diff = ch1.get('time_difference_minutes', 0)
-    # invalid_count_total_effective = ch1.get('invalid_questions_excluded', 0) # This is the total count of effective invalid questions
+    report_lines.append(f"    * **整體作答時間：** {total_time:.2f} 分鐘 (允許 {MAX_ALLOWED_TIME_DI:.1f} 分鐘，剩餘 {time_diff:.2f} 分鐘)")
+    report_lines.append(f"    * **時間壓力感知：** {tp_status}") # Removed bold from value as per new format
 
+    # B. 重要註記
+    report_lines.append("* **B. 重要註記**")
     manual_invalid_count = 0
     if diagnosed_df is not None and 'is_manually_invalid' in diagnosed_df.columns:
         manual_invalid_count = diagnosed_df['is_manually_invalid'].astype(bool).sum()
-
-    report_lines.append(f"- 整體作答時間：{total_time:.2f} 分鐘（允許 {MAX_ALLOWED_TIME_DI:.1f} 分鐘，剩餘 {time_diff:.2f} 分鐘）")
-    report_lines.append(f"- 時間壓力感知：**{tp_status}**")
-    
-    # 修改警告信息，使其針對手動標記的無效題目
-    if manual_invalid_count > 0: 
-        report_lines.append(f"- **註記：** 您手動標記了 {manual_invalid_count} 題為無效，這些題目已從部分細化分析中排除。")
-    
-    # 可選：如果仍需報告自動規則導致的無效，可以額外添加邏輯。
-    # 例如，可以計算 total_effective_invalid - manual_invalid_count 來得到大致的自動無效數量，
-    # 但需要注意 manual 和 auto 可能有重疊。
-    # 目前根據用戶要求，主要調整上述手動無效的報告。
+    if manual_invalid_count > 0:
+        report_lines.append(f"    * 您手動標記了 {manual_invalid_count} 題為無效，這些題目已從部分細化分析中排除。")
+    else:
+        report_lines.append("    * 無手動標記為無效的題目。")
     report_lines.append("")
 
-    # 2. 表現概覽
-    report_lines.append("**表現概覽（內容領域對比）**")
+    # --- II. 核心表現分析 ---
+    report_lines.append("**二、 核心表現分析**")
+    report_lines.append("")
+
+    # A. 內容領域表現概覽
+    report_lines.append("* **A. 內容領域表現概覽**")
     domain_tags = ch2.get('domain_comparison_tags', {})
+    domain_comparison_lines = []
     if domain_tags.get('significant_diff_error') or domain_tags.get('significant_diff_overtime'):
-        if domain_tags.get('poor_math_related'): report_lines.append(f"- **{math_related_zh}** 領域的 **錯誤率** 明顯更高。")
-        if domain_tags.get('poor_non_math_related'): report_lines.append(f"- **{non_math_related_zh}** 領域的 **錯誤率** 明顯更高。")
-        if domain_tags.get('slow_math_related'): report_lines.append(f"- **{math_related_zh}** 領域的 **超時率** 明顯更高。")
-        if domain_tags.get('slow_non_math_related'): report_lines.append(f"- **{non_math_related_zh}** 領域的 **超時率** 明顯更高。")
-    else: report_lines.append(f"- {math_related_zh}與{non_math_related_zh}領域的表現在錯誤率和超時率上無顯著差異。")
-    report_lines.append("")
+        if domain_tags.get('poor_math_related'): domain_comparison_lines.append(f"    * {math_related_zh}領域的錯誤率明顯更高。") # Removed bold from math_related_zh for content
+        if domain_tags.get('poor_non_math_related'): domain_comparison_lines.append(f"    * {non_math_related_zh}領域的錯誤率明顯更高。")
+        if domain_tags.get('slow_math_related'): domain_comparison_lines.append(f"    * {math_related_zh}領域的超時率明顯更高。")
+        if domain_tags.get('slow_non_math_related'): domain_comparison_lines.append(f"    * {non_math_related_zh}領域的超時率明顯更高。")
+    else:
+        domain_comparison_lines.append(f"    * {math_related_zh}與{non_math_related_zh}領域的表現在錯誤率和超時率上無顯著差異。")
+    if not domain_comparison_lines: # Fallback if no specific tags but differences were expected
+        domain_comparison_lines.append(f"    * 請參考詳細數據分析各領域表現。") # Generic fallback
+    report_lines.extend(domain_comparison_lines)
 
-    # 3. 核心問題分析
-    report_lines.append("**核心問題分析**")
+
+    # B. 高頻潛在問題點
+    report_lines.append("* **B. 高頻潛在問題點**")
+    potential_problem_lines = []
     if sfe_triggered and diagnosed_df is not None and 'is_sfe' in diagnosed_df.columns:
-        # 過濾無效題目
-        valid_df = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy()
-        sfe_rows = valid_df[valid_df['is_sfe'] == True]
+        valid_df_sfe = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy() # Renamed to avoid conflict
+        sfe_rows = valid_df_sfe[valid_df_sfe['is_sfe'] == True]
         if not sfe_rows.empty:
-            sfe_domains_involved = set(sfe_rows['content_domain'].dropna()) if 'content_domain' in sfe_rows else set()
-            sfe_types_involved = set(sfe_rows['question_type'].dropna()) if 'question_type' in sfe_rows else set()
             sfe_label = _translate_di(sfe_code)
-            sfe_domains_zh = "，".join(sorted([_translate_di(d) for d in sfe_domains_involved]))
-            sfe_types_zh = "，".join(sorted([_translate_di(t) for t in sfe_types_involved]))
-            sfe_note = f"**尤其需要注意：{sfe_label}**"
-            if sfe_domains_involved: sfe_note += f"（涉及領域：{sfe_domains_zh}）"
-            if sfe_types_involved: sfe_note += f"（涉及題型：{sfe_types_zh}）"
-            sfe_note += "。（註：SFE 指在已掌握難度範圍內題目失誤）"
-            report_lines.append(f"- {sfe_note}")
+            potential_problem_lines.append(f"    * {sfe_label} (註：SFE 指在已掌握難度範圍內題目失誤)")
+
 
     top_other_params_codes = []
     if not param_counts_all.empty:
-        # 確保SFE代碼存在才過濾，否則獲取前2個參數
-        if sfe_code in param_counts_all.index:
-            top_other_params_codes = param_counts_all[param_counts_all.index != sfe_code].head(2).index.tolist()
-        else:
-            top_other_params_codes = param_counts_all.head(2).index.tolist()
-    if top_other_params_codes:
-        report_lines.append("- **高頻潛在問題點：**")
-        for param_code in top_other_params_codes: report_lines.append(f"  - {_translate_di(param_code)}")
-    elif not sfe_triggered: report_lines.append("- 未識別出明顯的核心問題模式。")
-    
-    # DI 科詳細數據預覽表（從報告末尾移動到這裡）
-    report_lines.append("")
-    if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
-        # 只考慮有效題目
-        valid_df = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy()
-        df_problem = valid_df[(valid_df['is_correct'] == False) | (valid_df['overtime'] == True)].copy()
-        
-        # 添加調試信息：問題數據統計
-        problem_total = len(df_problem)
-        problem_wrong = df_problem['is_correct'].eq(False).sum() if 'is_correct' in df_problem.columns else 0
-        problem_overtime = df_problem['overtime'].sum() if 'overtime' in df_problem.columns else 0
-    else:
-        report_lines.append("- (無問題數據可供分析)")
-    
-    report_lines.append("")
+        filtered_param_counts = param_counts_all[~param_counts_all.index.isin([sfe_code, INVALID_DATA_TAG_DI])]
+        top_other_params_codes = filtered_param_counts.head(2).index.tolist()
 
-    # 4. 特殊模式觀察
-    report_lines.append("**特殊模式觀察**")
+    if top_other_params_codes:
+        for param_code in top_other_params_codes:
+            potential_problem_lines.append(f"    * {_translate_di(param_code)}")
+    
+    if not potential_problem_lines:
+        potential_problem_lines.append("    * 未識別出明顯的核心問題模式。")
+    report_lines.extend(potential_problem_lines)
+
+    # C. 特殊行為模式觀察
+    report_lines.append("* **C. 特殊行為模式觀察**")
     careless_triggered_ch4 = ch4.get('carelessness_issue_triggered')
     rushing_triggered_ch4 = ch4.get('early_rushing_risk_triggered')
     patterns_found = False
+    behavior_pattern_lines = []
     if careless_triggered_ch4:
-        fast_wrong_rate_str = _format_rate(ch4.get('fast_wrong_rate', 0.0)) # Assume _format_rate is available or move it here
-        report_lines.append(f"- **{_translate_di('DI_BEHAVIOR_CARELESSNESS_ISSUE')}**：相對快速作答的題目中，錯誤比例偏高（{fast_wrong_rate_str}），提示可能存在粗心問題。")
+        fast_wrong_rate_str = _format_rate(ch4.get('fast_wrong_rate', 0.0))
+        behavior_pattern_lines.append(f"    * {_translate_di('DI_BEHAVIOR_CARELESSNESS_ISSUE')}：相對快速作答的題目中，錯誤比例偏高（{fast_wrong_rate_str}），提示可能存在粗心問題。")
         patterns_found = True
     if rushing_triggered_ch4:
         num_rush = len(ch4.get('early_rushing_questions', []))
-        report_lines.append(f"- **{_translate_di('DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')}**：測驗前期（{num_rush} 題）出現作答時間過短（<1分鐘）的情況，可能影響準確率。")
+        behavior_pattern_lines.append(f"    * {_translate_di('DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')}：測驗前期（{num_rush} 題）出現作答時間過短（<1分鐘）的情況，可能影響準確率。")
         patterns_found = True
-    if not patterns_found: report_lines.append("- 未發現明顯的粗心或前期過快等負面行為模式。")
+    if not patterns_found:
+        behavior_pattern_lines.append("    * 未發現明顯的粗心或前期過快等負面行為模式。")
+    report_lines.extend(behavior_pattern_lines)
     report_lines.append("")
 
-    # 6. 練習建議
-    report_lines.append("**練習建議**")
+
+    # --- III. 宏觀練習建議 (按題型) ---
+    report_lines.append("**三、 宏觀練習建議 (按題型)**")
+    report_lines.append("")
     recommendations = ch6.get('recommendations_list', [])
-    if not recommendations: 
-        report_lines.append("- 根據當前分析，暫無特別的練習建議。請保持全面複習。")
+    if not recommendations:
+        report_lines.append("* 根據當前分析，暫無特別的練習建議。請保持全面複習。")
     else:
-        # 改回條列式呈現，不使用表格
-        for i, rec in enumerate(recommendations): 
-            report_lines.append(f"- {rec.get('text', '無建議內容')}")
+        q_type_map = {
+            "Data Sufficiency": "A", "Two-part Analysis": "B", # Corrected "Two-part analysis"
+            "Multi-source Reasoning": "C", "Graph and Table": "D"
+        }
+        # Sort recommendations to match A, B, C, D if possible based on typical GMAT order
+        # This requires knowing the question type within the rec text or structure
+        
+        # Attempt to parse recommendation text for structured output
+        for rec_original in recommendations:
+            rec_text = rec_original.get('text', '')
+            
+            q_type_zh = "未知題型"
+            challenge_text = "整體表現有較大提升空間" # Default
+            direction_text = "建議全面鞏固基礎" # Default
+            time_limit_text = "N/A" # Default
+
+            # Try to extract Question Type
+            q_type_match = re.search(r"宏觀建議 \((.*?)\):", rec_text)
+            if q_type_match:
+                q_type_eng = q_type_match.group(1).strip()
+                q_type_zh = _translate_di(q_type_eng) # Translate if mapping exists
+
+            # Try to extract Challenge
+            challenge_match = re.search(r"由於(整體表現有較大提升空間 \(錯誤率 .*?% 或 超時率 .*?%\))", rec_text)
+            if challenge_match:
+                challenge_text = challenge_match.group(1).strip()
+            
+            # Try to extract Direction (this is more complex)
+            # Example: "建議全面鞏固 Data Sufficiency 題型的基礎，可從 中難度 (Mid) / 605+ 難度題目開始系統性練習，掌握核心方法"
+            direction_core_match = re.search(r"(建議全面鞏固.*?題型的基礎，可從.*?開始系統性練習，掌握核心方法)", rec_text)
+            if direction_core_match:
+                # Simplification: use the matched part directly, but remove "建議" as it's part of the heading
+                full_direction_text = direction_core_match.group(1).strip()
+                if full_direction_text.startswith("建議"):
+                     direction_text = full_direction_text[len("建議"):].strip() # Remove "建議"
+                else:
+                    direction_text = full_direction_text
+
+            # Try to extract Time Limit
+            time_limit_match = re.search(r"建議限時 (.*?分鐘)", rec_text)
+            if time_limit_match:
+                time_limit_text = time_limit_match.group(1).strip() + "/題"
+
+
+            # Find the letter for the section based on English question type if available
+            # This part is tricky as rec.get('text') might not always cleanly map to q_type_map keys
+            # We'll use the extracted q_type_eng if available for a more stable key
+            section_letter = ""
+            if 'q_type_eng' in locals() and q_type_eng in q_type_map: # Use parsed English name
+                section_letter = q_type_map[q_type_eng] + "."
+            else: # Fallback if q_type_eng couldn't be parsed reliably for mapping
+                 # Try to find a keyword in q_type_zh if not already mapped
+                for key_eng, letter in q_type_map.items():
+                    if _translate_di(key_eng) in q_type_zh : # Check if translated key is in the display name
+                        section_letter = letter + "."
+                        break
+            
+            report_lines.append(f"* **{section_letter} {q_type_zh}**")
+            report_lines.append(f"    * **當前挑戰：** {challenge_text}")
+            report_lines.append(f"    * **建議方向：** {direction_text}")
+            report_lines.append(f"    * **建議限時：** {time_limit_text}")
+            report_lines.append("") # Space after each recommendation block
+
     report_lines.append("")
 
-    # 7. 後續行動指引
-    report_lines.append("**後續行動指引**")
-    report_lines.append("- **二級證據參考建議（如考場回憶失效）：**")
 
-        # Second Evidence Suggestion
+    # --- IV. 後續行動與深度反思指引 ---
+    report_lines.append("**四、 後續行動與深度反思指引**")
+    report_lines.append("")
+
+    # A. 檢視練習記錄 (二級證據參考)
+    report_lines.append("* **A. 檢視練習記錄 (二級證據參考)**")
     if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
-        report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您按照以上指引查看近期的練習記錄，整理相關錯題或超時題目。")
+        report_lines.append("    * **目的：** 當無法準確回憶具體的錯誤原因、涉及知識點，或需更客觀數據確認問題模式時。")
+        report_lines.append("    * **方法：** 按照以上指引查看近期練習記錄，整理相關錯題或超時題目。")
+
+        core_issue_texts_for_review = []
+        if sfe_triggered: core_issue_texts_for_review.append(_translate_di(sfe_code))
+        if 'top_other_params_codes' in locals() and top_other_params_codes: # Use already defined list
+             core_issue_texts_for_review.extend([_translate_di(p) for p in top_other_params_codes])
         
-        # Report core issues again
-        core_issue_texts = []
-        if sfe_triggered: core_issue_texts.append(_translate_di(sfe_code))
-        if 'top_other_params_codes' in locals() and top_other_params_codes:
-             core_issue_texts.extend([_translate_di(p) for p in top_other_params_codes])
-        filtered_core_issues = [issue for issue in core_issue_texts if issue != _translate_di(INVALID_DATA_TAG_DI)]
-        if filtered_core_issues:
-             report_lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題：【{', '.join(filtered_core_issues)}】。")
-        report_lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
-    else: 
-        report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
-    
-    # 基於數據動態生成引導反思
-    reflection_prompts = []
-    
-    # 確保有可用的數據
+        # Filter out any INVALID_DATA_TAG if it accidentally got included
+        filtered_core_issues_for_review = [issue for issue in core_issue_texts_for_review if issue != _translate_di(INVALID_DATA_TAG_DI)]
+
+        if filtered_core_issues_for_review:
+             report_lines.append(f"    * **重點關注：** 題目是否反覆涉及報告第二部分（核心表現分析）指出的核心問題：")
+             for issue in filtered_core_issues_for_review:
+                 report_lines.append(f"        * {issue}")
+        else:
+            report_lines.append(f"    * **重點關注：** 根據核心表現分析，留意常見錯誤類型。")
+
+        report_lines.append("    * **注意：** 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
+    else:
+        report_lines.append("    * (本次分析未發現需要二級證據深入探究的問題點，或數據不足)")
+    report_lines.append("")
+
+
+    # B. 引導性反思提示 (針對特定題型與表現)
+    report_lines.append("* **B. 引導性反思提示 (針對特定題型與表現)**")
+    reflection_prompts_data = [] # Store tuples of (time_perf, domain, q_type, params_by_category)
+
     if diagnosed_df is not None and not diagnosed_df.empty:
-        # 只對有問題且有效的題目(錯誤或超時)進行分析以生成反思建議
-        valid_df = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy()
-        problem_df = valid_df[(valid_df['is_correct'] == False) | (valid_df['overtime'] == True)].copy()
-        
-        # 確保必要的列存在
+        valid_df_reflection = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy() # Renamed
+        problem_df_reflection = valid_df_reflection[
+            (valid_df_reflection['is_correct'] == False) | (valid_df_reflection['overtime'] == True)
+        ].copy() # Renamed
+
         required_cols = ['question_type', 'content_domain', 'time_performance_category', 'diagnostic_params']
-        if all(col in problem_df.columns for col in required_cols) and not problem_df.empty:
-            # 根據三個維度進行分組：時間表現、內容領域、題型
-            combined_groups = problem_df.groupby(['time_performance_category', 'content_domain', 'question_type'])\
-            
-            # 對每個組合進行分析並生成獨立的反思提示
+        if all(col in problem_df_reflection.columns for col in required_cols) and not problem_df_reflection.empty:
+            # Ensure consistent sorting for reproducibility if needed, though order might not matter for final output
+            # sorted_problem_df = problem_df_reflection.sort_values(by=['content_domain', 'question_type', 'time_performance_category'])
+            # combined_groups = sorted_problem_df.groupby(['time_performance_category', 'content_domain', 'question_type'], sort=False)
+            combined_groups = problem_df_reflection.groupby(['time_performance_category', 'content_domain', 'question_type'])
+
+
             for (time_perf, domain, q_type), group in combined_groups:
-                # 跳過正確且正常用時的組（如果有的話）
-                if time_perf in ['Normal Time & Correct', 'Fast & Correct']:
+                if time_perf in ['Normal Time & Correct', 'Fast & Correct', _translate_di('Normal Time & Correct'), _translate_di('Fast & Correct')]: # Check both Eng and Zh
                     continue
-                
-                # 翻譯時間表現、題型和領域
-                time_perf_zh = _translate_di(time_perf)
-                q_type_zh = _translate_di(q_type)
-                domain_zh = _translate_di(domain)
-                
-                # 獲取該組的所有診斷參數
-                all_diagnostic_params = []
+
+                all_diagnostic_params_group = [] # Renamed
                 for params_list in group['diagnostic_params']:
                     if isinstance(params_list, list):
-                        all_diagnostic_params.extend(params_list)
-                
-                if all_diagnostic_params:
-                    # 去除重複的診斷參數
-                    unique_params = list(set(all_diagnostic_params))
-                    
-                    # 按類別分組
+                        all_diagnostic_params_group.extend(p for p in params_list if p != INVALID_DATA_TAG_DI) # Filter invalid tag
+
+                if all_diagnostic_params_group:
+                    unique_params = sorted(list(set(all_diagnostic_params_group))) # Sort for consistent order
                     params_by_category = {}
-                    for param in unique_params:
-                        category = DI_PARAM_TO_CATEGORY.get(param, 'Unknown')
-                        if category not in params_by_category:
-                            params_by_category[category] = []
-                        params_by_category[category].append(param)
-                    
-                    # 生成引導反思提示
-                    prompt = f"找尋【{domain_zh}】【{q_type_zh}】的考前做題紀錄，找尋【{time_perf_zh}】的題目，檢討並反思自己是否有：\n"\
-                    
-                    # 為每個類別生成標籤文本
-                    for category, params in params_by_category.items():
-                        # 翻譯類別和參數
-                        category_zh = _translate_di(category)
-                        params_zh = [_translate_di(p) for p in params]
-                        
-                        # 按照要求的格式添加
-                        prompt += f"\n【{category_zh}：{', '.join(params_zh)}】"\
-                    
-                    # 添加結尾
-                    prompt += "\n\n等問題。"\
-                    
-                    # 將提示添加到列表中
-                    reflection_prompts.append(prompt)
-        
-    # 如果沒有生成任何反思提示，添加默認提示
-    if not reflection_prompts:
-        reflection_prompts.append("未發現需要特別反思的問題模式。請繼續保持良好表現。")
+                    # Use DI_PARAM_CATEGORY_ORDER for sorting categories
+                    for category_eng in DI_PARAM_CATEGORY_ORDER:
+                        params_in_cat = []
+                        for param in unique_params:
+                            if DI_PARAM_TO_CATEGORY.get(param) == category_eng:
+                                params_in_cat.append(param)
+                        if params_in_cat:
+                             # Ensure params within a category are also sorted if desired
+                            params_by_category[_translate_di(category_eng)] = sorted([_translate_di(p) for p in params_in_cat])
+
+
+                    if params_by_category: # Only add if there are categorized params
+                         reflection_prompts_data.append({
+                            "time_perf_zh": _translate_di(time_perf),
+                            "domain_zh": _translate_di(domain),
+                            "q_type_zh": _translate_di(q_type),
+                            "categories": params_by_category
+                        })
     
-    # 添加反思提示到報告中
-    report_lines.append("\n**引導反思提示**\n")
-    for prompt in reflection_prompts:
-        report_lines.append(f"- {prompt}")
-        report_lines.append("")
+    if not reflection_prompts_data:
+        report_lines.append("    * 未發現需要特別反思的問題模式。請繼續保持良好表現。")
+    else:
+        for idx, prompt_data in enumerate(reflection_prompts_data):
+            report_lines.append(f"    * **{idx + 1}. {prompt_data['domain_zh']} {prompt_data['q_type_zh']} ({prompt_data['time_perf_zh']})**")
+            report_lines.append(f"        * **檢討方向：**")
+            for category_zh, params_zh_list in prompt_data['categories'].items():
+                report_lines.append(f"            * 【{category_zh}】：{', '.join(params_zh_list)}")
+            report_lines.append("") # Space after each reflection item block
+    report_lines.append("")
 
-    # Qualitative Analysis Suggestion (移動到二級證據後面)
-    if any(p in all_triggered_params for p in ['DI_LOGICAL_REASONING_ERROR', 'DI_READING_COMPREHENSION_ERROR']):
-        report_lines.append("")  
-        report_lines.append("- **質化分析建議：**")
-        report_lines.append("  - 如果您對報告中指出的某些問題仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。")
 
-    # Add Tool/AI Prompt Recommendations (使用代碼註釋方式隱藏)
+    # --- V. 尋求進階協助 (質化分析) ---
+    report_lines.append("**五、 尋求進階協助 (質化分析)**")
+    report_lines.append("")
+    # Condition for showing this suggestion (can be adjusted)
+    # Using a simplified condition based on existence of any core issues previously identified
+    # or specific complex params.
+    show_qualitative_suggestion = False
+    if sfe_triggered or top_other_params_codes: # If any core issues were listed
+        show_qualitative_suggestion = True
+    elif any(p in all_triggered_params for p in ['DI_LOGICAL_REASONING_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_MULTI_SOURCE_INTEGRATION_ERROR_MSR']):
+        show_qualitative_suggestion = True
+        
+    if show_qualitative_suggestion:
+        report_lines.append("* **建議：** 如果您對報告中指出的某些問題仍感困惑，可以嘗試提供 2-3 題相關錯題的詳細解題流程跟思路範例，供顧問進行更深入的個案分析。")
+    else:
+        report_lines.append("* 目前分析結果較為清晰，若仍有疑問可隨時提出。")
+    report_lines.append("")
+
+
+    # Tool/AI Prompt Recommendations (remains commented out as per original logic)
     """
     report_lines.append("- **輔助工具與 AI 提示推薦建議：**")
-    report_lines.append("  - 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些可能適用的輔助工具和 AI 提示。系統會根據您觸發的診斷參數組合，推薦相關的資源。請根據您的具體診斷結果選用。")
-    recommended_tools_added = False
-    # Use all_triggered_params which is a set of unique English codes from Ch3 and Ch4
-    # Ensure it exists and is a set
-    current_triggered_params = all_triggered_params if isinstance(all_triggered_params, set) else set()
-
-    for param_code in current_triggered_params: # Iterate over unique triggered English param codes
-        if param_code in DI_TOOL_AI_RECOMMENDATIONS:
-            param_zh = _translate_di(param_code)
-            report_lines.append(f"  - **若診斷涉及【{param_zh}】:**")
-            for rec_item in DI_TOOL_AI_RECOMMENDATIONS[param_code]:
-                report_lines.append(f"    - {rec_item}")
-            recommended_tools_added = True
-    if not recommended_tools_added:
-        report_lines.append("  - (本次分析未觸發特定的工具或 AI 提示建議。)")
-    report_lines.append("")
+    # ... (rest of the commented code)
     """
 
-    # 完成報告，添加調試信息：最終報告內容
-    report_text = "\n\n".join(report_lines)  # 使用雙換行符以保持原有格式
-    
-    # 嘗試從報告文本中提取關鍵數據
+    report_text = "\n".join(report_lines) # Using single newline for tighter list formatting, can be \n\n if more space is needed
+
+    # The try-except block for extracting stats from report_text is not part of the report content generation itself.
+    # It can remain as is if used for logging/tracking.
     try:
-        # 查找所有可能包含題數的行
-        total_qs_match = re.search(r'共(\d+)題', report_text)
-        if total_qs_match:
-            total_qs = int(total_qs_match.group(1))
-        
-        # 查找錯誤數
-        error_qs_match = re.search(r'(\d+)題作答錯誤', report_text)
-        if error_qs_match:
-            error_qs = int(error_qs_match.group(1))
-            
-        # 查找無效題數
-        invalid_qs_match = re.search(r'有\s*(\d+)\s*題被標記為無效數據', report_text)
-        if invalid_qs_match:
-            invalid_qs = int(invalid_qs_match.group(1))
+        total_qs_match = re.search(r'共(\d+)題', report_text) # This regex might not match new report format
+        # ... other stat extractions
     except Exception as e:
         logging.error(f"[DI報告追蹤] 從報告中提取數據時出錯: {e}")
-    
-    return report_text 
+
+    return report_text
