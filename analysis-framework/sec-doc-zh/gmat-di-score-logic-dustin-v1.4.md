@@ -481,7 +481,7 @@
             - **聚合信息:** 在該分組內聚合計算以下信息：
                 - **聚合練習難度 (`Y`):** 基於組內所有觸發題目的 **最低** `question_difficulty` 分數，使用 `_grade_difficulty_di` 轉換為難度等級（統一6級標準）。
                 - **聚合起始限時 (`Z`, 分鐘):** 對組內每個觸發題目，先計算其個案建議限時 `Z_individual`：
-                    - 設定目標時間：根據題型設定（例如 DS 為 2.0 分鐘，TPA/GT 為 3.0 分鐘）。
+                    - 設定目標時間：根據題型設定（例如 DS 為 2.0 分鐘，TPA/GT 為 3.0 分鐘，MSR 單題為 1.5 分鐘）。
                     - 計算 `base_time`：若題目 `overtime` 為 `True`，則 `T - 0.5`，否則 `T`。
                     - 計算 `Z_raw`：將 `base_time` 向下取整到最近的 0.5 分鐘。
                     - 確保最低值：`Z_individual` = `max(Z_raw, target_time_minutes)`。

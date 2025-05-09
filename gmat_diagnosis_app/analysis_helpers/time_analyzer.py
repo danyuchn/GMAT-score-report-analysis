@@ -26,7 +26,7 @@ def _calculate_overtime_di(df_di, pressure, thresholds):
     msr_individual_threshold = overtime_thresholds_config.get('MSR_INDIVIDUAL_THRESHOLD', 1.5) # Default from DI Doc if not in JSON
 
     # --- MSR Group Overtime --- 
-    msr_group_overtime_flags = pd.Series(False, index=df_di.index)
+    msr_group_overtime = pd.Series(False, index=df_di.index)
     if 'msr_group_id' in df_di.columns and 'msr_group_total_time' in df_di.columns:
         # Iterate over unique group_ids for MSR questions to apply group logic once per group
         unique_msr_groups = df_di.loc[(df_di['question_type'] == 'MSR') & (df_di['msr_group_id'].notna()), 'msr_group_id'].unique()
@@ -38,12 +38,12 @@ def _calculate_overtime_di(df_di, pressure, thresholds):
             target_time_for_group = msr_target_times.get('pressure' if pressure else 'no_pressure', 6.0 if pressure else 7.0) # Default from DI Doc
 
             if actual_group_total_time > target_time_for_group:
-                msr_group_overtime_flags.loc[group_data.index] = True
+                msr_group_overtime.loc[group_data.index] = True
     else:
         warnings.warn("DI overtime: Missing 'msr_group_id' or 'msr_group_total_time' column. Cannot calculate MSR group overtime.", UserWarning, stacklevel=3)
 
     # --- MSR Individual Question Overtime ---
-    msr_individual_overtime_flags = pd.Series(False, index=df_di.index)
+    msr_individual_overtime = pd.Series(False, index=df_di.index)
     msr_mask_for_individual = (df_di['question_type'] == 'MSR')
     if msr_mask_for_individual.any() and 'msr_reading_time' in df_di.columns and 'msr_group_id' in df_di.columns:
         df_di['adjusted_msr_time'] = df_di['q_time_numeric']
@@ -52,11 +52,11 @@ def _calculate_overtime_di(df_di, pressure, thresholds):
         df_di.loc[first_q_msr_mask, 'adjusted_msr_time'] = df_di.loc[first_q_msr_mask, 'q_time_numeric'] - df_di.loc[first_q_msr_mask, 'msr_reading_time']
         
         is_msr_ind_overtime = (df_di['adjusted_msr_time'] > msr_individual_threshold).fillna(False)
-        msr_individual_overtime_flags.loc[msr_mask_for_individual & is_msr_ind_overtime] = True
+        msr_individual_overtime.loc[msr_mask_for_individual & is_msr_ind_overtime] = True
     # else: warnings.warn for missing msr_reading_time could be added if strict notification is needed.
 
     # --- Combine MSR Overtime flags ---
-    final_msr_overtime = msr_group_overtime_flags | msr_individual_overtime_flags
+    final_msr_overtime = msr_group_overtime | msr_individual_overtime
     overtime_mask.loc[df_di['question_type'] == 'MSR'] = final_msr_overtime[df_di['question_type'] == 'MSR']
 
     # --- Non-MSR Question Types Overtime (DS, TPA, GT) ---
