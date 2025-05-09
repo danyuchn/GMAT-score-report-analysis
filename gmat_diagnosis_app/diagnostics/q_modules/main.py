@@ -40,14 +40,15 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     Main entry point for Q diagnostics.
     
     This function orchestrates the entire Q diagnostic process by:
-    1. Analyzing time pressure and data validity (Ch 1)
+    1. Analyzing time pressure and data validity (Ch 1) - Note: Time pressure from attrs, invalid handling updated.
     2. Performing root cause analysis on each question
     3. Analyzing patterns across questions (Ch 2-6)
     4. Generating practice recommendations (Ch 7)
     5. Producing the final report (Ch 8)
     
     Args:
-        df (DataFrame): Input dataframe with question data
+        df (DataFrame): Input dataframe with question data. Expected to have 'is_manually_invalid' if manual review is done,
+                        otherwise 'is_invalid' will be used as a fallback for filtering.
         include_summaries (bool): Whether to include detailed summary data
         include_individual_errors (bool): Whether to include individual error details
         include_summary_report (bool): Whether to generate the text summary report
@@ -59,41 +60,49 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     df_q = df.copy()
     
     # --- Chapter 1: Time Pressure & Data Validity Analysis ---
-    # 注意：這些邏輯已移至analysis_orchestrator.py和time_analyzer.py中實現
-    # time_pressure和overtime計算由外部處理並傳入
-    
-    # 確保'is_invalid'和'overtime'欄位存在，用於後續分析
-    if 'is_invalid' not in df_q.columns:
-        df_q['is_invalid'] = False # Default to False if not present
-    else:
-        df_q['is_invalid'] = df_q['is_invalid'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
-        
-    if 'overtime' not in df_q.columns:
-        df_q['overtime'] = False # Default to False if not present
-    else:
-        df_q['overtime'] = df_q['overtime'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
-
-    # 從df_q.attrs獲取時間壓力狀態（如果可用）
+    # Time pressure status is expected to be in df_q.attrs.get('time_pressure_q', False)
     q_time_pressure_status = df_q.attrs.get('time_pressure_q', False)
-    num_invalid_q = df_q['is_invalid'].sum()
 
-    # --- Process the Valid Data ---
-    df_valid = df_q[~df_q['is_invalid']].copy()
+    # Determine the mask for valid data, prioritizing 'is_manually_invalid'
+    if 'is_manually_invalid' in df_q.columns:
+        manual_invalid_mask = df_q['is_manually_invalid'].fillna(False).astype(bool)
+        valid_data_mask = ~manual_invalid_mask
+        num_manual_invalid_q = manual_invalid_mask.sum()
+        # Ensure is_invalid column reflects the manual decision for subsequent logic if other parts rely on it
+        # This is a critical step: if is_manually_invalid exists, it should be the source of truth for 'is_invalid' state.
+        df_q['is_invalid'] = manual_invalid_mask 
+    elif 'is_invalid' in df_q.columns:
+        # Fallback to is_invalid if is_manually_invalid is not present
+        # Logging a warning might be useful here in a real scenario
+        print("Warning: 'is_manually_invalid' column not found. Falling back to 'is_invalid' for filtering Q data.")
+        valid_data_mask = ~df_q['is_invalid'].fillna(False).astype(bool)
+        num_manual_invalid_q = df_q['is_invalid'].sum() # In this case, it reflects total invalid based on the fallback
+    else:
+        # No invalid column, assume all are valid
+        print("Warning: Neither 'is_manually_invalid' nor 'is_invalid' column found. Assuming all Q data is valid.")
+        valid_data_mask = pd.Series([True] * len(df_q), index=df_q.index)
+        num_manual_invalid_q = 0
+        df_q['is_invalid'] = False # Ensure is_invalid column exists and is False
+
+    # --- Process the Valid Data based on the determined mask ---
+    df_valid_for_analysis = df_q[valid_data_mask].copy()
     
-    # Calculate average times for each question type for later use
-    avg_times_by_type = df_valid.groupby('question_type')['question_time'].mean().to_dict() if 'question_time' in df_valid.columns else {}
+    # Calculate average times for each question type using the correctly filtered valid data
+    avg_times_by_type = df_valid_for_analysis.groupby('question_type')['question_time'].mean().to_dict() if 'question_time' in df_valid_for_analysis.columns and not df_valid_for_analysis.empty else {}
     
-    # Calculate max correct difficulty by skill for SFE detection
+    # Calculate max correct difficulty by skill for SFE detection using correctly filtered valid data
     max_diffs_by_skill = {}
-    if not df_valid.empty and 'question_difficulty' in df_valid.columns and 'question_fundamental_skill' in df_valid.columns:
-        df_correct = df_valid[df_valid['is_correct'] == True]
-        for skill, skill_df in df_correct.groupby('question_fundamental_skill'):
-            if not skill_df.empty and not pd.isna(skill):
-                max_diffs_by_skill[skill] = skill_df['question_difficulty'].max()
+    if not df_valid_for_analysis.empty and 'question_difficulty' in df_valid_for_analysis.columns and 'question_fundamental_skill' in df_valid_for_analysis.columns:
+        df_correct_valid = df_valid_for_analysis[df_valid_for_analysis['is_correct'] == True]
+        if not df_correct_valid.empty:
+            for skill, skill_df in df_correct_valid.groupby('question_fundamental_skill'):
+                if not skill_df.empty and not pd.isna(skill):
+                    max_diffs_by_skill[skill] = skill_df['question_difficulty'].max()
     
     # --- Root Cause Diagnosis ---
-    # Add diagnosis params to each row
-    df_diagnosed = diagnose_q_root_causes(df_q, avg_times_by_type, max_diffs_by_skill)
+    # Add diagnosis params to each row. df_diagnosed will be a modified copy of the original df_q,
+    # with root causes applied. 'diagnose_q_root_causes' needs to correctly handle 'is_invalid' internally.
+    df_diagnosed = diagnose_q_root_causes(df_q.copy(), avg_times_by_type, max_diffs_by_skill) # Pass a copy of df_q
     
     # 首先處理所有數據的診斷參數翻譯（包括無效數據）
     if 'diagnostic_params' in df_diagnosed.columns:
@@ -103,7 +112,9 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
         )
 
     # For the rest of the analysis, focus on valid data with diagnosis
-    df_valid_diagnosed = df_diagnosed[~df_diagnosed['is_invalid']].copy()
+    # This df_valid_diagnosed should now also correctly reflect manual invalid decisions
+    # as df_diagnosed was based on df_q where 'is_invalid' was updated from 'is_manually_invalid'
+    df_valid_diagnosed = df_diagnosed[valid_data_mask].copy()
     
     # --- Chapters 2-6: Internal Diagnosis ---
     internal_diagnosis = diagnose_q_internal(df_valid_diagnosed)
@@ -161,9 +172,9 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     # --- Chapter 7: Generate Recommendations ---
     q_diagnosis_results = {
         'chapter1_results': {
-            'time_pressure_status': q_time_pressure_status, # This needs to be correctly sourced
-            'overtime_threshold_used': OVERTIME_THRESHOLDS[q_time_pressure_status], # This also needs correct pressure status
-            'invalid_questions_excluded': num_invalid_q
+            'time_pressure_status': q_time_pressure_status, 
+            'overtime_threshold_used': OVERTIME_THRESHOLDS[q_time_pressure_status], 
+            'invalid_questions_excluded': num_manual_invalid_q # Use the count of manually invalid questions
         },
         'chapter2_flags': ch2_flags,
         'chapter2_summary': ch2_summary,

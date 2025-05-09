@@ -7,7 +7,8 @@ from .constants import (
     SUSPICIOUS_FAST_MULTIPLIER, 
     CARELESSNESS_THRESHOLD,
     TOTAL_QUESTIONS_DI, # Import TOTAL_QUESTIONS_DI
-    EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES # Import new constant
+    EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES, # Import new constant
+    INVALID_DATA_TAG_DI # Ensure this is imported
 )
 from .translation import _translate_di # Needed later for other functions
 from .utils import _grade_difficulty_di, _format_rate
@@ -18,7 +19,9 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
     Analyzes root causes row-by-row based on Chapter 3 logic from the MD document.
     Adds 'diagnostic_params' and 'is_sfe' columns.
     Relies on 'question_type', 'content_domain', 'question_difficulty', 'question_time',
-    'is_correct', 'overtime', 'msr_reading_time', 'is_first_msr_q'.
+    'is_correct', 'overtime', 'msr_reading_time', 'is_first_msr_q', and 'is_invalid'.
+    MODIFIED: Calculates time_performance_category for ALL rows.
+    MODIFIED: Applies SFE and detailed diagnostic_params only to VALID rows.
     """
     # NOTE: This function still uses iterrows() and could be further optimized,
     # but that involves more complex refactoring than requested. Keeping as is.
@@ -56,9 +59,10 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
         is_overtime = bool(row.get('overtime', False))
         msr_reading_time = row.get('msr_reading_time', None)
         is_first_msr_q = bool(row.get('is_first_msr_q', False))
+        is_invalid_row = bool(row.get('is_invalid', False)) # Get invalid status for the row
 
         is_relatively_fast = False
-        is_slow = is_overtime
+        is_slow = is_overtime # For time category, slow means overtime
         is_normal_time = False
         avg_time_for_type = avg_times.get(q_type, np.inf)
 
@@ -67,13 +71,6 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                 is_relatively_fast = True
             if not is_relatively_fast and not is_slow:
                 is_normal_time = True
-
-        if not is_correct and pd.notna(q_diff):
-            max_correct_diff_key = (q_type, q_domain)
-            max_correct_diff = max_diff_dict.get(max_correct_diff_key, -np.inf)
-            if q_diff < max_correct_diff:
-                sfe_triggered = True
-                params.append('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
 
         current_time_performance_category = 'Unknown'
         if is_correct:
@@ -86,69 +83,112 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
             else: current_time_performance_category = 'Normal Time & Wrong'
 
         # --- Detailed Diagnostic Logic ---
-        # A. Data Sufficiency
-        if q_type == 'Data Sufficiency':
-            if q_domain == 'Math Related':
-                if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
-                elif (is_normal_time or is_relatively_fast) and not is_correct:
-                    params.append('DI_CONCEPT_APPLICATION_ERROR')
-                    if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-            elif q_domain == 'Non-Math Related':
-                if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
-                elif (is_normal_time or is_relatively_fast) and not is_correct:
-                    params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                    if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-        # B. Two-Part Analysis
-        elif q_type == 'Two-part analysis':
-             if q_domain == 'Math Related':
-                if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
-                elif (is_normal_time or is_relatively_fast) and not is_correct:
-                    params.append('DI_CONCEPT_APPLICATION_ERROR')
-                    if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-             elif q_domain == 'Non-Math Related':
-                if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
-                elif (is_normal_time or is_relatively_fast) and not is_correct:
-                    params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                    if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-        # C. Graph & Table
-        elif q_type == 'Graph and Table':
-             if q_domain == 'Math Related':
-                if is_slow and not is_correct: params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_DATA_EXTRACTION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
-                elif (is_normal_time or is_relatively_fast) and not is_correct:
-                    params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                    if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-             elif q_domain == 'Non-Math Related':
-                if is_slow and not is_correct: params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
-                elif (is_normal_time or is_relatively_fast) and not is_correct:
-                    params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                    if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-        # D. Multi-Source Reasoning
-        elif q_type == 'Multi-source reasoning':
-            if is_first_msr_q and pd.notna(msr_reading_time) and msr_reading_time > msr_reading_threshold: params.append('DI_MSR_READING_COMPREHENSION_BARRIER')
-            if q_domain == 'Math Related':
-                if is_slow and not is_correct: params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
-                elif (is_normal_time or is_relatively_fast) and not is_correct:
-                    params.append('DI_CONCEPT_APPLICATION_ERROR')
-                    if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-            elif q_domain == 'Non-Math Related':
-                 if is_slow and not is_correct: params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_LOGICAL_REASONING_ERROR', 'DI_QUESTION_TYPE_SPECIFIC_ERROR'])
-                 elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
-                 elif (is_normal_time or is_relatively_fast) and not is_correct:
-                     params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                     if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
-        # --- End Detailed Logic ---
+        # These detailed params and SFE should only be applied if the row is NOT invalid.
+        if not is_invalid_row:
+            # SFE check (only for non-invalid rows)
+            if not is_correct and pd.notna(q_diff):
+                max_correct_diff_key = (q_type, q_domain)
+                max_correct_diff = max_diff_dict.get(max_correct_diff_key, -np.inf)
+                if q_diff < max_correct_diff:
+                    sfe_triggered = True
+                    params.append('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
 
-        # Add the results to our lists
-        all_diagnostic_params.append(params)
+            # A. Data Sufficiency
+            if q_type == 'Data Sufficiency':
+                if q_domain == 'Math Related':
+                    if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
+                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                    elif (is_normal_time or is_relatively_fast) and not is_correct:
+                        params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                elif q_domain == 'Non-Math Related':
+                    if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                    elif (is_normal_time or is_relatively_fast) and not is_correct:
+                        params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+            # B. Two-Part Analysis
+            elif q_type == 'Two-part analysis':
+                 if q_domain == 'Math Related':
+                    if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
+                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                    elif (is_normal_time or is_relatively_fast) and not is_correct:
+                        params.append('DI_CONCEPT_APPLICATION_ERROR')
+                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                 elif q_domain == 'Non-Math Related':
+                    if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                    elif (is_normal_time or is_relatively_fast) and not is_correct:
+                        params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+            # C. Graph & Table
+            elif q_type == 'Graph and Table':
+                 if q_domain == 'Math Related':
+                    if is_slow and not is_correct: params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_DATA_EXTRACTION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
+                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                    elif (is_normal_time or is_relatively_fast) and not is_correct:
+                        params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
+                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                 elif q_domain == 'Non-Math Related':
+                    if is_slow and not is_correct: params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                    elif (is_normal_time or is_relatively_fast) and not is_correct:
+                        params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+            # D. Multi-Source Reasoning
+            elif q_type == 'Multi-source reasoning':
+                if is_first_msr_q and pd.notna(msr_reading_time) and msr_reading_time > msr_reading_threshold: params.append('DI_MSR_READING_COMPREHENSION_BARRIER')
+                if q_domain == 'Math Related':
+                    if is_slow and not is_correct: params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
+                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                    elif (is_normal_time or is_relatively_fast) and not is_correct:
+                        params.append('DI_CONCEPT_APPLICATION_ERROR')
+                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                elif q_domain == 'Non-Math Related':
+                     if is_slow and not is_correct: params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_LOGICAL_REASONING_ERROR', 'DI_QUESTION_TYPE_SPECIFIC_ERROR'])
+                     elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                     elif (is_normal_time or is_relatively_fast) and not is_correct:
+                         params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
+                         if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+        # --- End Detailed Logic ---
+        else: # This row IS invalid
+            sfe_triggered = False # Invalid rows are not SFE by this logic
+            # params list should be empty or contain only INVALID_DATA_TAG_DI
+            # The INVALID_DATA_TAG_DI is usually added in main.py to the original 'diagnostic_params' column.
+            # Here, we ensure that if this function is solely responsible for 'params', it reflects invalidity.
+            existing_row_params = row.get('diagnostic_params', [])
+            if isinstance(existing_row_params, list) and INVALID_DATA_TAG_DI in existing_row_params:
+                params = [INVALID_DATA_TAG_DI]
+            elif not params: # If no SFE was added (because it's invalid), and params is empty
+                params = [INVALID_DATA_TAG_DI]
+            # current_time_performance_category is already calculated for all rows and will be used.
+
+        # Ensure INVALID_DATA_TAG_DI is handled correctly if added by main.py
+        # and merge with params calculated here (which are empty if invalid_row is true and no SFE)
+        original_input_row_params = row.get('diagnostic_params', [])
+        if not isinstance(original_input_row_params, list): original_input_row_params = []
+
+        final_params_for_row = []
+        if is_invalid_row:
+            # For invalid rows, the params list should primarily be [INVALID_DATA_TAG_DI].
+            # If main.py already put it in original_input_row_params, use that.
+            if INVALID_DATA_TAG_DI in original_input_row_params:
+                final_params_for_row = [p for p in original_input_row_params if p == INVALID_DATA_TAG_DI] # Keep only this tag if others exist
+                if not final_params_for_row: final_params_for_row = [INVALID_DATA_TAG_DI] # Ensure it's there
+            else:
+                final_params_for_row = [INVALID_DATA_TAG_DI]
+            # sfe_triggered is already False for invalid rows at this point if it came from this function's logic
+        else: # Valid row
+            # Combine any params from earlier steps (e.g. behavioral from main) with SFE/detailed from here
+            temp_combined = original_input_row_params + params
+            final_params_for_row = list(dict.fromkeys(temp_combined)) # Remove duplicates
+            if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in final_params_for_row:
+                final_params_for_row.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+                final_params_for_row.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+        
+        all_diagnostic_params.append(final_params_for_row)
         all_is_sfe.append(sfe_triggered)
-        all_time_performance_categories.append(current_time_performance_category)
+        all_time_performance_categories.append(current_time_performance_category) # Appends category for all rows
 
     # Update the dataframe with all the collected information
     df['diagnostic_params'] = all_diagnostic_params
@@ -619,3 +659,47 @@ def _analyze_and_tag_content_domain_in_exam_by_type(df_di_filtered):
     # This function should return a dictionary with content domain in exam by type analysis results
     # For now, we'll return an empty dictionary as the implementation is not provided
     return {}
+
+def ch1_analysis_di(df, avg_times_by_q_type, max_diffs):
+    """
+    Performs Chapter 1 analysis: Time Pressure, Time Efficiency, Domain Distribution, and High-level Metrics.
+    Returns a dict with the insights.
+    """
+    # 預設輸出
+    output = {}
+    
+    # 先檢查是否為空數據
+    if df is None or df.empty:
+        return output
+
+    # 確保計算排除無效題時僅考慮手動標記的無效題
+    if 'is_manually_invalid' in df.columns:
+        manual_invalid_mask = df['is_manually_invalid'].fillna(False).astype(bool)
+        manual_invalid_count = manual_invalid_mask.sum()
+        # 在各種計算中使用這個計數而不是總的無效題目計數
+        output['invalid_questions_excluded'] = int(manual_invalid_count)
+    else:
+        # 如果沒有is_manually_invalid列，則使用0作為默認值
+        output['invalid_questions_excluded'] = 0
+
+    # 所有其他計算都應使用is_invalid列，確保排除自動和手動標記的無效題
+    valid_mask = ~df['is_invalid'].fillna(False).astype(bool)
+    df_valid = df[valid_mask].copy()
+
+    # 總的測試時間（以分鐘為單位）
+    total_time_minutes = df_valid['question_time'].sum() / 60 if 'question_time' in df_valid.columns else 0
+    output['total_test_time_minutes'] = round(total_time_minutes, 2)
+
+    # 與允許時間的差異
+    MAX_ALLOWED_TIME_DI = 45  # DI允許的最大時間（分鐘）
+    time_diff = MAX_ALLOWED_TIME_DI - total_time_minutes
+    output['time_difference_minutes'] = round(time_diff, 2)
+
+    # 檢查答題時間有效性 (是否包含所有需要的值)
+    if 'question_time' not in df_valid.columns or df_valid['question_time'].isnull().any():
+        output['time_data_valid'] = False
+        return output
+    else:
+        output['time_data_valid'] = True
+
+    return output

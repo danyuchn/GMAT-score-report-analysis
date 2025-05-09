@@ -76,8 +76,8 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
                 logging.warning(f"警告：無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
         
         # --- Chapter 0: Initial Setup and Basic Metrics ---
-        logging.debug("[V Diag - Entry] Received data. Overtime count: %s", df_v_processed['overtime'].sum())
-        logging.debug("[V Diag - Entry] Input df overtime head:\\n%s", df_v_processed[['question_position', 'question_time', 'overtime']].head().to_string())
+        logging.debug("[V Diag - Entry] Received data. Overtime count: %s", df_v_processed['overtime'].sum() if 'overtime' in df_v_processed.columns else 'N/A')
+        logging.debug("[V Diag - Entry] Input df overtime head:\\n%s", df_v_processed[['question_position', 'question_time', 'overtime']].head().to_string() if 'overtime' in df_v_processed.columns else "Overtime col missing")
 
         # Convert time to numeric, fill NaNs
         df_v_processed['question_time'] = pd.to_numeric(df_v_processed['question_time'], errors='coerce')
@@ -126,21 +126,24 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         # 僅在日誌中記錄
         logging.info(f"V科診斷: 總共有 {num_invalid_v_total} 個項目被標記為無效")
 
-        # --- Filter out invalid data ---
-        df_v_processed_full = df_v_processed.copy() # Store potentially modified df before filtering valid
-        df_v_valid = df_v_processed[~df_v_processed['is_invalid']].copy() # Use the latest df_v
+        # --- Create df_v_valid_for_analysis_only for specific analyses that ONLY need valid data ---
+        # This df is for reading/analysis, not for modifying rows that go back to the main df_v_processed
+        df_v_valid_for_analysis_only = df_v_processed[~df_v_processed['is_invalid']].copy()
 
-        # --- Chapter 1: RC Reading Comprehension Barrier Inquiry (on valid data) ---
-        df_v_valid['reading_comprehension_barrier_inquiry'] = False
-        # Ensure necessary columns are numeric and exist
-        if 'rc_reading_time' in df_v_valid.columns and 'rc_group_num_questions' in df_v_valid.columns and 'rc_group_id' in df_v_valid.columns:
-            df_v_valid['rc_reading_time'] = pd.to_numeric(df_v_valid['rc_reading_time'], errors='coerce')
-            df_v_valid['rc_group_num_questions'] = pd.to_numeric(df_v_valid['rc_group_num_questions'], errors='coerce')
+
+        # --- Chapter 1: RC Reading Comprehension Barrier Inquiry (on df_v_valid_for_analysis_only) ---
+        # This section calculates 'reading_comprehension_barrier_inquiry' as a summary metric.
+        # It does not directly affect per-row time_performance_category for display.
+        # Initialize the column in the analysis-only df first
+        df_v_valid_for_analysis_only['reading_comprehension_barrier_inquiry'] = False
+        if 'rc_reading_time' in df_v_valid_for_analysis_only.columns and \
+           'rc_group_num_questions' in df_v_valid_for_analysis_only.columns and \
+           'rc_group_id' in df_v_valid_for_analysis_only.columns:
+            df_v_valid_for_analysis_only['rc_reading_time'] = pd.to_numeric(df_v_valid_for_analysis_only['rc_reading_time'], errors='coerce')
+            df_v_valid_for_analysis_only['rc_group_num_questions'] = pd.to_numeric(df_v_valid_for_analysis_only['rc_group_num_questions'], errors='coerce')
 
             rc_barrier_triggered_groups = set()
-            # Iterate over unique RC groups in the valid dataframe
-            # We only care about the first question of each group for its rc_reading_time
-            first_questions_in_groups = df_v_valid[df_v_valid['rc_reading_time'] != 0] # As per verbal_preprocessor, only first Q has non-zero rc_reading_time
+            first_questions_in_groups = df_v_valid_for_analysis_only[df_v_valid_for_analysis_only['rc_reading_time'] != 0]
             
             for idx, row in first_questions_in_groups.iterrows():
                 if row['question_type'] == 'Reading Comprehension':
@@ -150,118 +153,101 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
                     
                     barrier = False
                     if pd.notna(num_q) and pd.notna(reading_time):
-                        # 使用常量文件中定義的閾值，與 MD 文件中的定義一致
-                        # MD 文件定義：
-                        # - 3題組的閾值是 2.0 分鐘，等同於 RC_READING_TIME_THRESHOLD_3Q
-                        # - 4題組的閾值是 2.5 分鐘，等同於 RC_READING_TIME_THRESHOLD_4Q
                         if (num_q == 3 and reading_time > RC_READING_TIME_THRESHOLD_3Q) or \
                            (num_q == 4 and reading_time > RC_READING_TIME_THRESHOLD_4Q):
                             barrier = True
                     
-                    if barrier and pd.notna(group_id): # Check group_id is not NaN
+                    if barrier and pd.notna(group_id):
                         rc_barrier_triggered_groups.add(group_id)
             
-            if rc_barrier_triggered_groups: # Check if set is not empty before iterating
+            if rc_barrier_triggered_groups:
                 for group_id_to_mark in rc_barrier_triggered_groups:
-                    df_v_valid.loc[df_v_valid['rc_group_id'] == group_id_to_mark, 'reading_comprehension_barrier_inquiry'] = True
+                    # Mark in the analysis-only DataFrame
+                    df_v_valid_for_analysis_only.loc[df_v_valid_for_analysis_only['rc_group_id'] == group_id_to_mark, 'reading_comprehension_barrier_inquiry'] = True
         # --- End RC Reading Comprehension Barrier Inquiry ---
 
-        if df_v_valid.empty:
-            logging.warning("No V data remaining after excluding invalid entries. Skipping further V diagnosis.")
-            minimal_report = generate_v_summary_report(v_diagnosis_results)
-            # Ensure essential columns exist even for empty valid df scenario return
-            essential_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time',
-                              'question_type', 'question_fundamental_skill', 'Subject', 'is_invalid',
-                              'overtime', 'suspiciously_fast', 'is_sfe',
-                              'time_performance_category', 'diagnostic_params_list']
-            for col in essential_cols:
-                if col not in df_v_processed_full.columns:
-                     # Add column appropriately (e.g., bool for flags, empty list for list cols)
-                     if col == 'diagnostic_params_list':
-                         df_v_processed_full[col] = [[] for _ in range(len(df_v_processed_full))]
-                     elif col == 'Subject':
-                         df_v_processed_full[col] = 'V'
-                     elif col in ['overtime', 'suspiciously_fast', 'is_sfe']:
-                         df_v_processed_full[col] = False
-                     elif col == 'time_performance_category':
-                         df_v_processed_full[col] = ''
-                     else: # Default for others (like numeric/object)
-                         df_v_processed_full[col] = None
-            return v_diagnosis_results, minimal_report, df_v_processed_full # Return the df with invalid tags
 
-        # --- Chapter 1 Global Rule: Mark Suspiciously Fast ---
-        # Ensure suspicious_fast exists before modification
-        if 'suspiciously_fast' not in df_v_valid.columns: df_v_valid['suspiciously_fast'] = False
+        if df_v_valid_for_analysis_only.empty:
+            logging.warning("No V data remaining after excluding invalid entries for specific analyses. Diagnosis will proceed on all data where applicable.")
+            # Do not return early, proceed with df_v_processed
+
+        # --- Chapter 1 Global Rule: Mark Suspiciously Fast (on df_v_processed) ---
+        # This flag is used in observe_patterns, which itself runs on a valid data subset.
+        # However, calculating it on df_v_processed and then filtering is fine.
+        if 'suspiciously_fast' not in df_v_processed.columns: df_v_processed['suspiciously_fast'] = False
         for q_type, avg_time in v_avg_time_per_type.items():
-            # Check avg_time is valid before using
-            if avg_time is not None and pd.notna(avg_time) and avg_time > 0 and 'question_time' in df_v_valid.columns:
-                 valid_time_mask = df_v_valid['question_time'].notna()
-                 not_invalid_mask = ~df_v_valid['is_invalid'] # Use latest is_invalid status
-                 # 使用 constants.py 中定義的 V_SUSPICIOUS_FAST_MULTIPLIER 替代硬編碼值 0.5
-                 # 此值對應 MD 文件中第一章 suspiciously_fast 的判定標準
-                 # MD 文件定義：suspiciously_fast = question_time < avg_time * 0.5
-                 suspicious_mask = (df_v_valid['question_type'] == q_type) & \
-                                   (df_v_valid['question_time'] < (avg_time * V_SUSPICIOUS_FAST_MULTIPLIER)) & \
+            if avg_time is not None and pd.notna(avg_time) and avg_time > 0 and 'question_time' in df_v_processed.columns:
+                 valid_time_mask = df_v_processed['question_time'].notna()
+                 # Apply to non-invalid rows within df_v_processed
+                 not_invalid_mask = ~df_v_processed['is_invalid']
+                 suspicious_mask = (df_v_processed['question_type'] == q_type) & \
+                                   (df_v_processed['question_time'] < (avg_time * V_SUSPICIOUS_FAST_MULTIPLIER)) & \
                                    valid_time_mask & \
-                                   not_invalid_mask
-                 df_v_valid.loc[suspicious_mask, 'suspiciously_fast'] = True
+                                   not_invalid_mask 
+                 df_v_processed.loc[suspicious_mask, 'suspiciously_fast'] = True
 
 
-        # --- Apply Chapter 3 Diagnostic Rules ---
-        # Calculate max correct difficulty on VALID data
-        df_correct_valid_v = df_v_valid[df_v_valid['is_correct'] == True].copy()
+        # --- Apply Chapter 3 Diagnostic Rules (on df_v_processed) ---
+        # Calculate max correct difficulty on VALID data for SFE rule
+        df_correct_valid_v_for_sfe = df_v_processed[(df_v_processed['is_correct'] == True) & (~df_v_processed['is_invalid'])].copy()
         max_correct_difficulty_per_skill_v = {}
-        if not df_correct_valid_v.empty and 'question_fundamental_skill' in df_correct_valid_v.columns and 'question_difficulty' in df_correct_valid_v.columns:
-            # Ensure difficulty is numeric before calculating max
-            numeric_diff_correct = pd.to_numeric(df_correct_valid_v['question_difficulty'], errors='coerce')
+        if not df_correct_valid_v_for_sfe.empty and 'question_fundamental_skill' in df_correct_valid_v_for_sfe.columns and 'question_difficulty' in df_correct_valid_v_for_sfe.columns:
+            numeric_diff_correct = pd.to_numeric(df_correct_valid_v_for_sfe['question_difficulty'], errors='coerce')
             if numeric_diff_correct.notna().any():
-                 df_correct_v_skill_valid = df_correct_valid_v.dropna(subset=['question_fundamental_skill', 'question_difficulty'])
-                 df_correct_v_skill_valid['question_difficulty'] = pd.to_numeric(df_correct_v_skill_valid['question_difficulty'], errors='coerce')
-                 df_correct_v_skill_valid = df_correct_v_skill_valid.dropna(subset=['question_difficulty']) # Drop rows where conversion failed
-                 if not df_correct_v_skill_valid.empty:
-                     max_correct_difficulty_per_skill_v = df_correct_v_skill_valid.groupby('question_fundamental_skill')['question_difficulty'].max().to_dict()
+                 df_correct_v_skill_valid_for_sfe = df_correct_valid_v_for_sfe.dropna(subset=['question_fundamental_skill', 'question_difficulty'])
+                 df_correct_v_skill_valid_for_sfe['question_difficulty'] = pd.to_numeric(df_correct_v_skill_valid_for_sfe['question_difficulty'], errors='coerce')
+                 df_correct_v_skill_valid_for_sfe = df_correct_v_skill_valid_for_sfe.dropna(subset=['question_difficulty']) 
+                 if not df_correct_v_skill_valid_for_sfe.empty:
+                     max_correct_difficulty_per_skill_v = df_correct_v_skill_valid_for_sfe.groupby('question_fundamental_skill')['question_difficulty'].max().to_dict()
 
-        # Apply rules - modifies df_v in place. Pass v_time_pressure_status here.
-        # Overtime calculation is now embedded within this function.
-        df_v_valid = apply_ch3_diagnostic_rules(df_v_valid, max_correct_difficulty_per_skill_v, v_avg_time_per_type, v_time_pressure_status)
+        # apply_ch3_diagnostic_rules will now operate on all rows of df_v_processed
+        # It needs to internally handle 'is_invalid' for SFE and specific diagnostic_params.
+        df_v_processed = apply_ch3_diagnostic_rules(df_v_processed, max_correct_difficulty_per_skill_v, v_avg_time_per_type, v_time_pressure_status)
 
         # === DEBUG START ===
-        logging.debug("[V Diag - After Ch3 Rules] Overtime count: %s", df_v_valid['overtime'].sum())
-        logging.debug("[V Diag - After Ch3 Rules] Sample with time category:\n%s", df_v_valid[['question_position', 'overtime', 'time_performance_category']].head().to_string())
+        logging.debug("[V Diag - After Ch3 Rules on df_v_processed] Overtime count: %s", df_v_processed['overtime'].sum() if 'overtime' in df_v_processed.columns else 'N/A')
+        logging.debug("[V Diag - After Ch3 Rules on df_v_processed] Sample with time category:\n%s", df_v_processed[['question_position', 'overtime', 'time_performance_category', 'is_invalid']].head().to_string() if 'time_performance_category' in df_v_processed.columns else "Time category col missing")
         # === DEBUG END ===
 
-        # --- Translate diagnostic codes ---
-        if 'diagnostic_params' in df_v_valid.columns:
+        # --- Translate diagnostic codes (on df_v_processed) ---
+        if 'diagnostic_params' in df_v_processed.columns:
             # Ensure the lambda handles non-list inputs gracefully
-            df_v_valid['diagnostic_params_list'] = df_v_valid['diagnostic_params'].apply(
+            df_v_processed['diagnostic_params_list'] = df_v_processed['diagnostic_params'].apply(
                 lambda params: [translate_v(p) for p in params if isinstance(p, str)] if isinstance(params, list) else []
             )
         else:
             # Initialize if 'diagnostic_params' somehow got dropped
-            num_rows = len(df_v_valid)
-            df_v_valid['diagnostic_params_list'] = pd.Series([[] for _ in range(num_rows)], index=df_v_valid.index)
+            num_rows = len(df_v_processed)
+            df_v_processed['diagnostic_params_list'] = pd.Series([[] for _ in range(num_rows)], index=df_v_processed.index)
 
         # --- Populate Chapter 1 Results ---
+        rc_barrier_triggered_metric = False
+        if 'reading_comprehension_barrier_inquiry' in df_v_valid_for_analysis_only.columns:
+             rc_barrier_triggered_metric = df_v_valid_for_analysis_only['reading_comprehension_barrier_inquiry'].any()
+
         v_diagnosis_results['chapter_1'] = {
             'time_pressure_status': v_time_pressure_status,
             'invalid_count': num_invalid_v_total,
-            'reading_comprehension_barrier_inquiry_triggered': df_v_valid['reading_comprehension_barrier_inquiry'].any() if 'reading_comprehension_barrier_inquiry' in df_v_valid else False
+            'reading_comprehension_barrier_inquiry_triggered': rc_barrier_triggered_metric
         }
         logging.debug("Populated Chapter 1 V results.")
 
-        # --- Populate Chapter 2 Results (Basic Metrics on VALID data) ---
-        logging.debug("Executing V Analysis (Chapter 2 - Metrics)...")
+        # --- Populate Chapter 2 Results (Basic Metrics on df_v_valid_for_analysis_only) ---
+        logging.debug("Executing V Analysis (Chapter 2 - Metrics using df_v_valid_for_analysis_only)...")
         # Recalculate valid df based on potentially modified df_v's is_invalid column
-        df_valid_v = df_v_valid.copy() # Use the latest df_v
+        # df_valid_v = df_v_valid.copy() # Use the latest df_v # This line is redundant if df_v_valid_for_analysis_only is used
 
-        # Correctly calculate overall metrics for Chapter 2
-        v_diagnosis_results.setdefault('chapter_2', {})['overall_metrics'] = calculate_metrics_for_group(df_valid_v)
-        v_diagnosis_results.setdefault('chapter_2', {})['by_type'] = analyze_dimension(df_valid_v, 'question_type')
+        v_diagnosis_results.setdefault('chapter_2', {})['overall_metrics'] = calculate_metrics_for_group(df_v_valid_for_analysis_only)
+        v_diagnosis_results.setdefault('chapter_2', {})['by_type'] = analyze_dimension(df_v_valid_for_analysis_only, 'question_type')
         # Ensure difficulty grading happens on the valid data for Ch2 analysis
-        df_valid_v['difficulty_grade'] = df_valid_v['question_difficulty'].apply(grade_difficulty_v)
-        v_diagnosis_results.setdefault('chapter_2', {})['by_difficulty'] = analyze_dimension(df_valid_v, 'difficulty_grade')
-        # >>> MODIFICATION: Add analysis by skill <<<
-        v_diagnosis_results.setdefault('chapter_2', {})['by_skill'] = analyze_dimension(df_valid_v, 'question_fundamental_skill')
+        if not df_v_valid_for_analysis_only.empty: # Check if df is not empty before applying functions
+            df_v_valid_for_analysis_only['difficulty_grade'] = df_v_valid_for_analysis_only['question_difficulty'].apply(grade_difficulty_v)
+            v_diagnosis_results.setdefault('chapter_2', {})['by_difficulty'] = analyze_dimension(df_v_valid_for_analysis_only, 'difficulty_grade')
+            v_diagnosis_results.setdefault('chapter_2', {})['by_skill'] = analyze_dimension(df_v_valid_for_analysis_only, 'question_fundamental_skill')
+        else: # Handle empty case for by_difficulty and by_skill
+            v_diagnosis_results.setdefault('chapter_2', {})['by_difficulty'] = {}
+            v_diagnosis_results.setdefault('chapter_2', {})['by_skill'] = {}
+            
         logging.debug("Finished Chapter 2 V metrics.")
 
         # --- Populate Chapter 3 Results ---
@@ -269,25 +255,22 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         # Store the dataframe WITH BOTH param columns for report generator
         # Store the df *after* Ch3 rules have been applied (initially)
         # We will update this df later after adding behavioral tags from Ch5
-        df_after_ch3 = df_v_valid.copy()
-        v_diagnosis_results['chapter_3'] = {'diagnosed_dataframe': df_after_ch3} # Store initial Ch3 df
+        v_diagnosis_results['chapter_3'] = {'diagnosed_dataframe': df_v_processed.copy()} # Store the full df_v_processed
         logging.debug("Finished Chapter 3 V result structuring.")
 
-        # --- Populate Chapter 4 Results (Correct but Slow on VALID data) ---
+        # --- Populate Chapter 4 Results (Correct but Slow on a filtered version of df_v_processed) ---
         logging.debug("Executing V Analysis (Chapter 4 - Correct Slow)...")
-        # Use valid data derived from the df *after* Ch3 processing
-        df_valid_v_post_ch3 = df_v_valid.copy()
-        df_correct_v = df_valid_v_post_ch3[df_valid_v_post_ch3['is_correct'] == True].copy() # Use valid data post Ch3
+        df_correct_v_for_ch4 = df_v_processed[(df_v_processed['is_correct'] == True) & (~df_v_processed['is_invalid'])].copy()
         # === DEBUG START - CH4 Input ===
-        logging.debug("[V Diag - Ch4] Input df_correct_v for analyze_correct_slow (shape: %s). Overtime counts:\n%s",
-                     df_correct_v.shape, df_correct_v['overtime'].value_counts().to_string() if 'overtime' in df_correct_v else "Overtime col missing")
-        # === ADDED DEBUG - Check Question Types in df_correct_v ===
-        if not df_correct_v.empty and 'question_type' in df_correct_v:
-            logging.debug("[V Diag - Ch4] Question types present in df_correct_v:\n%s", df_correct_v['question_type'].value_counts().to_string())
+        logging.debug("[V Diag - Ch4] Input df_correct_v_for_ch4 for analyze_correct_slow (shape: %s). Overtime counts:\n%s",
+                     df_correct_v_for_ch4.shape, df_correct_v_for_ch4['overtime'].value_counts().to_string() if 'overtime' in df_correct_v_for_ch4 else "Overtime col missing")
+        # === ADDED DEBUG - Check Question Types in df_correct_v_for_ch4 ===
+        if not df_correct_v_for_ch4.empty and 'question_type' in df_correct_v_for_ch4:
+            logging.debug("[V Diag - Ch4] Question types present in df_correct_v_for_ch4:\n%s", df_correct_v_for_ch4['question_type'].value_counts().to_string())
         # === DEBUG END ===
         # === MODIFICATION: Use full question type names for filtering ===
-        cr_correct_slow_result = analyze_correct_slow(df_correct_v[df_correct_v['question_type'] == 'Critical Reasoning'], 'CR')
-        rc_correct_slow_result = analyze_correct_slow(df_correct_v[df_correct_v['question_type'] == 'Reading Comprehension'], 'RC')
+        cr_correct_slow_result = analyze_correct_slow(df_correct_v_for_ch4[df_correct_v_for_ch4['question_type'] == 'Critical Reasoning'], 'CR')
+        rc_correct_slow_result = analyze_correct_slow(df_correct_v_for_ch4[df_correct_v_for_ch4['question_type'] == 'Reading Comprehension'], 'RC')
         # === END MODIFICATION ===
         # === DEBUG START - CH4 Results ===
         logging.debug("[V Diag - Ch4] Result from analyze_correct_slow(CR): %s", cr_correct_slow_result)
@@ -299,127 +282,97 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         }
         logging.debug("Finished Chapter 4 V correct slow analysis.")
 
-        # --- Populate Chapter 5 Results (Behavioral Patterns on VALID data) ---
+        # --- Populate Chapter 5 Results (Behavioral Patterns on a filtered version of df_v_processed) ---
         logging.debug("Executing V Analysis (Chapter 5 - Behavioral Patterns)...")
         # Use the valid data derived from the df *after* Ch3 processing for pattern observation
-        df_valid_v_for_ch5 = df_v_valid.copy() # Use df_v state AFTER Ch3
-        ch5_behavioral_analysis = observe_patterns(df_valid_v_for_ch5, v_time_pressure_status)
+        df_valid_v_for_ch5_analysis = df_v_processed[~df_v_processed['is_invalid']].copy()
+        ch5_behavioral_analysis = observe_patterns(df_valid_v_for_ch5_analysis, v_time_pressure_status)
         v_diagnosis_results['chapter_5'] = ch5_behavioral_analysis
         logging.debug("Finished Chapter 5 V behavioral analysis.")
 
-        # === NEW: Apply Behavioral Tags (e.g., Carelessness) BACK to DataFrame ===
-        # We modify the main df_v dataframe, which contains all rows (incl. invalid)
-        # but the indices come from analysis on valid data.
+        # === NEW: Apply Behavioral Tags (e.g., Carelessness) BACK to df_v_processed ===
         carelessness_indices = ch5_behavioral_analysis.get('carelessness_question_indices', [])
         if carelessness_indices:
-            logging.debug(f"Applying BEHAVIOR_CARELESSNESS_ISSUE tag to indices: {carelessness_indices}")
+            logging.debug(f"Applying BEHAVIOR_CARELESSNESS_ISSUE tag to indices: {carelessness_indices} in df_v_processed")
             for index in carelessness_indices:
-                if index in df_v_valid.index: # Ensure index exists in the main df
-                     current_params = df_v_valid.loc[index, 'diagnostic_params']
-                     # Ensure it's a list before appending
+                if index in df_v_processed.index: # Ensure index exists in df_v_processed
+                     current_params = df_v_processed.loc[index, 'diagnostic_params']
                      if not isinstance(current_params, list):
                          current_params = []
                      if 'BEHAVIOR_CARELESSNESS_ISSUE' not in current_params:
-                         # Create a new list and assign it back
                          new_params = current_params + ['BEHAVIOR_CARELESSNESS_ISSUE']
-                         # Use .at for scalar assignment
-                         df_v_valid.at[index, 'diagnostic_params'] = new_params
-                         # Also update the translated list if it exists
-                         if 'diagnostic_params_list' in df_v_valid.columns:
-                             current_translated = df_v_valid.loc[index, 'diagnostic_params_list'] # Reading with .loc is fine
+                         df_v_processed.at[index, 'diagnostic_params'] = new_params
+                         if 'diagnostic_params_list' in df_v_processed.columns:
+                             current_translated = df_v_processed.loc[index, 'diagnostic_params_list']
                              if not isinstance(current_translated, list):
                                  current_translated = []
                              translated_tag = translate_v('BEHAVIOR_CARELESSNESS_ISSUE')
                              if translated_tag not in current_translated:
-                                 # Create a new list and assign it back
                                  new_translated_list = current_translated + [translated_tag]
-                                 # Use .at for scalar assignment
-                                 df_v_valid.at[index, 'diagnostic_params_list'] = new_translated_list
+                                 df_v_processed.at[index, 'diagnostic_params_list'] = new_translated_list
                 else:
-                     logging.warning(f"    Warning: Carelessness index {index} not found in main df_v.")
+                     logging.warning(f"    Warning: Carelessness index {index} not found in df_v_processed.")
 
         # Update the dataframe in Chapter 3 results *after* adding behavioral tags
-        v_diagnosis_results['chapter_3']['diagnosed_dataframe'] = df_v_valid.copy()
+        v_diagnosis_results['chapter_3']['diagnosed_dataframe'] = df_v_processed.copy()
         # =========================================================================
 
-        # --- Populate Chapter 6 Results (Skill Override Check on VALID data) ---
+        # --- Populate Chapter 6 Results (Skill Override Check on df_v_valid_for_analysis_only) ---
         logging.debug("Executing V Analysis (Chapter 6 - Skill Override)...")
-        # Use valid data derived from the df *after* Ch3 processing
-        exempted_skills = calculate_skill_exemption_status(df_valid_v_post_ch3)
-        ch6_override_results = calculate_skill_override(df_valid_v_post_ch3)
+        # Use df_v_valid_for_analysis_only for these summary calculations
+        exempted_skills = calculate_skill_exemption_status(df_v_valid_for_analysis_only)
+        ch6_override_results = calculate_skill_override(df_v_valid_for_analysis_only)
         ch6_results = {**ch6_override_results, 'exempted_skills': exempted_skills}
         v_diagnosis_results['chapter_6'] = ch6_results
         logging.debug(f"Finished Chapter 6 V skill override/exemption analysis. Exempted: {exempted_skills}")
 
         # --- Generate Recommendations & Summary Report (Chapter 7 & 8) --- #
         # Pass the df *after* Ch3 processing to recommendation generator
-        v_recommendations = generate_v_recommendations(v_diagnosis_results, exempted_skills)
+        # Recommendations might be based on analysis of valid data, or overall patterns.
+        # For now, assume generate_v_recommendations uses v_diagnosis_results (which contains summaries from valid data)
+        # and potentially the full df_v_processed if needed.
+        v_recommendations = generate_v_recommendations(v_diagnosis_results, exempted_skills) # exempted_skills is from valid data
         v_diagnosis_results['chapter_7'] = v_recommendations
 
-        # Generate report using results containing the df with both param columns
-        # === DEBUG START - Report Input ===
-        logging.debug("[V Diag - Report Gen] Input v_diagnosis_results['chapter_4'] for report:\n%s", v_diagnosis_results.get('chapter_4'))
-        # === DEBUG END ===
+        # Generate report using results.
+        # generate_v_summary_report uses v_diagnosis_results which now includes df_v_processed in chapter_3.
         v_report_content = generate_v_summary_report(v_diagnosis_results)
 
         # --- Prepare Final DataFrame for Return ---
-        df_v_final = df_v_valid.copy() # Start with the df that has Ch3 results
+        df_v_final = df_v_processed.copy() # Start with the fully processed df
 
         # === DEBUG START ===
-        logging.debug("[V Diag - Before Return] Final df overtime count: %s", df_v_final['overtime'].sum())
-        logging.debug("[V Diag - Before Return] Final df overtime head:\n%s", df_v_final[['question_position', 'overtime']].head().to_string())
+        logging.debug("[V Diag - Before Return] Final df_v_final overtime count: %s", df_v_final['overtime'].sum() if 'overtime' in df_v_final.columns else 'N/A')
+        logging.debug("[V Diag - Before Return] Final df_v_final overtime head:\n%s", df_v_final[['question_position', 'overtime', 'is_invalid', 'time_performance_category']].head().to_string() if 'overtime' in df_v_final.columns else "Overtime col missing")
         # === DEBUG END ===
 
         # --- Drop English column AFTER report is generated ---
         if 'diagnostic_params' in df_v_final.columns:
             try:
-                df_v_final.drop(columns=['diagnostic_params'], inplace=True)
+                df_v_final.drop(columns=['diagnostic_params'], inplace=True, errors='ignore')
             except KeyError:
                 pass # Ignore if already dropped
 
         # --- Ensure Subject Column ---
         if 'Subject' not in df_v_final.columns or df_v_final['Subject'].isnull().any() or (df_v_final['Subject'] != 'V').any():
             df_v_final['Subject'] = 'V'
+        else: # Ensure it's 'V' if column exists but has mixed/wrong values
+            df_v_final['Subject'] = 'V'
 
         logging.debug("Verbal Diagnosis Complete.")
 
-        # 關鍵修改：確保將is_invalid和is_manually_invalid列從原始完整數據集中合併回返回的數據集
-        # 這樣無效數據標記將不會丟失
-        for invalid_col in ['is_invalid', 'is_manually_invalid']:
-            if invalid_col in df_v_processed_full.columns:
-                # 先確保df_v_final中有這個列
-                if invalid_col not in df_v_final.columns:
-                    df_v_final[invalid_col] = False
-                
-                # 遍歷原始完整數據，將標記為True的行找到並更新到最終數據集
-                for idx, row in df_v_processed_full[df_v_processed_full[invalid_col] == True].iterrows():
-                    # 在最終數據集中找到相同題號的行
-                    matching_rows = df_v_final[df_v_final['question_position'] == row['question_position']]
-                    if not matching_rows.empty:
-                        for final_idx in matching_rows.index:
-                            df_v_final.at[final_idx, invalid_col] = True
-                    else:
-                        # 如果最終數據集中沒有這道題，說明它可能是有效數據中被過濾掉的
-                        # 需要添加回來
-                        df_v_final = pd.concat([df_v_final, row.to_frame().T], ignore_index=True)
-        
-        # 再次確保 is_invalid 優先使用手動標記
-        if 'is_manually_invalid' in df_v_final.columns and 'is_invalid' in df_v_final.columns:
-            # 將手動標記的行設置為無效，這比合併更強力，確保手動標記總是優先
-            df_v_final.loc[df_v_final['is_manually_invalid'] == True, 'is_invalid'] = True
+        # No longer need to merge 'is_invalid' or 'is_manually_invalid' back,
+        # as df_v_processed (and thus df_v_final) always contained the correct 'is_invalid' status.
+        # Ensure 'is_invalid' is bool type for consistency
+        df_v_final['is_invalid'] = df_v_final['is_invalid'].astype(bool)
             
-            # 調試信息
-            manual_invalid_count = df_v_final['is_manually_invalid'].sum()
-            final_invalid_count = df_v_final['is_invalid'].sum()
-            logging.info(f"V科診斷: 最終數據集中有 {manual_invalid_count} 個手動標記的無效項，總共 {final_invalid_count} 個無效項")
-        
-        # 再次檢查無效項數量
+        # Final check on invalid counts for logging
         if 'is_invalid' in df_v_final.columns:
-            final_invalid_count = df_v_final['is_invalid'].sum()
-            if final_invalid_count > 0:
-                logging.info(f"V科診斷: 最終返回數據集中包含 {final_invalid_count} 個無效項")
+            final_invalid_count_in_df = df_v_final['is_invalid'].sum()
+            if final_invalid_count_in_df != num_invalid_v_total:
+                 logging.warning(f"V科診斷: 最終返回數據集中無效項數量 ({final_invalid_count_in_df}) 與初始記錄 ({num_invalid_v_total}) 不符。")
             else:
-                logging.error(f"V科診斷: 警告！最終返回數據集中沒有無效項，但原始數據集中有 {num_invalid_v_total} 個")
+                 logging.info(f"V科診斷: 最終返回數據集中確認包含 {final_invalid_count_in_df} 個無效項。")
 
         # Return the final df AFTER dropping the English params col
         return v_diagnosis_results, v_report_content, df_v_final

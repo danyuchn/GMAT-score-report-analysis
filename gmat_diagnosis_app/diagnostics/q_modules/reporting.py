@@ -161,71 +161,109 @@ def generate_report_section7(triggered_params_translated, param_to_positions, sk
     # --- Reflection Prompts ---
     lines.append("- **引導反思:**")
     
-    # 從診斷數據中提取基本信息，用於引導反思格式模板
-    recommended_skills = set()
-    content_domains = set()
-    time_performances = set()
-    diagnostic_labels = set()
+    # 從診斷數據中提取基本信息，用於生成反思提示
+    reflection_prompts = []
     
-    # 從診斷數據中提取信息
+    # 確保有可用的數據
     if df_diagnosed is not None and not df_diagnosed.empty:
-        # 提取技能
-        if 'question_fundamental_skill' in df_diagnosed.columns:
-            valid_skills = df_diagnosed['question_fundamental_skill'].dropna().unique()
-            for skill in valid_skills:
-                if isinstance(skill, str) and skill != 'Unknown Skill':
-                    recommended_skills.add(skill)
+        # 只對有問題且有效的題目(錯誤或超時)進行分析以生成反思建議
+        if 'is_manually_invalid' in df_diagnosed.columns:
+            manual_invalid_mask = df_diagnosed['is_manually_invalid'].fillna(False).astype(bool)
+            valid_df = df_diagnosed[~manual_invalid_mask].copy()
+        elif 'is_invalid' in df_diagnosed.columns: # Fallback if is_manually_invalid is not present
+            invalid_mask = df_diagnosed['is_invalid'].fillna(False).astype(bool)
+            valid_df = df_diagnosed[~invalid_mask].copy()
+        else: # No invalid column, assume all are valid
+            valid_df = df_diagnosed.copy()
         
-        # 提取內容領域
-        if 'content_domain' in df_diagnosed.columns:
-            valid_domains = df_diagnosed['content_domain'].dropna().unique()
-            for domain in valid_domains:
-                if isinstance(domain, str) and domain != 'Unknown':
-                    content_domains.add(domain)
+        problem_df = valid_df[(valid_df['is_correct'] == False)].copy()
         
-        # 提取時間表現
-        if 'time_performance_category' in df_diagnosed.columns:
-            valid_perfs = df_diagnosed['time_performance_category'].dropna().unique()
-            for perf in valid_perfs:
-                if isinstance(perf, str) and perf != 'Unknown':
-                    time_performances.add(perf)
-        
-        # 提取診斷標籤
-        all_diagnostic_params = []
-        if 'diagnostic_params_list' in df_diagnosed.columns:
-            for params_list in df_diagnosed['diagnostic_params_list']:
-                if isinstance(params_list, list):
-                    all_diagnostic_params.extend(params_list)
+        # 確保必要的列存在
+        required_cols = ['question_type', 'question_fundamental_skill', 'time_performance_category', 'diagnostic_params_list']
+        if all(col in problem_df.columns for col in required_cols) and not problem_df.empty:
+            # 根據三個維度進行分組：時間表現、基本技能、題型(REAL/PURE)
+            combined_groups = problem_df.groupby(['time_performance_category', 'question_fundamental_skill', 'question_type'])\
             
-            # 將英文診斷標籤轉換為中文
-            for param in all_diagnostic_params:
-                if isinstance(param, str):
-                    translated_param = get_translation(param)
-                    diagnostic_labels.add(translated_param)
+            # 對每個組合進行分析並生成獨立的反思提示
+            for (time_perf, skill, q_type), group in combined_groups:
+                # 跳過正確題目的組（如果有的話）
+                if 'Correct' in time_perf:
+                    continue
+                
+                # 翻譯時間表現、技能和題型
+                time_perf_map = {
+                    'Fast & Wrong': '快錯',
+                    'Slow & Wrong': '慢錯',
+                    'Normal Time & Wrong': '正常時間錯'
+                }
+                
+                time_perf_zh = time_perf_map.get(time_perf, time_perf)
+                q_type_zh = q_type  # 假設REAL/PURE不需要翻譯
+                skill_zh = skill  # 技能名稱可能已經是中文或不需要翻譯
+                
+                # 獲取該組的所有診斷參數
+                all_diagnostic_params = []
+                for params_list in group['diagnostic_params_list']:
+                    if isinstance(params_list, list):
+                        all_diagnostic_params.extend(params_list)
+                
+                if all_diagnostic_params:
+                    # 去除重複的診斷參數並過濾無效參數
+                    unique_params = list(set([p for p in all_diagnostic_params if isinstance(p, str) and p.strip()]))
+                    
+                    # 按類別分組 (這裡需要根據Q模塊的分類實際情況進行調整)
+                    # 暫時使用簡單分組，可以根據需要完善
+                    params_by_category = {}
+                    for param in unique_params:
+                        # 這裡可以添加更複雜的分類邏輯
+                        # 例如：根據參數前綴或特定關鍵字進行分類
+                        category = "問題類型"  # 默認類別
+                        
+                        # 簡單分類邏輯示例 (實際應用中應更完善)
+                        if "CARELESSNESS" in param:
+                            category = "粗心問題"
+                        elif "READING" in param or "COMPREHENSION" in param:
+                            category = "閱讀理解問題"
+                        elif "CALCULATION" in param:
+                            category = "計算問題"
+                        elif "CONCEPT" in param or "APPLICATION" in param:
+                            category = "概念應用問題"
+                        elif "EFFICIENCY" in param:
+                            category = "效率問題"
+                        
+                        if category not in params_by_category:
+                            params_by_category[category] = []
+                        params_by_category[category].append(param)
+                    
+                    # 生成引導反思提示的各個行
+                    current_prompt_lines = []
+                    current_prompt_lines.append(f"- 找尋【{skill_zh}】【{q_type_zh}】的考前做題紀錄，找尋【{time_perf_zh}】的題目，檢討並反思自己是否有：")
+                    current_prompt_lines.append("") # Blank line
+
+                    for cat_name, cat_params in params_by_category.items():
+                        # 翻譯參數
+                        params_zh = []
+                        for p_code in cat_params:
+                            try:
+                                translated = get_translation(p_code)
+                                params_zh.append(translated)
+                            except:
+                                params_zh.append(p_code)
+                        current_prompt_lines.append(f"  【{cat_name}：{', '.join(params_zh)}】")
+                    
+                    current_prompt_lines.append("") # Blank line
+                    current_prompt_lines.append("  等問題。")
+                    reflection_prompts.append(current_prompt_lines) # Add the list of lines
     
-    # 將集合轉換為排序的列表
-    skills_list = sorted(list(recommended_skills))
-    domains_list = sorted(list(content_domains))
-    time_performances_list = sorted(list(time_performances))
-    diagnostic_labels_list = sorted(list(diagnostic_labels))
+    # 如果沒有生成任何反思提示，添加默認提示
+    if not reflection_prompts:
+        reflection_prompts.append(["- 找尋考前做題紀錄中的錯題，按照【基礎技能】【題型】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。"]) # Ensure it's a list of lines
     
-    # 格式化時間表現
-    time_perf_text = "，".join(time_performances_list) if time_performances_list else "各種時間表現"
-    
-    # 格式化診斷標籤
-    labels_text = "，".join(diagnostic_labels_list) if diagnostic_labels_list else "診斷標籤"
-    
-    # 格式化題型和領域
-    domains_text = "，".join(domains_list) if domains_list else "內容領域"
-    skills_text = "，".join(skills_list) if skills_list else "基礎技能"
-    
-    # 添加單一統一格式的引導反思，與DI模組保持一致
-    if domains_list and skills_list:
-        unified_reflection = f"  - 找尋【{domains_text}】【{skills_text}】的考前做題紀錄，找尋【{time_perf_text}】的題目，檢討並反思自己是否有：【{labels_text}】等問題。"
-    else:
-        unified_reflection = "  - 找尋考前做題紀錄中的錯題和超時題，按照【題型】【內容領域】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。"
-    
-    lines.append(unified_reflection)
+    # 添加反思提示到報告中
+    for prompt_line_list in reflection_prompts:
+        for line_content in prompt_line_list:
+            lines.append(line_content)
+        lines.append("") # Add a blank line between different reflection prompt blocks
 
     # --- Second Evidence ---
     lines.append("- **二級證據參考建議（如考場回憶失效）：**")
@@ -273,19 +311,30 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     
     # 計算基本統計信息
     total_q = len(df_final)
-    valid_q = len(df_final[df_final['is_invalid'] == False]) if 'is_invalid' in df_final.columns else total_q
-    invalid_q = total_q - valid_q
     
-    correct_q = df_final[df_final['is_correct'] == True].shape[0] if 'is_correct' in df_final.columns else 0
-    incorrect_q = df_final[df_final['is_correct'] == False].shape[0] if 'is_correct' in df_final.columns else 0
+    # 使用 is_manually_invalid 計算 manual_invalid_q 和 manual_valid_q
+    if 'is_manually_invalid' in df_final.columns:
+        manual_invalid_mask = df_final['is_manually_invalid'].fillna(False).astype(bool)
+        manual_invalid_q = manual_invalid_mask.sum()
+        manual_valid_q = total_q - manual_invalid_q
+        df_for_stats = df_final[~manual_invalid_mask].copy() # 用於後續統計的數據框
+    elif 'is_invalid' in df_final.columns: # Fallback to is_invalid if is_manually_invalid is missing
+        invalid_mask_fallback = df_final['is_invalid'].fillna(False).astype(bool)
+        manual_invalid_q = invalid_mask_fallback.sum() # 在這種情況下，它實際上是總無效
+        manual_valid_q = total_q - manual_invalid_q
+        df_for_stats = df_final[~invalid_mask_fallback].copy()
+    else: # No invalid columns
+        manual_invalid_q = 0
+        manual_valid_q = total_q
+        df_for_stats = df_final.copy()
     
-    correct_valid_q = df_final[(df_final['is_correct'] == True) & (df_final['is_invalid'] == False)].shape[0] if 'is_correct' in df_final.columns and 'is_invalid' in df_final.columns else 0
-    incorrect_valid_q = df_final[(df_final['is_correct'] == False) & (df_final['is_invalid'] == False)].shape[0] if 'is_correct' in df_final.columns and 'is_invalid' in df_final.columns else 0
-    
-    overtime_q = df_final[df_final['overtime'] == True].shape[0] if 'overtime' in df_final.columns else 0
+    # 基於 df_for_stats (排除了手動無效題) 進行後續統計
+    correct_valid_q = df_for_stats[(df_for_stats['is_correct'] == True)].shape[0] if 'is_correct' in df_for_stats.columns else 0
+    incorrect_valid_q = df_for_stats[(df_for_stats['is_correct'] == False)].shape[0] if 'is_correct' in df_for_stats.columns else 0
+    overtime_q_on_valid = df_for_stats[df_for_stats['overtime'] == True].shape[0] if 'overtime' in df_for_stats.columns else 0
     
     # 計算評分率
-    valid_score_rate = round((correct_valid_q / valid_q * 100) if valid_q > 0 else 0, 1)
+    valid_score_rate = round((correct_valid_q / manual_valid_q * 100) if manual_valid_q > 0 else 0, 1)
     
     
     # 2. 第一章：測試條件和有效性
@@ -295,9 +344,9 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     overtime_threshold = ch1_results.get('overtime_threshold_used', 2.5)
     report_parts.append(f"* 時間壓力狀態：{time_pressure_text}")
     report_parts.append(f"* 使用的超時閾值：{overtime_threshold} 分鐘")
-    if invalid_q > 0:
-        report_parts.append(f"* 無效數據題數：{invalid_q} ({invalid_q / total_q * 100:.1f}%)")
-    report_parts.append(f"* 有效評分率：{valid_score_rate}% ({correct_valid_q}/{valid_q})")
+    if manual_invalid_q > 0:
+        report_parts.append(f"* 手動標記無效數據題數：{manual_invalid_q} ({'{:.1f}'.format(manual_invalid_q / total_q * 100 if total_q > 0 else 0)}%)")
+    report_parts.append(f"* 有效評分率（基於手動無效排除）：{valid_score_rate}% ({correct_valid_q}/{manual_valid_q})")
     report_parts.append("")
     
     # 3. 第二章：Real vs Pure分析
@@ -347,8 +396,8 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     summary_items = []
     
     # 基於第一章
-    if invalid_q > 0:
-        summary_items.append(f"測試中有 {invalid_q} 題無效數據，可能影響部分診斷精確度")
+    if manual_invalid_q > 0:
+        summary_items.append(f"測試中有 {manual_invalid_q} 題手動標記無效數據，可能影響部分診斷精確度")
     
     # 基於第二章
     if ch2_flags.get('poor_real', False):
@@ -380,88 +429,104 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     # 7. 引導反思
     report_parts.append("**引導反思**")
     
-    recommended_skills_final = set()
-    content_domains_final = set()
-    time_performances_final = set() # Will store Chinese versions of relevant time performances
-    diagnostic_labels_final = set()
-
+    # 使用新的引導反思生成邏輯，根據各組合獨立生成反思提示
+    reflection_prompts = []
+    
     if df_final is not None and not df_final.empty:
-        valid_df_final = df_final[df_final['is_invalid'] == False].copy() if 'is_invalid' in df_final.columns else df_final.copy()
+        # 修改：使用 is_manually_invalid 進行過濾，如果不存在，則回退到 is_invalid，但優先考慮 is_manually_invalid
+        if 'is_manually_invalid' in df_final.columns:
+            manual_invalid_mask_final = df_final['is_manually_invalid'].fillna(False).astype(bool)
+            valid_df_final_for_reflection = df_final[~manual_invalid_mask_final].copy()
+        elif 'is_invalid' in df_final.columns: # Fallback if is_manually_invalid is not present
+            invalid_mask_final_fallback = df_final['is_invalid'].fillna(False).astype(bool)
+            valid_df_final_for_reflection = df_final[~invalid_mask_final_fallback].copy()
+        else: # No invalid column, assume all are valid
+            valid_df_final_for_reflection = df_final.copy()
         
-        if not valid_df_final.empty and 'time_performance_category' in valid_df_final.columns:
+        if not valid_df_final_for_reflection.empty and 'time_performance_category' in valid_df_final_for_reflection.columns:
+            # 只針對有問題的題目生成反思提示
             target_reflection_time_perf_en = ['Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong']
-            reflection_relevant_df = valid_df_final[valid_df_final['time_performance_category'].isin(target_reflection_time_perf_en)]
+            reflection_relevant_df = valid_df_final_for_reflection[valid_df_final_for_reflection['time_performance_category'].isin(target_reflection_time_perf_en)]
 
-            if not reflection_relevant_df.empty:
-                if 'question_fundamental_skill' in reflection_relevant_df.columns:
-                    skills = reflection_relevant_df['question_fundamental_skill'].dropna().unique()
-                    for skill in skills:
-                        if isinstance(skill, str) and skill != 'Unknown Skill':
-                            recommended_skills_final.add(skill)
-                
-                # Change source for content_domains_final to 'question_type' for REAL/PURE
-                if 'question_type' in reflection_relevant_df.columns:
-                    # This column should contain 'REAL', 'PURE' for Q module
-                    real_pure_values = reflection_relevant_df['question_type'].dropna().unique()
-                    for rp_value in real_pure_values:
-                        if isinstance(rp_value, str) and rp_value in ['REAL', 'PURE']: # Explicitly check for REAL/PURE
-                            content_domains_final.add(rp_value)
-                
-                # Populate time_performances_final with Chinese translations of *existing* target categories
-                time_perf_translation_map = {
-                    'Fast & Wrong': '快錯',
-                    'Slow & Wrong': '慢錯',
-                    'Normal Time & Wrong': '正常時間錯'
-                }
-                actual_relevant_time_perfs_en = reflection_relevant_df['time_performance_category'].dropna().unique()
-                for perf_en in actual_relevant_time_perfs_en:
-                    if perf_en in time_perf_translation_map:
-                         time_performances_final.add(time_perf_translation_map[perf_en])
-                
-                if 'diagnostic_params_list' in reflection_relevant_df.columns:
-                    all_params = []
-                    for params_list in reflection_relevant_df['diagnostic_params_list']:
-                        if isinstance(params_list, list):
-                            all_params.extend(params_list)
-                    for param in all_params:
-                        if isinstance(param, str) and param != INVALID_DATA_TAG_Q:
-                            try:
-                                translated = get_translation(param)
-                                diagnostic_labels_final.add(translated if translated != param else param)
-                            except KeyError:
-                                diagnostic_labels_final.add(param)
+            if not reflection_relevant_df.empty and all(col in reflection_relevant_df.columns for col in ['question_fundamental_skill', 'question_type', 'diagnostic_params_list']):
+                # 按三個維度組合分組
+                try:
+                    combined_groups = reflection_relevant_df.groupby(['time_performance_category', 'question_fundamental_skill', 'question_type'])\
+                    
+                    # 對每個組合生成獨立的反思提示
+                    for (time_perf, skill, q_type), group in combined_groups:
+                        # 翻譯時間表現
+                        time_perf_map = {
+                            'Fast & Wrong': '快錯',
+                            'Slow & Wrong': '慢錯',
+                            'Normal Time & Wrong': '正常時間錯'
+                        }
+                        time_perf_zh = time_perf_map.get(time_perf, time_perf)
+                        
+                        # 獲取該組的所有診斷參數
+                        all_diagnostic_params = []
+                        for params_list in group['diagnostic_params_list']:
+                            if isinstance(params_list, list):
+                                all_diagnostic_params.extend(params_list)
+                        
+                        if all_diagnostic_params:
+                            # 去除重複的診斷參數
+                            unique_params = list(set([p for p in all_diagnostic_params if isinstance(p, str) and p.strip()]))\
+                            
+                            # 按類別分組
+                            params_by_category = {}
+                            for param in unique_params:
+                                category = "問題類型"  # 默認類別
+                                
+                                # 簡單分類邏輯
+                                if "CARELESSNESS" in param:
+                                    category = "粗心問題"
+                                elif "READING" in param or "COMPREHENSION" in param:
+                                    category = "閱讀理解問題"
+                                elif "CALCULATION" in param:
+                                    category = "計算問題"
+                                elif "CONCEPT" in param or "APPLICATION" in param:
+                                    category = "概念應用問題"
+                                elif "EFFICIENCY" in param:
+                                    category = "效率問題"
+                                
+                                if category not in params_by_category:
+                                    params_by_category[category] = []
+                                params_by_category[category].append(param)
+                            
+                            # 生成引導反思提示的各個行
+                            current_prompt_lines = []
+                            current_prompt_lines.append(f"- 找尋【{skill}】【{q_type}】的考前做題紀錄，找尋【{time_perf_zh}】的題目，檢討並反思自己是否有：")
+                            current_prompt_lines.append("") # Blank line
 
-    skills_list_str = "，".join(sorted(list(recommended_skills_final))) if recommended_skills_final else "fundamental_skill"
-    domains_list_str = "，".join(sorted(list(content_domains_final))) if content_domains_final else "content_domain"
-    time_perf_text_str = "，".join(sorted(list(time_performances_final))) if time_performances_final else "time_performance"
+                            for cat_name, cat_params in params_by_category.items():
+                                # 翻譯參數
+                                params_zh = []
+                                for p_code in cat_params:
+                                    try:
+                                        translated = get_translation(p_code)
+                                        params_zh.append(translated)
+                                    except:
+                                        params_zh.append(p_code)
+                                current_prompt_lines.append(f"  【{cat_name}：{', '.join(params_zh)}】")
+                            
+                            current_prompt_lines.append("") # Blank line
+                            current_prompt_lines.append("  等問題。")
+                            reflection_prompts.append(current_prompt_lines) # Add the list of lines
 
-    # Combine skills and domains with a '＋' sign
-    skills_plus_domains_text = f"{skills_list_str}＋{domains_list_str}"
-
-    # Format diagnostic labels as a multi-line indented list
-    labels_block_content = []
-    if diagnostic_labels_final:
-        sorted_labels = sorted(list(diagnostic_labels_final))
-        for i, label in enumerate(sorted_labels):
-            line = f"    - {label}"  # 4 spaces for indentation before '-'
-            if i == len(sorted_labels) - 1:  # Last item
-                line += "。"
-            labels_block_content.append(line)
-    else:
-        labels_block_content.append("    - 【診斷標籤】。") # 4 spaces for indentation
+                except Exception as e:
+                    # 錯誤處理
+                    reflection_prompts.append([f"- 生成引導反思時發生錯誤：{str(e)}"]) # Ensure it's a list of lines
     
-    labels_indented_string = "\n".join(labels_block_content)
-
-    # Construct the reflection string with specific newlines and indentation
-    # The initial "  - " is for the main bullet point of this entire reflection block when appended to report_parts
-    line1 = f"  - 請協助找尋考前2-4周【{skills_plus_domains_text}】的題目中，【{time_perf_text_str}】的做題紀錄，回想是否有以下問題："
+    # 如果沒有生成任何反思提示，添加默認提示
+    if not reflection_prompts:
+        reflection_prompts.append(["- 找尋考前做題紀錄中的錯題，按照【基礎技能】【題型】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。"]) # Ensure it's a list of lines
     
-    final_text_segment = "請從此範圍聚焦確定自己的問題所在，並且前往「編輯診斷標籤」分頁修剪診斷標籤。"
-
-    unified_reflection = f"{line1}\n\n{labels_indented_string}\n\n{final_text_segment}"
-    
-    report_parts.append(unified_reflection)
-    report_parts.append("")
+    # 添加反思提示到報告中
+    for prompt_line_list in reflection_prompts:
+        for line_content in prompt_line_list:
+            report_parts.append(line_content) # Add each line individually
+        report_parts.append("") # Keep one blank line after each full prompt block
 
     # 7. AI工具和提示建議（這部分將被新的獨立函數取代，但保留結構以便參考）
     # """
