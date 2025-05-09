@@ -95,45 +95,90 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
 
         # --- 添加識別異常快速作答的邏輯（核心邏輯文件第一章）---
         # 初始化 suspiciously_fast 列
-        df_di['suspiciously_fast'] = False
+        df_di['suspiciously_fast'] = False # This column might be redundant after full invalid logic
         
-        # 獲取前三分之一的題目位置
-        if 'question_position' in df_di.columns and 'question_time' in df_di.columns:
+        # 計算考試前三分之一各題型平均時間 (first_third_average_time_per_type)
+        first_third_average_time_per_type = {}
+        if 'question_position' in df_di.columns and 'question_time' in df_di.columns and 'question_type' in df_di.columns:
             positions = df_di['question_position'].sort_values().unique()
-            first_third_positions = positions[:max(1, len(positions) // 3)]
+            if len(positions) > 0: # Ensure positions is not empty
+                first_third_q_count = max(1, len(positions) // 3)
+                first_third_positions = positions[:first_third_q_count]
+                
+                first_third_df = df_di[df_di['question_position'].isin(first_third_positions)].copy() # Use .copy() to avoid SettingWithCopyWarning
+                if not first_third_df.empty:
+                    first_third_average_time_per_type = first_third_df.groupby('question_type')['question_time'].mean().to_dict()
+
+        # 舊的 suspiciously_fast 邏輯 (基於全局平均) 可以被新的 is_invalid 邏輯覆蓋或移除
+        # For now, we comment it out as the new invalid logic is more comprehensive
+        # if 'question_position' in df_di.columns and 'question_time' in df_di.columns:
+        #     positions = df_di['question_position'].sort_values().unique()
+        #     first_third_positions = positions[:max(1, len(positions) // 3)]
+        #     first_third_mask = df_di['question_position'].isin(first_third_positions)
+        #     first_third_avg_time = df_di.loc[first_third_mask, 'question_time'].mean()
+        #     suspicious_fast_threshold = first_third_avg_time * SUSPICIOUS_FAST_MULTIPLIER
+        #     suspiciously_fast_mask = df_di['question_time'].notna() & (df_di['question_time'] < suspicious_fast_threshold)
+        #     df_di.loc[suspiciously_fast_mask, 'suspiciously_fast'] = True
             
-            # 獲取前三分之一題目的平均時間
-            first_third_mask = df_di['question_position'].isin(first_third_positions)
-            first_third_avg_time = df_di.loc[first_third_mask, 'question_time'].mean()
-            
-            # 使用 SUSPICIOUS_FAST_MULTIPLIER 計算異常快速閾值
-            suspicious_fast_threshold = first_third_avg_time * SUSPICIOUS_FAST_MULTIPLIER
-            
-            # 標記異常快速作答的題目
-            suspiciously_fast_mask = df_di['question_time'].notna() & (df_di['question_time'] < suspicious_fast_threshold)
-            df_di.loc[suspiciously_fast_mask, 'suspiciously_fast'] = True
-            
-            # 對於在時間壓力下且用時低於 INVALID_TIME_THRESHOLD_MINUTES 的題目，標記為無效
-            invalid_time_mask = df_di['question_time'].notna() & (df_di['question_time'] < INVALID_TIME_THRESHOLD_MINUTES)
-            
-            # 只標記我們懷疑是出於時間壓力而過快作答的題目（通常出現在題組後段）
-            if di_time_pressure_status and time_diff < TIME_PRESSURE_THRESHOLD_DI:
-                # 獲取所有題目位置
-                position_order = sorted(df_di['question_position'].unique())
+        # 核心邏輯：標記無效數據 (is_invalid)
+        if di_time_pressure_status: # 文檔標準：僅在 time_pressure == True 時執行
+            # 獲取所有題目位置
+            all_positions_sorted = sorted(df_di['question_position'].unique())
+            if len(all_positions_sorted) > 0: # Ensure all_positions_sorted is not empty
                 # 確定題目總數的後三分之一起始位置
-                last_third_start = max(1, len(position_order) - len(position_order) // 3)
-                # 獲取後三分之一的題目位置列表
-                last_third_positions = position_order[last_third_start-1:] if last_third_start <= len(position_order) else []
-                
-                # 標記最後三分之一且用時異常短的題目為無效
-                invalid_mask = (df_di['question_position'].isin(last_third_positions)) & invalid_time_mask & (~df_di['is_invalid'])
-                
-                # 更新 is_invalid 標記
-                df_di.loc[invalid_mask, 'is_invalid'] = True
-                
-                # 記錄新標記的無效題目數量
-                num_newly_invalid = invalid_mask.sum()
-                logging.debug(f"[run_di_diagnosis_logic] Marked {num_newly_invalid} additional questions as invalid due to time pressure and hasty responses.")
+                num_total_questions = len(all_positions_sorted)
+                last_third_start_index = num_total_questions - (num_total_questions // 3)
+                # 獲取後三分之一的題目位置列表 (0-indexed for iloc, but positions themselves are values)
+                last_third_positions_values = all_positions_sorted[last_third_start_index:]
+
+                # 篩選出位於後三分之一的題目
+                last_third_questions_df = df_di[df_di['question_position'].isin(last_third_positions_values)].copy() # Use .copy()
+
+                if not last_third_questions_df.empty:
+                    for index, row in last_third_questions_df.iterrows():
+                        if df_di.loc[index, 'is_invalid']: # Skip if already marked as invalid by preprocessor
+                            continue
+
+                        q_time = row['question_time']
+                        q_type = row['question_type']
+                        
+                        abnormally_fast = False
+
+                        # 標準 1 (疑似放棄)
+                        if pd.notna(q_time) and q_time < INVALID_TIME_THRESHOLD_MINUTES: # 0.5 minutes
+                            abnormally_fast = True
+
+                        # 標準 2 (絕對倉促)
+                        if not abnormally_fast and pd.notna(q_time) and q_time < 1.0: # 1.0 minutes (use EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES)
+                            abnormally_fast = True
+                        
+                        # 標準 3-5 (相對單題倉促 - DS, TPA, GT)
+                        if not abnormally_fast and q_type in ['DS', 'TPA', 'GT', 'Data Sufficiency', 'Two-part analysis', 'Graph and Table']: # Handle variations in q_type names
+                            # Map variations to standard names for lookup
+                            standard_q_type = q_type
+                            if q_type == 'Data Sufficiency': standard_q_type = 'DS'
+                            elif q_type == 'Two-part analysis': standard_q_type = 'TPA'
+                            elif q_type == 'Graph and Table': standard_q_type = 'GT'
+                                
+                            avg_time = first_third_average_time_per_type.get(standard_q_type)
+                            if avg_time is not None and pd.notna(avg_time) and pd.notna(q_time) and q_time < (avg_time * SUSPICIOUS_FAST_MULTIPLIER):
+                                abnormally_fast = True
+                        
+                        # 標準 6 (相對題組倉促 - MSR)
+                        if not abnormally_fast and q_type in ['MSR', 'Multi-source reasoning']:
+                            standard_q_type_msr = 'MSR' # Standardize for lookup
+                            avg_time_msr = first_third_average_time_per_type.get(standard_q_type_msr)
+                            group_total_time = row.get('msr_group_total_time')
+                            num_q_in_group = row.get('msr_group_num_questions')
+
+                            if avg_time_msr is not None and pd.notna(avg_time_msr) and \
+                               pd.notna(group_total_time) and pd.notna(num_q_in_group) and num_q_in_group > 0 and \
+                               group_total_time < (avg_time_msr * num_q_in_group * SUSPICIOUS_FAST_MULTIPLIER):
+                                abnormally_fast = True
+
+                        if abnormally_fast:
+                            df_di.loc[index, 'is_invalid'] = True
+                            # logging.debug(f"Marked question pos {row['question_position']} as invalid due to abnormal fast response.")
         
         num_invalid_questions_total = df_di['is_invalid'].sum()
         di_diagnosis_results['invalid_count'] = num_invalid_questions_total
