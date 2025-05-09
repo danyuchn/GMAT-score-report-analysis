@@ -160,161 +160,101 @@ def generate_report_section7(triggered_params_translated, param_to_positions, sk
 
     # --- Reflection Prompts ---
     lines.append("- **引導反思:**")
-    reflection_prompts = []
-    sfe_param_translated = get_translation('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-    param_concept_app = get_translation('Q_CONCEPT_APPLICATION_ERROR')
-    param_problem_under = get_translation('Q_PROBLEM_UNDERSTANDING_ERROR')
-    param_calculation = get_translation('Q_CALCULATION_ERROR')
-    param_eff_calc = get_translation('Q_EFFICIENCY_BOTTLENECK_CALCULATION')
-    param_careless_detail = get_translation('Q_CARELESSNESS_DETAIL_OMISSION')
-    param_careless_interpretation = get_translation('Q_CARELESSNESS_INTERPRETATION_ERROR')
-    param_strategy_selection = get_translation('Q_STRATEGY_SELECTION_ERROR')
     
-    # 定義獲取位置上下文的輔助函數
-    def get_pos_context_str_translated(positions):
-        return f" (涉及題號: {sorted(list(positions))})" if positions else ""
+    # 從診斷數據中提取基本信息，用於引導反思格式模板
+    recommended_skills = set()
+    content_domains = set()
+    time_performances = set()
+    diagnostic_labels = set()
     
-    # 提取推薦的技能和時間表現（如果可用）
-    recommended_skill = "Rates/Ratio/Percent"  # 預設值
-    question_type = "Real"  # 預設值
-    time_performance = "慢錯"  # 預設值
-    diagnostic_label = "診斷標籤"  # 預設值
-    
-    # 從診斷數據中提取最常見的技能、問題類型和時間表現
+    # 從診斷數據中提取信息
     if df_diagnosed is not None and not df_diagnosed.empty:
-        # 提取最常見的技能
+        # 提取技能
         if 'question_fundamental_skill' in df_diagnosed.columns:
-            skill_counts = df_diagnosed['question_fundamental_skill'].value_counts()
-            if not skill_counts.empty:
-                recommended_skill = skill_counts.index[0]
+            valid_skills = df_diagnosed['question_fundamental_skill'].dropna().unique()
+            for skill in valid_skills:
+                if isinstance(skill, str) and skill != 'Unknown Skill':
+                    recommended_skills.add(skill)
         
-        # 提取最常見的問題類型
-        if 'question_type' in df_diagnosed.columns:
-            type_counts = df_diagnosed['question_type'].value_counts()
-            if not type_counts.empty:
-                question_type = type_counts.index[0]
+        # 提取內容領域
+        if 'content_domain' in df_diagnosed.columns:
+            valid_domains = df_diagnosed['content_domain'].dropna().unique()
+            for domain in valid_domains:
+                if isinstance(domain, str) and domain != 'Unknown':
+                    content_domains.add(domain)
         
-        # 提取最常見的時間表現
+        # 提取時間表現
         if 'time_performance_category' in df_diagnosed.columns:
-            perf_counts = df_diagnosed['time_performance_category'].value_counts()
-            if not perf_counts.empty and perf_counts.index[0] != 'Unknown':
-                perf = perf_counts.index[0]
-                if perf == 'Fast & Wrong': time_performance = "快錯"
-                elif perf == 'Slow & Wrong': time_performance = "慢錯"
-                elif perf == 'Normal Time & Wrong': time_performance = "正常時間錯"
-                elif perf == 'Slow & Correct': time_performance = "慢對"
+            valid_perfs = df_diagnosed['time_performance_category'].dropna().unique()
+            for perf in valid_perfs:
+                if isinstance(perf, str) and perf != 'Unknown':
+                    time_performances.add(perf)
         
-        # 提取最常見的診斷標籤
+        # 提取診斷標籤
+        all_diagnostic_params = []
         if 'diagnostic_params_list' in df_diagnosed.columns:
-            all_labels = []
-            for labels_list in df_diagnosed['diagnostic_params_list']:
-                if isinstance(labels_list, list):
-                    all_labels.extend(labels_list)
-            if all_labels:
-                from collections import Counter
-                label_counts = Counter(all_labels)
-                if label_counts:
-                    diagnostic_label = max(label_counts.items(), key=lambda x: x[1])[0]
+            for params_list in df_diagnosed['diagnostic_params_list']:
+                if isinstance(params_list, list):
+                    all_diagnostic_params.extend(params_list)
+            
+            # 將英文診斷標籤轉換為中文
+            for param in all_diagnostic_params:
+                if isinstance(param, str):
+                    translated_param = get_translation(param)
+                    diagnostic_labels.add(translated_param)
     
-    # 添加已有的反思提示
-    if sfe_param_translated in triggered_params_translated:
-        sfe_skills_str = ", ".join(sorted(sfe_skills_involved)) if sfe_skills_involved else "任何相關基礎技能"
-        skill_context = f"**{sfe_skills_str}** 的基礎知識點" if sfe_skills_involved else "**相關基礎知識點**"
-        reflection_prompts.append(f"  - **基礎掌握不穩定:** 請檢視{skill_context}。對於每個基礎知識點，問自己：我能否不看參考資料，流暢且無錯誤地複述其定義、公式、關鍵性質？能否在 30 秒內快速識別應用場景？")
-
-    if param_concept_app in triggered_params_translated:
-        pos_str = get_pos_context_str_translated(param_to_positions.get(param_concept_app, []))
-        reflection_prompts.append(f"  - **概念應用錯誤:** 反思{pos_str}的錯誤，您是否了解題目要求的數學概念，但無法靈活應用？可能是知識點學習停留在理解階段，未達熟練應用階段。試著解釋：「我知道要用什麼概念，但卡在哪一步實際操作？」")
-
-    if param_problem_under in triggered_params_translated:
-        pos_str = get_pos_context_str_translated(param_to_positions.get(param_problem_under, []))
-        reflection_prompts.append(f"  - **題意理解錯誤:** 分析{pos_str}的錯誤，問題是否出在誤解題目意圖、條件或限制？回顧這些題目時，找出您理解有誤的特定部分，並確認：「下次遇到類似表述時，我需要注意哪些關鍵字或關係？」")
-
-    if param_calculation in triggered_params_translated:
-        pos_str = get_pos_context_str_translated(param_to_positions.get(param_calculation, []))
-        reflection_prompts.append(f"  - **計算錯誤:** 檢視{pos_str}的錯誤，確認計算過程中的具體問題點：是運算符號錯誤、數字抄寫錯誤、還是公式套用錯誤？對於每次發現的計算錯誤，記錄下具體錯誤類型，尋找個人計算模式中的弱點。")
-
-    if param_eff_calc in triggered_params_translated:
-        pos_str = get_pos_context_str_translated(param_to_positions.get(param_eff_calc, []))
-        reflection_prompts.append(f"  - **計算效率瓶頸:** 針對{pos_str}的題目，您的計算過程是否過於冗長或繁瑣？嘗試拆解您的解題路徑：「我有沒有遺漏更簡潔的解法？是否有不必要的中間步驟？」考慮是否能通過代數技巧、數字特性或估算來簡化運算。")
-
-    if param_careless_detail in triggered_params_translated or param_careless_interpretation in triggered_params_translated:
-        pos_careless_detail = param_to_positions.get(param_careless_detail, [])
-        pos_careless_interp = param_to_positions.get(param_careless_interpretation, [])
-        all_careless_pos = list(set(pos_careless_detail + pos_careless_interp))
-        pos_str = get_pos_context_str_translated(all_careless_pos)
-        reflection_prompts.append(f"  - **粗心問題:** 回顧{pos_str}的錯誤，具體分析「粗心」的本質：是單純的符號抄錯、還是解題途中失去對題目核心的關注？對於每道粗心導致的錯題，找出您解題過程中的關鍵轉折點，並思考：「我在哪一步開始偏離正確方向？這種偏離有什麼特定模式或前兆？」")
-
-    if param_strategy_selection in triggered_params_translated:
-        pos_str = get_pos_context_str_translated(param_to_positions.get(param_strategy_selection, []))
-        reflection_prompts.append(f"  - **策略選擇錯誤:** 針對{pos_str}的題目，回顧您當時選擇的解題路徑，與更優解法對比：「我是否陷入複雜計算而忽略了更直接的方法？我對某些常見解題策略的識別是否自動化？」思考您的策略選擇過程，確認是缺乏特定解法知識，還是未能迅速識別適用場景。")
-
-    # 添加找尋特定技能和題型考前做題記錄的反思提示
-    reflection_prompts.append(f"  - **考前做題記錄檢視:** 找尋【{recommended_skill}】＋【{question_type}】的考前做題紀錄，針對【{time_performance}】的題目，檢討並反思自己是否有【{diagnostic_label}】等問題並進一步細分確實考點。")
-
-    if reflection_prompts:
-        lines.extend(reflection_prompts)
+    # 將集合轉換為排序的列表
+    skills_list = sorted(list(recommended_skills))
+    domains_list = sorted(list(content_domains))
+    time_performances_list = sorted(list(time_performances))
+    diagnostic_labels_list = sorted(list(diagnostic_labels))
+    
+    # 格式化時間表現
+    time_perf_text = "，".join(time_performances_list) if time_performances_list else "各種時間表現"
+    
+    # 格式化診斷標籤
+    labels_text = "，".join(diagnostic_labels_list) if diagnostic_labels_list else "診斷標籤"
+    
+    # 格式化題型和領域
+    domains_text = "，".join(domains_list) if domains_list else "內容領域"
+    skills_text = "，".join(skills_list) if skills_list else "基礎技能"
+    
+    # 添加單一統一格式的引導反思，與DI模組保持一致
+    if domains_list and skills_list:
+        unified_reflection = f"  - 找尋【{domains_text}】【{skills_text}】的考前做題紀錄，找尋【{time_perf_text}】的題目，檢討並反思自己是否有：【{labels_text}】等問題。"
     else:
-        lines.append("  - (本次分析未觸發針對性反思提示)")
-        lines.append("  - 建議您仍針對錯題和超時題，分析是否有知識點不熟、題意理解有誤、或解題策略不佳等問題。")
+        unified_reflection = "  - 找尋考前做題紀錄中的錯題和超時題，按照【題型】【內容領域】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。"
+    
+    lines.append(unified_reflection)
 
-    # --- Secondary Evidence ---
-    lines.append("- **二級證據參考建議:**")
-    if df_diagnosed is not None and not df_diagnosed.empty and 'time_performance_category' in df_diagnosed.columns and 'is_correct' in df_diagnosed.columns:
-        # Filter out invalid data upfront for this section's analysis
-        df_problem = df_diagnosed[
-            (df_diagnosed['is_invalid'] == False) &
-            ((df_diagnosed['is_correct'] == False) | (df_diagnosed.get('overtime', False) == True))
-        ].copy()
-
-        if not df_problem.empty:
-            lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您查看近期的練習記錄，整理相關錯題或超時題目。")
-            details_added_2nd_ev = False
-            performance_order_en = ['Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong', 'Slow & Correct', 'Unknown']
-            # Group by performance category ONLY on the filtered (valid) problem data
-            grouped_by_performance = df_problem.groupby('time_performance_category')
-
-            for perf_en in performance_order_en:
-                if perf_en in grouped_by_performance.groups:
-                    group_df = grouped_by_performance.get_group(perf_en)
-                    if not group_df.empty:
-                        perf_zh = perf_en
-                        if perf_en == 'Fast & Wrong': perf_zh = "**快錯**"
-                        elif perf_en == 'Slow & Wrong': perf_zh = "**慢錯**"
-                        elif perf_en == 'Normal Time & Wrong': perf_zh = "**正常時間錯**"
-                        elif perf_en == 'Slow & Correct': perf_zh = "**慢對**"
-                        elif perf_en == 'Unknown': perf_zh = "**未知時間表現錯題**"
-                        types_in_group = sorted(list(group_df['question_type'].dropna().unique()))
-                        skills_in_group = sorted(list(group_df['question_fundamental_skill'].dropna().unique()))
-                        all_labels_in_group = set()
-                        if 'diagnostic_params_list' in group_df.columns:
-                            for labels_list in group_df['diagnostic_params_list']:
-                                if isinstance(labels_list, list):
-                                    # Exclude invalid tag if somehow present (should not be due to filter)
-                                    from gmat_diagnosis_app.diagnostics.q_modules.constants import INVALID_DATA_TAG_Q
-                                    valid_labels = {label for label in labels_list if label != get_translation(INVALID_DATA_TAG_Q.split("：")[0])}
-                                    all_labels_in_group.update(valid_labels)
-                        sorted_labels_zh = sorted(list(all_labels_in_group))
-                        report_line = f"  - {perf_zh}: 需關注題型：【{', '.join(types_in_group)}】；涉及技能：【{', '.join(skills_in_group)}】。"
-                        if sorted_labels_zh: report_line += f" 注意相關問題點：【{', '.join(sorted_labels_zh)}】。"
-                        lines.append(report_line)
-                        details_added_2nd_ev = True
-
-            if not details_added_2nd_ev: lines.append("  - (本次分析未聚焦到特定的有效問題類型或技能)")
-            lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
-        else: lines.append("  - (本次分析未發現需要二級證據深入探究的有效問題點)")
+    # --- Second Evidence ---
+    lines.append("- **二級證據參考建議（如考場回憶失效）：**")
+    
+    # 直接檢查是否有足夠診斷數據，作為二級證據參考建議的條件
+    if df_diagnosed is not None and not df_diagnosed.empty:
+        lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您按照上述引導反思查看近期的練習記錄，整理相關錯題或超時題目。")
+        
+        # 再次強調核心問題
+        core_issue_text = []
+        param_to_emphasize = ["Q_CARELESSNESS_DETAIL_OMISSION", "Q_CONCEPT_APPLICATION_ERROR", "Q_CALCULATION_ERROR", "Q_READING_COMPREHENSION_ERROR"]
+        for param in param_to_emphasize:
+            if get_translation(param) in triggered_params_translated:
+                core_issue_text.append(get_translation(param))
+        
+        if sfe_skills_involved:
+            core_issue_text.append(get_translation("Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE"))
+        
+        if core_issue_text:
+            lines.append(f"  - 請特別留意題目是否反覆涉及報告第三章指出的核心問題：【{', '.join(core_issue_text)}】。")
+        
+        lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
     else:
-        lines.append("  - **觸發時機:** 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時。")
-        lines.append("  - **建議行動:** 為了更精確地定位具體困難點，建議您查看近期的練習記錄（例如考前 2-4 週），整理相關錯題，歸納是哪些知識點或題型反覆出現問題。如果樣本不足，請在接下來的做題中注意收集，累積到足夠樣本後再進行分析。")
+        lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
 
-    # --- Qualitative Analysis ---
-    lines.append("- **質化分析建議:**")
-    lines.append("  - **觸發時機:** 當您對診斷報告指出的錯誤原因感到困惑，或者上述方法仍無法幫您釐清根本問題時。")
-    qualitative_focus_skills = set()
-    if param_concept_app in triggered_params_translated: qualitative_focus_skills.update(skill for skill, poses in skill_to_positions.items() if any(pos in param_to_positions.get(param_concept_app, []) for pos in poses))
-    if param_problem_under in triggered_params_translated: qualitative_focus_skills.update(skill for skill, poses in skill_to_positions.items() if any(pos in param_to_positions.get(param_problem_under, []) for pos in poses))
-    qualitative_focus_area_skills = f"涉及 **{', '.join(sorted(list(qualitative_focus_skills)))}** 的題目" if qualitative_focus_skills else "某些類型的題目"
-    lines.append(f"  - **建議行動:** 如果您對 {qualitative_focus_area_skills} 的錯誤原因仍感困惑，可以嘗試**提供 2-3 題該類型題目的詳細解題流程跟思路範例**（可以是文字記錄或口述錄音），以便與顧問進行更深入的個案分析，共同找到癥結所在。")
+    # --- Qualitative Analysis Suggestion ---
+    lines.append("")
+    lines.append("- **質化分析建議：**")
+    lines.append("  - 如果您對報告中指出的某些問題仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。")
 
     return lines
 
@@ -440,94 +380,87 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     # 7. 引導反思
     report_parts.append("**引導反思**")
     
-    # 定義時間表現類型
-    time_performances = [
-        {'en': 'Slow & Wrong', 'zh': '慢錯'},
-        {'en': 'Fast & Wrong', 'zh': '快錯'},
-        {'en': 'Normal Time & Wrong', 'zh': '正常時間錯'},
-        {'en': 'Slow & Correct', 'zh': '慢對'}
-    ]
-    
-    # 獲取常見問題類型和診斷標籤
-    common_skills = {}
-    common_question_types = {}
-    common_diagnostic_labels = {}
-    existing_performances = set()  # 追蹤實際存在的時間表現類型
-    
-    # 從df_final提取數據
-    if df_final is not None and not df_final.empty and 'time_performance_category' in df_final.columns:
-        # 準備數據分析
-        valid_df = df_final[df_final['is_invalid'] == False].copy() if 'is_invalid' in df_final.columns else df_final.copy()
+    recommended_skills_final = set()
+    content_domains_final = set()
+    time_performances_final = set() # Will store Chinese versions of relevant time performances
+    diagnostic_labels_final = set()
+
+    if df_final is not None and not df_final.empty:
+        valid_df_final = df_final[df_final['is_invalid'] == False].copy() if 'is_invalid' in df_final.columns else df_final.copy()
         
-        # 查找數據中存在的時間表現類型
-        existing_performances = set(valid_df['time_performance_category'].unique())
-        
-        # 為每種時間表現類別找出最常見的技能和題型
-        for perf in time_performances:
-            perf_en = perf['en']
-            if perf_en not in existing_performances:
-                continue  # 跳過不存在的時間表現類型
+        if not valid_df_final.empty and 'time_performance_category' in valid_df_final.columns:
+            target_reflection_time_perf_en = ['Fast & Wrong', 'Slow & Wrong', 'Normal Time & Wrong']
+            reflection_relevant_df = valid_df_final[valid_df_final['time_performance_category'].isin(target_reflection_time_perf_en)]
+
+            if not reflection_relevant_df.empty:
+                if 'question_fundamental_skill' in reflection_relevant_df.columns:
+                    skills = reflection_relevant_df['question_fundamental_skill'].dropna().unique()
+                    for skill in skills:
+                        if isinstance(skill, str) and skill != 'Unknown Skill':
+                            recommended_skills_final.add(skill)
                 
-            perf_df = valid_df[valid_df['time_performance_category'] == perf_en]
-            
-            # 提取最常見的技能
-            if not perf_df.empty and 'question_fundamental_skill' in perf_df.columns:
-                skill_counts = perf_df['question_fundamental_skill'].value_counts()
-                if not skill_counts.empty:
-                    common_skills[perf_en] = skill_counts.index[0]
-                else:
-                    common_skills[perf_en] = "Rates/Ratio/Percent"  # 預設值
-            else:
-                common_skills[perf_en] = "Rates/Ratio/Percent"  # 預設值
-            
-            # 提取最常見的問題類型
-            if not perf_df.empty and 'question_type' in perf_df.columns:
-                type_counts = perf_df['question_type'].value_counts()
-                if not type_counts.empty:
-                    common_question_types[perf_en] = type_counts.index[0]
-                else:
-                    common_question_types[perf_en] = "Real"  # 預設值
-            else:
-                common_question_types[perf_en] = "Real"  # 預設值
-            
-            # 提取最常見的診斷標籤
-            if not perf_df.empty and 'diagnostic_params_list' in perf_df.columns:
-                all_labels = []
-                for labels_list in perf_df['diagnostic_params_list']:
-                    if isinstance(labels_list, list):
-                        all_labels.extend(labels_list)
-                if all_labels:
-                    from collections import Counter
-                    label_counts = Counter(all_labels)
-                    if label_counts:
-                        # Exclude INVALID_DATA_TAG_Q if present
-                        if INVALID_DATA_TAG_Q in label_counts:
-                            del label_counts[INVALID_DATA_TAG_Q]
-                        if label_counts: # Check if still non-empty
-                            common_diagnostic_labels[perf_en] = label_counts.most_common(1)[0][0]
-                        else:
-                            common_diagnostic_labels[perf_en] = "無特定標籤" # Default if only invalid tags were present
-                    else:
-                        common_diagnostic_labels[perf_en] = "無特定標籤" # 預設值
-                else:
-                    common_diagnostic_labels[perf_en] = "無特定標籤" # 預設值
-            else:
-                common_diagnostic_labels[perf_en] = "無特定標籤" # 預設值
+                # Change source for content_domains_final to 'question_type' for REAL/PURE
+                if 'question_type' in reflection_relevant_df.columns:
+                    # This column should contain 'REAL', 'PURE' for Q module
+                    real_pure_values = reflection_relevant_df['question_type'].dropna().unique()
+                    for rp_value in real_pure_values:
+                        if isinstance(rp_value, str) and rp_value in ['REAL', 'PURE']: # Explicitly check for REAL/PURE
+                            content_domains_final.add(rp_value)
+                
+                # Populate time_performances_final with Chinese translations of *existing* target categories
+                time_perf_translation_map = {
+                    'Fast & Wrong': '快錯',
+                    'Slow & Wrong': '慢錯',
+                    'Normal Time & Wrong': '正常時間錯'
+                }
+                actual_relevant_time_perfs_en = reflection_relevant_df['time_performance_category'].dropna().unique()
+                for perf_en in actual_relevant_time_perfs_en:
+                    if perf_en in time_perf_translation_map:
+                         time_performances_final.add(time_perf_translation_map[perf_en])
+                
+                if 'diagnostic_params_list' in reflection_relevant_df.columns:
+                    all_params = []
+                    for params_list in reflection_relevant_df['diagnostic_params_list']:
+                        if isinstance(params_list, list):
+                            all_params.extend(params_list)
+                    for param in all_params:
+                        if isinstance(param, str) and param != INVALID_DATA_TAG_Q:
+                            try:
+                                translated = get_translation(param)
+                                diagnostic_labels_final.add(translated if translated != param else param)
+                            except KeyError:
+                                diagnostic_labels_final.add(param)
+
+    skills_list_str = "，".join(sorted(list(recommended_skills_final))) if recommended_skills_final else "fundamental_skill"
+    domains_list_str = "，".join(sorted(list(content_domains_final))) if content_domains_final else "content_domain"
+    time_perf_text_str = "，".join(sorted(list(time_performances_final))) if time_performances_final else "time_performance"
+
+    # Combine skills and domains with a '＋' sign
+    skills_plus_domains_text = f"{skills_list_str}＋{domains_list_str}"
+
+    # Format diagnostic labels as a multi-line indented list
+    labels_block_content = []
+    if diagnostic_labels_final:
+        sorted_labels = sorted(list(diagnostic_labels_final))
+        for i, label in enumerate(sorted_labels):
+            line = f"    - {label}"  # 4 spaces for indentation before '-'
+            if i == len(sorted_labels) - 1:  # Last item
+                line += "。"
+            labels_block_content.append(line)
+    else:
+        labels_block_content.append("    - 【診斷標籤】。") # 4 spaces for indentation
     
-    # 生成引導反思問題
-    for perf in time_performances:
-        perf_en = perf['en']
-        perf_zh = perf['zh']
-        
-        # 只為實際存在的時間表現類型生成問題
-        if perf_en not in existing_performances:
-            continue
-            
-        skill = common_skills.get(perf_en, "代數")
-        q_type = common_question_types.get(perf_en, "文字題")
-        label = common_diagnostic_labels.get(perf_en, "概念應用錯誤")
-        
-        report_parts.append(f"* 當出現 **{perf_zh}** 時，通常是 **{skill}** 方面的 **{q_type}** 題，診斷為 **{label}**，您認為可能的原因是什麼？")
+    labels_indented_string = "\n".join(labels_block_content)
+
+    # Construct the reflection string with specific newlines and indentation
+    # The initial "  - " is for the main bullet point of this entire reflection block when appended to report_parts
+    line1 = f"  - 請協助找尋考前2-4周【{skills_plus_domains_text}】的題目中，【{time_perf_text_str}】的做題紀錄，回想是否有以下問題："
+    
+    final_text_segment = "請從此範圍聚焦確定自己的問題所在，並且前往「編輯診斷標籤」分頁修剪診斷標籤。"
+
+    unified_reflection = f"{line1}\n\n{labels_indented_string}\n\n{final_text_segment}"
+    
+    report_parts.append(unified_reflection)
     report_parts.append("")
 
     # 7. AI工具和提示建議（這部分將被新的獨立函數取代，但保留結構以便參考）

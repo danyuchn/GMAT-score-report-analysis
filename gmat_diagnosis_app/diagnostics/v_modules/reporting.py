@@ -316,48 +316,94 @@ def generate_v_summary_report(v_diagnosis_results):
 
     # 後續行動 (二級證據收集與質化分析)
     report_lines.append("**後續行動建議**")
-    if secondary_evidence_trigger:
-        report_lines.append("- **二級證據收集:** 為進一步確認問題，建議回顧近期（2-4週內）的練習記錄：")
-        # Focus on SFE skills if SFE triggered
-        focus_areas = []
-        if sfe_triggered_overall and sfe_skills_involved:
-            # Keep skill names in English
-            sfe_skills_display = sorted(list(sfe_skills_involved))
-            focus_areas.append(f"  - 特別關注與SFE相關的技能 ({', '.join(sfe_skills_display)}) 的錯題和慢題。")
+    
+    # 提取基本信息用於引導反思格式模板
+    fundamental_skills = set()
+    time_performances = set()
+    diagnostic_labels = set()
+    
+    # 從診斷數據中提取信息
+    if diagnosed_df_ch3_raw is not None and not diagnosed_df_ch3_raw.empty:
+        # 提取技能
+        if 'question_fundamental_skill' in diagnosed_df_ch3_raw.columns:
+            valid_skills = diagnosed_df_ch3_raw['question_fundamental_skill'].dropna().unique()
+            for skill in valid_skills:
+                if isinstance(skill, str) and skill != 'Unknown Skill':
+                    fundamental_skills.add(skill)
         
-        # Add other secondary evidence triggers if any (e.g., specific time_cat issues)
-        # This can be expanded based on `secondary_evidence_trigger` logic if more granularity is needed.
-        if not focus_areas:  # If SFE didn't trigger specific skills or no SFE
-            focus_areas.append("  - 整理所有錯題和慢題，注意是否存在重複出現的題型、技能或錯誤模式。")
-        report_lines.extend(focus_areas)
+        # 提取時間表現
+        if 'time_performance_category' in diagnosed_df_ch3_raw.columns:
+            valid_perfs = diagnosed_df_ch3_raw['time_performance_category'].dropna().unique()
+            for perf in valid_perfs:
+                if isinstance(perf, str) and perf != 'Unknown':
+                    time_performances.add(perf)
+        
+        # 提取診斷標籤
+        all_diagnostic_params = []
+        if 'diagnostic_params' in diagnosed_df_ch3_raw.columns:
+            for params_list in diagnosed_df_ch3_raw['diagnostic_params']:
+                if isinstance(params_list, list):
+                    all_diagnostic_params.extend(params_list)
+            
+            # 將英文診斷標籤轉換為中文
+            for param in all_diagnostic_params:
+                if isinstance(param, str):
+                    translated_param = translate_v(param)
+                    diagnostic_labels.add(translated_param)
+    
+    # 將集合轉換為排序的列表
+    skills_list = sorted(list(fundamental_skills))
+    time_performances_list = sorted(list(time_performances))
+    diagnostic_labels_list = sorted(list(diagnostic_labels))
+    
+    # 格式化時間表現
+    time_perf_text = "，".join(time_performances_list) if time_performances_list else "各種時間表現"
+    
+    # 格式化診斷標籤
+    labels_text = "，".join(diagnostic_labels_list) if diagnostic_labels_list else "診斷標籤"
+    
+    # 格式化技能
+    skills_text = "，".join(skills_list) if skills_list else "基礎技能"
+    
+    # 添加引導反思
+    report_lines.append("- **引導反思:**")
+    
+    # 添加單一統一格式的引導反思，與DI模組保持一致
+    if skills_list:
+        unified_reflection = f"  - 找尋【內容領域】【{skills_text}】的考前做題紀錄，找尋【{time_perf_text}】的題目，檢討並反思自己是否有：【{labels_text}】等問題。"
+    else:
+        unified_reflection = "  - 找尋考前做題紀錄中的錯題和超時題，按照【題型】【內容領域】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。"
+    
+    report_lines.append(unified_reflection)
+    
+    # 添加二級證據參考建議
+    report_lines.append("")
+    report_lines.append("- **二級證據參考建議（如考場回憶失效）：**")
+    
+    if diagnosed_df_ch3_raw is not None and not diagnosed_df_ch3_raw.empty:
+        report_lines.append("  - 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時，建議您按照上述引導反思查看近期的練習記錄，整理相關錯題或超時題目。")
+        
+        # 再次強調核心問題
+        core_issue_text = []
+        for param_code in ['CR_REASONING_CHAIN_ERROR', 'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY']:
+            if translate_v(param_code) in diagnostic_labels:
+                core_issue_text.append(translate_v(param_code))
+        
+        if sfe_triggered_overall:
+            core_issue_text.append(translate_v('FOUNDATIONAL_MASTERY_INSTABILITY_SFE'))
+        
+        if core_issue_text:
+            report_lines.append(f"  - 請特別留意題目是否反覆涉及報告核心問題診斷章節指出的問題：【{', '.join(core_issue_text)}】。")
+        
         report_lines.append("  - 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
     else:
-        report_lines.append("- 本次分析未明確觸發二級證據收集。若仍有疑慮，可主動回顧近期練習。")
+        report_lines.append("  - (本次分析未發現需要二級證據深入探究的問題點)")
+    
+    # 質化分析建議
     report_lines.append("")
-
-    if qualitative_analysis_trigger:
-        report_lines.append("- **質化分析建議:** 若對診斷報告指出的錯誤原因感到困惑，或上述方法仍無法釐清根本問題：")
-        # Identify focus skills for qualitative analysis
-        qual_focus_skills_set = set()
-        # Based on the logic for qualitative_analysis_trigger, identify the skills/types involved.
-        # This is a simplified version. A more detailed implementation would trace back the exact triggers.
-        if diagnosed_df_ch3_raw is not None and 'question_fundamental_skill' in diagnosed_df_ch3_raw.columns:
-            triggered_rows_for_qual = diagnosed_df_ch3_raw[diagnosed_df_ch3_raw.apply(
-                lambda row: row.get('time_performance_category', 'Unknown') in ['Normal Time & Wrong', 'Slow & Wrong', 'Slow & Correct'], axis=1
-            )]
-            if not triggered_rows_for_qual.empty:
-                qual_focus_skills_set.update(triggered_rows_for_qual['question_fundamental_skill'].dropna().unique())
-        
-        qual_focus_display = "某些題目" # Default
-        if qual_focus_skills_set:
-            # 保持技能名為英文
-            qual_focus_skills_sorted = sorted(list(s for s in qual_focus_skills_set if s!= 'Unknown Skill'))
-            if qual_focus_skills_sorted:
-                 qual_focus_display = f"涉及 **{', '.join(qual_focus_skills_sorted)}** 等技能的題目"
-
-        report_lines.append(f"  - 建議提供 2-3 題您在 {qual_focus_display} 上「典型錯誤」或「耗時過久」的詳細解題思路（文字/錄音），以便與顧問進行更深入的個案分析。")
-    else:
-        report_lines.append("- 本次分析未明確觸發質化分析。若對特定問題有深入探討需求，可主動整理案例。")
+    report_lines.append("- **質化分析建議：**")
+    report_lines.append("  - 如果您對報告中指出的某些問題仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。")
+    
     report_lines.append("")
 
     # --- Section 8: Tool and AI Prompt Recommendations (COMMENTED OUT - to be replaced by new function) ---
