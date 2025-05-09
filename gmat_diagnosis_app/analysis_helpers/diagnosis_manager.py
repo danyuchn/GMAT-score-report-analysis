@@ -5,7 +5,6 @@ Diagnosis manager for GMAT diagnosis app.
 """
 
 import pandas as pd
-import numpy as np
 import logging
 import streamlit as st
 from gmat_diagnosis_app.constants.config import SUBJECTS

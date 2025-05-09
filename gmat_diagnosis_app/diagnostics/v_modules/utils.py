@@ -6,7 +6,6 @@ V診斷模塊的工具函數
 """
 
 import pandas as pd
-import numpy as np
 
 def format_rate(rate_value):
     """Formats a rate value (0 to 1) as a percentage string, handling None/NaN."""

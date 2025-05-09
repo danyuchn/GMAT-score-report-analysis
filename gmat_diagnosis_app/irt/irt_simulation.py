@@ -10,7 +10,7 @@ import logging
 
 # Import from core
 from gmat_diagnosis_app.irt.irt_core import (
-    probability_correct, 
+    # probability_correct, # This import is unused in this file.
     item_information, 
     estimate_theta
 )

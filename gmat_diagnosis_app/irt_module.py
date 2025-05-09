@@ -32,7 +32,6 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.special import expit # Sigmoid function
-from scipy.stats import norm
 
 # Configure basic logging (this might be better in the main app entry point)
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

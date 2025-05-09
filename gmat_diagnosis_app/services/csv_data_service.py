@@ -8,7 +8,7 @@ stored in CSV files.
 import csv
 import os
 import datetime
-from typing import List, Dict, Any, Union, Optional, Tuple
+from typing import List, Dict, Any, Optional
 
 
 # Define constants

@@ -5,8 +5,6 @@ Q診斷模塊的翻譯功能
 用於在診斷過程中將英文術語翻譯為中文。
 """
 
-from gmat_diagnosis_app.diagnostics.q_modules.constants import INVALID_DATA_TAG_Q
-
 # --- Q Appendix A Translation ---
 APPENDIX_A_TRANSLATION = {
     'Q_READING_COMPREHENSION_ERROR': "Quant 閱讀理解: Real 題文字理解錯誤/障礙",

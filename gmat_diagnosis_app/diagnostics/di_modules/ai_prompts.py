@@ -5,9 +5,8 @@ DI科AI工具與提示建議生成模組
 """
 
 import pandas as pd
-from typing import List, Dict, Any, Optional
 from gmat_diagnosis_app.diagnostics.di_modules.constants import DI_TOOL_AI_RECOMMENDATIONS
-from gmat_diagnosis_app.diagnostics.di_modules.translation import APPENDIX_A_TRANSLATION_DI, _translate_di
+from gmat_diagnosis_app.diagnostics.di_modules.translation import APPENDIX_A_TRANSLATION_DI
 
 def translate_zh_to_en(zh_tag: str) -> str:
     """

@@ -7,14 +7,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from gmat_diagnosis_app.utils.styling import apply_styles
 from gmat_diagnosis_app.utils.excel_utils import to_excel
 from gmat_diagnosis_app.constants.config import SUBJECTS, EXCEL_COLUMN_MAP
 from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
-from gmat_diagnosis_app.diagnostics.q_modules.reporting import generate_q_summary_report # Placeholder for actual Q AI prompt function
-from gmat_diagnosis_app.diagnostics.di_modules.report_generation import _generate_di_summary_report # Placeholder
-from gmat_diagnosis_app.diagnostics.v_modules.reporting import generate_v_summary_report # Placeholder
 import logging
 
 # --- Column Display Configuration (Moved from app.py) ---

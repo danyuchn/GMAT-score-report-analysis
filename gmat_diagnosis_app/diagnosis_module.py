@@ -10,8 +10,6 @@ from gmat_diagnosis_app.diagnostics.di_diagnostic import run_di_diagnosis
 # --- Constants from V-Doc Chapter 1 ---
 V_MAX_ALLOWED_TIME = 45.0 # minutes
 V_TIME_PRESSURE_THRESHOLD_DIFF = 1.0 # minutes difference
-# V_INVALID_TIME_ABANDONED = 0.5 # minutes - 註解掉，因為主函數似乎未使用
-# V_INVALID_TIME_HASTY_MIN = 1.0 # minutes - 註解掉，因為主函數似乎未使用
 V_CR_OVERTIME_THRESHOLD_PRESSURE_TRUE = 2.0 # minutes
 V_CR_OVERTIME_THRESHOLD_PRESSURE_FALSE = 2.5 # minutes
 V_SUSPICIOUS_FAST_MULTIPLIER = 0.5

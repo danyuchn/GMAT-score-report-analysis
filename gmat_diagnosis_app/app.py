@@ -30,37 +30,39 @@ try:
     # Import custom modules for core logic
     from gmat_diagnosis_app import preprocess_helpers # Ensure the module itself is imported for setup_input_tabs
     # from gmat_diagnosis_app import irt_module as irt # Moved to analysis_orchestrator
-    from gmat_diagnosis_app.irt import probability_correct, item_information, estimate_theta, initialize_question_bank, simulate_cat_exam
+    # from gmat_diagnosis_app.irt import probability_correct, item_information, estimate_theta, initialize_question_bank, simulate_cat_exam
     # from gmat_diagnosis_app.diagnostics.v_diagnostic import run_v_diagnosis_processed # Moved
     # from gmat_diagnosis_app.diagnostics.di_diagnostic import run_di_diagnosis_processed # Moved
     # from gmat_diagnosis_app.diagnostics.q_diagnostic import diagnose_q # Moved
     
     # Import our modularized components
     from gmat_diagnosis_app.constants.config import (
-        SUBJECTS, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, BANK_SIZE, RANDOM_SEED,
-        SUBJECT_SIM_PARAMS, FINAL_DIAGNOSIS_INPUT_COLS, BASE_RENAME_MAP,
-        REQUIRED_ORIGINAL_COLS, EXCEL_COLUMN_MAP
+        SUBJECTS, # Retained: Used in main for iterating tabs and processing
+        # MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, # Removed: Likely used within setup_input_tabs
+        # BANK_SIZE, RANDOM_SEED, SUBJECT_SIM_PARAMS, FINAL_DIAGNOSIS_INPUT_COLS, # Removed: Likely used in analysis_orchestrator or deeper
+        BASE_RENAME_MAP # Retained: Used in main for sample data processing
+        # REQUIRED_ORIGINAL_COLS, EXCEL_COLUMN_MAP # Removed: Likely used within setup_input_tabs or preprocess_helpers
     )
-    from gmat_diagnosis_app.constants.thresholds import THRESHOLDS
+    # from gmat_diagnosis_app.constants.thresholds import THRESHOLDS # Removed: Likely used in analysis_orchestrator or deeper
     # from gmat_diagnosis_app.utils.validation import validate_dataframe
     # from gmat_diagnosis_app.utils.data_processing import process_subject_tab
     # from gmat_diagnosis_app.utils.styling import apply_styles
-    from gmat_diagnosis_app.utils.excel_utils import to_excel
-    from gmat_diagnosis_app.services.openai_service import (
-        summarize_report_with_openai, generate_ai_consolidated_report,
-        get_chat_context, get_openai_response
+    # from gmat_diagnosis_app.utils.excel_utils import to_excel # Removed
+    from gmat_diagnosis_app.services.openai_service import ( # Retained: get_chat_context, get_openai_response might be used by a chat interface if it were called
+        # summarize_report_with_openai, generate_ai_consolidated_report, # Removed: Assumed handled by orchestrator/display
+        get_chat_context, get_openai_response # Retained cautiously, though display_chat_interface is not called
     )
     # from gmat_diagnosis_app.services.plotting_service import create_theta_plot
-    from gmat_diagnosis_app.ui.results_display import display_results, display_subject_results
-    from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
+    from gmat_diagnosis_app.ui.results_display import display_results # Removed display_subject_results
+    # from gmat_diagnosis_app.ui.chat_interface import display_chat_interface # Removed: Not called
     from gmat_diagnosis_app.ui.input_tabs import setup_input_tabs, combine_input_data, display_analysis_button
     from gmat_diagnosis_app.session_manager import init_session_state, reset_session_for_new_upload, ensure_chat_history_persistence
     from gmat_diagnosis_app.analysis_orchestrator import run_analysis # Added import
     
-    # Import the new analysis helpers
-    from gmat_diagnosis_app.analysis_helpers.time_pressure_analyzer import calculate_time_pressure, calculate_and_apply_invalid_logic
-    from gmat_diagnosis_app.analysis_helpers.simulation_manager import run_simulation, prepare_dataframes_for_diagnosis
-    from gmat_diagnosis_app.analysis_helpers.diagnosis_manager import run_diagnosis, update_session_state_after_analysis
+    # Import the new analysis helpers - These are likely used by analysis_orchestrator, not directly here.
+    # from gmat_diagnosis_app.analysis_helpers.time_pressure_analyzer import calculate_time_pressure, calculate_and_apply_invalid_logic # Removed
+    # from gmat_diagnosis_app.analysis_helpers.simulation_manager import run_simulation, prepare_dataframes_for_diagnosis # Removed
+    # from gmat_diagnosis_app.analysis_helpers.diagnosis_manager import run_diagnosis, update_session_state_after_analysis # Removed
     
 except ImportError as e:
     st.error(f"導入模組時出錯: {e}. 請確保環境設定正確，且 gmat_diagnosis_app 在 Python 路徑中。")

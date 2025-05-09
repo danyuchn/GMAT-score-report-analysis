@@ -5,7 +5,6 @@
 
 import streamlit as st
 import pandas as pd
-import numpy as np
 from gmat_diagnosis_app.utils.data_processing import process_subject_tab
 from gmat_diagnosis_app.constants.config import (
     SUBJECTS,
@@ -171,8 +170,6 @@ def combine_input_data(input_dfs, SUBJECTS):
     df_combined_input = None
     if len(valid_input_dfs) == len(SUBJECTS):  # Only combine if ALL subjects are valid
         try:
-            import pandas as pd
-            
             # 調試：更詳細地檢查每個數據框
             # st.write("準備合併的數據框詳情:") # Removed
             df_list = []

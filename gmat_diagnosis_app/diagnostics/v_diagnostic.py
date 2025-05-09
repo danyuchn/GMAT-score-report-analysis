@@ -5,7 +5,7 @@ V診斷主模塊
 實際邏輯已分拆到 v_modules 子包中的相關模塊實現。
 """
 
-import pandas as pd
+# import pandas as pd # Removed, as pd is not directly used in this forwarding module.
 
 # 從 v_modules 子包導入主要功能
 # 確保 main 模塊中定義了 run_v_diagnosis_processed

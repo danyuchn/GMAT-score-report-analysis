@@ -6,31 +6,24 @@ Q診斷模塊的主入口函數
 """
 
 import pandas as pd
-import numpy as np
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 from gmat_diagnosis_app.diagnostics.q_modules.constants import (
-    MAX_ALLOWED_TIME_Q,
-    TOTAL_QUESTIONS_Q,
-    TIME_PRESSURE_THRESHOLD_Q,
-    INVALID_TIME_THRESHOLD_MINUTES,
-    SUSPICIOUS_FAST_MULTIPLIER,
     OVERTIME_THRESHOLDS,
     INVALID_DATA_TAG_Q
 )
 from gmat_diagnosis_app.diagnostics.q_modules.translations import get_translation
-from gmat_diagnosis_app.diagnostics.q_modules.utils import format_rate
 from gmat_diagnosis_app.diagnostics.q_modules.analysis import diagnose_q_root_causes, diagnose_q_internal
 from gmat_diagnosis_app.diagnostics.q_modules.behavioral import analyze_behavioral_patterns, analyze_skill_override
 from gmat_diagnosis_app.diagnostics.q_modules.recommendations import generate_q_recommendations
 from gmat_diagnosis_app.diagnostics.q_modules.reporting import (
-    generate_report_section1,
-    generate_report_section2,
-    generate_report_section3,
-    generate_report_section4,
-    generate_report_section5,
-    generate_report_section6,
-    generate_report_section7,
+    # generate_report_section1,
+    # generate_report_section2,
+    # generate_report_section3,
+    # generate_report_section4,
+    # generate_report_section5,
+    # generate_report_section6,
+    # generate_report_section7,
     generate_q_summary_report
 )
 
@@ -188,23 +181,25 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     recommendations = generate_q_recommendations(q_diagnosis_results, df_valid_diagnosed)
     
     # --- Chapter 8: Generate Report Sections --- 
-    report_sections = []
-    report_sections.extend(generate_report_section1(q_diagnosis_results['chapter1_results']))
-    report_sections.append("")
-    report_sections.extend(generate_report_section2(ch2_summary, ch2_flags, ch3_errors))
-    report_sections.append("")
-    report_sections.extend(generate_report_section3(triggered_params_translated, sfe_triggered, sfe_skills_involved))
-    report_sections.append("")
-    report_sections.extend(generate_report_section4(ch5_patterns))
-    report_sections.append("")
-    report_sections.extend(generate_report_section5(ch6_skill_override))
-    report_sections.append("")
-    report_sections.extend(generate_report_section6(recommendations, sfe_triggered))
-    report_sections.append("")
-    report_sections.extend(generate_report_section7(triggered_params_translated, param_to_positions, skill_to_positions, sfe_skills_involved, df_valid_diagnosed))
+    # report_sections = [] # Commented out
+    # report_sections.extend(generate_report_section1(q_diagnosis_results['chapter1_results'])) # Commented out
+    # report_sections.append("") # Commented out
+    # report_sections.extend(generate_report_section2(ch2_summary, ch2_flags, ch3_errors)) # Commented out
+    # report_sections.append("") # Commented out
+    # report_sections.extend(generate_report_section3(triggered_params_translated, sfe_triggered, sfe_skills_involved)) # Commented out
+    # report_sections.append("") # Commented out
+    # report_sections.extend(generate_report_section4(ch5_patterns)) # Commented out
+    # report_sections.append("") # Commented out
+    # report_sections.extend(generate_report_section5(ch6_skill_override)) # Commented out
+    # report_sections.append("") # Commented out
+    # report_sections.extend(generate_report_section6(recommendations, sfe_triggered)) # Commented out
+    # report_sections.append("") # Commented out
+    # report_sections.extend(generate_report_section7(triggered_params_translated, param_to_positions, skill_to_positions, sfe_skills_involved, df_valid_diagnosed)) # Commented out
     
     # Compile the main diagnostic report
-    main_report = "\n".join(report_sections)
+    main_report = "" # Initialize main_report as empty or a placeholder
+    # if report_sections: # This list is no longer populated
+        # main_report = "\\n".join(report_sections) # Commented out
     
     # Generate summary report if requested
     summary_report = None
@@ -234,6 +229,9 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
         results['individual_errors'] = ch3_errors
     
     # Determine the primary report string to be returned alongside results and df_diagnosed
+    # If summary_report is generated, it's preferred. Otherwise, main_report (which is now empty or placeholder).
     final_report_str = summary_report if include_summary_report and summary_report is not None else main_report
+    if final_report_str is None: # Ensure final_report_str is never None
+        final_report_str = "報告生成被禁用或遇到問題。" # Default message if no report is generated
     
     return results, final_report_str, df_diagnosed 

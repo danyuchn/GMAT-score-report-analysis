@@ -6,10 +6,7 @@
 import re
 import pandas as pd
 from gmat_diagnosis_app.constants.validation_rules import (
-    VALIDATION_RULES,
-    ALL_CONTENT_DOMAINS,
-    ALL_QUESTION_TYPES,
-    ALL_FUNDAMENTAL_SKILLS
+    VALIDATION_RULES
 )
 from gmat_diagnosis_app.constants.config import REQUIRED_ORIGINAL_COLS
 

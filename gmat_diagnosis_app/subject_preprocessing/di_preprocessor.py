@@ -2,7 +2,6 @@
 """Functions for preprocessing Data Insights (DI) section data, especially MSR groups."""
 import pandas as pd
 import numpy as np
-import warnings
 import logging
 
 def _identify_msr_groups(df_di_subset):

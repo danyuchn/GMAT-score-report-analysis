@@ -6,63 +6,9 @@ Q診斷模塊的報告生成功能
 """
 
 import pandas as pd
-from gmat_diagnosis_app.diagnostics.q_modules.translations import get_translation, APPENDIX_A_TRANSLATION
-from gmat_diagnosis_app.diagnostics.q_modules.utils import format_rate, map_difficulty_to_label, grade_difficulty_q, calculate_practice_time_limit
-from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMMENDATIONS, INVALID_DATA_TAG_Q
-import re
-
-
-def generate_report_section1(ch1_results):
-    """Generates Section 1: Opening Summary."""
-    lines = ["**一、 報告總覽與即時反饋**"]
-    lines.append("")
-    time_pressure_q = ch1_results.get('time_pressure_status', False)
-    num_invalid_q = ch1_results.get('invalid_questions_excluded', 0)
-    if time_pressure_q:
-        lines.append("* 根據分析，您在本輪測驗中可能感受到明顯的時間壓力。")
-    else:
-        lines.append("* 根據分析，您在本輪測驗中未處於明顯的時間壓力下。")
-    if num_invalid_q > 0:
-        lines.append(f"* 測驗末尾存在因時間壓力導致作答過快、可能影響數據有效性的跡象 ({num_invalid_q} 題被排除)。")
-    else:
-        lines.append("* 未發現因時間壓力導致數據無效的跡象。")
-    return lines
-
-
-def generate_report_section2(ch2_summary, ch2_flags, ch3_errors):
-    """Generates Section 2: Performance Overview."""
-    lines = ["**二、 核心表現分析**"]
-    lines.append("")
-    lines.append("* **A. 內容領域表現概覽**")
-    real_stats_error = next((item for item in ch2_summary if item.get('Metric') == 'Error Rate'), None)
-    real_stats_ot = next((item for item in ch2_summary if item.get('Metric') == 'Overtime Rate'), None)
-    if real_stats_error and real_stats_ot:
-        real_err_rate_str = format_rate(real_stats_error.get('Real_Value', 'N/A'))
-        real_ot_rate_str = format_rate(real_stats_ot.get('Real_Value', 'N/A'))
-        pure_err_rate_str = format_rate(real_stats_error.get('Pure_Value', 'N/A'))
-        pure_ot_rate_str = format_rate(real_stats_ot.get('Pure_Value', 'N/A'))
-        lines.append(f"    * Real 題表現: 錯誤率 {real_err_rate_str}, 超時率 {real_ot_rate_str}")
-        lines.append(f"    * Pure 題表現: 錯誤率 {pure_err_rate_str}, 超時率 {pure_ot_rate_str}")
-
-        triggered_ch2_flags_desc = []
-        if ch2_flags.get('poor_real', False): triggered_ch2_flags_desc.append(get_translation('poor_real'))
-        if ch2_flags.get('poor_pure', False): triggered_ch2_flags_desc.append(get_translation('poor_pure'))
-        if ch2_flags.get('slow_real', False): triggered_ch2_flags_desc.append(get_translation('slow_real'))
-        if ch2_flags.get('slow_pure', False): triggered_ch2_flags_desc.append(get_translation('slow_pure'))
-        if triggered_ch2_flags_desc:
-            lines.append(f"    * **比較提示**: {'; '.join(triggered_ch2_flags_desc)}")
-    else:
-        lines.append("    * 未能進行 Real vs. Pure 題的詳細比較。")
-
-    if ch3_errors:
-        error_difficulties = [err.get('Difficulty') for err in ch3_errors if err.get('Difficulty') is not None and not pd.isna(err.get('Difficulty'))]
-        if error_difficulties:
-            difficulty_labels = [map_difficulty_to_label(d) for d in error_difficulties]
-            label_counts = pd.Series(difficulty_labels).value_counts().sort_index()
-            if not label_counts.empty:
-                distribution_str = ", ".join([f"{label} ({count}題)" for label, count in label_counts.items()])
-                lines.append(f"    * **錯誤難度分佈:** {distribution_str}")
-    return lines
+from gmat_diagnosis_app.diagnostics.q_modules.translations import get_translation
+from gmat_diagnosis_app.diagnostics.q_modules.utils import format_rate, map_difficulty_to_label
+from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMMENDATIONS
 
 
 def generate_report_section3(triggered_params_translated, sfe_triggered, sfe_skills_involved):
@@ -167,7 +113,7 @@ def generate_report_section6(q_recommendations, sfe_triggered):
     return lines
 
 
-def generate_report_section7(triggered_params_translated, param_to_positions, skill_to_positions, sfe_skills_involved, df_diagnosed):
+def generate_report_section7(triggered_params_translated, sfe_skills_involved, df_diagnosed):
     """Generates Section 7: Follow-up Action Guidance."""
     lines = []
     lines.append("**四、 後續行動與深度反思指引**")
@@ -272,7 +218,7 @@ def generate_report_section7(triggered_params_translated, param_to_positions, sk
     
     # 如果沒有生成任何反思提示，添加默認提示
     if not reflection_prompts:
-        reflection_prompts.append(["    * 找尋考前做題紀錄中的錯題，按照【基礎技能】【題型】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。"]) # Ensure it's a list of lines
+        reflection_prompts.append(["    * 找尋考前做題紀錄中的錯題，按照【基礎技能】【題型】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。"]) # Ensure it\'s a list of lines
     
     # 添加反思提示到報告中
     for prompt_line_list in reflection_prompts:
@@ -313,8 +259,13 @@ def generate_report_section7(triggered_params_translated, param_to_positions, sk
     lines.append("")
     lines.append("**五、 尋求進階協助 (質化分析)**")
     lines.append("")
-    lines.append("* **建議：** 如果您對報告中指出的某些問題仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。")
+    lines.append("* **建議：** 如果您對報告中指出的某些問題仍感困惑，可以嘗試 **提供 2-3 題相關錯題的詳細解題流程跟思路範例** ，供顧問進行更深入的個案分析。") # Example of a long line
+    lines.append("")
 
+    print("--- DEBUG: generate_report_section7 lines ---")
+    for idx, line_content_debug in enumerate(lines):
+        print(f"S7_LINE_{idx}: [{line_content_debug}]")
+    print("--- END DEBUG: generate_report_section7 lines ---")
     return lines
 
 
@@ -451,11 +402,33 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     report_lines.append("")
     
     # 4 & 5. 後續行動與深度反思指引 & 尋求進階協助
-    action_lines = generate_report_section7(triggered_params_translated, {}, {}, sfe_skills_involved, df_final)
+    action_lines = generate_report_section7(triggered_params_translated, sfe_skills_involved, df_final)
     report_lines.extend(action_lines)
     report_lines.append("")
     
-    return "\n".join(report_lines)
+    # AI Tool Recommendation Section (Chapter 9)
+    # Placeholder - this should be generated by a new function if needed
+    # For now, let's assume it might come from 'recommendations' or be a static text.
+    # Example: ai_tool_recs = generate_q_ai_tool_recommendations(df_final) # You'd need to create this
+    # report_lines.extend(ai_tool_recs)
+    
+    # --- Final cleanup and assembly ---
+    # Ensure no leading/trailing empty lines in the final report sections
+    # (This is a basic example, more sophisticated cleanup might be needed)
+    final_report_lines = []
+    for line in report_lines:
+        if final_report_lines or line.strip(): # Add line if it's not a leading empty line
+            final_report_lines.append(line)
+    
+    # Remove trailing empty lines
+    while final_report_lines and not final_report_lines[-1].strip():
+        final_report_lines.pop()
+        
+    print("--- DEBUG: generate_q_summary_report report_lines ---")
+    for idx, line_content_debug in enumerate(final_report_lines): # Iterate over final_report_lines
+        print(f"FINAL_Q_REPORT_LINE_{idx}: [{line_content_debug}]")
+    print("--- END DEBUG: generate_q_summary_report report_lines ---")
+    return "\n".join(final_report_lines) # Ensure this returns a joined string for the UI
 
 
 def generate_q_ai_tool_recommendations(diagnosed_df_q_subject):

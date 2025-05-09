@@ -7,7 +7,7 @@ V診斷模塊的主要診斷功能
 
 import pandas as pd
 import logging
-import streamlit as st
+# import streamlit as st # Removed this unused top-level import
 
 from gmat_diagnosis_app.diagnostics.v_modules.constants import INVALID_DATA_TAG_V, V_SUSPICIOUS_FAST_MULTIPLIER, RC_READING_TIME_THRESHOLD_3Q, RC_READING_TIME_THRESHOLD_4Q
 from gmat_diagnosis_app.diagnostics.v_modules.translations import translate_v
@@ -27,21 +27,22 @@ from gmat_diagnosis_app.diagnostics.v_modules.recommendations import generate_v_
 from gmat_diagnosis_app.diagnostics.v_modules.reporting import generate_v_summary_report
 
 
-def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
-    """
-    DEPRECATED - Logic moved to run_v_diagnosis_processed.
-    """
-    time_pressure_status_map = {'V': v_time_pressure_status}
-    # Assuming this import works in the actual environment
-    from gmat_diagnosis_app.preprocess_helpers import suggest_invalid_questions
-    df_v_preprocessed = suggest_invalid_questions(df_v_raw, time_pressure_status_map)
-    return run_v_diagnosis_processed(df_v_preprocessed, v_time_pressure_status, v_avg_time_per_type)
+# Removed deprecated function run_v_diagnosis
+# def run_v_diagnosis(df_v_raw, v_time_pressure_status, v_avg_time_per_type):
+#     """
+#     DEPRECATED - Logic moved to run_v_diagnosis_processed.
+#     """
+#     time_pressure_status_map = {'V': v_time_pressure_status}
+#     # Assuming this import works in the actual environment
+#     from gmat_diagnosis_app.preprocess_helpers import suggest_invalid_questions
+#     df_v_preprocessed = suggest_invalid_questions(df_v_raw, time_pressure_status_map)
+#     return run_v_diagnosis_processed(df_v_preprocessed, v_time_pressure_status, v_avg_time_per_type)
 
 
 def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time_per_type):
     try:
         # 添加調試日誌
-        import streamlit as st
+        # import streamlit as st # Removed unused import from function scope
         import logging
         
         # 調試檢查手動標記的無效項
@@ -286,7 +287,7 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         logging.debug("Executing V Analysis (Chapter 5 - Behavioral Patterns)...")
         # Use the valid data derived from the df *after* Ch3 processing for pattern observation
         df_valid_v_for_ch5_analysis = df_v_processed[~df_v_processed['is_invalid']].copy()
-        ch5_behavioral_analysis = observe_patterns(df_valid_v_for_ch5_analysis, v_time_pressure_status)
+        ch5_behavioral_analysis = observe_patterns(df_valid_v_for_ch5_analysis) # Updated call to observe_patterns
         v_diagnosis_results['chapter_5'] = ch5_behavioral_analysis
         logging.debug("Finished Chapter 5 V behavioral analysis.")
 
