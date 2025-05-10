@@ -27,16 +27,24 @@
   where nchildren>0{fill=orange!10, rounded corners=2pt}{},
 [gmat\_diagnosis\_app, name=root, folder, open
   [ {\textbf{app.py}\\{\scriptsize Path: app.py}\\{\scriptsize 主應用程式進入點 (Main application entry point)}} , tier=file]
+  [ {\textbf{app.py.bak}\\{\scriptsize Path: app.py.bak}\\{\scriptsize 主應用程式備份 (Main application backup)}} , tier=file]
   [ {\textbf{analysis\_orchestrator.py}\\{\scriptsize Path: analysis\_orchestrator.py}\\{\scriptsize 分析協調器 (Analysis orchestrator)}} , tier=file]
   [ {\textbf{diagnosis\_module.py}\\{\scriptsize Path: diagnosis\_module.py}\\{\scriptsize 診斷主模組 (Main diagnosis module)}} , tier=file]
   [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: \_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
   [ {\textbf{irt\_module.py}\\{\scriptsize Path: irt\_module.py}\\{\scriptsize 項目反應理論模組 (Item Response Theory module)}} , tier=file]
   [ {\textbf{preprocess\_helpers.py}\\{\scriptsize Path: preprocess\_helpers.py}\\{\scriptsize 預處理輔助函數 (Preprocessing helper functions)}} , tier=file]
   [ {\textbf{session\_manager.py}\\{\scriptsize Path: session\_manager.py}\\{\scriptsize 會話管理器 (Session manager)}} , tier=file]
-  [ {\textbf{README.md}\\{\scriptsize Path: README.md}\\{\scriptsize 專案說明文件 (Project README)}} , tier=file]
+  [ {\textbf{csv\_data\_example.py}\\{\scriptsize Path: csv\_data\_example.py}\\{\scriptsize CSV數據範例腳本 (CSV data example script)}} , tier=file]
+  [ {\textbf{csv\_data\_README.md}\\{\scriptsize Path: csv\_data\_README.md}\\{\scriptsize CSV數據格式說明 (CSV data format description)}} , tier=file]
+  [ {\textbf{gmat\_performance\_data.csv}\\{\scriptsize Path: gmat\_performance\_data.csv}\\{\scriptsize GMAT成績數據範例 (GMAT performance data sample)}} , tier=file]
+  [ {\textbf{memo.md}\\{\scriptsize Path: memo.md}\\{\scriptsize 專案備忘錄 (Project memo)}} , tier=file]
+  [ {\textbf{student\_subjective\_reports.csv}\\{\scriptsize Path: student\_subjective\_reports.csv}\\{\scriptsize 學生主觀報告範例 (Student subjective reports sample)}} , tier=file]
   [analysis\_helpers, folder
     [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: analysis\_helpers/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+    [ {\textbf{diagnosis\_manager.py}\\{\scriptsize Path: analysis\_helpers/diagnosis\_manager.py}\\{\scriptsize 診斷管理器 (Diagnosis manager)}} , tier=file]
+    [ {\textbf{simulation\_manager.py}\\{\scriptsize Path: analysis\_helpers/simulation\_manager.py}\\{\scriptsize 模擬管理器 (Simulation manager)}} , tier=file]
     [ {\textbf{time\_analyzer.py}\\{\scriptsize Path: analysis\_helpers/time\_analyzer.py}\\{\scriptsize 時間分析器 (Time analyzer)}} , tier=file]
+    [ {\textbf{time\_pressure\_analyzer.py}\\{\scriptsize Path: analysis\_helpers/time\_pressure\_analyzer.py}\\{\scriptsize 時間壓力分析器 (Time pressure analyzer)}} , tier=file]
   ]
   [constants, folder
     [ {\textbf{config.py}\\{\scriptsize Path: constants/config.py}\\{\scriptsize 配置設定 (Configuration settings)}} , tier=file]
@@ -54,6 +62,7 @@
     [ {\textbf{v\_diagnostic.py}\\{\scriptsize Path: diagnostics/v\_diagnostic.py}\\{\scriptsize Verbal 診斷協調器 (Verbal diagnostic coordinator)}} , tier=file]
     [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: diagnostics/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
     [di\_modules, folder
+      [ {\textbf{ai\_prompts.py}\\{\scriptsize Path: diagnostics/di\_modules/ai\_prompts.py}\\{\scriptsize DI AI 提示 (DI AI Prompts)}} , tier=file]
       [ {\textbf{chapter\_logic.py}\\{\scriptsize Path: diagnostics/di\_modules/chapter\_logic.py}\\{\scriptsize DI 章節邏輯 (DI chapter logic)}} , tier=file]
       [ {\textbf{constants.py}\\{\scriptsize Path: diagnostics/di\_modules/constants.py}\\{\scriptsize DI 模組常數 (DI module constants)}} , tier=file]
       [ {\textbf{main.py}\\{\scriptsize Path: diagnostics/di\_modules/main.py}\\{\scriptsize DI 模組主要邏輯 (DI module main logic)}} , tier=file]
@@ -63,6 +72,7 @@
       [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: diagnostics/di\_modules/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
     ]
     [q\_modules, folder
+      [ {\textbf{ai\_prompts.py}\\{\scriptsize Path: diagnostics/q\_modules/ai\_prompts.py}\\{\scriptsize Quant AI 提示 (Quant AI Prompts)}} , tier=file]
       [ {\textbf{analysis.py}\\{\scriptsize Path: diagnostics/q\_modules/analysis.py}\\{\scriptsize Quant 分析 (Quant analysis)}} , tier=file]
       [ {\textbf{behavioral.py}\\{\scriptsize Path: diagnostics/q\_modules/behavioral.py}\\{\scriptsize Quant 行為分析 (Quant behavioral analysis)}} , tier=file]
       [ {\textbf{constants.py}\\{\scriptsize Path: diagnostics/q\_modules/constants.py}\\{\scriptsize Quant 模組常數 (Quant module constants)}} , tier=file]
@@ -74,6 +84,7 @@
       [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: diagnostics/q\_modules/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
     ]
     [v\_modules, folder
+      [ {\textbf{ai\_prompts.py}\\{\scriptsize Path: diagnostics/v\_modules/ai\_prompts.py}\\{\scriptsize Verbal AI 提示 (Verbal AI Prompts)}} , tier=file]
       [ {\textbf{analysis.py}\\{\scriptsize Path: diagnostics/v\_modules/analysis.py}\\{\scriptsize Verbal 分析 (Verbal analysis)}} , tier=file]
       [ {\textbf{constants.py}\\{\scriptsize Path: diagnostics/v\_modules/constants.py}\\{\scriptsize Verbal 模組常數 (Verbal module constants)}} , tier=file]
       [ {\textbf{main.py}\\{\scriptsize Path: diagnostics/v\_modules/main.py}\\{\scriptsize Verbal 模組主要邏輯 (Verbal module main logic)}} , tier=file]
@@ -84,7 +95,15 @@
       [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: diagnostics/v\_modules/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
     ]
   ]
+  [irt, folder
+    [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: irt/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]
+    [ {\textbf{irt\_core.py}\\{\scriptsize Path: irt/irt\_core.py}\\{\scriptsize IRT 核心邏輯 (IRT Core Logic)}} , tier=file]
+    [ {\textbf{irt\_simulation.py}\\{\scriptsize Path: irt/irt\_simulation.py}\\{\scriptsize IRT 模擬 (IRT Simulation)}} , tier=file]
+  ]
   [services, folder
+    [ {\textbf{csv\_batch\_processor.py}\\{\scriptsize Path: services/csv\_batch\_processor.py}\\{\scriptsize CSV 批次處理器 (CSV Batch Processor)}} , tier=file]
+    [ {\textbf{csv\_data\_analysis.py}\\{\scriptsize Path: services/csv\_data\_analysis.py}\\{\scriptsize CSV 數據分析 (CSV Data Analysis)}} , tier=file]
+    [ {\textbf{csv\_data\_service.py}\\{\scriptsize Path: services/csv\_data\_service.py}\\{\scriptsize CSV 數據服務 (CSV Data Service)}} , tier=file]
     [ {\textbf{openai\_service.py}\\{\scriptsize Path: services/openai\_service.py}\\{\scriptsize OpenAI服務互動 (OpenAI service interaction)}} , tier=file]
     [ {\textbf{plotting\_service.py}\\{\scriptsize Path: services/plotting\_service.py}\\{\scriptsize 繪圖服務 (Plotting service)}} , tier=file]
     [ {\textbf{\_\_init\_\_.py}\\{\scriptsize Path: services/\_\_init\_\_.py}\\{\scriptsize 套件初始化檔案 (Package initializer)}} , tier=file]

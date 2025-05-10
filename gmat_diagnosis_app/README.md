@@ -10,16 +10,24 @@ GMAT診斷應用已被重構為以下模組結構，以改善可維護性：
 gmat_diagnosis_app/
 ├── __init__.py                 # 套件初始化檔案
 ├── app.py                      # 主應用程式進入點
+├── app.py.bak                  # 主應用程式備份
 ├── analysis_orchestrator.py    # 分析協調器
+├── csv_data_example.py         # CSV數據範例腳本
+├── csv_data_README.md          # CSV數據格式說明
 ├── diagnosis_module.py         # 診斷主模組
+├── gmat_performance_data.csv   # GMAT成績數據範例
 ├── irt_module.py               # 項目反應理論模組
+├── memo.md                     # 專案備忘錄
 ├── preprocess_helpers.py       # 預處理輔助函數
 ├── session_manager.py          # 會話管理器
-├── README.md                   # 專案說明文件
+├── student_subjective_reports.csv # 學生主觀報告範例
 │
 ├── analysis_helpers/           # 分析輔助工具
 │   ├── __init__.py
-│   └── time_analyzer.py        # 時間分析器
+│   ├── diagnosis_manager.py    # 診斷管理器
+│   ├── simulation_manager.py   # 模擬管理器
+│   ├── time_analyzer.py        # 時間分析器
+│   └── time_pressure_analyzer.py # 時間壓力分析器
 │
 ├── constants/                  # 常量和配置
 │   ├── __init__.py
@@ -39,6 +47,7 @@ gmat_diagnosis_app/
 │   │
 │   ├── di_modules/             # DI 特定模組
 │   │   ├── __init__.py
+│   │   ├── ai_prompts.py       # DI AI 提示
 │   │   ├── chapter_logic.py
 │   │   ├── constants.py
 │   │   ├── main.py
@@ -48,6 +57,7 @@ gmat_diagnosis_app/
 │   │
 │   ├── q_modules/              # Quant 特定模組
 │   │   ├── __init__.py
+│   │   ├── ai_prompts.py       # Quant AI 提示
 │   │   ├── analysis.py
 │   │   ├── behavioral.py
 │   │   ├── constants.py
@@ -59,6 +69,7 @@ gmat_diagnosis_app/
 │   │
 │   └── v_modules/              # Verbal 特定模組
 │       ├── __init__.py
+│       ├── ai_prompts.py       # Verbal AI 提示
 │       ├── analysis.py
 │       ├── constants.py
 │       ├── main.py
@@ -67,8 +78,20 @@ gmat_diagnosis_app/
 │       ├── translations.py
 │       └── utils.py
 │
+├── exports/                    # 導出檔案目錄 (內容動態生成)
+│
+├── irt/                        # IRT 相關模組
+│   ├── __init__.py
+│   ├── irt_core.py             # IRT 核心邏輯
+│   └── irt_simulation.py       # IRT 模擬工具
+│
+├── logs/                       # 日誌檔案目錄 (內容動態生成)
+│
 ├── services/                   # 外部服務接口
 │   ├── __init__.py
+│   ├── csv_batch_processor.py  # CSV 批次處理器
+│   ├── csv_data_analysis.py    # CSV 數據分析
+│   ├── csv_data_service.py     # CSV 數據服務
 │   ├── openai_service.py       # OpenAI API服務
 │   └── plotting_service.py     # 圖表生成服務
 │
