@@ -423,4 +423,82 @@ If answering in Chinese, use traditional Chinese characters (繁體中文).
     except Exception as e:
         error_msg = f"與OpenAI API通訊時發生未知錯誤: {e}"
         logging.error(error_msg, exc_info=True)
-        raise ValueError(error_msg) 
+        raise ValueError(error_msg)
+
+def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: str, api_key: str) -> str:
+    """
+    Uses OpenAI to suggest a trimmed list of 1-2 most relevant diagnostic tags
+    based on original tags and user's description of their difficulty.
+
+    Args:
+        original_tags_str: A string containing the original diagnostic tags (e.g., comma-separated or list-like).
+        user_description: User's description of their difficulty with the question.
+        api_key: OpenAI API key.
+
+    Returns:
+        A string containing the AI's suggested trimmed tags, or an error message.
+    """
+    if not api_key:
+        logging.warning("OpenAI API key is missing for tag trimming.")
+        return "錯誤：OpenAI API 金鑰未提供。"
+    if not original_tags_str.strip():
+        return "錯誤：原始診斷標籤不能為空。"
+    if not user_description.strip():
+        return "錯誤：使用者描述不能為空。"
+
+    client = openai.OpenAI(api_key=api_key)
+
+    system_prompt = """
+您是一位專業的 GMAT 診斷標籤修剪助手。
+您的任務是分析使用者提供的「原始診斷標籤」（以逗號,分隔）以及他們「對題目的描述或遇到的困難」。
+根據使用者的描述，從原始標籤中篩選出 1 至 2 個最能直接對應並解釋使用者所述困難的核心診斷標籤。
+
+輸出要求：
+- 直接返回修剪後建議的 1 或 2 個標籤全名，不要省略成簡名。
+- 如果有多個建議標籤，請用逗號和一個空格（例如：標籤1, 標籤2）分隔。
+- 如果原始標籤已經很少（例如只有1-2個）且與使用者描述相關，可以直接返回原始標籤（或相關的部分）。
+- 如果根據使用者描述，原始標籤中沒有明顯直接相關的標籤，請明確指出「根據您的描述，原始標籤中未找到直接對應的項目。」
+- 不要添加任何解釋、引言或額外的客套話，只需提供建議的標籤或上述明確的提示。
+"""
+    
+    user_content = f"原始診斷標籤：\n{original_tags_str}\n\n使用者描述：\n{user_description}"
+
+    try:
+        logging.info("Calling OpenAI ChatCompletion for tag trimming with model gpt-3.5-turbo.")
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini", # Using a cost-effective and capable model
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            temperature=0.2, # Lower temperature for more deterministic output
+            max_tokens=100 # Expecting a short list of tags
+        )
+        
+        trimmed_suggestion = response.choices[0].message.content
+        
+        if trimmed_suggestion and trimmed_suggestion.strip():
+            logging.info(f"OpenAI tag trimming successful. Suggestion: {trimmed_suggestion}")
+            return trimmed_suggestion.strip()
+        else:
+            logging.warning("OpenAI returned empty response for tag trimming.")
+            return "AI 未能提供修剪建議（返回空內容）。"
+
+    except openai.AuthenticationError:
+        logging.error("OpenAI AuthenticationError during tag trimming.")
+        return "錯誤：OpenAI API 金鑰無效或權限不足。"
+    except openai.RateLimitError:
+        logging.error("OpenAI RateLimitError during tag trimming.")
+        return "錯誤：OpenAI API 請求頻率過高，請稍後再試。"
+    except openai.APIConnectionError as e:
+        logging.error(f"OpenAI APIConnectionError during tag trimming: {e}")
+        return f"錯誤：無法連接至 OpenAI API ({e})。"
+    except openai.APITimeoutError:
+        logging.error("OpenAI APITimeoutError during tag trimming.")
+        return "錯誤：OpenAI API 請求超時。"
+    except openai.BadRequestError as e:
+        logging.error(f"OpenAI BadRequestError during tag trimming: {e}")
+        return f"錯誤：OpenAI API 請求無效 ({e})。可能是輸入內容問題。"
+    except Exception as e:
+        logging.error(f"Unknown OpenAI API error during tag trimming: {e}", exc_info=True)
+        return f"調用 OpenAI API 時發生未知錯誤：{e}。" 
