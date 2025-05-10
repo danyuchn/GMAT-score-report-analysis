@@ -13,6 +13,7 @@ import numpy as np
 import logging
 import openai
 import plotly.graph_objects as go
+import datetime
 
 # --- Project Path Setup ---
 try:
@@ -58,6 +59,7 @@ try:
     from gmat_diagnosis_app.ui.input_tabs import setup_input_tabs, combine_input_data, display_analysis_button
     from gmat_diagnosis_app.session_manager import init_session_state, reset_session_for_new_upload, ensure_chat_history_persistence
     from gmat_diagnosis_app.analysis_orchestrator import run_analysis # Added import
+    from gmat_diagnosis_app.services.csv_data_service import add_gmat_performance_record, GMAT_PERFORMANCE_HEADERS # Added for CSV export
     
     # Import the new analysis helpers - These are likely used by analysis_orchestrator, not directly here.
     # from gmat_diagnosis_app.analysis_helpers.time_pressure_analyzer import calculate_time_pressure, calculate_and_apply_invalid_logic # Removed
@@ -404,6 +406,82 @@ def main():
 
             if df_combined_input is not None:
                 with st.spinner("正在執行 IRT 模擬與診斷..."):
+                    # --- Add to CSV ---
+                    records_to_add = []
+                    # Generate a unique student_id for this upload session if not available
+                    # For simplicity, using a fixed student_id for now, or derive from session
+                    student_id_for_batch = st.session_state.get("student_id_for_upload", f"student_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}")
+                    st.session_state.student_id_for_upload = student_id_for_batch # Store for potential reuse in the session
+                    
+                    test_date_for_batch = datetime.date.today().isoformat()
+
+                    # Calculate per-section totals first
+                    section_stats = {}
+                    if 'Subject' in df_combined_input.columns and 'question_time' in df_combined_input.columns:
+                        for subject_name, group in df_combined_input.groupby('Subject'):
+                            if subject_name in SUBJECTS: # Process only Q, V, DI
+                                section_stats[subject_name] = {
+                                    'total_questions': len(group),
+                                    'total_time': group['question_time'].sum()
+                                }
+
+                    for index, row in df_combined_input.iterrows():
+                        record = {}
+                        gmat_section = row.get("Subject")
+                        
+                        # Skip if not a main GMAT section (e.g. 'Total' if it exists in df_combined_input)
+                        if gmat_section not in SUBJECTS:
+                            continue
+                            
+                        record["student_id"] = student_id_for_batch
+                        # Create a unique test_instance_id for each section within the batch
+                        record["test_instance_id"] = f"{student_id_for_batch}_{gmat_section}_{test_date_for_batch.replace('-', '')}_upload"
+                        record["gmat_section"] = gmat_section
+                        record["test_date"] = test_date_for_batch
+                        
+                        question_pos = row.get("question_position", index + 1)
+                        record["question_id"] = f"{gmat_section}_{question_pos}_{test_date_for_batch.replace('-', '')}"
+                        record["question_position"] = int(question_pos) if pd.notnull(question_pos) else index + 1
+                        record["question_time_minutes"] = float(row.get("question_time", 0.0))
+                        
+                        is_correct_val = row.get("is_correct")
+                        if isinstance(is_correct_val, bool):
+                            record["is_correct"] = 1 if is_correct_val else 0
+                        elif isinstance(is_correct_val, str):
+                            record["is_correct"] = 1 if is_correct_val.lower() == 'correct' else 0
+                        else:
+                            record["is_correct"] = 0 # Default if unknown format
+                            
+                        # question_difficulty might not be present in uploaded data, default to 0 or a placeholder
+                        record["question_difficulty"] = float(row.get("question_difficulty", 0.0)) 
+                        record["question_type"] = str(row.get("question_type", ""))
+                        record["question_fundamental_skill"] = str(row.get("question_fundamental_skill", ""))
+                        record["content_domain"] = str(row.get("content_domain", ""))
+                        
+                        if gmat_section in section_stats:
+                            record["total_questions_in_section"] = int(section_stats[gmat_section]['total_questions'])
+                            record["total_section_time_minutes"] = float(section_stats[gmat_section]['total_time'])
+                        else:
+                            record["total_questions_in_section"] = 0 # Should not happen if Subject is Q,V,DI
+                            record["total_section_time_minutes"] = 0.0
+
+                        record["max_allowed_section_time_minutes"] = 45.0 # Standard or from config
+                        
+                        # Ensure all GMAT_PERFORMANCE_HEADERS are present, even if with None or default values, except record_timestamp
+                        for header in GMAT_PERFORMANCE_HEADERS:
+                            if header not in record and header != "record_timestamp":
+                                record[header] = None 
+                        records_to_add.append(record)
+                    
+                    if records_to_add:
+                        if add_gmat_performance_record(records_to_add):
+                            st.toast(f"已成功將 {len(records_to_add)} 筆資料附加到 gmat_performance_data.csv", icon="✅")
+                        else:
+                            st.toast("附加資料到 gmat_performance_data.csv 時發生錯誤。", icon="⚠️")
+                    else:
+                        st.toast("沒有可附加到 gmat_performance_data.csv 的資料。", icon="ℹ️")
+                    # --- End Add to CSV ---
+
                     run_analysis(df_combined_input) # This will update diagnosis_complete and analysis_error
                 
                 if st.session_state.diagnosis_complete:
