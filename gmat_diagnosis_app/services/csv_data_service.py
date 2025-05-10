@@ -12,8 +12,9 @@ from typing import List, Dict, Any, Optional
 
 
 # Define constants
-GMAT_PERFORMANCE_DATA_FILE = "gmat_performance_data.csv"
-STUDENT_SUBJECTIVE_REPORTS_FILE = "student_subjective_reports.csv"
+APP_SUBDIRECTORY = "gmat_diagnosis_app" # Define the app subdirectory
+GMAT_PERFORMANCE_DATA_FILE = os.path.join(APP_SUBDIRECTORY, "gmat_performance_data.csv")
+STUDENT_SUBJECTIVE_REPORTS_FILE = os.path.join(APP_SUBDIRECTORY, "student_subjective_reports.csv")
 
 # Define CSV headers
 GMAT_PERFORMANCE_HEADERS = [
