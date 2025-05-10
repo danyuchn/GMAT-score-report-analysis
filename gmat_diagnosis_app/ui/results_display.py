@@ -927,6 +927,8 @@ def display_results():
                         # Generate and display the new diagnostic report based on edited tags
                         if st.session_state.get("editable_diagnostic_df") is not None:
                             new_report_content = generate_new_diagnostic_report(st.session_state.editable_diagnostic_df)
+                            # 保存到 session_state 中，供其他模塊使用
+                            st.session_state.generated_new_diagnostic_report = new_report_content
                             # Place the new diagnostic report inside an expander
                             with tabs[edit_tab_index].expander("新診斷報告 (根據已修剪標籤與標準分類)", expanded=False):
                                 st.markdown(new_report_content, unsafe_allow_html=True)

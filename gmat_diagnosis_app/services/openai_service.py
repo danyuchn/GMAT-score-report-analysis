@@ -176,7 +176,7 @@ User: 從以下 GMAT 診斷報告中提取練習建議和後續行動部分，�
         logging.error(f"Unknown error during consolidated report generation: {e}", exc_info=True)
         return None
 
-def get_chat_context(session_state, max_rows=50):
+def get_chat_context(session_state, max_rows=100):
     """Get combined report and dataframe context for chat."""
     context = {
         "report": _get_combined_report_context(session_state),
@@ -187,72 +187,138 @@ def get_chat_context(session_state, max_rows=50):
 def _get_combined_report_context(session_state):
     """Combines markdown reports from all subjects."""
     full_report = ""
+    
+    # 檢查是否有重要分數/百分位資訊並添加到報告開頭
+    if hasattr(session_state, 'total_score') and session_state.total_score:
+        full_report += "## 總體分數與百分位\n\n"
+        
+        # 添加各科目分數
+        scores_text = []
+        if hasattr(session_state, 'q_score') and session_state.q_score:
+            scores_text.append(f"Q (Quantitative): {session_state.q_score}")
+        if hasattr(session_state, 'v_score') and session_state.v_score:
+            scores_text.append(f"V (Verbal): {session_state.v_score}")
+        if hasattr(session_state, 'di_score') and session_state.di_score:
+            scores_text.append(f"DI (Data Insights): {session_state.di_score}")
+        if hasattr(session_state, 'total_score') and session_state.total_score:
+            scores_text.append(f"Total: {session_state.total_score}")
+            
+        if scores_text:
+            full_report += "### 各科目分數\n\n"
+            for score in scores_text:
+                full_report += f"- {score}\n"
+            full_report += "\n"
+    
+    # 添加AI總結建議（如果存在）
+    if hasattr(session_state, 'consolidated_report_text') and session_state.consolidated_report_text:
+        full_report += "## AI 總結建議\n\n"
+        full_report += session_state.consolidated_report_text
+        full_report += "\n\n---\n\n"
+    
+    # 添加各科目診斷報告
     if session_state.report_dict:
-        for subject in ['Q', 'V', 'DI']:  # Explicitly define subjects order
+        for subject in ['Q', 'V', 'DI']:  # 明確定義科目順序
             report = session_state.report_dict.get(subject)
             if report:
-                full_report += f"\n\n## {subject} 科診斷報告\n\n{report}"
+                full_report += f"## {subject} 科診斷報告\n\n{report}\n\n---\n\n"
+                
+    # 如果已經存在新診斷報告（從編輯標籤生成），則添加到報告中
+    if hasattr(session_state, 'editable_diagnostic_df') and session_state.editable_diagnostic_df is not None:
+        try:
+            # 使用內部函數生成新診斷報告，避免循環導入
+            df = session_state.editable_diagnostic_df
+            if 'generated_new_diagnostic_report' in session_state:
+                # 使用已生成的報告
+                new_report = session_state.generated_new_diagnostic_report
+                full_report += "## 新標籤分類報告\n\n"
+                full_report += new_report
+                full_report += "\n\n"
+            else:
+                # 嘗試生成新報告
+                logging.info("嘗試生成新診斷報告...")
+                # 我們將使用動態導入來避免循環導入問題
+                import importlib
+                try:
+                    results_display_module = importlib.import_module('gmat_diagnosis_app.ui.results_display')
+                    generate_report_func = getattr(results_display_module, 'generate_new_diagnostic_report')
+                    
+                    new_report = generate_report_func(df)
+                    if new_report:
+                        # 保存到session_state以便重複使用
+                        session_state.generated_new_diagnostic_report = new_report
+                        full_report += "## 新標籤分類報告\n\n"
+                        full_report += new_report
+                        full_report += "\n\n"
+                except (ImportError, AttributeError) as ie:
+                    logging.error(f"無法導入或使用generate_new_diagnostic_report函數: {ie}")
+        except Exception as e:
+            logging.error(f"生成新診斷報告時出錯: {e}")
+    
     return full_report.strip()
 
-def _get_dataframe_context(session_state, max_rows=50):
+def _get_dataframe_context(session_state, max_rows=100):
     """Converts the processed dataframe to a string format (markdown) for context."""
-    if session_state.processed_df is not None and not session_state.processed_df.empty:
+    # 優先使用修剪標籤後的數據表格 (如果存在)
+    if hasattr(session_state, 'editable_diagnostic_df') and session_state.editable_diagnostic_df is not None and not session_state.editable_diagnostic_df.empty:
+        df_context = session_state.editable_diagnostic_df.copy()
+        logging.info(f"準備轉換修剪標籤後的診斷試算表，原始列數: {len(df_context)}, 列名: {', '.join(df_context.columns)}")
+    elif session_state.processed_df is not None and not session_state.processed_df.empty:
         df_context = session_state.processed_df.copy()
-        logging.info(f"準備轉換診斷試算表，原始列數: {len(df_context)}, 列名: {', '.join(df_context.columns)}")
+        logging.info(f"準備轉換原始診斷試算表，原始列數: {len(df_context)}, 列名: {', '.join(df_context.columns)}")
+    else:
+        logging.warning("診斷試算表為空或不存在")
+        return "(無詳細數據表格)"
         
-        try:
-            # 選擇關鍵列以提高可讀性，排除不必要的列
-            important_cols = [
-                'qnum', 'subject', 'content_classification', 'difficulty_classification', 
-                'time_classification', 'is_invalid', 'is_correct', 'time_spent',
-                'difficulty_code'
-            ]
-            
-            # 只保留存在於 DataFrame 中的列
-            cols_to_use = [col for col in important_cols if col in df_context.columns]
-            
-            # 添加其他可能有用的列（但優先使用上面定義的關鍵列）
-            for col in df_context.columns:
-                if col not in cols_to_use and col not in ['diagnostic_params_list', 'raw_content']:
-                    cols_to_use.append(col)
-            
-            logging.info(f"選擇的列: {', '.join(cols_to_use)}")
-            
-            # 如果有列可用，則使用這些列；否則使用所有列
-            if cols_to_use:
-                df_context = df_context[cols_to_use]
-            
-            # Convert boolean columns to Yes/No for better readability for the LLM
-            bool_cols = df_context.select_dtypes(include=bool).columns
-            for col in bool_cols:
-                df_context[col] = df_context[col].map({True: 'Yes', False: 'No'})
-                logging.info(f"已將布爾列 '{col}' 轉換為 Yes/No 格式")
+    try:
+        # 選擇關鍵列以提高可讀性，排除不必要的列
+        important_cols = [
+            'Subject', 'question_position', 'question_type', 'question_fundamental_skill',
+            'content_domain', 'is_invalid', 'is_correct', 'question_time',
+            'time_performance_category', 'diagnostic_params_list'
+        ]
+        
+        # 只保留存在於 DataFrame 中的列
+        cols_to_use = [col for col in important_cols if col in df_context.columns]
+        
+        # 添加其他可能有用的列（但優先使用上面定義的關鍵列）
+        for col in df_context.columns:
+            if col not in cols_to_use and col not in ['raw_content']:
+                cols_to_use.append(col)
+        
+        logging.info(f"選擇的列: {', '.join(cols_to_use)}")
+        
+        # 如果有列可用，則使用這些列；否則使用所有列
+        if cols_to_use:
+            df_context = df_context[cols_to_use]
+        
+        # Convert boolean columns to Yes/No for better readability for the LLM
+        bool_cols = df_context.select_dtypes(include=bool).columns
+        for col in bool_cols:
+            df_context[col] = df_context[col].map({True: 'Yes', False: 'No'})
+            logging.info(f"已將布爾列 '{col}' 轉換為 Yes/No 格式")
 
-            # Convert list column to string
-            if 'diagnostic_params_list' in df_context.columns:
-                df_context['diagnostic_params_list'] = df_context['diagnostic_params_list'].apply(
-                    lambda x: ', '.join(map(str, x)) if isinstance(x, list) else str(x)
-                )
-                logging.info("已將 'diagnostic_params_list' 列轉換為字符串格式")
+        # Convert list column to string
+        if 'diagnostic_params_list' in df_context.columns:
+            df_context['diagnostic_params_list'] = df_context['diagnostic_params_list'].apply(
+                lambda x: ', '.join(map(str, x)) if isinstance(x, list) else str(x)
+            )
+            logging.info("已將 'diagnostic_params_list' 列轉換為字符串格式")
 
-            # Limit rows to avoid excessive context length
-            if len(df_context) > max_rows:
-                logging.info(f"數據行數超過限制 ({len(df_context)} > {max_rows})，只取前 {max_rows} 行")
-                df_context_str = df_context.head(max_rows).to_markdown(index=False)
-                df_context_str += f"\n... (只顯示前 {max_rows} 行，共 {len(df_context)} 行)"
-            else:
-                logging.info(f"轉換全部 {len(df_context)} 行數據為 markdown 格式")
-                df_context_str = df_context.to_markdown(index=False)
-            
-            logging.info(f"成功轉換診斷試算表，輸出長度約 {len(df_context_str)} 字符")
-            return df_context_str
-        except Exception as e:
-            error_msg = f"Error converting dataframe to markdown context: {e}"
-            logging.error(error_msg, exc_info=True)
-            return f"(無法轉換詳細數據表格: {str(e)})"
-    
-    logging.warning("診斷試算表為空或不存在")
-    return "(無詳細數據表格)"
+        # Limit rows to avoid excessive context length
+        if len(df_context) > max_rows:
+            logging.info(f"數據行數超過限制 ({len(df_context)} > {max_rows})，只取前 {max_rows} 行")
+            df_context_str = df_context.head(max_rows).to_markdown(index=False)
+            df_context_str += f"\n... (只顯示前 {max_rows} 行，共 {len(df_context)} 行)"
+        else:
+            logging.info(f"轉換全部 {len(df_context)} 行數據為 markdown 格式")
+            df_context_str = df_context.to_markdown(index=False)
+        
+        logging.info(f"成功轉換診斷試算表，輸出長度約 {len(df_context_str)} 字符")
+        return df_context_str
+    except Exception as e:
+        error_msg = f"Error converting dataframe to markdown context: {e}"
+        logging.error(error_msg, exc_info=True)
+        return f"(無法轉換詳細數據表格: {str(e)})"
 
 def get_openai_response(current_chat_history, report_context, dataframe_context, api_key):
     """Gets response from OpenAI using the responses API and handles conversation history.
