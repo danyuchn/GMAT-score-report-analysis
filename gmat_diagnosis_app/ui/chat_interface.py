@@ -21,13 +21,22 @@ def display_chat_interface(session_state):
         st.subheader("💬 與 AI 對話 (基於本次報告)")
         
         # 添加提示信息，告知用戶 AI 可以回答的內容
-        st.info("""
+        info_text = """
         AI 助手可以回答有關您的診斷報告和測試數據的問題。您可以詢問：
         - 關於報告中具體內容的解釋
         - 關於診斷試算表中的數據分析
         - 特定題型或難度的表現
         - 時間分配和準確率的問題
-        """)
+        """
+        
+        # 如果存在修剪標籤後的數據，告知用戶
+        if hasattr(session_state, 'editable_diagnostic_df') and session_state.editable_diagnostic_df is not None:
+            info_text += """
+            📝 **重要：** AI 將使用您已修剪標籤後的數據和完整診斷報告進行回答，
+            包括「🔧 編輯診斷標籤」頁籤中的更新內容（如果您已編輯）。
+            """
+        
+        st.info(info_text)
         
         # 確保聊天歷史存在
         if 'chat_history' not in session_state:
@@ -108,7 +117,7 @@ def display_chat_interface(session_state):
         
 def _debug_show_chat_history(session_state):
     """顯示完整的聊天歷史信息（僅用於調試）"""
-    with st.expander("顯示聊天歷史調試信息", expanded=True):
+    with st.expander("顯示聊天歷史調試信息", expanded=False):
         if session_state.chat_history:
             debug_info = "聊天歷史:\n"
             for i, msg in enumerate(session_state.chat_history):
@@ -124,6 +133,12 @@ def _debug_show_chat_history(session_state):
             st.markdown("##### 當前聊天上下文摘要")
             try:
                 context = get_chat_context(session_state)
+                
+                # 顯示數據來源信息
+                if hasattr(session_state, 'editable_diagnostic_df') and session_state.editable_diagnostic_df is not None:
+                    st.success("目前使用的是**修剪標籤後的數據表格**進行聊天")
+                else:
+                    st.info("目前使用的是原始數據表格進行聊天 (未進行標籤修剪)")
                 
                 # 顯示報告摘要
                 if context["report"]:
@@ -144,29 +159,40 @@ def _debug_show_chat_history(session_state):
                 if "dataframe" in context and context["dataframe"] != "(無詳細數據表格)":
                     st.markdown("##### 數據統計")
                     lines = context["dataframe"].split("\n")
-                    di_lines = [line for line in lines if "| DI " in line]
-                    q_lines = [line for line in lines if "| Q " in line]
-                    v_lines = [line for line in lines if "| V " in line]
+                    
+                    # 調試：顯示前幾行數據格式以便觀察
+                    if len(lines) > 5:
+                        st.text("數據格式示例（前 3 行）:")
+                        for i in range(min(3, len(lines))):
+                            st.text(lines[i])
+                    
+                    # 使用更靈活的方式識別科目
+                    di_lines = [line for line in lines if " DI " in line or "|DI|" in line or "| DI|" in line or "|DI |" in line]
+                    q_lines = [line for line in lines if " Q " in line or "|Q|" in line or "| Q|" in line or "|Q |" in line]
+                    v_lines = [line for line in lines if " V " in line or "|V|" in line or "| V|" in line or "|V |" in line]
+                    
+                    # 顯示識別到的各科題目數
+                    st.text(f"識別到的行數：DI={len(di_lines)}, Q={len(q_lines)}, V={len(v_lines)}")
                     
                     # 分析 DI 部分
                     di_total = len(di_lines)
-                    di_invalid = len([line for line in di_lines if "| True " in line[:20]])
+                    di_invalid = len([line for line in di_lines if "Yes" in line and "is_invalid" in line])
                     di_valid = di_total - di_invalid
-                    di_correct = len([line for line in di_lines if "| False " in line[:20] and "| True " in line[20:30]])
+                    di_correct = len([line for line in di_lines if "Yes" in line and "is_correct" in line])
                     di_wrong = di_valid - di_correct
                     
                     # 分析 Q 部分
                     q_total = len(q_lines)
-                    q_invalid = len([line for line in q_lines if "| True " in line[:20]])
+                    q_invalid = len([line for line in q_lines if "Yes" in line and "is_invalid" in line])
                     q_valid = q_total - q_invalid
-                    q_correct = len([line for line in q_lines if "| False " in line[:20] and "| True " in line[20:30]])
+                    q_correct = len([line for line in q_lines if "Yes" in line and "is_correct" in line])
                     q_wrong = q_valid - q_correct
                     
                     # 分析 V 部分
                     v_total = len(v_lines)
-                    v_invalid = len([line for line in v_lines if "| True " in line[:20]])
+                    v_invalid = len([line for line in v_lines if "Yes" in line and "is_invalid" in line])
                     v_valid = v_total - v_invalid
-                    v_correct = len([line for line in v_lines if "| False " in line[:20] and "| True " in line[20:30]])
+                    v_correct = len([line for line in v_lines if "Yes" in line and "is_correct" in line])
                     v_wrong = v_valid - v_correct
                     
                     # 顯示統計
