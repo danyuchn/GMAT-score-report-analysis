@@ -1,6 +1,10 @@
 import pandas as pd
 import numpy as np
 import math # Keep math for _check_foundation_override if it moves here later
+import logging
+
+# # Basic logging configuration to ensure INFO messages are displayed within this module # Removed by AI
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(module)s - %(funcName)s - %(lineno)d - %(message)s') # Removed by AI
 
 from .constants import (
     CARELESSNESS_THRESHOLD,
@@ -352,12 +356,33 @@ def _check_foundation_override(df, type_metrics):
 def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
     """Generates practice recommendations based on Chapters 3, 5, and 2 results."""
     if 'question_type' not in df_diagnosed.columns or 'content_domain' not in df_diagnosed.columns: # Ensure content_domain also exists
+        logging.warning("[DI Reco Init] 'question_type' or 'content_domain' missing in df_diagnosed. Returning empty recommendations.")
         return []
 
-    question_types_in_data = df_diagnosed['question_type'].unique()
-    question_types_valid = [qt for qt in question_types_in_data if pd.notna(qt)]
-    # Initialize recommendations_by_type properly for all valid types
-    recommendations_by_type = {q_type: [] for q_type in question_types_valid if q_type is not None}
+    # Ensure 'is_sfe' column exists, defaulting to False if not present.
+    # This addresses the issue where missing 'is_sfe' caused Case Recommendations to be skipped.
+    if 'is_sfe' not in df_diagnosed.columns:
+        logging.warning("[DI Reco Init] 'is_sfe' column was missing in df_diagnosed. Initializing with False.")
+        df_diagnosed['is_sfe'] = False
+
+    # Ensure 'diagnostic_params' column exists, defaulting to empty list if not present
+    if 'diagnostic_params' not in df_diagnosed.columns:
+        logging.warning("[DI Reco Init] 'diagnostic_params' column was missing in df_diagnosed. Initializing with empty lists.")
+        df_diagnosed['diagnostic_params'] = [[] for _ in range(len(df_diagnosed))]
+    else:
+        # Ensure its content is list-like for consistent processing later
+        df_diagnosed['diagnostic_params'] = df_diagnosed['diagnostic_params'].apply(
+            lambda x: list(x) if isinstance(x, (list, tuple, set)) else ([] if pd.isna(x) else [x] if isinstance(x, str) else [])
+        )
+
+    # question_types_in_data = df_diagnosed['question_type'].unique()
+    # question_types_valid = [qt for qt in question_types_in_data if pd.notna(qt)]
+    # # Initialize recommendations_by_type properly for all valid types
+    # recommendations_by_type = {q_type: [] for q_type in question_types_valid if q_type is not None}
+    
+    CORE_DI_QUESTION_TYPES = ["Data Sufficiency", "Two-part analysis", "Graph and Table", "Multi-source reasoning"]
+    recommendations_by_type = {q_type: [] for q_type in CORE_DI_QUESTION_TYPES}
+    
     processed_override_types = set()
 
     # Exemption Rule (per type + domain, as per DI Doc Chapter 5)
@@ -404,16 +429,38 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
     # Case Recommendations
     target_times_minutes = {'Data Sufficiency': 2.0, 'Two-part analysis': 3.0, 'Graph and Table': 3.0, 'Multi-source reasoning': 1.5}
     required_cols = ['is_correct', 'overtime', 'question_type', 'content_domain', 'question_difficulty', 'question_time', 'is_sfe', 'diagnostic_params']
-    if all(col in df_diagnosed.columns for col in required_cols):
+    
+    # Logging to check columns in df_diagnosed and the condition for case recommendations
+    logging.info(f"[DI Reco Pre-Check] df_diagnosed columns: {list(df_diagnosed.columns)}")
+    missing_cols = [col for col in required_cols if col not in df_diagnosed.columns]
+    if missing_cols:
+        logging.warning(f"[DI Reco Pre-Check] Missing required columns in df_diagnosed for Case Recommendations: {missing_cols}")
+    condition_met = all(col in df_diagnosed.columns for col in required_cols)
+    logging.info(f"[DI Reco Pre-Check] Condition 'all(col in df_diagnosed.columns for col in required_cols)' is {condition_met}.")
+
+    if condition_met:
         df_trigger = df_diagnosed[((df_diagnosed['is_correct'] == False) | (df_diagnosed['overtime'] == True))]
         if not df_trigger.empty:
+            logging.info(f"[DI Reco Logic] df_trigger is not empty. Row count: {len(df_trigger)}. Unique q_types in trigger: {df_trigger['question_type'].unique()}") # MODIFIED Log
             try:
                 grouped_triggers = df_trigger.groupby(['question_type', 'content_domain'], observed=False, dropna=False) # Handle potential NaNs in grouping keys
                 for name, group_df in grouped_triggers:
                     q_type, domain = name
-                    if pd.isna(q_type) or pd.isna(domain): continue
-                    if q_type in processed_override_types: continue # Already handled by macro
-                    if (q_type, domain) in exempted_type_domain_combinations: continue # Skip exempted type-domain combo
+                    logging.info(f"[DI Reco Logic] Processing group: q_type='{q_type}', domain='{domain}'") # New Log
+
+                    if pd.isna(q_type) or pd.isna(domain):
+                        logging.info(f"[DI Reco Logic] SKIPPING group ('{q_type}', '{domain}') because q_type or domain is NaN.") # New Log
+                        continue
+
+                    if q_type in processed_override_types:
+                        logging.info(f"[DI Reco Logic] SKIPPING group ('{q_type}', '{domain}') because q_type '{q_type}' is in processed_override_types: {processed_override_types}." ) # MODIFIED Log
+                        continue
+
+                    if (q_type, domain) in exempted_type_domain_combinations:
+                        logging.info(f"[DI Reco Logic] SKIPPING group ('{q_type}', '{domain}') because it is in exempted_type_domain_combinations: {exempted_type_domain_combinations}." ) # MODIFIED Log
+                        continue
+                    
+                    logging.info(f"[DI Reco Logic] PROCEEDING to generate case recommendation for group ('{q_type}', '{domain}'). Row count in group: {len(group_df)}.") # MODIFIED Log
 
                     min_difficulty_score = group_df['question_difficulty'].min()
                     y_grade = _grade_difficulty_di(min_difficulty_score)
@@ -447,9 +494,11 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
 
                     if q_type in recommendations_by_type:
                          recommendations_by_type[q_type].append({'type': 'case_aggregated', 'is_sfe': group_sfe, 'domain': domain, 'difficulty_grade': y_grade, 'time_limit_z': max_z_minutes, 'text': rec_text, 'question_type': q_type})
-            except Exception:
+            except Exception as e: # Modified to capture the exception object as e
                  # Error handling or logging can be added here
-                 pass
+                 logging.error(f"Error generating case recommendation for q_type={q_type}, domain={domain}: {e}", exc_info=True) # New line
+        else: # New Log block for empty df_trigger
+            logging.info(f"[DI Reco Logic] df_trigger is EMPTY. No incorrect or overtime questions found in df_diagnosed to generate case recommendations.")
 
     # Final Assembly
     final_recommendations = []
@@ -471,7 +520,7 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
             'domain': domain
         })
 
-    for q_type in question_types_valid: # Iterate through valid types found in data
+    for q_type in CORE_DI_QUESTION_TYPES: # Iterate through valid types found in data
         # Check if all domain combinations for this q_type are exempted
         all_domains_for_type_exempted = True
         # Get all domains present in the data for this specific q_type

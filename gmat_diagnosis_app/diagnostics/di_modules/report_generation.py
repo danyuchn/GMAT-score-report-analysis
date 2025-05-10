@@ -1,6 +1,7 @@
 import pandas as pd
 import logging
 import re
+import os
 
 from .translation import (
     _translate_di,
@@ -154,6 +155,7 @@ def _generate_di_summary_report(di_results):
     report_lines.append("**三、 宏觀練習建議 (按題型)**")
     report_lines.append("")
     recommendations = ch6.get('recommendations_list', [])
+    
     if not recommendations:
         report_lines.append("* 根據當前分析，暫無特別的練習建議。請保持全面複習。")
     else:
@@ -165,64 +167,116 @@ def _generate_di_summary_report(di_results):
         # This requires knowing the question type within the rec text or structure
         
         # Attempt to parse recommendation text for structured output
-        for rec_original in recommendations:
+        for idx, rec_original in enumerate(recommendations):
             rec_text = rec_original.get('text', '')
-            
-            q_type_zh = "未知題型"
-            challenge_text = "整體表現有較大提升空間" # Default
-            direction_text = "建議全面鞏固基礎" # Default
-            time_limit_text = "N/A" # Default
+            rec_type = rec_original.get('type', 'unknown')
+            original_q_type_field = rec_original.get('question_type', 'Unknown Type')
 
-            # Try to extract Question Type
-            q_type_match = re.search(r"宏觀建議 \((.*?)\):", rec_text)
-            if q_type_match:
-                q_type_eng = q_type_match.group(1).strip()
-                q_type_zh = _translate_di(q_type_eng) # Translate if mapping exists
-
-            # Try to extract Challenge
-            challenge_match = re.search(r"由於(整體表現有較大提升空間 \(錯誤率 .*?% 或 超時率 .*?%\))", rec_text)
-            if challenge_match:
-                challenge_text = challenge_match.group(1).strip()
-            
-            # Try to extract Direction (this is more complex)
-            # Example: "建議全面鞏固 Data Sufficiency 題型的基礎，可從 中難度 (Mid) / 605+ 難度題目開始系統性練習，掌握核心方法"
-            direction_core_match = re.search(r"(建議全面鞏固.*?題型的基礎，可從.*?開始系統性練習，掌握核心方法)", rec_text)
-            if direction_core_match:
-                # Simplification: use the matched part directly, but remove "建議" as it's part of the heading
-                full_direction_text = direction_core_match.group(1).strip()
-                if full_direction_text.startswith("建議"):
-                     direction_text = full_direction_text[len("建議"):].strip() # Remove "建議"
-                else:
-                    direction_text = full_direction_text
-
-            # Try to extract Time Limit
-            time_limit_match = re.search(r"建議限時 (.*?分鐘)", rec_text)
-            if time_limit_match:
-                time_limit_text = time_limit_match.group(1).strip() + "/題"
-
-
-            # Find the letter for the section based on English question type if available
-            # This part is tricky as rec.get('text') might not always cleanly map to q_type_map keys
-            # We'll use the extracted q_type_eng if available for a more stable key
-            section_letter = ""
+            q_type_eng = ""
             q_type_eng_stripped = ""
-            if 'q_type_eng' in locals() and q_type_eng:
+            q_type_zh = _translate_di(original_q_type_field)
+
+            # Default texts, primarily for macro or as fallback
+            challenge_text = _translate_di("整體表現有較大提升空間") # Generic default
+            direction_text = _translate_di("建議全面鞏固基礎")     # Generic default
+            time_limit_text = "N/A"
+
+            if rec_type == 'macro':
+                q_type_match_macro = re.search(r"宏觀建議 \((.*?)\):", rec_text)
+                if q_type_match_macro:
+                    q_type_eng = q_type_match_macro.group(1).strip()
+                    q_type_zh = _translate_di(q_type_eng)
+
+                challenge_match_macro = re.search(r"由於(整體表現有較大提升空間 \(錯誤率 .*?% 或 超時率 .*?%\))", rec_text)
+                if challenge_match_macro:
+                    challenge_text = challenge_match_macro.group(1).strip()
+
+                direction_match_macro = re.search(r"(建議全面鞏固.*?題型的基礎，可從.*?開始系統性練習，掌握核心方法)", rec_text)
+                if direction_match_macro:
+                    full_direction_text = direction_match_macro.group(1).strip()
+                    direction_text = full_direction_text[len("建議"):].strip() if full_direction_text.startswith("建議") else full_direction_text
+                
+                time_limit_match_macro = re.search(r"建議限時 \*\*(.*?分鐘)\*\*", rec_text)
+                if time_limit_match_macro:
+                    time_limit_text = time_limit_match_macro.group(1).strip()
+
+            elif rec_type == 'case_aggregated':
+                q_type_eng = original_q_type_field # Use type from the recommendation object
+
+                # Construct challenge_text from structured fields or parse rec_text
+                sfe_prefix = "*基礎掌握不穩* " if rec_original.get('is_sfe') else ""
+                domain_in_rec = _translate_di(rec_original.get('domain', '未知領域'))
+                # q_type_in_rec_zh = _translate_di(rec_original.get('question_type', '未知題型')) # q_type_zh is already this
+                problem_desc_in_rec = _translate_di("錯誤或超時")
+                challenge_text = f"{sfe_prefix}針對 **{domain_in_rec}** 領域的 **{q_type_zh}** 題目 ({problem_desc_in_rec})"
+                
+                # Construct direction_text
+                difficulty_grade_in_rec = rec_original.get('difficulty_grade', '未知難度')
+                # Target times map (consider making this a global constant or passing it if it varies)
+                target_times_map_for_report = {'Data Sufficiency': 2.0, 'Two-part analysis': 3.0, 'Graph and Table': 3.0, 'Multi-source reasoning': 1.5}
+                target_time_val = target_times_map_for_report.get(q_type_eng, 2.0) # Default to 2.0 if q_type_eng not found
+                target_time_str = f"{target_time_val:.1f} 分鐘"
+                
+                # Try to get the specific part from rec_text first for direction
+                direction_pattern_case = r"建議練習 \*\*(.*?)\*\* 難度題目,.*?\(最終目標時間: (.*?)\)"
+                direction_match_case = re.search(direction_pattern_case, rec_text)
+                if direction_match_case:
+                    direction_text = f"建議練習 **{direction_match_case.group(1)}** 難度題目 (最終目標時間: {direction_match_case.group(2)})"
+                else: # Fallback to structured data
+                    direction_text = f"建議練習 **{difficulty_grade_in_rec}** 難度題目 (最終目標時間: {target_time_str})"
+
+                # Append focus note if present in rec_text (usually at the end)
+                focus_note_match = re.search(r"(\s\*\*建議增加.*?比例。\*\*)", rec_text) # Matches the bolded focus note
+                if focus_note_match:
+                    direction_text += focus_note_match.group(1)
+
+
+                # Construct time_limit_text
+                time_val_z = rec_original.get('time_limit_z')
+                if pd.notna(time_val_z):
+                    time_limit_text = f"{time_val_z:.1f} 分鐘"
+                else:
+                    # Fallback regex if field not present, though direct field is better
+                    time_limit_pattern_case = r"起始練習限時建議為 \*\*(.*?)\*\*"
+                    time_limit_match_case = re.search(time_limit_pattern_case, rec_text)
+                    if time_limit_match_case:
+                        time_limit_text = time_limit_match_case.group(1).strip()
+                    else:
+                        time_limit_text = "N/A"
+            
+            # Common post-processing for time_limit_text
+            if time_limit_text != "N/A":
+                if q_type_eng == "Multi-source reasoning":
+                    time_limit_text += "/題組"
+                else:
+                    time_limit_text += "/題"
+            
+            section_letter = ""
+            title_line_content_for_type = q_type_zh # Default to translated type
+
+            if q_type_eng:
                 q_type_eng_stripped = q_type_eng.strip()
 
-            if q_type_eng_stripped and q_type_eng_stripped in q_type_map: # Use parsed English name (stripped)
-                section_letter = q_type_map[q_type_eng_stripped] + "."
-            else: # Fallback if q_type_eng couldn't be parsed reliably for mapping
-                 # Try to find a keyword in q_type_zh if not already mapped
-                for key_eng, letter in q_type_map.items():
-                    if _translate_di(key_eng) in q_type_zh : # Check if translated key is in the display name
-                        section_letter = letter + "."
-                        break
+                if q_type_eng_stripped in q_type_map:
+                    section_letter = q_type_map[q_type_eng_stripped] + "."
+                else: # Fallback for section letter if direct map fails (should be rare now)
+                    for key_eng_map, letter_map in q_type_map.items():
+                        if _translate_di(key_eng_map) in q_type_zh : 
+                            section_letter = letter_map + "."
+                            break
+                    if not section_letter:
+                        pass
             
-            report_lines.append(f"* **{section_letter} {q_type_zh}**")
+            if rec_type == 'case_aggregated' and rec_original.get('is_sfe'):
+                title_line_content_for_type += " (*基礎掌握不穩*)"
+
+            title_line = f"* **{section_letter} {title_line_content_for_type}**"
+            
+            report_lines.append(title_line)
             report_lines.append(f"    * **當前挑戰：** {challenge_text}")
             report_lines.append(f"    * **建議方向：** {direction_text}")
             report_lines.append(f"    * **建議限時：** {time_limit_text}")
-            report_lines.append("") # Space after each recommendation block
+            report_lines.append("")
 
     report_lines.append("")
 

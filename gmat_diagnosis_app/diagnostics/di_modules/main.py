@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import logging
 
+# # Basic logging configuration to ensure INFO messages are displayed # Removed by AI
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(module)s - %(funcName)s - %(lineno)d - %(message)s') # Removed by AI
+
 # Import from sibling modules within di_modules
 from .constants import (
     MAX_ALLOWED_TIME_DI, TIME_PRESSURE_THRESHOLD_DI, INVALID_DATA_TAG_DI,
@@ -384,6 +387,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         logging.debug("[run_di_diagnosis_logic] Chapter 7: Summary Report")
         # Update chapter 3's dataframe in results for the report generator, ensuring it's the full df_di
         di_diagnosis_results['chapter_3']['diagnosed_dataframe'] = df_di.copy()
+
         report_str = _generate_di_summary_report(di_diagnosis_results)
         logging.debug("[run_di_diagnosis_logic] Completed Chapter 7.")
         
