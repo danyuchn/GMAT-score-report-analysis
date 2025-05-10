@@ -499,6 +499,118 @@ def display_total_results(tab_container):
     <iframe width="560" height="315" src="https://www.youtube.com/embed/MLVT-zxaBkE?si=9SJ68LSrvvii35p-" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
     """, unsafe_allow_html=True)
 
+# --- Function to generate new diagnostic report based on edited tags ---
+def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
+    """
+    Generates a new diagnostic report by classifying questions based on their
+    edited diagnostic tags and predefined criteria for Q, V, and DI subjects.
+
+    Args:
+        df: DataFrame containing the diagnostic data, including a 'Subject' column,
+            'question_position', 'question_type', 'question_fundamental_skill',
+            'content_domain', and 'diagnostic_params_list'.
+
+    Returns:
+        A markdown string representing the new diagnostic report.
+    """
+    report_parts = ["### 新診斷報告 (根據已修剪標籤與標準分類)"]
+
+    if df is None or df.empty:
+        report_parts.append("* 沒有可供分析的數據。")
+        return "\n".join(report_parts)
+
+    # Ensure required columns exist to prevent KeyErrors during groupby or access
+    required_cols_q = ["Subject", "question_position", "question_type", "question_fundamental_skill", "diagnostic_params_list"]
+    required_cols_v = ["Subject", "question_position", "question_fundamental_skill", "diagnostic_params_list"]
+    required_cols_di = ["Subject", "question_position", "content_domain", "question_type", "diagnostic_params_list"]
+
+    for subject in ["Q", "V", "DI"]:
+        # Filter for the current subject
+        subject_df = df[df["Subject"] == subject].copy()
+        if subject_df.empty:
+            # report_parts.append(f"#### {subject} 科目：無數據") # Optional: explicitly state no data
+            continue
+
+        report_parts.append(f"#### {subject} 科目分類結果：")
+        missing_columns = []
+
+        if subject == "Q":
+            missing_columns = [col for col in required_cols_q if col not in subject_df.columns]
+            if missing_columns:
+                report_parts.append(f"* Q科目缺少必要欄位進行分類: {', '.join(missing_columns)}")
+                continue
+            grouped = subject_df.groupby(["question_type", "question_fundamental_skill"], dropna=False)
+            if not any(grouped): # Check if there are any groups
+                report_parts.append("* Q科目：沒有可依據 '題型' 和 '技能' 分類的題目。")
+            for (q_type, f_skill), group_data in grouped:
+                q_type_str = str(q_type) if pd.notna(q_type) else "未知題型"
+                f_skill_str = str(f_skill) if pd.notna(f_skill) else "未知技能"
+                
+                all_tags_in_group = []
+                if not group_data.empty:
+                    for _, row in group_data.iterrows():
+                        tags_for_question = row.get("diagnostic_params_list", [])
+                        if isinstance(tags_for_question, list):
+                            all_tags_in_group.extend(tags_for_question)
+                        elif isinstance(tags_for_question, str) and tags_for_question.strip():
+                            all_tags_in_group.extend([t.strip() for t in tags_for_question.split(',') if t.strip()])
+                
+                unique_tags = sorted(list(set(str(tag).strip() for tag in all_tags_in_group if tag and str(tag).strip())))
+                tags_display_str = ", ".join(unique_tags) if unique_tags else "無特定共同標籤"
+                report_parts.append(f"- **分類 (題型: {q_type_str}, 技能: {f_skill_str})**: {tags_display_str}")
+        
+        elif subject == "V":
+            missing_columns = [col for col in required_cols_v if col not in subject_df.columns]
+            if missing_columns:
+                report_parts.append(f"* V科目缺少必要欄位進行分類: {', '.join(missing_columns)}")
+                continue
+            grouped = subject_df.groupby(["question_fundamental_skill"], dropna=False)
+            if not any(grouped):
+                report_parts.append("* V科目：沒有可依據 '技能' 分類的題目。")
+            for f_skill, group_data in grouped:
+                f_skill_str = str(f_skill) if pd.notna(f_skill) else "未知技能"
+
+                all_tags_in_group = []
+                if not group_data.empty:
+                    for _, row in group_data.iterrows():
+                        tags_for_question = row.get("diagnostic_params_list", [])
+                        if isinstance(tags_for_question, list):
+                            all_tags_in_group.extend(tags_for_question)
+                        elif isinstance(tags_for_question, str) and tags_for_question.strip():
+                            all_tags_in_group.extend([t.strip() for t in tags_for_question.split(',') if t.strip()])
+                
+                unique_tags = sorted(list(set(str(tag).strip() for tag in all_tags_in_group if tag and str(tag).strip())))
+                tags_display_str = ", ".join(unique_tags) if unique_tags else "無特定共同標籤"
+                report_parts.append(f"- **分類 (技能: {f_skill_str})**: {tags_display_str}")
+
+        elif subject == "DI":
+            missing_columns = [col for col in required_cols_di if col not in subject_df.columns]
+            if missing_columns:
+                report_parts.append(f"* DI科目缺少必要欄位進行分類: {', '.join(missing_columns)}")
+                continue
+            grouped = subject_df.groupby(["content_domain", "question_type"], dropna=False)
+            if not any(grouped):
+                report_parts.append("* DI科目：沒有可依據 '內容領域' 和 '題型' 分類的題目。")
+            for (c_domain, q_type), group_data in grouped:
+                c_domain_str = str(c_domain) if pd.notna(c_domain) else "未知內容領域"
+                q_type_str = str(q_type) if pd.notna(q_type) else "未知題型"
+
+                all_tags_in_group = []
+                if not group_data.empty:
+                    for _, row in group_data.iterrows():
+                        tags_for_question = row.get("diagnostic_params_list", [])
+                        if isinstance(tags_for_question, list):
+                            all_tags_in_group.extend(tags_for_question)
+                        elif isinstance(tags_for_question, str) and tags_for_question.strip():
+                            all_tags_in_group.extend([t.strip() for t in tags_for_question.split(',') if t.strip()])
+                
+                unique_tags = sorted(list(set(str(tag).strip() for tag in all_tags_in_group if tag and str(tag).strip())))
+                tags_display_str = ", ".join(unique_tags) if unique_tags else "無特定共同標籤"
+                report_parts.append(f"- **分類 (內容領域: {c_domain_str}, 題型: {q_type_str})**: {tags_display_str}")
+        report_parts.append("  \n") # Add a blank line for spacing in Markdown (two spaces for hard line break)
+
+    return "\n".join(report_parts)
+
 # --- Display Results Function (Moved from app.py) ---
 def display_results():
     """Displays all diagnostic results in separate tabs."""
@@ -681,6 +793,15 @@ def display_results():
                     st.session_state.changes_saved = True  # 標記變更已儲存
                     tabs[edit_tab_index].success("變更已套用！AI建議將在下方更新。")
                     # 不需要重新載入頁面，所以不需要st.experimental_rerun()
+
+                    # Generate and display the new diagnostic report based on edited tags
+                    if st.session_state.get("editable_diagnostic_df") is not None:
+                        new_report_content = generate_new_diagnostic_report(st.session_state.editable_diagnostic_df)
+                        tabs[edit_tab_index].markdown("---") # Add a separator
+                        tabs[edit_tab_index].markdown(new_report_content, unsafe_allow_html=True)
+                    else:
+                        tabs[edit_tab_index].markdown("---") # Add a separator
+                        tabs[edit_tab_index].warning("無法生成新診斷報告，因為沒有可編輯的數據。")
 
                 # 新增下載試算表按鈕
                 if 'changes_saved' not in st.session_state:
