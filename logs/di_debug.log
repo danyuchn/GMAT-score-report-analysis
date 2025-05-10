@@ -1,0 +1,122 @@
+[DEBUG-診斷宏觀建議]處理 2 條建議
+[DEBUG-診斷宏觀建議] 處理建議 #1: 類型=macro, 文本開頭=**宏觀建議 (Two-part analysis):** 由於整體表現有較大提升空間 (錯誤率 1...
+[DEBUG-診斷宏觀建議] 從建議 #1 中提取的題型: 'Two-part analysis' -> 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: q_type_eng_stripped = 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: 從q_type_map直接找到section_letter = 'B.'
+[DEBUG-診斷宏觀建議] 建議 #1: 最終標題行 = '* **B. Two-part analysis**'
+[DEBUG-診斷宏觀建議] 處理建議 #2: 類型=macro, 文本開頭=**宏觀建議 (Multi-source reasoning):** 由於整體表現有較大提升空間 (...
+[DEBUG-診斷宏觀建議] 從建議 #2 中提取的題型: 'Multi-source reasoning' -> 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: q_type_eng_stripped = 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: 從q_type_map直接找到section_letter = 'C.'
+[DEBUG-診斷宏觀建議] 建議 #2: 最終標題行 = '* **C. Multi-source reasoning**'
+[DEBUG-診斷宏觀建議]處理 2 條建議
+[DEBUG-診斷宏觀建議] 處理建議 #1: 類型=macro, 文本開頭=**宏觀建議 (Two-part analysis):** 由於整體表現有較大提升空間 (錯誤率 1...
+[DEBUG-診斷宏觀建議] 從建議 #1 中提取的題型: 'Two-part analysis' -> 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: q_type_eng_stripped = 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: 從q_type_map直接找到section_letter = 'B.'
+[DEBUG-診斷宏觀建議] 建議 #1: 最終標題行 = '* **B. Two-part analysis**'
+[DEBUG-診斷宏觀建議] 處理建議 #2: 類型=macro, 文本開頭=**宏觀建議 (Multi-source reasoning):** 由於整體表現有較大提升空間 (...
+[DEBUG-診斷宏觀建議] 從建議 #2 中提取的題型: 'Multi-source reasoning' -> 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: q_type_eng_stripped = 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: 從q_type_map直接找到section_letter = 'C.'
+[DEBUG-診斷宏觀建議] 建議 #2: 最終標題行 = '* **C. Multi-source reasoning**'
+[DEBUG-診斷宏觀建議]處理 2 條建議
+[DEBUG-診斷宏觀建議] 處理建議 #1: 類型=macro, 文本開頭=**宏觀建議 (Two-part analysis):** 由於整體表現有較大提升空間 (錯誤率 1...
+[DEBUG-診斷宏觀建議] 從建議 #1 中提取的題型: 'Two-part analysis' -> 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: q_type_eng_stripped = 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: 從q_type_map直接找到section_letter = 'B.'
+[DEBUG-診斷宏觀建議] 建議 #1: 最終標題行 = '* **B. Two-part analysis**'
+[DEBUG-診斷宏觀建議] 處理建議 #2: 類型=macro, 文本開頭=**宏觀建議 (Multi-source reasoning):** 由於整體表現有較大提升空間 (...
+[DEBUG-診斷宏觀建議] 從建議 #2 中提取的題型: 'Multi-source reasoning' -> 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: q_type_eng_stripped = 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: 從q_type_map直接找到section_letter = 'C.'
+[DEBUG-診斷宏觀建議] 建議 #2: 最終標題行 = '* **C. Multi-source reasoning**'
+[DEBUG-診斷宏觀建議]處理 6 條建議
+[DEBUG-診斷宏觀建議] 處理建議 #1: 類型=macro, 文本開頭=**宏觀建議 (Two-part analysis):** 由於整體表現有較大提升空間 (錯誤率 1...
+[DEBUG-診斷宏觀建議] 從建議 #1 中提取的題型: 'Two-part analysis' -> 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: q_type_eng_stripped = 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: 從q_type_map直接找到section_letter = 'B.'
+[DEBUG-診斷宏觀建議] 建議 #1: 最終標題行 = '* **B. Two-part analysis**'
+[DEBUG-診斷宏觀建議] 處理建議 #2: 類型=macro, 文本開頭=**宏觀建議 (Multi-source reasoning):** 由於整體表現有較大提升空間 (...
+[DEBUG-診斷宏觀建議] 從建議 #2 中提取的題型: 'Multi-source reasoning' -> 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: q_type_eng_stripped = 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: 從q_type_map直接找到section_letter = 'C.'
+[DEBUG-診斷宏觀建議] 建議 #2: 最終標題行 = '* **C. Multi-source reasoning**'
+[DEBUG-診斷宏觀建議] 處理建議 #3: 類型=case_aggregated, 文本開頭=針對 **數學相關** 領域的 **Data Sufficiency** 題目 (錯誤或超時)，建議...
+[DEBUG-診斷宏觀建議] 無法從建議 #3 提取題型，文本：針對 **數學相關** 領域的 **Data Sufficiency** 題目 (錯誤或超時)，建議練習 **低難度 (Low) / 505+** 難度題目，起始練習限時建議為 **4.0 分鐘** ...
+[DEBUG-診斷宏觀建議] 建議 #3: q_type_eng_stripped = 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #3: 從q_type_map直接找到section_letter = 'C.'
+[DEBUG-診斷宏觀建議] 建議 #3: 最終標題行 = '* **C. 未知題型**'
+[DEBUG-診斷宏觀建議] 處理建議 #4: 類型=case_aggregated, 文本開頭=針對 **非數學相關** 領域的 **Data Sufficiency** 題目 (錯誤或超時)，建...
+[DEBUG-診斷宏觀建議] 無法從建議 #4 提取題型，文本：針對 **非數學相關** 領域的 **Data Sufficiency** 題目 (錯誤或超時)，建議練習 **中難度 (Mid) / 555+** 難度題目，起始練習限時建議為 **2.5 分鐘**...
+[DEBUG-診斷宏觀建議] 建議 #4: q_type_eng_stripped = 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #4: 從q_type_map直接找到section_letter = 'C.'
+[DEBUG-診斷宏觀建議] 建議 #4: 最終標題行 = '* **C. 未知題型**'
+[DEBUG-診斷宏觀建議] 處理建議 #5: 類型=case_aggregated, 文本開頭=針對 **數學相關** 領域的 **Graph and Table** 題目 (錯誤或超時)，建議練...
+[DEBUG-診斷宏觀建議] 無法從建議 #5 提取題型，文本：針對 **數學相關** 領域的 **Graph and Table** 題目 (錯誤或超時)，建議練習 **中難度 (Mid) / 555+** 難度題目，起始練習限時建議為 **3.0 分鐘** (...
+[DEBUG-診斷宏觀建議] 建議 #5: q_type_eng_stripped = 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #5: 從q_type_map直接找到section_letter = 'C.'
+[DEBUG-診斷宏觀建議] 建議 #5: 最終標題行 = '* **C. 未知題型**'
+[DEBUG-診斷宏觀建議] 處理建議 #6: 類型=case_aggregated, 文本開頭=針對 **非數學相關** 領域的 **Graph and Table** 題目 (錯誤或超時)，建議...
+[DEBUG-診斷宏觀建議] 無法從建議 #6 提取題型，文本：針對 **非數學相關** 領域的 **Graph and Table** 題目 (錯誤或超時)，建議練習 **低難度 (Low) / 505+** 難度題目，起始練習限時建議為 **3.0 分鐘** ...
+[DEBUG-診斷宏觀建議] 建議 #6: q_type_eng_stripped = 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #6: 從q_type_map直接找到section_letter = 'C.'
+[DEBUG-診斷宏觀建議] 建議 #6: 最終標題行 = '* **C. 未知題型**'
+[DEBUG-診斷宏觀建議]處理 6 條建議
+[DEBUG-診斷宏觀建議] 處理建議 #1: 類型=macro, 原始題型字段=Two-part analysis, 文本開頭=**宏觀建議 (Two-part analysis):** 由於整體表現有較大提升空間 (錯誤率 1...
+[DEBUG-診斷宏觀建議] 從宏觀建議 #1 中提取的題型: 'Two-part analysis' -> 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: q_type_eng_stripped for mapping = 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: 從q_type_map直接找到section_letter = 'B.'
+[DEBUG-診斷宏觀建議] 建議 #1: 最終標題行 = '* **B. Two-part analysis**'
+[DEBUG-診斷宏觀建議] 處理建議 #2: 類型=macro, 原始題型字段=Multi-source reasoning, 文本開頭=**宏觀建議 (Multi-source reasoning):** 由於整體表現有較大提升空間 (...
+[DEBUG-診斷宏觀建議] 從宏觀建議 #2 中提取的題型: 'Multi-source reasoning' -> 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: q_type_eng_stripped for mapping = 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: 從q_type_map直接找到section_letter = 'C.'
+[DEBUG-診斷宏觀建議] 建議 #2: 最終標題行 = '* **C. Multi-source reasoning**'
+[DEBUG-診斷宏觀建議] 處理建議 #3: 類型=case_aggregated, 原始題型字段=Data Sufficiency, 文本開頭=針對 **數學相關** 領域的 **Data Sufficiency** 題目 (錯誤或超時)，建議...
+[DEBUG-診斷宏觀建議] 非宏觀建議 #3，使用原始題型: 'Data Sufficiency' -> 'Data Sufficiency'，文本：針對 **數學相關** 領域的 **Data Sufficiency** 題目 (錯誤或超時)，建議練習 **低難度 (Low) / 505+** 難度題目，起始練習限時建議為 **4.0 分鐘** ...
+[DEBUG-診斷宏觀建議] 建議 #3: q_type_eng_stripped for mapping = 'Data Sufficiency'
+[DEBUG-診斷宏觀建議] 建議 #3: 從q_type_map直接找到section_letter = 'A.'
+[DEBUG-診斷宏觀建議] 建議 #3: 最終標題行 = '* **A. Data Sufficiency**'
+[DEBUG-診斷宏觀建議] 處理建議 #4: 類型=case_aggregated, 原始題型字段=Data Sufficiency, 文本開頭=針對 **非數學相關** 領域的 **Data Sufficiency** 題目 (錯誤或超時)，建...
+[DEBUG-診斷宏觀建議] 非宏觀建議 #4，使用原始題型: 'Data Sufficiency' -> 'Data Sufficiency'，文本：針對 **非數學相關** 領域的 **Data Sufficiency** 題目 (錯誤或超時)，建議練習 **中難度 (Mid) / 555+** 難度題目，起始練習限時建議為 **2.5 分鐘**...
+[DEBUG-診斷宏觀建議] 建議 #4: q_type_eng_stripped for mapping = 'Data Sufficiency'
+[DEBUG-診斷宏觀建議] 建議 #4: 從q_type_map直接找到section_letter = 'A.'
+[DEBUG-診斷宏觀建議] 建議 #4: 最終標題行 = '* **A. Data Sufficiency**'
+[DEBUG-診斷宏觀建議] 處理建議 #5: 類型=case_aggregated, 原始題型字段=Graph and Table, 文本開頭=針對 **數學相關** 領域的 **Graph and Table** 題目 (錯誤或超時)，建議練...
+[DEBUG-診斷宏觀建議] 非宏觀建議 #5，使用原始題型: 'Graph and Table' -> 'Graph and Table'，文本：針對 **數學相關** 領域的 **Graph and Table** 題目 (錯誤或超時)，建議練習 **中難度 (Mid) / 555+** 難度題目，起始練習限時建議為 **3.0 分鐘** (...
+[DEBUG-診斷宏觀建議] 建議 #5: q_type_eng_stripped for mapping = 'Graph and Table'
+[DEBUG-診斷宏觀建議] 建議 #5: 從q_type_map直接找到section_letter = 'D.'
+[DEBUG-診斷宏觀建議] 建議 #5: 最終標題行 = '* **D. Graph and Table**'
+[DEBUG-診斷宏觀建議] 處理建議 #6: 類型=case_aggregated, 原始題型字段=Graph and Table, 文本開頭=針對 **非數學相關** 領域的 **Graph and Table** 題目 (錯誤或超時)，建議...
+[DEBUG-診斷宏觀建議] 非宏觀建議 #6，使用原始題型: 'Graph and Table' -> 'Graph and Table'，文本：針對 **非數學相關** 領域的 **Graph and Table** 題目 (錯誤或超時)，建議練習 **低難度 (Low) / 505+** 難度題目，起始練習限時建議為 **3.0 分鐘** ...
+[DEBUG-診斷宏觀建議] 建議 #6: q_type_eng_stripped for mapping = 'Graph and Table'
+[DEBUG-診斷宏觀建議] 建議 #6: 從q_type_map直接找到section_letter = 'D.'
+[DEBUG-診斷宏觀建議] 建議 #6: 最終標題行 = '* **D. Graph and Table**'
+[DEBUG-診斷宏觀建議]處理 6 條建議
+[DEBUG-診斷宏觀建議] 處理建議 #1: 類型=macro, 原始題型字段=Two-part analysis, 文本開頭=**宏觀建議 (Two-part analysis):** 由於整體表現有較大提升空間 (錯誤率 100.0% 或 超時率 50.0%), ...
+[DEBUG-診斷宏觀建議] 從宏觀建議 #1 中提取的題型: 'Two-part analysis' -> 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: q_type_eng_stripped for mapping = 'Two-part analysis'
+[DEBUG-診斷宏觀建議] 建議 #1: 從q_type_map直接找到section_letter = 'B.'
+[DEBUG-診斷宏觀建議] 建議 #1: 最終標題行 = '* **B. Two-part analysis**'
+[DEBUG-診斷宏觀建議] 處理建議 #2: 類型=macro, 原始題型字段=Multi-source reasoning, 文本開頭=**宏觀建議 (Multi-source reasoning):** 由於整體表現有較大提升空間 (錯誤率 100.0% 或 超時率 66....
+[DEBUG-診斷宏觀建議] 從宏觀建議 #2 中提取的題型: 'Multi-source reasoning' -> 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: q_type_eng_stripped for mapping = 'Multi-source reasoning'
+[DEBUG-診斷宏觀建議] 建議 #2: 從q_type_map直接找到section_letter = 'C.'
+[DEBUG-診斷宏觀建議] 建議 #2: 最終標題行 = '* **C. Multi-source reasoning**'
+[DEBUG-診斷宏觀建議] 處理建議 #3: 類型=case_aggregated, 原始題型字段=Data Sufficiency, 文本開頭=針對 **數學相關** 領域的 **Data Sufficiency** 題目 (錯誤或超時)，建議練習 **低難度 (Low) / 505...
+[DEBUG-診斷宏觀建議] 建議 #3: q_type_eng_stripped for mapping = 'Data Sufficiency'
+[DEBUG-診斷宏觀建議] 建議 #3: 從q_type_map直接找到section_letter = 'A.'
+[DEBUG-診斷宏觀建議] 建議 #3: 最終標題行 = '* **A. Data Sufficiency**'
+[DEBUG-診斷宏觀建議] 處理建議 #4: 類型=case_aggregated, 原始題型字段=Data Sufficiency, 文本開頭=針對 **非數學相關** 領域的 **Data Sufficiency** 題目 (錯誤或超時)，建議練習 **中難度 (Mid) / 55...
+[DEBUG-診斷宏觀建議] 建議 #4: q_type_eng_stripped for mapping = 'Data Sufficiency'
+[DEBUG-診斷宏觀建議] 建議 #4: 從q_type_map直接找到section_letter = 'A.'
+[DEBUG-診斷宏觀建議] 建議 #4: 最終標題行 = '* **A. Data Sufficiency**'
+[DEBUG-診斷宏觀建議] 處理建議 #5: 類型=case_aggregated, 原始題型字段=Graph and Table, 文本開頭=針對 **數學相關** 領域的 **Graph and Table** 題目 (錯誤或超時)，建議練習 **中難度 (Mid) / 555+...
+[DEBUG-診斷宏觀建議] 建議 #5: q_type_eng_stripped for mapping = 'Graph and Table'
+[DEBUG-診斷宏觀建議] 建議 #5: 從q_type_map直接找到section_letter = 'D.'
+[DEBUG-診斷宏觀建議] 建議 #5: 最終標題行 = '* **D. Graph and Table**'
+[DEBUG-診斷宏觀建議] 處理建議 #6: 類型=case_aggregated, 原始題型字段=Graph and Table, 文本開頭=針對 **非數學相關** 領域的 **Graph and Table** 題目 (錯誤或超時)，建議練習 **低難度 (Low) / 505...
+[DEBUG-診斷宏觀建議] 建議 #6: q_type_eng_stripped for mapping = 'Graph and Table'
+[DEBUG-診斷宏觀建議] 建議 #6: 從q_type_map直接找到section_letter = 'D.'
+[DEBUG-診斷宏觀建議] 建議 #6: 最終標題行 = '* **D. Graph and Table**'
