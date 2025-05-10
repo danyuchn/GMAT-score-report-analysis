@@ -196,7 +196,7 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
             # Ensure 'is_manually_invalid' is boolean and set final 'is_invalid'
             if 'is_manually_invalid' not in final_df.columns: # Should exist from editor
                 final_df['is_manually_invalid'] = False
-            final_df['is_manually_invalid'] = final_df['is_manually_invalid'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False).astype(bool)
+            final_df['is_manually_invalid'] = final_df['is_manually_invalid'].replace({pd.NA: False, None: False, np.nan: False}).astype(bool)
             final_df['is_invalid'] = final_df['is_manually_invalid'] # Final invalid status based on user edit
 
             # Add Subject identifier

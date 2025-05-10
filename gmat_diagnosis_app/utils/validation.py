@@ -9,6 +9,7 @@ from gmat_diagnosis_app.constants.validation_rules import (
     VALIDATION_RULES
 )
 from gmat_diagnosis_app.constants.config import REQUIRED_ORIGINAL_COLS
+from thefuzz import process, fuzz # Changed from fuzzywuzzy to thefuzz
 
 def preprocess_skill(skill):
     """Lowercase, strip, collapse spaces for skill matching."""
@@ -96,33 +97,92 @@ def validate_dataframe(df, subject):
                             if value_str_lower in allowed_map:
                                 correct_value = allowed_map[value_str_lower]
                                 is_valid = True
-                            else: is_valid = False
+                            else:
+                                # Fuzzy match for Q's Question Type if exact fails
+                                match, score = process.extractOne(value_str_stripped, allowed_values_list, scorer=fuzz.ratio) if allowed_values_list else (None, 0)
+                                if score >= 85: # Fuzzy match threshold
+                                    correct_value = match
+                                    is_valid = True
+                                    warnings.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 值 '{value_str_stripped}' 透過模糊比對修正為 '{correct_value}'。")
+                                else:
+                                    is_valid = False
 
-                    # Specific Logic for Fundamental Skills (Fuzzy Match + Canonical Mapping)
+                    # Specific Logic for Fundamental Skills (Preprocessing + Exact Match, then Fuzzy)
                     elif original_col_name == 'Fundamental Skills':
                         processed_input = preprocess_skill(value_str_stripped)
                         is_valid = False # Assume invalid initially
                         skill_map = {}
+                        # Prepare a list of preprocessed allowed skills for fuzzy matching
+                        preprocessed_allowed_skills_for_fuzzy = []
+
                         for allowed_val in allowed_values_list:
                             processed_allowed = preprocess_skill(allowed_val)
                             # Canonical mapping for Rates/Ratio/Percent(s)
                             canonical_value = 'Rates/Ratio/Percent' if processed_allowed == 'rates/ratios/percent' else allowed_val
                             skill_map[processed_allowed] = canonical_value
+                            preprocessed_allowed_skills_for_fuzzy.append(processed_allowed) # Store preprocessed version for fuzzy
+
                         if processed_input in skill_map:
                             correct_value = skill_map[processed_input]
                             is_valid = True
-
+                        else:
+                            # Fuzzy match against preprocessed allowed skills
+                            # We use the original allowed_values_list to extract the *original* casing if a match is found
+                            # The `process.extractOne` needs the original list to return the correctly cased value.
+                            # We find the best match based on the preprocessed input against preprocessed allowed values.
+                            
+                            # To get the original cased value from a fuzzy match on preprocessed strings:
+                            # 1. Fuzzy match `processed_input` against `preprocessed_allowed_skills_for_fuzzy`.
+                            # 2. If a match is found, get the index of the matched preprocessed skill.
+                            # 3. Use this index to get the original cased skill from `allowed_values_list`.
+                            # OR, simpler: fuzzy match `value_str_stripped` (original input) directly against `allowed_values_list` (original allowed values)
+                            
+                            match, score = process.extractOne(value_str_stripped, allowed_values_list, scorer=fuzz.WRatio) if allowed_values_list else (None, 0)
+                            if score >= 85: # Fuzzy match threshold (using WRatio for better results with mixed case/punctuation)
+                                # Check if the matched value, after preprocessing, is a known skill
+                                preprocessed_match = preprocess_skill(match)
+                                if preprocessed_match in skill_map: # Ensure the fuzzy matched skill is valid after preprocessing
+                                    correct_value = skill_map[preprocessed_match] # Use the canonical form
+                                    is_valid = True
+                                    warnings.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 值 '{value_str_stripped}' 透過模糊比對修正為 '{correct_value}'。")
+                                else:
+                                    # This case is unlikely if skill_map is comprehensive but good for safety
+                                    is_valid = False
+                            else:
+                                is_valid = False
+                    
                     # Default Case-Insensitive Check (Handles 'Graphs and Tables' -> 'Graph and Table')
+                    # And Fuzzy matching for Content Domain and general Question Types (non-Q)
                     else:
                         allowed_map = {}
+                        # Special handling for 'Graphs and Tables' -> 'Graph and Table' for DI Question Type
+                        # This canonical mapping should ideally be in validation_rules.py or handled more generically
                         for v in allowed_values_list:
                             key = str(v).lower()
-                            canonical_value = 'Graph and Table' if key == 'graphs and tables' else v
+                            canonical_value = v
+                            if original_col_name == 'Question Type' and subject == 'DI' and key == 'graphs and tables':
+                                canonical_value = 'Graph and Table' # Specific canonical mapping
                             allowed_map[key] = canonical_value
+                        
                         if value_str_lower in allowed_map:
                             correct_value = allowed_map[value_str_lower]
                             is_valid = True
-                        else: is_valid = False
+                        else:
+                            # Fuzzy match for 'Content Domain' and other 'Question Type'
+                            if original_col_name in ['Content Domain', 'Question Type']:
+                                match, score = process.extractOne(value_str_stripped, allowed_values_list, scorer=fuzz.ratio) if allowed_values_list else (None, 0)
+                                if score >= 85: # Fuzzy match threshold
+                                    # If it was 'Graphs and Tables' and matched to 'Graph and Table', ensure canonical
+                                    if original_col_name == 'Question Type' and subject == 'DI' and str(match).lower() == 'graph and table':
+                                        correct_value = 'Graph and Table'
+                                    else:
+                                        correct_value = match
+                                    is_valid = True
+                                    warnings.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 值 '{value_str_stripped}' 透過模糊比對修正為 '{correct_value}'。")
+                                else:
+                                    is_valid = False
+                            else:
+                                is_valid = False # Not one of the fuzzy matched fields, and no exact match
 
                     # --- Auto-Correction Application ---
                     if is_valid and correct_value is not None and value_str_stripped != correct_value:
