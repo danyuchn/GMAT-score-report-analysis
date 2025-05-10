@@ -1,4 +1,4 @@
-#!/Users/danyuchn/Documents/GMAT-score-report-analysis/venv/bin/python3.13
+#!/Users/danyuchn/GMAT-score-report-analysis/venv/bin/python3.13
 # -*- coding: utf-8 -*-
 import re
 import sys

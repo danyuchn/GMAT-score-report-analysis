@@ -6,3 +6,7 @@ openpyxl
 XlsxWriter
 scipy
 plotly 
+thefuzz>=0.20.0
+python-Levenshtein>=0.20.0
+matplotlib
+seaborn 
