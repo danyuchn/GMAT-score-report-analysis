@@ -475,7 +475,8 @@ def main():
                     
                     if records_to_add:
                         if add_gmat_performance_record(records_to_add):
-                            st.toast(f"已成功將 {len(records_to_add)} 筆資料附加到 gmat_performance_data.csv", icon="✅")
+                            # st.toast(f"已成功將 {len(records_to_add)} 筆資料附加到 gmat_performance_data.csv", icon="✅") # This line will be commented out
+                            pass # Add pass if commenting out the toast makes the block empty
                         else:
                             st.toast("附加資料到 gmat_performance_data.csv 時發生錯誤。", icon="⚠️")
                     else:
