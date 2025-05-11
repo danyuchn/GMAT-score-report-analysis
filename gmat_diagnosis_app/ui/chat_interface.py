@@ -10,12 +10,12 @@ from gmat_diagnosis_app.session_manager import ensure_chat_history_persistence
 
 def display_chat_interface(session_state):
     """顯示聊天界面，處理訊息交換"""
-    # 確保聊天歷史持久化
+    # 確保聊天歷史持久化 (在最開始調用一次)
     ensure_chat_history_persistence()
     
     # Check conditions to show chat
     show_chat = check_chat_conditions(session_state)
-    session_state.show_chat = show_chat
+    # session_state.show_chat = show_chat # This seems redundant if session_state is passed around directly
 
     if show_chat:
         st.subheader("💬 與 AI 對話 (基於本次報告)")
@@ -41,76 +41,78 @@ def display_chat_interface(session_state):
         # 確保聊天歷史存在
         if 'chat_history' not in session_state:
             session_state.chat_history = []
-            st.info("已初始化新的聊天歷史")
-        else:
-            st.info(f"當前聊天歷史包含 {len(session_state.chat_history)} 條消息")
+            # logging.info("已初始化新的聊天歷史") # Replaced st.info with logging
+        # else:
+            # logging.info(f"當前聊天歷史包含 {len(session_state.chat_history)} 條消息") # Replaced st.info with logging
         
         # Debug: 顯示現有聊天歷史中的response_id (用於調試)
         _debug_show_chat_history(session_state)
         
         # 添加自定義CSS，創建固定高度的聊天容器
-        st.markdown("""
-        <style>
-        .chat-container {
-            height: 400px;
-            overflow-y: auto;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            margin-bottom: 15px;
-        }
-        .chat-container::-webkit-scrollbar {
-            width: 6px;
-            background-color: #F5F5F5;
-        }
-        .chat-container::-webkit-scrollbar-thumb {
-            background-color: #CCCCCC;
-            border-radius: 3px;
-        }
-        .stChatMessage {
-            margin-bottom: 10px;
-        }
-        .chat-message-user {
-            background-color: #e1f5fe;
-            border-radius: 10px;
-            padding: 8px 12px;
-            margin: 5px 0;
-            max-width: 80%;
-            margin-left: auto;
-            text-align: right;
-        }
-        .chat-message-assistant {
-            background-color: #f1f1f1;
-            border-radius: 10px;
-            padding: 8px 12px;
-            margin: 5px 0;
-            max-width: 80%;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+        # TEMPORARILY COMMENTED OUT FOR DEBUGGING
+        # st.markdown(\"\"\"
+        # <style>
+        # .chat-container {
+        #     height: 400px;
+        #     overflow-y: auto;
+        #     border: 1px solid #e0e0e0;
+        #     border-radius: 8px;
+        #     padding: 15px;
+        #     background-color: #f8f9fa;
+        #     margin-bottom: 15px;
+        # }
+        # .chat-container::-webkit-scrollbar {
+        #     width: 6px;
+        #     background-color: #F5F5F5;
+        # }
+        # .chat-container::-webkit-scrollbar-thumb {
+        #     background-color: #CCCCCC;
+        #     border-radius: 3px;
+        # }
+        # .stChatMessage {
+        #     margin-bottom: 10px;
+        # }
+        # .chat-message-user {
+        #     background-color: #e1f5fe;
+        #     border-radius: 10px;
+        #     padding: 8px 12px;
+        #     margin: 5px 0;
+        #     max-width: 80%;
+        #     margin-left: auto;
+        #     text-align: right;
+        # }
+        # .chat-message-assistant {
+        #     background-color: #f1f1f1;
+        #     border-radius: 10px;
+        #     padding: 8px 12px;
+        #     margin: 5px 0;
+        #     max-width: 80%;
+        # }
+        # </style>
+        # \"\"\", unsafe_allow_html=True)
         
         # 在固定容器中顯示聊天歷史
-        with st.container():
-            with st.markdown('<div class="chat-container" id="chat-container">', unsafe_allow_html=True):
+        # with st.container(): # Temporarily remove container to simplify
+        #     with st.markdown('<div class="chat-container" id="chat-container">', unsafe_allow_html=True):
                 # 使用streamlit的聊天元素顯示歷史聊天記錄
-                display_chat_history(session_state)
+        display_chat_history(session_state) # Display history directly
             
             # 在聊天歷史加載後添加滾動腳本
-            st.markdown("""
-            <script>
-                function scrollChatToBottom() {
-                    const chatContainer = document.getElementById('chat-container');
-                    if (chatContainer) {
-                        chatContainer.scrollTop = chatContainer.scrollHeight;
-                    }
-                }
-                // 在完整加載後執行
-                window.addEventListener('load', scrollChatToBottom);
-                // 延遲執行以確保聊天內容已加載
-                setTimeout(scrollChatToBottom, 500);
-            </script>
-            """, unsafe_allow_html=True)
+            # TEMPORARILY COMMENTED OUT FOR DEBUGGING
+            # st.markdown(\"\"\"
+            # <script>
+            #     function scrollChatToBottom() {
+            #         const chatContainer = document.getElementById('chat-container');
+            #         if (chatContainer) {
+            #             chatContainer.scrollTop = chatContainer.scrollHeight;
+            #         }
+            #     }
+            #     // 在完整加載後執行
+            #     window.addEventListener('load', scrollChatToBottom);
+            #     // 延遲執行以確保聊天內容已加載
+            #     setTimeout(scrollChatToBottom, 500);
+            # </script>
+            # \"\"\", unsafe_allow_html=True)
 
         # 聊天輸入在固定容器下方
         handle_chat_input(session_state)
@@ -212,32 +214,22 @@ def check_chat_conditions(session_state):
 
 def display_chat_history(session_state):
     """顯示聊天歷史"""
-    # 使用HTML實現自定義樣式的聊天氣泡
+    # 使用 Streamlit 原生的 st.chat_message
     for i, message in enumerate(session_state.chat_history):
         role = message["role"]
         content = message["content"]
         
-        if role == "user":
-            st.markdown(f'<div class="chat-message-user">{content}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="chat-message-assistant">{content}</div>', unsafe_allow_html=True)
+        with st.chat_message(role):
+            st.markdown(content) # Use markdown for potential formatting in content
 
 def handle_chat_input(session_state):
     """處理用戶輸入和AI回應"""
     if prompt := st.chat_input("針對報告和數據提問..."):
-        # 添加用戶消息到歷史前先備份
-        current_history = session_state.chat_history.copy()
-        
         # 添加用戶消息到歷史
         session_state.chat_history.append({"role": "user", "content": prompt})
         
-        # 更新備份
-        if hasattr(st.session_state, 'chat_history_backup'):
-            st.session_state.chat_history_backup = session_state.chat_history.copy()
-        
         # 調試輸出
-        st.info(f"添加用戶消息前歷史長度: {len(current_history)}")
-        st.info(f"添加用戶消息後歷史長度: {len(session_state.chat_history)}")
+        # logging.info(f"添加用戶消息後歷史長度: {len(session_state.chat_history)}") # Replaced st.info with logging
         
         # 準備上下文並呼叫OpenAI
         with st.spinner("AI思考中..."):
@@ -246,20 +238,20 @@ def handle_chat_input(session_state):
                 context = get_chat_context(session_state)
                 
                 # 顯示調試信息
-                st.info(f"發送至API的聊天歷史長度: {len(session_state.chat_history)}")
+                # logging.info(f"發送至API的聊天歷史長度: {len(session_state.chat_history)}") # Replaced st.info with logging
                 
                 # 呼叫OpenAI - 確保傳遞完整聊天歷史以獲取previous_response_id
                 logging.info(f"準備調用OpenAI，聊天歷史長度: {len(session_state.chat_history)}")
                 ai_response_text, response_id = get_openai_response(
-                    session_state.chat_history,
+                    session_state.chat_history, # Pass the current history directly
                     context["report"],
                     context["dataframe"],
                     session_state.openai_api_key
                 )
                 
                 # 明確記錄response_id的獲取
-                logging.info(f"已獲得OpenAI回應，response_id: {response_id[:10]}... (長度:{len(response_id) if response_id else 0})")
-                st.success(f"AI回應已生成，ID: {response_id[:8]}...")
+                logging.info(f"已獲得OpenAI回應，response_id: {response_id[:10] if response_id else 'N/A'}... (長度:{len(response_id) if response_id else 0})")
+                st.success(f"AI回應已生成，ID: {response_id[:8] if response_id else 'N/A'}...")
 
                 # 添加AI回應到歷史，確保包含response_id
                 session_state.chat_history.append({
@@ -268,15 +260,11 @@ def handle_chat_input(session_state):
                     "response_id": response_id  # 儲存ID用於下一次對話
                 })
                 
-                # 再次更新備份
-                if hasattr(st.session_state, 'chat_history_backup'):
-                    st.session_state.chat_history_backup = session_state.chat_history.copy()
-                
                 # 顯示更新後的聊天歷史長度
-                st.info(f"更新後的聊天歷史長度: {len(session_state.chat_history)}")
+                # logging.info(f"更新後的聊天歷史長度: {len(session_state.chat_history)}") # Replaced st.info with logging
                 
-                # 確保聊天歷史在會話狀態中直接更新
-                st.session_state.chat_history = session_state.chat_history
+                # st.session_state 會自動保存，不需要手動賦值回 st.session_state.chat_history = session_state.chat_history
+                # 除非 session_state 不是 st.session_state 的直接引用
                 
                 # 使用JavaScript重新加載頁面以更新聊天並滾動到底部
                 st.rerun()
@@ -286,16 +274,9 @@ def handle_chat_input(session_state):
                 logging.error(f"OpenAI調用錯誤: {e}", exc_info=True)
                 # 添加錯誤訊息到歷史，沒有response_id
                 session_state.chat_history.append({"role": "assistant", "content": error_message})
-                
-                # 確保聊天歷史在會話狀態中直接更新
-                st.session_state.chat_history = session_state.chat_history
-                
-                # 更新備份
-                if hasattr(st.session_state, 'chat_history_backup'):
-                    st.session_state.chat_history_backup = session_state.chat_history.copy()
-                
+                                
                 st.error(error_message)
                 st.rerun()
                 
-    # 確保每次執行時都檢查並保存聊天歷史
-    ensure_chat_history_persistence() 
+    # 不再需要在末尾調用 ensure_chat_history_persistence() 因為 rerun 後會在 display_chat_interface 開頭調用
+    # ensure_chat_history_persistence() 
