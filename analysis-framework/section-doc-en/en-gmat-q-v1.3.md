@@ -344,13 +344,14 @@ We checked for questions answered absolutely too fast (`question_time` < 1.0 min
 2.  **Generate and Preliminarily Classify Recommendations:**
     - Initialize a dictionary `recommendations_by_skill` = `{}` to temporarily store recommendation lists by skill.
     - Initialize a set `processed_override_skills` = `set()` to track skills for which macro recommendations have been generated.
+    - **Note:** Unlike Verbal and DI, Quant recommendations are not aggregated. Instead, individual recommendations are generated for each specific trigger point/topic. This is because the scope of `fundamental_skill` is broader, and maintaining individual recommendations ensures targeted advice.
     - Iterate through all triggering questions `X` (with core skill `S`, difficulty `D`, original time `T`):
         - **Check Exemption (Based on Chapter 6):** First, check the skill `S` exemption status `skill_exemption_status[S]`. If it is `True`, **skip** all subsequent recommendation generation steps for this skill and proceed to the next trigger point.
         - **Check for Macro Recommendation (for skill S):** If `skill_override_triggered`[`S`] is `True` AND skill `S` is **not** in `processed_override_skills`:
             - Generate macro recommendation `G` = "For skill [`S`], due to significant room for improvement (based on Chapter 6 analysis), recommend comprehensive foundational consolidation. Start systematic practice with [`Y_agg`] difficulty questions, focusing on core methods, with a recommended time limit of [`Z_agg`] minutes." (`Y_agg` and `Z_agg` from Chapter 6).
             - Add macro recommendation `G` to `recommendations_by_skill`[`S`] if the key exists, otherwise initialize the list with G.
             - Add skill `S` to `processed_override_skills`.
-        - **Generate Case Recommendation (if skill S is not exempted):**
+        - **Generate Case Recommendation (if skill S is not exempted and a macro suggestion for S was not triggered):**
             - **Practice Difficulty (`Y`):** Map question `X`'s difficulty `D` using the **unified 6-level standard**:
                 - If `D` ≤ -1: `Y` = "Low / 505+"
                 - If -1 < `D` ≤ 0: `Y` = "Medium / 555+"
@@ -363,8 +364,11 @@ We checked for questions answered absolutely too fast (`question_time` < 1.0 min
                 - Calculate `base_time`: If `X` was overtime (`overtime` == `True`), then `T` - 0.5, else `T`.
                 - Calculate `Z_raw` = `floor`(`base_time` * 2) / 2 (round down to nearest 0.5).
                 - Ensure minimum value: `Z` = `max`(`Z_raw`, `target_time`).
-            - Construct the case recommendation `C` string (e.g., "Practice similar problems at difficulty level [`Y`] with a time limit of [`Z`] minutes.")
-            - Add case recommendation `C` to `recommendations_by_skill`[`S`] if the key exists, otherwise initialize the list with C.
+            - **Construct Case Recommendation Text:**
+                - Base template: "For skill [`S`], specifically regarding triggering point/question [`X`], it's recommended to practice [`Y`] difficulty questions. The starting practice time limit is [`Z`] minutes. (Final target time: 2.0 minutes)."
+                - **Priority Annotation:** If triggering point `X` was flagged `special_focus_error` = `True`, prepend "**Foundational mastery unstable** - " to this recommendation for emphasis.
+                - **Extended Time Reminder:** If `Z` > 4.0 minutes, add a reminder: "**Note: Starting time limit is significantly above target; substantial practice volume is needed to ensure gradual time reduction is effective.**"
+            - Add case recommendation `C` (built from the template) to `recommendations_by_skill`[`S`] if the key exists, otherwise initialize the list with C.
 3.  **Collate and Output Recommendation List:**
     - Initialize `final_recommendations` = []
     - **Process Exempted Skills:** Iterate through all `fundamental_skill`s. For each skill `S`, if its `skill_exemption_status[S]` (from Chapter 6) is `True`, add an exemption note to `final_recommendations`: "Skill [`S`] performance is excellent; practice recommendations exempted."
@@ -432,6 +436,10 @@ We checked for questions answered absolutely too fast (`question_time` < 1.0 min
 *   **Qualitative Analysis Suggestion:**
     *   *Trigger When:* You are confused about the cause of errors identified in the report, or the above methods haven't clarified the root problem.
     *   *Recommended Action:* 'If you remain unclear about the reason for errors in [`Type of problem`], consider **providing detailed step-by-step solution processes and thought examples for 2-3 questions of that type** (text or audio recording). This allows for deeper case analysis with a consultant to identify the crux of the issue.'
+
+    <aside>
+**Chapter Summary:** We generated a final diagnostic report written entirely in natural language.
+    </aside>
 
 #### Auxiliary Tools and AI Prompt Recommendations:
 

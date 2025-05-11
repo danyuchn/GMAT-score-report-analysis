@@ -57,9 +57,10 @@
     `time_diff` = `max_allowed_time` - `total_test_time`
 
 2.  **Determine Time Pressure Status (`time_pressure`)**: 
-    - If `time_diff` < 1.0 minutes, then `time_pressure` = `True`.
-    - Otherwise, `time_pressure` = `False`.
-    - *(User override rule can be applied here if needed)*
+    - Default `time_pressure` = `False`.
+    - Check end-of-test situation: Identify questions in the last 1/3 of the test (`last_third_questions`) where `question_time` < 1.0 minute (`fast_end_questions`).
+    - Logic: If `time_diff` <= 3 minutes **AND** `fast_end_questions` is not empty, then set `time_pressure` = `True`.
+    - **User Override:** If the user explicitly states there was little pressure, forcibly set `time_pressure` = `False`.
 
 3.  **Set Overtime Thresholds and Rules (Based on `time_pressure`)**: 
     - **CR Overtime Threshold (`overtime_threshold_cr`)**: 
@@ -76,14 +77,18 @@
     - Check if reading time is potentially long:
         - Get the number of questions in the group `num_q_in_group`.
         - If (`num_q_in_group` == 3 and `rc_reading_time` > 2.0 minutes) or (`num_q_in_group` == 4 and `rc_reading_time` > 2.5 minutes), then trigger `reading_comprehension_barrier_inquiry` = `True`.
+        - During report generation, if `reading_comprehension_barrier_inquiry` is triggered, the system will add the `RC_READING_COMPREHENSION_BARRIER` diagnostic parameter to the diagnostic results for tool recommendations and report display.
     - *Note: This flag suggests a potential foundational reading barrier and will be referenced in later chapter recommendations.*
 
 5.  **Identify Invalid Data (`is_invalid`)**: 
-    - Examine questions in the last 1/3 of the test (`last_third_questions`).
-    - Identify anomalous end-of-test responses:
-        - "Hasty": `question_time` < 1.0 minute OR (`CR` type AND `question_time` < `first_third_average_time_per_type`['CR'] * 0.5) OR (`RC` group AND `group_total_time` < (`first_third_average_time_per_type`['RC'] * `num_q_in_group`) * 0.5).
-        - "Abandoned": `question_time` < 0.5 minutes.
-    - Flagging Logic: If a question meets the "Hasty" or "Abandoned" criteria **AND** `time_pressure` == `True` (determined in step 2), then flag that question with `is_invalid` = `True`.
+    - **Prerequisite:** Execute invalid data identification and flagging only if `time_pressure` == `True`. If `time_pressure` == `False`, no questions are flagged as `is_invalid`.
+    - **Scope:** Only examine questions in the last 1/3 of the test (`last_third_questions`).
+    - **Define "Abnormally Fast Response (`abnormally_fast_response`)" Criteria (meeting any one triggers):**
+        - *Criterion 1 (Suspected Skip):* `question_time` < 0.5 minutes.
+        - *Criterion 2 (Absolute Rush):* `question_time` < 1.0 minutes.
+        - *Criterion 3 (Relative Single Question Rush):* `question_time` < (`first_third_average_time_per_type`[question's `question_type`] * 0.5).
+        - *Criterion 4 (Relative Group Rush - RC Only):* The `group_total_time` of the RC group the question belongs to < (`first_third_average_time_per_type`['RC'] * `num_q_in_group` * 0.5).
+    - **Flagging Logic:** If a question within the scope (or its RC group for Criterion 4) meets **at least one** `abnormally_fast_response` criterion, **AND `time_pressure` == `True`**, then flag that question with `is_invalid` = `True`.
     - Output Diagnostic Hint: If any questions are flagged as `is_invalid`, suggest: "Possible rushing at the end; evaluate strategy appropriateness."
 
 6.  **Other Observations and Suggestions**: 
@@ -619,57 +624,58 @@
 
 # **Appendix A: Diagnostic Parameter Tags and Descriptions**
 
-| English Parameter                          | English Description                                       |
-|--------------------------------------------|-----------------------------------------------------------|
-| **CR - Reading Comprehension**             |                                                           |
-| `CR_READING_BASIC_OMISSION`                | CR Reading: Basic comprehension omission                  |
-| `CR_READING_DIFFICULTY_STEM`               | CR Reading: Stem comprehension difficulty (keyword/syntax/logic/domain) |
-| `CR_READING_TIME_EXCESSIVE`                | CR Reading: Excessive time spent reading                  |
-| **CR - Question Understanding**            |                                                           |
-| `CR_QUESTION_UNDERSTANDING_MISINTERPRETATION` | CR Question Understanding: Misinterpretation of question task |
-| **CR - Reasoning Deficiencies**          |                                                           |
-| `CR_REASONING_CHAIN_ERROR`                 | CR Reasoning: Error in analyzing logical chain (premise/conclusion/relation) |
-| `CR_REASONING_ABSTRACTION_DIFFICULTY`      | CR Reasoning: Difficulty with abstract logic/terminology |
-| `CR_REASONING_PREDICTION_ERROR`            | CR Reasoning: Incorrect or missing prediction             |
-| `CR_REASONING_TIME_EXCESSIVE`              | CR Reasoning: Excessive time spent on logical thinking     |
-| `CR_REASONING_CORE_ISSUE_ID_DIFFICULTY`    | CR Reasoning: Difficulty identifying the core issue       |
-| **CR - Answer Choice Analysis**          |                                                           |
-| `CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY`  | CR AC Analysis: Difficulty understanding the answer choice itself |
-| `CR_AC_ANALYSIS_RELEVANCE_ERROR`           | CR AC Analysis: Error judging answer choice relevance     |
-| `CR_AC_ANALYSIS_DISTRACTOR_CONFUSION`      | CR AC Analysis: Confusion with strong distractors         |
-| `CR_AC_ANALYSIS_TIME_EXCESSIVE`            | CR AC Analysis: Excessive time spent eliminating choices   |
-| **CR - Method Application**               |                                                           |
-| `CR_METHOD_PROCESS_DEVIATION`              | CR Method: Deviation from standard procedure              |
-| `CR_METHOD_TYPE_SPECIFIC_ERROR`            | CR Method: Error/unfamiliarity with specific question type method (Specify type) |
-| **RC - Reading Comprehension**             |                                                           |
-| `RC_READING_INFO_LOCATION_ERROR`           | RC Reading: Error locating/understanding key information |
-| `RC_READING_KEYWORD_LOGIC_OMISSION`        | RC Reading: Omission of keywords/logic                   |
-| `RC_READING_VOCAB_BOTTLENECK`              | RC Reading: Vocabulary bottleneck                         |
-| `RC_READING_SENTENCE_STRUCTURE_DIFFICULTY` | RC Reading: Difficulty parsing complex sentence structures |
-| `RC_READING_PASSAGE_STRUCTURE_DIFFICULTY`  | RC Reading: Difficulty grasping passage structure         |
-| `RC_READING_DOMAIN_KNOWLEDGE_GAP`          | RC Reading: Lack of background knowledge in specific domain |
-| `RC_READING_SPEED_SLOW_FOUNDATIONAL`       | RC Reading: Slow reading speed (foundational issue)       |
-| `RC_READING_PRECISION_INSUFFICIENT`        | RC Reading: Insufficient precision (close reading/location issue) |
-| **RC - Reading Method**                    |                                                           |
-| `RC_METHOD_INEFFICIENT_READING`            | RC Method: Inefficient reading method (e.g., over-reading) |
-| **RC - Question Understanding**            |                                                           |
-| `RC_QUESTION_UNDERSTANDING_MISINTERPRETATION` | RC Question Understanding: Misinterpretation of question focus |
-| **RC - Location Skills**                   |                                                           |
-| `RC_LOCATION_ERROR_INEFFICIENCY`           | RC Location: Incorrect or inefficient information location |
-| `RC_LOCATION_TIME_EXCESSIVE`               | RC Location: Excessive time spent locating information (re-locating) |
-| **RC - Reasoning Deficiencies**          |                                                           |
-| `RC_REASONING_INFERENCE_WEAKNESS`          | RC Reasoning: Weak inference skills (prediction/detail/tone) |
-| `RC_REASONING_TIME_EXCESSIVE`              | RC Reasoning: Excessive time spent on deep thinking       |
-| **RC - Answer Choice Analysis**          |                                                           |
-| `RC_AC_ANALYSIS_DIFFICULTY`                | RC AC Analysis: Difficulty understanding/discriminating choices (meaning/mapping) |
-| `RC_AC_ANALYSIS_TIME_EXCESSIVE`            | RC AC Analysis: Excessive time spent eliminating choices   |
-| **Foundational Mastery (CR & RC)**         |                                                           |
-| `FOUNDATIONAL_MASTERY_INSTABILITY_SFE`     | Foundational Mastery: Unstable application (Special Focus Error) |
-| **Efficiency Issues (CR & RC)**            |                                                           |
-| `EFFICIENCY_BOTTLENECK_[AREA]`             | Efficiency Issue: Bottleneck in [Specific Area] causing inefficiency (Specify Area: READING, REASONING, LOCATION, AC_ANALYSIS) |
-| **Behavioral Patterns**                    |                                                           |
-| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`         | Behavioral Pattern: Rushing early in section (< 1.0 min, Note flag for review risk)  |
-| `BEHAVIOR_CARELESSNESS_ISSUE`              | Behavioral Pattern: Carelessness issue (high fast-wrong rate > 25%) |
-| `BEHAVIOR_GUESSING_HASTY`                  | Behavioral Pattern: Hasty response suggesting guessing/rushing |
+| English Parameter                          | Chinese Description (中文描述)                         |
+|--------------------------------------------|----------------------------------------------------|
+| **CR - Reading Comprehension**                |                                                    |
+| `CR_READING_BASIC_OMISSION`                   | CR 閱讀理解: 基礎理解疏漏                           |
+| `CR_READING_DIFFICULTY_STEM`                  | CR 閱讀理解: 題幹理解障礙 (關鍵詞/句式/邏輯/領域)     |
+| `CR_READING_TIME_EXCESSIVE`                   | CR 閱讀理解: 閱讀耗時過長                         |
+| **CR - Question Understanding**               |                                                    |
+| `CR_QUESTION_UNDERSTANDING_MISINTERPRETATION` | CR 題目理解: 提問要求把握錯誤                       |
+| **CR - Reasoning Deficiencies**             |                                                    |
+| `CR_REASONING_CHAIN_ERROR`                    | CR 推理障礙: 邏輯鏈分析錯誤 (前提/結論/關係)           |
+| `CR_REASONING_ABSTRACTION_DIFFICULTY`         | CR 推理障礙: 抽象邏輯/術語理解困難                   |
+| `CR_REASONING_PREDICTION_ERROR`               | CR 推理障礙: 預判方向錯誤或缺失                     |
+| `CR_REASONING_TIME_EXCESSIVE`                 | CR 推理障礙: 邏輯思考耗時過長                     |
+| `CR_REASONING_CORE_ISSUE_ID_DIFFICULTY`       | CR 推理障礙: 核心議題識別困難                       |
+| **CR - Answer Choice Analysis**             |                                                    |
+| `CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY`     | CR 選項辨析: 選項本身理解困難                       |
+| `CR_AC_ANALYSIS_RELEVANCE_ERROR`              | CR 選項辨析: 選項相關性判斷錯誤                     |
+| `CR_AC_ANALYSIS_DISTRACTOR_CONFUSION`         | CR 選項辨析: 強干擾選項混淆                         |
+| `CR_AC_ANALYSIS_TIME_EXCESSIVE`               | CR 選項辨析: 選項篩選耗時過長                     |
+| **CR - Method Application**                  |                                                    |
+| `CR_METHOD_PROCESS_DEVIATION`                 | CR 方法應用: 未遵循標準流程                         |
+| `CR_METHOD_TYPE_SPECIFIC_ERROR`               | CR 方法應用: 特定題型方法錯誤/不熟 (需註明題型)       |
+| **RC - Reading Comprehension**                |                                                    |
+| `RC_READING_INFO_LOCATION_ERROR`              | RC 閱讀理解: 關鍵信息定位/理解錯誤                 |
+| `RC_READING_KEYWORD_LOGIC_OMISSION`           | RC 閱讀理解: 忽略關鍵詞/邏輯                       |
+| `RC_READING_VOCAB_BOTTLENECK`                 | RC 閱讀理解: 詞彙量瓶頸                             |
+| `RC_READING_SENTENCE_STRUCTURE_DIFFICULTY`    | RC 閱讀理解: 長難句解析困難                         |
+| `RC_READING_PASSAGE_STRUCTURE_DIFFICULTY`     | RC 閱讀理解: 篇章結構把握不清                       |
+| `RC_READING_DOMAIN_KNOWLEDGE_GAP`             | RC 閱讀理解: 特定領域背景知識缺乏                   |
+| `RC_READING_SPEED_SLOW_FOUNDATIONAL`          | RC 閱讀理解: 閱讀速度慢 (基礎問題)                   |
+| `RC_READING_PRECISION_INSUFFICIENT`           | RC 閱讀精度不足 (精讀/定位問題)                     |
+| **RC - Reading Method**                       |                                                    |
+| `RC_METHOD_INEFFICIENT_READING`               | RC 閱讀方法: 閱讀方法效率低 (過度精讀)               |
+| `RC_METHOD_TYPE_SPECIFIC_ERROR`               | RC 方法應用: 特定題型方法錯誤/不熟 (需註明題型)       |
+| **RC - Question Understanding**               |                                                    |
+| `RC_QUESTION_UNDERSTANDING_MISINTERPRETATION` | RC 題目理解: 提問焦點把握錯誤                       |
+| **RC - Location Skills**                      |                                                    |
+| `RC_LOCATION_ERROR_INEFFICIENCY`              | RC 定位能力: 定位錯誤/效率低下                      |
+| `RC_LOCATION_TIME_EXCESSIVE`                  | RC 定位能力: 定位效率低下 (反覆定位)                 |
+| **RC - Reasoning Deficiencies**             |                                                    |
+| `RC_REASONING_INFERENCE_WEAKNESS`             | RC 推理障礙: 推理能力不足 (預判/細節/語氣)             |
+| `RC_REASONING_TIME_EXCESSIVE`                 | RC 推理障礙: 深度思考耗時過長                     |
+| **RC - Answer Choice Analysis**             |                                                    |
+| `RC_AC_ANALYSIS_DIFFICULTY`                   | RC 選項辨析: 選項理解/辨析困難 (含義/對應)             |
+| `RC_AC_ANALYSIS_TIME_EXCESSIVE`               | RC 選項辨析: 選項篩選耗時過長                     |
+| **Foundational Mastery (CR & RC)**            |                                                    |
+| `FOUNDATIONAL_MASTERY_INSTABILITY_SFE`        | 基礎掌握: 應用不穩定 (Special Focus Error)          |
+| **Efficiency Issues (CR & RC)**               |                                                    |
+| `EFFICIENCY_BOTTLENECK_[AREA]`                | 效率問題: [具體障礙] 導致效率低下 (需指明 Area: READING, REASONING, LOCATION, AC_ANALYSIS)     |
+| **Behavioral Patterns**                       |                                                    |
+| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`            | 行為模式: 前期作答過快 (< 1.0 min, 注意 flag for review 風險) |
+| `BEHAVIOR_CARELESSNESS_ISSUE`                 | 行為模式: 粗心問題 (快而錯比例 > 25%)                    |
+| `BEHAVIOR_GUESSING_HASTY`                     | 行為模式: 過快疑似猜題/倉促                     |
 
 (End of document)
