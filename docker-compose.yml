@@ -1,0 +1,19 @@
+version: '3.8' # Specifies the docker-compose file format version
+
+services:
+  gmat_app: # This is the name of our service
+    image: gmat-diag-app:latest # Specifies the Docker image to use (the one we built earlier)
+    container_name: gmat_diagnostic_container # Optional: gives a specific name to the running container
+    ports:
+      - "8501:8501" # Maps port 8501 of the host to port 8501 of the container
+    restart: unless-stopped # Defines the restart policy
+                           # unless-stopped: restarts the container unless it was explicitly stopped
+                           # always: always restarts, even if stopped manually (use with caution)
+                           # on-failure: restarts only if it exits with an error code
+    # volumes: # Optional: if you need to mount local directories into the container
+      # For example, to persist data or to reflect code changes without rebuilding the image during development
+      # - ./gmat_diagnosis_app:/app/gmat_diagnosis_app # Mounts local gmat_diagnosis_app to container's /app/gmat_diagnosis_app
+      # Note: For production on VPS, usually you build data into the image or use Docker volumes for persistent data.
+      # Live code mounting is more for development.
+    # environment: # Optional: if you need to pass additional environment variables
+      # - MY_VARIABLE=my_value 
