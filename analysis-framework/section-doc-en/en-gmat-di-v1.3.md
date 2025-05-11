@@ -63,9 +63,10 @@
    `time_diff` = `max_allowed_time` - `total_test_time`
 
 2. **Determine Time Pressure Status (`time_pressure`)**: 
-   - If `time_diff` <= 3 minutes, then `time_pressure` = `True`.
-   - Otherwise, `time_pressure` = `False`.
-   - *(User override rule can be applied here if needed)*
+   - Default `time_pressure` = `False`.
+   - Check end-of-test situation: Identify questions in the last 1/3 of the test (`last_third_questions`) where `question_time` < 1.0 minute (`fast_end_questions`).
+   - Logic: If `time_diff` <= 3 minutes **AND** `fast_end_questions` is not empty, then set `time_pressure` = `True`.
+   - **User Override:** If the user explicitly states there was little pressure, forcibly set `time_pressure` = `False`.
 
 3. **Set Overtime Thresholds and Rules (Based on `time_pressure`)**: 
    - **`TPA` Overtime Threshold (`overtime_threshold_tpa`)**: 
@@ -287,10 +288,11 @@
                 - *Diagnostic Actions*: Apply general logic, emphasizing qualitative analysis for normal/fast errors.
 
     - **D. Multi-Source Reasoning (`MSR`)** (Structure same as above, apply general diagnostic action logic)
-        *Note: "Slow" for `MSR` usually refers to group overtime; diagnosis needs to consider the overall group situation and individual question performance.* 
+        *Note: "Slow" (`is_slow`) for `MSR` means the question is flagged as `overtime` = `True` (based on the updated definition in Chapter 1, i.e., group overtime or adjusted individual question overtime). Diagnosis needs to consider the overall group situation and individual question performance.*
 
         - **Independent `MSR` Time Checks (Priority over Slow/Fast/Normal classification):**
             - **Reading Time Check (for the first question of the group):** Calculate `msr_reading_time` (defined in Chapter 0). If `msr_reading_time` > `msr_reading_threshold` (1.5 minutes), trigger specific diagnostic parameter `` `DI_MSR_READING_COMPREHENSION_BARRIER` `` and record diagnostic action: "`MSR` group reading time is long. Ask student to recall source material absorption barrier (Vocabulary, Sentence structure, Domain, Chart, Cross-tab information integration)." Recommend secondary evidence if recall fails.
+            *(Note: Excessive reading time might also increase the `adjusted_msr_time` for the first question, potentially leading to it being flagged as `msr_individual_overtime`, and consequently triggering `overtime`.)*
             - *Note:* This check is performed independently to capture specific `MSR` reading efficiency issues. Its triggered parameter and action are separate from the subsequent "Slow" classification but should be aggregated into the final report.
 
         - **D.1. `Math Related`**
@@ -463,22 +465,24 @@
         - **Process Case Suggestion (for question `X` with type `Qt`, domain `Dm`, difficulty `D`, time `T`):**
             - **Check Exemption and Macro:** If `(Qt, Dm)` is in `exempted_combinations`, or `Qt` is in `processed_override_types`, skip.
             - **Practice Difficulty (Y):** Map `D` using the 6-level standard (same as Q/V files).
-            - **Starting Practice Time Limit (Z):** (**Unified Calculation Rule**)
-                - Determine type target time (`target_time`) (referencing Chapter 5 `Z_agg` setting logic):
-                    - `DS`: 2.0, `TPA`: 3.0, `GT`: 3.0, `MSR`: 2.0 (single question target).
-                - Calculate `base_time`: If question `X` is overtime (`overtime` == `True`), then `T` - 0.5, otherwise `T`.
-                - Calculate `Z_raw` = `floor`(`base_time` * 2) / 2 (round down to nearest 0.5).
-                - Ensure minimum value: `Z` = `max`(`Z_raw`, `target_time`).
+            - **Starting Practice Time Limit (Z):** (**Unified Calculation Rule for an aggregated group of questions X of type Qt and domain Dm**)
+                - Determine type target time (`target_time`):
+                    - `DS`: 2.0, `TPA`: 3.0, `GT`: 3.0, `MSR`: 1.5 (single question target).
+                - For each question `x` in the group:
+                    - Let `T_x` be the time taken for question `x`.
+                    - Calculate `base_time_x`: If question `x` is overtime (`overtime` == `True`), then `T_x` - 0.5, otherwise `T_x`.
+                    - Calculate `Z_raw_x` = `floor`(`base_time_x` * 2) / 2 (round down to nearest 0.5).
+                    - Calculate `Z_individual_x` = `max`(`Z_raw_x`, `target_time`).
+                - The aggregated starting practice time limit `Z` for the group is the **maximum** of all calculated `Z_individual_x` values.
             - **Construct Recommendation Text:**
-                - Base template: "For [`Qt`] questions in the [`Dm`] domain (addressing specific issue from Chapter 3/4 diagnosis), recommend practicing [`Y`] difficulty questions, with a starting time limit of [`Z`] minutes. (Target time: DS 2min; TPA/GT 3min; MSR single Q ~2min)."
+                - Base template: "For [`Qt`] questions in the [`Dm`] domain (addressing specific issue from Chapter 3/4 diagnosis), recommend practicing [`Y`] difficulty questions, with a starting time limit of [`Z`] minutes. (Target time: DS 2min; TPA/GT 3min; MSR single Q 1.5min)."
                 - **Priority Annotation:** If the question triggered `special_focus_error` = `True`, prepend "*Foundational mastery unstable*" to this recommendation.
                 - **Extended Time Reminder:** If `Z` - `target_time` > 2.0 minutes, add reminder "**Significant practice volume needed to ensure gradual time limit reduction is effective.**"
             - Add case suggestion `C` to `recommendations_by_type`[`Qt`].
     - **Collate and Output Recommendation List:**
         - Initialize `final_recommendations`.
         - **Process Exempted Combinations:** For each `(Qt, Dm)` in `exempted_combinations`:
-            - If `Qt` did **not** trigger a macro suggestion (`Qt` not in `processed_override_types`):
-                - Add an exemption note to `final_recommendations`: "Performance on [`Qt`] questions in [`Dm`] is stable; practice can be deferred."
+            Add an exemption note to `final_recommendations`: "Performance on [`Qt`] questions in [`Dm`] is stable; practice can be deferred."
         - **Collate Aggregated Suggestions:** Iterate through `recommendations_by_type`.
             - For each type `Qt` and its recommendation list `type_recs`:
                 - If the list is not empty:
@@ -535,7 +539,10 @@
 
 **6. Practice Recommendations (Based on Chapter 6)**
 
-*   (Present the specific practice recommendation table or list generated in Chapter 6. Emphasize that these recommendations are based on identified **English diagnostic parameters** and have been personalized by applying macro override, **aggregation**, and perfect performance exemption rules.)
+*   (Present the specific practice recommendation table or list generated in Chapter 6. Emphasize that these recommendations are based on identified **English diagnostic parameters** and have been personalized by applying macro override, **aggregation**, and perfect performance exemption rules. Recommendations should be presented in three forms:
+    * **Exemption Notes**: Indicating which `question_type` + `content_domain` combinations performed perfectly and are exempted from practice recommendations.
+    * **Macro Recommendations**: Systematic consolidation advice for `question_type`s with overall poor performance.
+    * **Aggregated Recommendations**: Specific practice advice aggregated by `question_type` + `content_domain`, including aggregated practice difficulty (Y) (based on the lowest difficulty among triggering questions in that combination), aggregated starting time limit (Z) (based on the maximum of individually calculated recommended time limits for triggering questions in that combination), and the final target time.)
 
 **7. Next Steps Guidance**
 
@@ -627,38 +634,38 @@
 
 ---
 
-# **Appendix A: Diagnostic Parameter Tags and English Descriptions**
+# **Appendix A: Diagnostic Parameter Tags and Chinese Descriptions**
 
-| English Parameter                          | English Description                                                    |
+| English Parameter                          | Chinese Description (中文描述)                                       |
 |--------------------------------------------|----------------------------------------------------------------------|
 | **DI - Reading & Understanding**           |                                                                      |
-| `DI_READING_COMPREHENSION_ERROR`           | DI Reading Comprehension: Text/Meaning Understanding Error/Barrier   |
-| `DI_GRAPH_TABLE_INTERPRETATION_ERROR`      | DI Graph/Table Interpretation: Error/Barrier in reading visual data |
+| `DI_READING_COMPREHENSION_ERROR`           | DI 閱讀理解: 文字/題意理解錯誤/障礙 (Math/Non-Math)                  |
+| `DI_GRAPH_TABLE_INTERPRETATION_ERROR`      | DI 圖表解讀: 圖形/表格信息解讀錯誤/障礙                               |
 | **DI - Concept & Application (Math)**      |                                                                      |
-| `DI_CONCEPT_APPLICATION_ERROR`             | DI Concept Application (Math): Math Concept/Formula Application Error/Barrier |
+| `DI_CONCEPT_APPLICATION_ERROR`             | DI 概念應用 (Math): 數學觀念/公式應用錯誤/障礙                       |
 | **DI - Logical Reasoning (Non-Math)**      |                                                                      |
-| `DI_LOGICAL_REASONING_ERROR`               | DI Logical Reasoning (Non-Math): Internal Logical Reasoning/Judgment Error |
+| `DI_LOGICAL_REASONING_ERROR`               | DI 邏輯推理 (Non-Math): 題目內在邏輯推理/判斷錯誤                    |
 | **DI - Data Handling & Calculation**       |                                                                      |
-| `DI_DATA_EXTRACTION_ERROR`                 | DI Data Extraction (GT): Error extracting data from charts/tables      |
-| `DI_INFORMATION_EXTRACTION_INFERENCE_ERROR`| DI Info Extraction/Inference (GT/MSR Non-Math): Info Location/Inference Error |
-| `DI_CALCULATION_ERROR`                     | DI Calculation: Mathematical Calculation Error/Barrier               |
+| `DI_DATA_EXTRACTION_ERROR`                 | DI 數據提取 (GT): 從圖表中提取數據錯誤                                 |
+| `DI_INFORMATION_EXTRACTION_INFERENCE_ERROR`| DI 信息提取/推斷 (GT/MSR Non-Math): 信息定位/推斷錯誤                |
+| `DI_CALCULATION_ERROR`                     | DI 計算: 數學計算錯誤/障礙                                           |
 | **DI - MSR Specific**                      |                                                                      |
-| `DI_MULTI_SOURCE_INTEGRATION_ERROR`        | DI Multi-Source Integration (MSR): Error/Barrier integrating info across tabs/sources |
-| `DI_MSR_READING_COMPREHENSION_BARRIER`     | DI MSR Reading Barrier: Excessive overall reading time for the group |
+| `DI_MULTI_SOURCE_INTEGRATION_ERROR`        | DI 多源整合 (MSR): 跨分頁/來源信息整合錯誤/障礙                      |
+| `DI_MSR_READING_COMPREHENSION_BARRIER`     | DI MSR 閱讀障礙: 題組整體閱讀時間過長                                |
 | **DI - Question Type Specific**            |                                                                      |
-| `DI_QUESTION_TYPE_SPECIFIC_ERROR`          | DI Specific Question Type Barrier (e.g., MSR Non-Math sub-type)       |
+| `DI_QUESTION_TYPE_SPECIFIC_ERROR`          | DI 特定題型障礙 (例如 MSR Non-Math 子題型)                           |
 | **DI - Foundational & Efficiency**         |                                                                      |
-| `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`  | DI Foundational Mastery: Unstable Application (Special Focus Error)  |
-| `DI_EFFICIENCY_BOTTLENECK_READING`         | DI Efficiency Bottleneck: Reading Comprehension Time (Math/Non-Math)|
-| `DI_EFFICIENCY_BOTTLENECK_CONCEPT`         | DI Efficiency Bottleneck: Concept/Formula Application Time (Math)    |
-| `DI_EFFICIENCY_BOTTLENECK_CALCULATION`     | DI Efficiency Bottleneck: Calculation Time                           |
-| `DI_EFFICIENCY_BOTTLENECK_LOGIC`           | DI Efficiency Bottleneck: Logical Reasoning Time (Non-Math)         |
-| `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE`     | DI Efficiency Bottleneck: Graph/Table Interpretation Time            |
-| `DI_EFFICIENCY_BOTTLENECK_INTEGRATION`     | DI Efficiency Bottleneck: Multi-Source Info Integration Time (MSR)  |
+| `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`  | DI 基礎掌握: 應用不穩定 (Special Focus Error)                        |
+| `DI_EFFICIENCY_BOTTLENECK_READING`         | DI 效率瓶頸: 閱讀理解耗時 (Math/Non-Math)                            |
+| `DI_EFFICIENCY_BOTTLENECK_CONCEPT`         | DI 效率瓶頸: 概念/公式應用耗時 (Math)                                |
+| `DI_EFFICIENCY_BOTTLENECK_CALCULATION`     | DI 效率瓶頸: 計算耗時                                                |
+| `DI_EFFICIENCY_BOTTLENECK_LOGIC`           | DI 效率瓶頸: 邏輯推理耗時 (Non-Math)                               |
+| `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE`     | DI 效率瓶頸: 圖表解讀耗時                                            |
+| `DI_EFFICIENCY_BOTTLENECK_INTEGRATION`     | DI 效率瓶頸: 多源信息整合耗時 (MSR)                                  |
 | **DI - Behavior**                          |                                                                      |
-| `DI_CARELESSNESS_DETAIL_OMISSION`          | DI Behavior: Carelessness - Detail Omission/Misread (Implied in Fast & Wrong) |
-| **Behavioral Patterns**                  |                                                                      |
-| `BEHAVIOR_CARELESSNESS_ISSUE`              | Behavioral Pattern: Carelessness - High Overall Fast & Wrong Rate    |
-| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`         | Behavioral Pattern: Risk of Rushing Early in the Test                |
+| `DI_CARELESSNESS_DETAIL_OMISSION`          | DI 行為: 粗心 - 細節忽略/看錯 (快錯時隱含)                           |
+| **行為模式 (Behavioral Patterns)**       |                                                                      |
+| `BEHAVIOR_CARELESSNESS_ISSUE`              | 行為模式: 粗心 - 整體快錯率偏高 (fast_wrong_rate > 25%)              |
+| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`         | 行為模式: 測驗前期作答過快風險 (< 1.0 min, 注意 flag for review)     |
 
 \n\n(End of document)\n\
