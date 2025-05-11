@@ -7,11 +7,15 @@ Q診斷模塊的分析功能
 
 import pandas as pd
 import numpy as np
+import logging # Add logging import
 from gmat_diagnosis_app.diagnostics.q_modules.constants import (
     INVALID_DATA_TAG_Q,
     PARAM_ASSIGNMENT_RULES,
     DEFAULT_INCORRECT_PARAMS
 )
+
+# # Configure basic logging # Removed by AI
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(module)s - %(funcName)s - %(lineno)d - %(message)s') # Removed by AI
 
 
 def diagnose_q_root_causes(df, avg_times, max_diffs):
@@ -27,21 +31,21 @@ def diagnose_q_root_causes(df, avg_times, max_diffs):
         return df
 
     # --- Vectorized Calculations for is_sfe and time_performance_category ---
-    # 計算每個題目對應題型的平均時間
+    # Calculate average time for each question type
     df['avg_time_for_type'] = df['question_type'].map(avg_times)
-    # 使用replace方法處理NaN值，避免FutureWarning
+    # Handle NaN values using replace to avoid FutureWarnings
     df['avg_time_for_type'] = df['avg_time_for_type'].replace({pd.NA: 2.0, None: 2.0, np.nan: 2.0}).infer_objects(copy=False)
     
-    # 取得數值型態的時間
+    # Get numeric time
     numeric_time = pd.to_numeric(df['question_time'], errors='coerce')
     
-    # 判斷是否为相对较快
+    # Determine if relatively fast
     df['is_relatively_fast'] = (numeric_time < (df['avg_time_for_type'] * 0.75)).replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
     
-    # 判断是否缓慢
+    # Determine if slow
     df['is_slow'] = df['overtime'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
 
-    # 設定時間表現分類
+    # Set time performance category
     conditions = [
         (df['is_correct'] == True) & (df['is_relatively_fast'] == True),
         (df['is_correct'] == True) & (df['is_slow'] == True),
@@ -57,10 +61,8 @@ def diagnose_q_root_causes(df, avg_times, max_diffs):
     df['time_performance_category'] = np.select(conditions, choices, default='Unknown')
     df.loc[numeric_time.isna(), 'time_performance_category'] = 'Unknown'
 
-    # 判斷是否特殊關注錯誤(SFE)：
-    # 該題的難度低於該學生在該技能上已正確完成的最高難度
+    # Determine Special Focus Error (SFE)
     df['max_correct_diff_for_skill'] = df['question_fundamental_skill'].map(max_diffs)
-    # 使用replace方法處理NaN值，避免FutureWarning
     df['max_correct_diff_for_skill'] = df['max_correct_diff_for_skill'].replace({pd.NA: -np.inf, None: -np.inf, np.nan: -np.inf}).infer_objects(copy=False)
     numeric_diff = pd.to_numeric(df['question_difficulty'], errors='coerce')
     df['is_sfe'] = (
@@ -68,51 +70,61 @@ def diagnose_q_root_causes(df, avg_times, max_diffs):
         (numeric_diff.notna()) & (numeric_diff < df['max_correct_diff_for_skill'])
     ).replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
 
-    # --- Parameter Assignment using Dictionary Lookup (Loop still needed for combining logic) ---
+    # --- Parameter Assignment using Dictionary Lookup ---
     all_diagnostic_params = []
+    # logging.info(f"Starting diagnostic parameter assignment for {len(df)} questions.") # Removed by AI
     for index, row in df.iterrows():
         current_params = []
         is_sfe = row['is_sfe']
         time_perf_cat = row['time_performance_category']
-        q_type = row['question_type']
+        q_type = row.get('question_type', 'N/A') # Safely get q_type, default to 'N/A'
         is_correct = bool(row.get('is_correct', True))
         is_invalid = bool(row.get('is_invalid', False))
+        question_position = row.get('question_position', 'N/A')
+
+        # logging.debug(f"Processing Q#{question_position}: q_type='{q_type}', time_perf_cat='{time_perf_cat}', is_correct={is_correct}, is_invalid={is_invalid}") # Removed by AI
 
         # 1. Get base parameters from rules dictionary
         lookup_key = (time_perf_cat, q_type)
-        # Only apply rules if incorrect or slow & correct
+        
+        base_params = [] # Initialize base_params
         if not is_correct:
-            # Special handling for Unknown time category if incorrect
             if time_perf_cat == 'Unknown':
                  base_params = PARAM_ASSIGNMENT_RULES.get(('Unknown', q_type), DEFAULT_INCORRECT_PARAMS)
+                 # logging.debug(f"Q#{question_position} (Incorrect, Unknown Time): lookup_key={('Unknown', q_type)}, base_params={base_params}") # Removed by AI
             else:
-                 base_params = PARAM_ASSIGNMENT_RULES.get(lookup_key, DEFAULT_INCORRECT_PARAMS) # Fallback if combo missing
+                 base_params = PARAM_ASSIGNMENT_RULES.get(lookup_key, DEFAULT_INCORRECT_PARAMS)
+                 # logging.debug(f"Q#{question_position} (Incorrect): lookup_key={lookup_key}, base_params={base_params}") # Removed by AI
             current_params.extend(base_params)
         elif time_perf_cat == 'Slow & Correct':
             base_params = PARAM_ASSIGNMENT_RULES.get(lookup_key, []) # Get efficiency params
+            # logging.info(f"Q#{question_position} (Slow & Correct): q_type='{q_type}', lookup_key={lookup_key}, fetched base_params={base_params}") # Removed by AI
             current_params.extend(base_params)
         # Other correct categories ('Fast & Correct', 'Normal Time & Correct') get no params from dict
+        
+        # logging.debug(f"Q#{question_position}: current_params after base rules: {current_params}") # Removed by AI
 
         # 2. Add SFE if applicable (regardless of time)
         if is_sfe:
-            # Avoid adding SFE if already present from the rule dictionary (though unlikely)
             if 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' not in current_params:
                 current_params.append('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+                # logging.debug(f"Q#{question_position}: Added SFE tag. current_params: {current_params}") # Removed by AI
 
         # 3. Remove duplicates and ensure SFE is first
-        unique_params = list(dict.fromkeys(current_params)) # Preserve order somewhat
+        unique_params = list(dict.fromkeys(current_params)) 
         if 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in unique_params:
             unique_params.remove('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
             unique_params.insert(0, 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-
+            # logging.debug(f"Q#{question_position}: SFE tag moved to front. unique_params: {unique_params}") # Removed by AI
+        
         # 4. Add invalid tag if needed
         if is_invalid:
-            # Avoid adding duplicate invalid tags
             if INVALID_DATA_TAG_Q not in unique_params:
-                 # Insert invalid tag at the end for clarity
                  unique_params.append(INVALID_DATA_TAG_Q)
+                 # logging.debug(f"Q#{question_position}: Added invalid tag. unique_params: {unique_params}") # Removed by AI
 
         all_diagnostic_params.append(unique_params)
+        # logging.info(f"Q#{question_position}: Final diagnostic_params for this row: {unique_params}") # Removed by AI
 
     df['diagnostic_params'] = all_diagnostic_params
 
