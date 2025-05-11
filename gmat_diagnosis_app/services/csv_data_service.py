@@ -44,6 +44,11 @@ STUDENT_SUBJECTIVE_REPORTS_HEADERS = [
     "report_collection_timestamp"
 ]
 
+# Headers for duplicate check, excluding fields that change with each write (e.g., timestamp)
+GMAT_PERFORMANCE_HEADERS_FOR_DUPLICATE_CHECK = [
+    h for h in GMAT_PERFORMANCE_HEADERS if h != "record_timestamp"
+]
+
 
 def initialize_csv_files() -> None:
     """
@@ -139,32 +144,128 @@ def validate_gmat_performance_record(record: Dict[str, Any]) -> bool:
     return True
 
 
+def _is_duplicate_record(
+    new_records_sample: List[Dict[str, Any]],
+    existing_csv_file_path: str,
+    headers_for_comparison: List[str]
+) -> bool:
+    """
+    Check if the sample of new records (first 5 rows) already exists in the CSV file.
+    Comparison is based on a specified list of headers.
+    """
+    if not os.path.exists(existing_csv_file_path):
+        return False # File doesn't exist, so no duplicates
+
+    if not new_records_sample:
+        return False # No new records to check
+
+    try:
+        with open(existing_csv_file_path, 'r', newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            existing_records = list(reader)
+            if not existing_records:
+                return False # Existing file is empty
+
+            num_new_sample = len(new_records_sample)
+            
+            # Prepare the new sample for comparison by selecting and ordering relevant fields
+            new_sample_to_compare = []
+            for new_rec in new_records_sample:
+                try:
+                    new_sample_to_compare.append(
+                        tuple(str(new_rec.get(h, '')) for h in headers_for_comparison)
+                    )
+                except Exception as e:
+                    # Handle potential errors if a header is missing or value conversion fails, though validation should prevent this
+                    print(f"Warning: Error preparing new record for comparison: {new_rec}, header: {h}, error: {e}")
+                    # Depending on strictness, could return True to prevent partial write, or False to allow
+                    return False # Or True if strictness is required
+
+
+            # Iterate through existing records to find a match for the new sample
+            for i in range(len(existing_records) - num_new_sample + 1):
+                current_existing_chunk_to_compare = []
+                is_match = True
+                for j in range(num_new_sample):
+                    existing_rec_for_chunk = existing_records[i+j]
+                    try:
+                        current_existing_chunk_to_compare.append(
+                             tuple(str(existing_rec_for_chunk.get(h, '')) for h in headers_for_comparison)
+                        )
+                    except Exception as e:
+                        print(f"Warning: Error preparing existing record for comparison: {existing_rec_for_chunk}, header: {h}, error: {e}")
+                        is_match = False # Chunk cannot be reliably compared
+                        break
+                
+                if not is_match: # if preparing this chunk failed
+                    continue
+
+                if new_sample_to_compare == current_existing_chunk_to_compare:
+                    return True # Found a duplicate chunk
+                    
+        return False # No duplicate chunk found
+    except FileNotFoundError:
+        return False # Should be caught by os.path.exists, but as a safeguard
+    except Exception as e:
+        print(f"Error reading or comparing CSV for duplicates: {e}")
+        return False # Treat errors as non-duplicate to allow write if unsure
+
+
 def add_gmat_performance_record(record_data: List[Dict[str, Any]]) -> bool:
     """
     Add GMAT performance records to the CSV file.
+    Skips adding if the first 5 records are identical to an existing sequence in the file.
     
     Args:
         record_data: List of dictionaries, each containing data for a single question performance
                     All records should share the same student_id, test_instance_id, etc.
                     
     Returns:
-        bool: True if records were added successfully, False otherwise
+        bool: True if records were added successfully or if duplicate was detected (operation considered complete), False otherwise
     """
     if not record_data:
-        print("Error: Empty record data provided")
+        print("Error: Empty record data provided to add_gmat_performance_record")
         return False
     
-    # Initialize CSV file if it doesn't exist
+    # Initialize CSV file if it doesn't exist (ensures headers are present for DictReader)
     initialize_csv_files()
+
+    # Take a sample of the first 5 records (or fewer if less than 5) for duplicate check
+    sample_size = min(5, len(record_data))
+    new_records_sample = record_data[:sample_size]
+
+    # Check for duplicates
+    if _is_duplicate_record(new_records_sample, GMAT_PERFORMANCE_DATA_FILE, GMAT_PERFORMANCE_HEADERS_FOR_DUPLICATE_CHECK):
+        print(f"Duplicate data detected based on the first {sample_size} records. Skipping write for {len(record_data)} records.")
+        # Consider this a "successful" operation in the sense that we've handled the input appropriately
+        return True 
     
     try:
         current_timestamp = datetime.datetime.now().isoformat()
         
+        # Open in append mode. If _is_duplicate_record was false, we proceed to write.
         with open(GMAT_PERFORMANCE_DATA_FILE, 'a', newline='') as csvfile:
+            # Check if file is empty to write headers. This is a bit tricky with 'a' mode.
+            # initialize_csv_files should handle header writing for new files.
+            # For existing files, we assume headers are there if the file is not empty.
+            # A more robust check might involve peeking at the file or checking size.
+            # However, DictWriter will write headers if the file is empty,
+            # but will raise an error if headers are present and fieldnames don't match.
+            # Given initialize_csv_files creates headers, this should be mostly fine.
+            
             writer = csv.DictWriter(csvfile, fieldnames=GMAT_PERFORMANCE_HEADERS)
             
+            # If the file was newly created by initialize_csv_files OR if it was empty before opening in 'a' mode,
+            # we might need to write headers if DictWriter doesn't do it on its own in 'a' mode for an empty file.
+            # Let's check file size. If 0, write header. (os.path.getsize might be better)
+            csvfile.seek(0, os.SEEK_END) # Go to end of file
+            file_is_empty = csvfile.tell() == 0 # Check if pointer is at position 0
+            if file_is_empty:
+                writer.writeheader()
+            
+            valid_records_written = 0
             for record in record_data:
-                # Validate the record
+                # Validate the record (individual record validation)
                 if not validate_gmat_performance_record(record):
                     print(f"Invalid record found, skipping: {record}")
                     continue
@@ -174,9 +275,20 @@ def add_gmat_performance_record(record_data: List[Dict[str, Any]]) -> bool:
                 
                 # Write the record to the CSV file
                 writer.writerow(record)
+                valid_records_written += 1
         
-        print(f"Successfully added {len(record_data)} GMAT performance records.")
-        return True
+        if valid_records_written > 0:
+            # print(f"Successfully added {valid_records_written} GMAT performance records.") # This line will be commented out/removed
+            pass # Keep a pass statement if removing the print makes the if block empty, or remove the if block if appropriate
+        elif not record_data: # Should be caught earlier
+             pass # No records were provided
+        # If valid_records_written is 0 but record_data was not empty, it means all were invalid
+        elif record_data and valid_records_written == 0:
+            print("No valid GMAT performance records were written (all were invalid).")
+
+
+        return True # Overall operation considered successful if it ran without exceptions
+                    # or if duplicates were skipped.
     except Exception as e:
         print(f"Error adding GMAT performance records: {e}")
         return False
