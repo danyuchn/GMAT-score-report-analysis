@@ -1,0 +1,42 @@
+# Git specific
+.git
+.gitignore
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.venv/
+ENV/
+env/
+
+# IDE and editor specific
+.vscode/
+.idea/
+.project
+.classpath
+*.swp
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Docker specific
+Dockerfile
+.dockerignore
+
+# Log files
+logs/
+*.log
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Other project specific files to ignore
+*.bak
+.cursor/ 
