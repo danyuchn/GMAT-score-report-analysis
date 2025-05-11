@@ -1,6 +1,7 @@
 # GMAT-score-report-analysis
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-orange.svg)
 ![Excel VBA](https://img.shields.io/badge/Excel-VBA-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Status](https://img.shields.io/badge/Status-Active-success.svg)
@@ -10,15 +11,18 @@
 This repository provides a comprehensive toolkit for GMAT test-takers and educators to analyze score reports, simulate exam performance, and optimize study strategies. It includes:
 
 * An interactive tool to map GMAT scale scores to percentiles and estimate total scores.
-* An Item Response Theory (IRT)-based simulation tool to track ability (theta) estimates and analyze question difficulty.
+* An Item Response Theory (IRT)-based simulation tool to track ability (theta) estimates and analyze question difficulty (available as a Jupyter Notebook).
 * An Excel VBA macro to annotate score reports with detailed insights for educational analysis.
-* A structured Standard Operating Procedure (SOP) for detailed score report analysis, outlining steps from data cleaning to personalized practice suggestions.  
+* A structured Standard Operating Procedure (SOP) for detailed score report analysis, outlining steps from data cleaning to personalized practice suggestions, found in `analysis-template-dustin.md`.
+* The `analysis-framework/` directory contains related documentation for the analysis methodology, potentially including overall and section-specific documents in English and Chinese.
+* **Additionally, this repository now features an interactive GMAT Score Diagnosis Platform (Streamlit App located in `gmat_diagnosis_app/`) for a more automated and web-based analysis experience (see dedicated section below).**
 
 ## Key Features
 
-* **Interactive Score Percentile Mapping**: Visualize scale scores and percentiles with sliders, estimate total scores using a weighted formula, and assess score efficiency via tangent slopes (steeper slopes indicate higher percentile gains per scale point).
-* **IRT-Based Exam Simulation**: Simulate GMAT exams with user-defined subject order, wrong questions, and initial θ values, generating theta trend plots and difficulty parameters (b).
-* **Excel VBA Score Annotation**: Automatically annotate GMAT score reports in Excel, marking overtime questions, too-fast responses, incorrect answers, and identifying "UNUSUAL" (easier incorrect questions) and "UNUSUAL SLOW" (excessively slow responses) conditions based on difficulty and response time.
+* **Interactive Score Percentile Mapping (`scale-percentile-simulation.ipynb`)**: Visualize scale scores and percentiles with sliders, estimate total scores using a weighted formula, and assess score efficiency via tangent slopes (steeper slopes indicate higher percentile gains per scale point).
+* **IRT-Based Exam Simulation (`irt-simulation-tool.ipynb`)**: Simulate GMAT exams with user-defined subject order, wrong questions, and initial θ values, generating theta trend plots and difficulty parameters (b).
+* **Excel VBA Score Annotation (`score-excel-vba.bas`)**: Automatically annotate GMAT score reports in Excel, marking overtime questions, too-fast responses, incorrect answers, and identifying "UNUSUAL" (easier incorrect questions) and "UNUSUAL SLOW" (excessively slow responses) conditions based on difficulty and response time.
+* **GMAT Score Diagnosis Platform (Streamlit App)**: A web-based application offering comprehensive analysis of Q, V, and DI sections with IRT insights, error pattern identification, and AI-powered summaries. (Detailed in its own section below).
 
 ## Installation
 
@@ -26,7 +30,7 @@ This repository provides a comprehensive toolkit for GMAT test-takers and educat
 
 * For Python Tools:
   * Python 3.8 or higher
-  * Required libraries: numpy, pandas, matplotlib, scipy, ipywidgets, pytz
+  * Required libraries: numpy, pandas, matplotlib, scipy, ipywidgets, pytz, **streamlit, openai** (ensure these are in `requirements.txt` or installed manually for the Streamlit app)
 * For Excel VBA Tool:
   * Microsoft Excel with VBA support enabled
 
@@ -47,11 +51,13 @@ This repository provides a comprehensive toolkit for GMAT test-takers and educat
    pip install -r requirements.txt
    ```
 
-4. Run Jupyter Notebook:
+4. Run Jupyter Notebook (for `.ipynb` files):
    ```bash
    jupyter notebook
    ```
    Open `scale-percentile-simulation.ipynb` or `irt-simulation-tool.ipynb` to get started.
+
+5. To run the GMAT Score Diagnosis Platform (Streamlit App), see its dedicated section below for launch instructions.
 
 ### Setup for Excel VBA Tool
 
@@ -133,7 +139,7 @@ This repository provides a comprehensive toolkit for GMAT test-takers and educat
 
 ### 4. Analysis Templates
 
-This repository includes a standardized analysis template based on Dustin’s Standard Operating Procedure (SOP) for dissecting GMAT score reports. The template, detailed in [analysis-template-dustin.md](./analysis-template-dustin.md), provides an 8-step framework to:
+This repository includes a standardized analysis template based on Dustin's Standard Operating Procedure (SOP) for dissecting GMAT score reports. The template, detailed in [analysis-template-dustin.md](./analysis-template-dustin.md), provides an 8-step framework to:
 
 * Clean and validate score data (e.g., filtering guessed or unanswered questions).
 * Analyze time management and performance by question type and difficulty.
@@ -142,16 +148,108 @@ This repository includes a standardized analysis template based on Dustin’s St
 
 This SOP is ideal for educators and test-takers aiming to systematically improve performance. Integrate it with the Excel VBA annotations and IRT simulation outputs for a comprehensive analysis workflow.
 
+## Interactive GMAT Score Diagnosis Platform (Streamlit App - `gmat_diagnosis_app/app.py`)
+
+This project also includes a powerful, web-based GMAT Score Diagnosis Platform built with Streamlit. It offers a more automated and interactive way to analyze your GMAT performance across Quantitative (Q), Verbal (V), and Data Insights (DI) sections.
+
+*   **Purpose**: Provides an interactive web application for in-depth analysis of GMAT Quantitative, Verbal, and Data Insights sections. It helps users identify weaknesses, understand performance patterns, and receive targeted practice recommendations.
+
+*   **Key Features**:
+    *   **Versatile Data Input**:
+        *   Upload score data via CSV files (up to 1MB).
+        *   Paste data directly from Excel or other tabular sources.
+        *   Supports Quantitative (Q), Verbal (V), and Data Insights (DI) sections.
+        *   Includes sample data for quick testing.
+    *   **Comprehensive Performance Analysis**:
+        *   IRT-based ability (Theta) estimation and trend visualization across questions.
+        *   Detailed time management analysis, identifying pacing issues.
+        *   Identification of error patterns, including Special Focus Errors (SFE) indicating inconsistent concept mastery.
+        *   Subject-specific diagnostic logic for Q, V, and DI.
+    *   **Insightful Diagnostic Reports**:
+        *   Per-subject reports showing Theta trend plots.
+        *   Text-based summaries detailing overall time pressure, performance across various dimensions (question type, difficulty, skills), core diagnostic findings, and special behavioral patterns.
+        *   Identification of foundational knowledge areas needing reinforcement.
+    *   **Personalized Practice Recommendations**:
+        *   Concrete suggestions for practice, including recommended difficulty levels and initial time constraints.
+    *   **Data Interaction and Export**:
+        *   Interactive data tables displaying input data alongside diagnostic tags (e.g., simulated difficulty, time performance category, SFE, overtime, invalid status).
+        *   Color-coded highlighting for incorrect answers, overtime, and invalid questions.
+        *   Ability to manually mark questions as "invalid" (e.g., due to rushing or guessing) to refine analysis accuracy.
+        *   Download detailed diagnostic data with all tags as an Excel file.
+    *   **Optional AI-Powered Enhancements (requires OpenAI API Key)**:
+        *   AI-generated consolidated summary of practice recommendations from all sections.
+        *   Interactive chat interface to ask questions about the generated reports and data.
+    *   **Data Persistence**:
+        *   Uploaded GMAT performance data is appended to `gmat_diagnosis_app/gmat_performance_data.csv` for record-keeping and potential future aggregated analysis.
+
+*   **How to Launch**:
+    1.  Ensure you have installed the necessary dependencies (including `streamlit` and `openai`) from `requirements.txt`.
+    2.  Navigate to the project's root directory in your terminal.
+    3.  Run the command: `streamlit run gmat_diagnosis_app/app.py`.
+    4.  The application should open in your web browser.
+
+*   **How to Use**:
+    1.  **Prepare Data**: Ensure your GMAT score data for Q, V, and DI sections is ready. It should include columns like `Question`, `Response Time (Minutes)`, `Performance`, and subject-specific fields like `Content Domain`, `Question Type`, and `Fundamental Skills`. **Crucially, de-identify your data by removing all personal information.** Refer to the app's built-in "快速使用指南" (Quick Start Guide) and "完整使用說明" (Complete Usage Guide) for exact column names, formats, and detailed instructions.
+    2.  **Input Data**: In the "數據輸入與分析" (Data Input & Analysis) tab of the app:
+        *   Navigate to the respective Q, V, and DI sub-tabs.
+        *   Either upload your CSV file or paste data from Excel/tables into the provided text areas.
+        *   The app provides an option to load sample data to explore its features.
+    3.  **Review and Edit Data**: 
+        *   Once data is loaded, a preview and editor will appear.
+        *   Verify the data accuracy. 
+        *   **Mark Invalid Questions**: Use the checkboxes to mark any questions that were answered under undue time pressure, guessed, or otherwise do not reflect your true ability. The system might pre-select some based on time, but manual input is prioritized.
+    4.  **Configure Settings (Sidebar)**:
+        *   **IRT Simulation**: Adjust initial Theta estimates for Q, V, DI if desired (default is 0.0).
+        *   **OpenAI API Key (Optional)**: If you have an OpenAI API key, enter it to enable AI-powered summary and chat features.
+        *   **Manual Adjustments**: Optionally, specify question numbers to be manually flipped from incorrect to correct (or vice-versa) for IRT simulation purposes.
+    5.  **Run Analysis**: Once data for all three sections (Q, V, DI) is successfully loaded and validated, the "開始分析" (Start Analysis) button will become active. Click it to initiate the diagnosis.
+    6.  **View Results**: After processing, navigate to the "結果查看" (View Results) tab:
+        *   **Per-Subject Tabs (e.g., "Q 科結果")**: View Theta trend plots, detailed text-based diagnostic reports (covering time pressure, error patterns, SFE, practice advice), and interactive data tables with diagnostic tags.
+        *   **Download Data**: Download the augmented data (including all diagnostic tags) as an Excel file.
+        *   **✨ AI Consolidated Advice (if OpenAI key provided)**: A summary of practice recommendations extracted by AI.
+    7.  **Interact with AI (if OpenAI key provided)**: Use the chat interface at the bottom of the results page to ask specific questions about your generated reports.
+
+*   **Important Considerations for the Platform**:
+    *   **Data Privacy and Anonymization**: 
+        *   You are responsible for **manually removing all personally identifiable information (PII)** (e.g., name, candidate ID, email, test center) from your score data before uploading or pasting it into the platform.
+        *   By using the tool and uploading data, you consent to the collection of this **anonymized** data by the developer for purposes such as model optimization, academic research, or other analytical uses, as stated in the app's disclaimer.
+    *   **Accuracy of Analysis**:
+        *   The diagnostic insights and recommendations provided by the platform are based on quantitative analysis of the data you provide and internal IRT model estimations.
+        *   The accuracy of the analysis heavily depends on the completeness and correctness of your input data.
+        *   The IRT-estimated question difficulties and Theta values are for relative comparison and diagnostic purposes within this tool's framework; they **do not represent official GMAT scores or official GMAT question difficulties**.
+        *   The platform may automatically filter data points it deems invalid (e.g., based on extreme response times), but your manual marking of invalid questions is also crucial.
+        *   All outputs (diagnostic tags, insights, suggestions) are preliminary results and should be used as a supplementary tool. **They are not a substitute for qualitative analysis with an experienced GMAT instructor or professional advisor.**
+        *   **Data Storage**: Note that uploaded performance data is appended to `gmat_diagnosis_app/gmat_performance_data.csv`.
+
 ## Files
 
+* `gmat_diagnosis_app/app.py`: The main Streamlit application file for the GMAT Score Diagnosis Platform.
+* `gmat_diagnosis_app/`: Directory containing the modules for the Streamlit GMAT diagnosis application. Key subdirectories include:
+    * `services/`: Modules for data handling (CSV, OpenAI), plotting, etc.
+    * `ui/`: Components for the Streamlit user interface (input tabs, results display, chat).
+    * `analysis_orchestrator.py`: Coordinates the analysis pipeline.
+    * `diagnostics/`: Contains diagnostic logic for Q, V, and DI sections.
+    * `irt/`: Modules for Item Response Theory calculations and simulation.
+    * `utils/`: Utility functions for data processing, validation, etc.
+    * `constants/`: Configuration files and constant definitions.
+    * `gmat_performance_data.csv`: CSV file where uploaded GMAT performance records from the Streamlit app are stored.
+    * `student_subjective_reports.csv`: CSV file for storing student subjective reports (primarily related to the CSV data service, less directly tied to the Streamlit app's core performance analysis input).
 * `scale-percentile-simulation.ipynb`: Interactive tool for GMAT score percentile mapping and total score estimation with tangent analysis.
-* `irt-simulation-tool.ipynb`: IRT-based simulation tool for theta estimation, difficulty analysis, and Excel output.
-* `score-excel-vba.bas`: Excel VBA macro for annotating GMAT score reports with overtime, too-fast, incorrect, unusual, and unusual slow conditions.
-* `analysis-template-dustin.md`Markdown file containing the full SOP table with descriptions, purposes, and examples.
+* `irt-simulation-tool.ipynb`: IRT-based simulation tool for theta estimation, difficulty analysis, and Excel output (manual workflow component).
+* `score-excel-vba.bas`: Excel VBA macro for annotating GMAT score reports with overtime, too-fast, incorrect, unusual, and unusual slow conditions (manual workflow component).
+* `analysis-template-dustin.md`: Markdown file containing the full SOP table with descriptions, purposes, and examples for score report analysis (supports manual workflow).
+* `analysis-framework/`: Directory containing documentation related to the GMAT analysis methodology used in the project. It may include:
+    * `overall-doc/`: General documents about the analysis framework.
+    * `sec-doc-zh/`: Section-specific documents in Chinese.
+    * `section-doc-en/`: Section-specific documents in English.
+    * `testset/`: Potentially sample data or test cases for the analysis framework.
+* `requirements.txt`: Lists the Python dependencies for the project (ensure `streamlit` and `openai` are included if using the diagnosis platform).
+* `README.md`: This file.
+* `LICENSE.md`: Project license information.
 
 ## Recommended Usage Workflow
 
-For optimal results, follow this step-by-step workflow:
+For optimal results, follow this step-by-step workflow (manual approach):
 
 1. **Analyze GMAT Total Score Target**
    * Open `scale-percentile-simulation.ipynb`
@@ -191,18 +289,16 @@ This integrated workflow allows you to target your study efforts efficiently by 
 
 ## Important Notes
 
-1. The IRT simulation tool uses difficulty parameters (b) within a range of -2 to +2 and a simulated question bank of 1000 randomly distributed items. These parameters can be customized but are intended only for simulation purposes. The actual difficulty range and question bank size used in the official GMAT exam are proprietary information.
-
-2. Theta (θ) estimates should be interpreted cautiously. Focus on relative values and patterns of change rather than absolute numbers.
-
-3. The plain text report generated by `GeneratePlainTextReport_WithColorInfo` can be input into a Large Language Model (LLM) for further analysis and personalized recommendations.
-
-4. The official GMAT exam includes unscored experimental questions (with variable quantity and positions). The IRT simulation tool assumes all questions are scored by default.
-
-5. For optimal analysis results, combine this toolset with:
+1. The IRT simulation tool (`irt-simulation-tool.ipynb`) uses difficulty parameters (b) within a range of -2 to +2 and a simulated question bank of 1000 randomly distributed items. These parameters can be customized but are intended only for simulation purposes. The actual difficulty range and question bank size used in the official GMAT exam are proprietary information.
+2. Theta (θ) estimates from the `.ipynb` simulation tool should be interpreted cautiously. Focus on relative values and patterns of change rather than absolute numbers.
+3. The plain text report generated by `GeneratePlainTextReport_WithColorInfo` (from the Excel VBA tool) can be input into a Large Language Model (LLM) for further analysis and personalized recommendations.
+4. The official GMAT exam includes unscored experimental questions (with variable quantity and positions). The IRT simulation tool (`irt-simulation-tool.ipynb`) assumes all questions are scored by default.
+5. For optimal analysis results when using the manual workflow tools, combine this toolset with:
    * The test-taker's specific recollections of individual questions
    * Practice test reviews with detailed error analysis
    * Recent practice data (from 2-4 weeks before the exam) if the above information is unavailable
+
+(For important notes specific to the **Interactive GMAT Score Diagnosis Platform**, please see its dedicated section above.)
 
 ## Contributing
 
