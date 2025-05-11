@@ -639,7 +639,8 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
                         if tags_to_display_for_category:
                             has_content_for_skill = True
                             formatted_category_tags = [f"【{tag}】" for tag in tags_to_display_for_category]
-                            report_parts.append(f"| {category} | {", ".join(formatted_category_tags)} |")
+                            joined_tags = ", ".join(formatted_category_tags)
+                            report_parts.append(f"| {category} | {joined_tags} |")
                     if not has_content_for_skill:
                          report_parts.append(f"| 無對應分類 | (此技能下未發現可匹配預定義分類的標籤) |")
                 else:
