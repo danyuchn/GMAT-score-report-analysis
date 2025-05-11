@@ -918,94 +918,150 @@ Building upon the established framework and its current implementation, several 
 \endlastfoot % Marks the end of the footer for the last page
 
 % --- Table Content Starts Here ---
-% Note: The \multicolumn lines for section headers remain the same
-\multicolumn{2}{|c|}{\textbf{Reading / Comprehension / Interpretation}} \\
+% Note: The \\multicolumn lines for section headers remain the same
+\multicolumn{2}{|c|}{\textbf{Reading / Comprehension / Interpretation}} \\\\
 \hline
-\texttt{Q\_READING\_COMPREHENSION\_ERROR} & Q Reading: Difficulty understanding word problem text (Real Context) \\
-\texttt{Q\_PROBLEM\_UNDERSTANDING\_ERROR} & Q Problem Understanding: Misinterpretation of question requirements/logic \\
-\texttt{DI\_READING\_COMPREHENSION\_ERROR} & DI Reading Comprehension: Error/Difficulty understanding text (Math/Non-Math) \\
-\texttt{DI\_GRAPH\_TABLE\_INTERPRETATION\_ERROR} & DI Graph/Table Interpretation: Error/Difficulty interpreting visual data \\
-\texttt{CR\_READING\_BASIC\_OMISSION} & CR Reading: Basic comprehension omission \\
-\texttt{CR\_READING\_DIFFICULTY\_STEM} & CR Reading: Stem comprehension difficulty (keyword/syntax/logic/domain) \\
-\texttt{CR\_QUESTION\_UNDERSTANDING\_MISINTERPRETATION} & CR Question Understanding: Misinterpretation of question task \\
-\texttt{RC\_READING\_VOCAB\_BOTTLENECK} & RC Reading: Vocabulary bottleneck \\
-\texttt{RC\_READING\_SENTENCE\_STRUCTURE\_DIFFICULTY} & RC Reading: Difficulty parsing complex sentence structures \\
-\texttt{RC\_READING\_PASSAGE\_STRUCTURE\_DIFFICULTY} & RC Reading: Difficulty grasping passage structure \\
-\texttt{RC\_READING\_DOMAIN\_KNOWLEDGE\_GAP} & RC Reading: Lack of background knowledge in specific domain \\
-\texttt{RC\_QUESTION\_UNDERSTANDING\_MISINTERPRETATION} & RC Question Understanding: Misinterpretation of question focus \\
+\texttt{Q\_READING\_COMPREHENSION\_ERROR} & Q Reading: Difficulty understanding word problem text (Real Context) \\\\
+\texttt{Q\_PROBLEM\_UNDERSTANDING\_ERROR} & Q Problem Understanding: Misinterpretation of question requirements/logic \\\\
+\texttt{DI\_READING\_COMPREHENSION\_ERROR} & DI Reading Comprehension: Error/Difficulty understanding text (Math/Non-Math) \\\\
+\texttt{DI\_GRAPH\_TABLE\_INTERPRETATION\_ERROR} & DI Graph/Table Interpretation: Error/Difficulty interpreting visual data \\\\
+% CR/RC Reading/Comprehension/Interpretation errors will be listed under specific CR/RC sections below
 \hline
-\multicolumn{2}{|c|}{\textbf{Concept / Logic Application}} \\
+\multicolumn{2}{|c|}{\textbf{Concept / Logic Application}} \\\\
 \hline
-\texttt{Q\_CONCEPT\_APPLICATION\_ERROR} & Q Concept Application: Error applying mathematical concepts/formulas \\
-\texttt{DI\_CONCEPT\_APPLICATION\_ERROR} & DI Concept Application (Math): Error applying mathematical concepts/formulas \\
-\texttt{DI\_LOGICAL\_REASONING\_ERROR} & DI Logical Reasoning (Non-Math): Error in inherent logical reasoning/judgment \\
-\texttt{CR\_REASONING\_CHAIN\_ERROR} & CR Reasoning: Error in analyzing logical chain (premise/conclusion/relation) \\
-\texttt{CR\_REASONING\_ABSTRACTION\_DIFFICULTY} & CR Reasoning: Difficulty with abstract logic/terminology \\
-\texttt{CR\_REASONING\_PREDICTION\_ERROR} & CR Reasoning: Incorrect or missing prediction \\
-\texttt{CR\_REASONING\_CORE\_ISSUE\_ID\_DIFFICULTY} & CR Reasoning: Difficulty identifying the core issue \\
-\texttt{RC\_REASONING\_INFERENCE\_WEAKNESS} & RC Reasoning: Weak inference skills (prediction/detail/tone) \\
+\texttt{Q\_CONCEPT\_APPLICATION\_ERROR} & Q Concept Application: Error applying mathematical concepts/formulas \\\\
+\texttt{DI\_CONCEPT\_APPLICATION\_ERROR} & DI Concept Application (Math): Error applying mathematical concepts/formulas \\\\
+\texttt{DI\_LOGICAL\_REASONING\_ERROR} & DI Logical Reasoning (Non-Math): Error in inherent logical reasoning/judgment \\\\
+% CR/RC Concept/Logic Application errors will be listed under specific CR/RC sections below
 \hline
-\multicolumn{2}{|c|}{\textbf{Data Handling / Calculation / Location}} \\
+\multicolumn{2}{|c|}{\textbf{Data Handling / Calculation / Location}} \\\\
 \hline
-\texttt{Q\_CALCULATION\_ERROR} & Q Calculation: Error in mathematical computation \\
-\texttt{DI\_DATA\_EXTRACTION\_ERROR} & DI Data Extraction (GT): Error extracting data from graphs/tables \\
-\texttt{DI\_INFORMATION\_EXTRACTION\_INFERENCE\_ERROR} & DI Info Extraction/Inference (GT/MSR Non-Math): Error locating/inferring info \\
-\texttt{DI\_CALCULATION\_ERROR} & DI Calculation: Error in mathematical computation \\
-\texttt{RC\_READING\_INFO\_LOCATION\_ERROR} & RC Reading: Error locating/understanding key information \\
-\texttt{RC\_READING\_KEYWORD\_LOGIC\_OMISSION} & RC Reading: Omission of keywords/logic \\
-\texttt{RC\_LOCATION\_ERROR\_INEFFICIENCY} & RC Location: Incorrect or inefficient information location \\
+\texttt{Q\_CALCULATION\_ERROR} & Q Calculation: Error in mathematical computation \\\\
+\texttt{DI\_DATA\_EXTRACTION\_ERROR} & DI Data Extraction (GT): Error extracting data from graphs/tables \\\\
+\texttt{DI\_INFORMATION\_EXTRACTION\_INFERENCE\_ERROR} & DI Info Extraction/Inference (GT/MSR Non-Math): Error locating/inferring info \\\\
+\texttt{DI\_CALCULATION\_ERROR} & DI Calculation: Error in mathematical computation \\\\
+% RC Location errors will be listed under specific RC sections below
 \hline
-\multicolumn{2}{|c|}{\textbf{Section/Type Specific (MSR / CR / RC)}} \\
+\multicolumn{2}{|c|}{\textbf{Section/Type Specific (MSR - DI Only)}} \\\\ % Changed header to be DI specific
 \hline
-\texttt{DI\_MULTI\_SOURCE\_INTEGRATION\_ERROR} & DI Multi-Source Integration (MSR): Error integrating info across sources \\
-\texttt{DI\_MSR\_READING\_COMPREHENSION\_BARRIER} & DI MSR Reading Barrier: Excessive overall reading time for the group \\
-\texttt{DI\_QUESTION\_TYPE\_SPECIFIC\_ERROR} & DI Question Type Specific Error (e.g., MSR Non-Math sub-type) \\
-\texttt{CR\_AC\_ANALYSIS\_UNDERSTANDING\_DIFFICULTY} & CR AC Analysis: Difficulty understanding the answer choice itself \\
-\texttt{CR\_AC\_ANALYSIS\_RELEVANCE\_ERROR} & CR AC Analysis: Error judging answer choice relevance \\
-\texttt{CR\_AC\_ANALYSIS\_DISTRACTOR\_CONFUSION} & CR AC Analysis: Confusion with strong distractors \\
-\texttt{CR\_METHOD\_PROCESS\_DEVIATION} & CR Method: Deviation from standard procedure \\
-\texttt{CR\_METHOD\_TYPE\_SPECIFIC\_ERROR} & CR Method: Error/unfamiliarity with specific question type method (Specify type) \\
-\texttt{RC\_READING\_PRECISION\_INSUFFICIENT} & RC Reading: Insufficient precision (close reading/location issue) \\
-\texttt{RC\_METHOD\_INEFFICIENT\_READING} & RC Method: Inefficient reading method (e.g., over-reading) \\
-\texttt{RC\_AC\_ANALYSIS\_DIFFICULTY} & RC AC Analysis: Difficulty understanding/discriminating choices (meaning/mapping) \\
+\texttt{DI\_MULTI\_SOURCE\_INTEGRATION\_ERROR} & DI Multi-Source Integration (MSR): Error integrating info across sources \\\\
+\texttt{DI\_MSR\_READING\_COMPREHENSION\_BARRIER} & DI MSR Reading Barrier: Excessive overall reading time for the group \\\\
+\texttt{DI\_QUESTION\_TYPE\_SPECIFIC\_ERROR} & DI Question Type Specific Error (e.g., MSR Non-Math sub-type) \\\\
 \hline
-\multicolumn{2}{|c|}{\textbf{Foundational Mastery}} \\
+\multicolumn{2}{|c|}{\textbf{Critical Reasoning (CR) - Verbal}} \\\\
 \hline
-\texttt{Q\_FOUNDATIONAL\_MASTERY\_INSTABILITY\_SFE} & Q Foundational Mastery: Unstable application (Special Focus Error) \\
-\texttt{DI\_FOUNDATIONAL\_MASTERY\_INSTABILITY\_SFE} & DI Foundational Mastery: Unstable application (Special Focus Error) \\
-\texttt{FOUNDATIONAL\_MASTERY\_INSTABILITY\_SFE} & V Foundational Mastery: Unstable application (Special Focus Error) \\ % Note: Original had V prefix missing, assumed generic V label applies here
+\multicolumn{2}{|c|}{\textit{CR Stem Understanding Errors}} \\\\
+\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_QUESTION\_REQUIREMENT\_GRASP} & CR Stem Understanding Error: Misinterpretation of question requirements \\\\
+\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_VOCAB} & CR Stem Understanding Error: Vocabulary issues in stem \\\\
+\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_SYNTAX} & CR Stem Understanding Error: Syntactical complexity in stem \\\\
+\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_LOGIC} & CR Stem Understanding Error: Logical structure of stem misunderstood \\\\
+\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_DOMAIN} & CR Stem Understanding Error: Domain-specific content in stem misunderstood \\\\
+\multicolumn{2}{|c|}{\textit{CR Reasoning Errors}} \\\\
+\texttt{CR\_REASONING\_ERROR\_LOGIC\_CHAIN\_ANALYSIS\_PREMISE\_CONCLUSION\_RELATIONSHIP} & CR Reasoning Error: Flawed analysis of premise-conclusion relationship \\\\
+\texttt{CR\_REASONING\_ERROR\_ABSTRACT\_LOGIC\_TERMINOLOGY\_UNDERSTANDING} & CR Reasoning Error: Misunderstanding of abstract logic or terminology \\\\
+\texttt{CR\_REASONING\_ERROR\_PREDICTION\_DIRECTION} & CR Reasoning Error: Incorrect prediction of answer direction \\\\
+\texttt{CR\_REASONING\_ERROR\_CORE\_ISSUE\_IDENTIFICATION} & CR Reasoning Error: Failure to identify the core issue of the argument \\\\
+\texttt{CR\_REASONING\_ERROR\_CHOICE\_RELEVANCE\_JUDGEMENT} & CR Reasoning Error: Incorrect judgment of answer choice relevance \\\\
+\texttt{CR\_REASONING\_ERROR\_STRONG\_DISTRACTOR\_CHOICE\_CONFUSION} & CR Reasoning Error: Confusion caused by strong distractor choices \\\\
+\multicolumn{2}{|c|}{\textit{CR Choice Understanding Errors}} \\\\
+\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_VOCAB} & CR Choice Understanding Error: Vocabulary issues in answer choices \\\\
+\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_SYNTAX} & CR Choice Understanding Error: Syntactical complexity in answer choices \\\\
+\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_LOGIC} & CR Choice Understanding Error: Logical structure of answer choices misunderstood \\\\
+\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_DOMAIN} & CR Choice Understanding Error: Domain-specific content in choices misunderstood \\\\
+\multicolumn{2}{|c|}{\textit{CR Specific Question Type Weakness}} \\\\
+\texttt{CR\_SPECIFIC\_QUESTION\_TYPE\_WEAKNESS\_NOTE\_TYPE} & CR Specific Question Type Weakness: (Type to be noted) \\\\
+\multicolumn{2}{|c|}{\textit{CR Stem Understanding Difficulties (Efficiency Issue / Slow Performance)}} \\\\
+\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_VOCAB} & CR Stem Understanding Difficulty: Vocabulary challenges in stem \\\\
+\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_SYNTAX} & CR Stem Understanding Difficulty: Syntactical complexity in stem causing slowdown \\\\
+\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_LOGIC} & CR Stem Understanding Difficulty: Logical structure of stem hard to grasp \\\\
+\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_DOMAIN} & CR Stem Understanding Difficulty: Domain-specific content in stem hard to grasp \\\\
+\multicolumn{2}{|c|}{\textit{CR Reasoning Difficulties (Efficiency Issue / Slow Performance)}} \\\\
+\texttt{CR\_REASONING\_DIFFICULTY\_ABSTRACT\_LOGIC\_TERMINOLOGY\_UNDERSTANDING} & CR Reasoning Difficulty: Difficulty with abstract logic or terminology \\\\
+\texttt{CR\_REASONING\_DIFFICULTY\_PREDICTION\_DIRECTION\_MISSING} & CR Reasoning Difficulty: Missing or slow prediction of answer direction \\\\
+\texttt{CR\_REASONING\_DIFFICULTY\_CORE\_ISSUE\_IDENTIFICATION} & CR Reasoning Difficulty: Difficulty identifying the core issue of the argument \\\\
+\texttt{CR\_REASONING\_DIFFICULTY\_CHOICE\_RELEVANCE\_JUDGEMENT} & CR Reasoning Difficulty: Difficulty judging answer choice relevance \\\\
+\texttt{CR\_REASONING_DIFFICULTY\_STRONG\_DISTRACTOR\_CHOICE\_ANALYSIS} & CR Reasoning Difficulty: Difficulty analyzing strong distractor choices \\\\
+\multicolumn{2}{|c|}{\textit{CR Choice Understanding Difficulties (Efficiency Issue / Slow Performance)}} \\\\
+\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_VOCAB} & CR Choice Understanding Difficulty: Vocabulary challenges in answer choices \\\\
+\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_SYNTAX} & CR Choice Understanding Difficulty: Syntactical complexity in choices causing slowdown \\\\
+\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_LOGIC} & CR Choice Understanding Difficulty: Logical structure of choices hard to grasp \\\\
+\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_DOMAIN} & CR Choice Understanding Difficulty: Domain-specific content in choices hard to grasp \\\\
 \hline
-\multicolumn{2}{|c|}{\textbf{Efficiency Bottlenecks}} \\
+\multicolumn{2}{|c|}{\textbf{Reading Comprehension (RC) - Verbal}} \\\\
 \hline
-\texttt{Q\_EFFICIENCY\_BOTTLENECK\_READING} & Q Efficiency Bottleneck: Reading time (Real Context) \\
-\texttt{Q\_EFFICIENCY\_BOTTLENECK\_CONCEPT} & Q Efficiency Bottleneck: Concept recall/application time \\
-\texttt{Q\_EFFICIENCY\_BOTTLENECK\_CALCULATION} & Q Efficiency Bottleneck: Calculation time \\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_READING} & DI Efficiency Bottleneck: Reading/Comprehension time (Math/Non-Math) \\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_CONCEPT} & DI Efficiency Bottleneck: Concept/Formula application time (Math) \\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_CALCULATION} & DI Calculation: Error in mathematical computation \\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_LOGIC} & DI Efficiency Bottleneck: Logical reasoning time (Non-Math) \\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_GRAPH\_TABLE} & DI Efficiency Bottleneck: Graph/Table interpretation time \\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_INTEGRATION} & DI Efficiency Bottleneck: Multi-source integration time (MSR) \\
-\texttt{CR\_READING\_TIME\_EXCESSIVE} & CR Reading: Excessive time spent reading \\
-\texttt{CR\_REASONING\_TIME\_EXCESSIVE} & CR Reasoning: Excessive time spent on logical thinking \\
-\texttt{CR\_AC\_ANALYSIS\_TIME\_EXCESSIVE} & CR AC Analysis: Excessive time spent eliminating choices \\
-\texttt{RC\_READING\_SPEED\_SLOW\_FOUNDATIONAL} & RC Reading: Slow reading speed (foundational issue) \\
-\texttt{RC\_LOCATION\_TIME\_EXCESSIVE} & RC Location: Excessive time spent locating information (re-locating) \\
-\texttt{RC\_REASONING\_TIME\_EXCESSIVE} & RC Reasoning: Excessive time spent on deep thinking \\
-\texttt{RC\_AC\_ANALYSIS\_TIME\_EXCESSIVE} & RC AC Analysis: Excessive time spent eliminating choices \\
-\texttt{EFFICIENCY\_BOTTLENECK\_[AREA]} & Generic V Efficiency Issue: Bottleneck in [Specific Area] (Specify Area: READING, REASONING, LOCATION, AC\_ANALYSIS) \\
+\multicolumn{2}{|c|}{\textit{RC Reading Comprehension Errors}} \\\\
+\texttt{RC\_READING\_COMPREHENSION\_ERROR\_VOCAB} & RC Reading Comprehension Error: Vocabulary misunderstanding \\\\
+\texttt{RC\_READING\_COMPREHENSION\_ERROR\_LONG\_DIFFICULT\_SENTENCE\_ANALYSIS} & RC Reading Comprehension Error: Incorrect analysis of long/difficult sentences \\\\
+\texttt{RC\_READING\_COMPREHENSION\_ERROR\_PASSAGE\_STRUCTURE} & RC Reading Comprehension Error: Misunderstanding of passage structure \\\\
+\texttt{RC\_READING\_COMPREHENSION\_ERROR\_KEY\_INFO\_LOCATION\_UNDERSTANDING} & RC Reading Comprehension Error: Incorrect location or understanding of key information \\\\
+\multicolumn{2}{|c|}{\textit{RC Question Understanding Errors}} \\\\
+\texttt{RC\_QUESTION\_UNDERSTANDING\_ERROR\_FOCUS\_POINT} & RC Question Understanding Error: Misinterpretation of the question's focus point \\\\
+\multicolumn{2}{|c|}{\textit{RC Location Skill Errors}} \\\\
+\texttt{RC\_LOCATION\_SKILL\_ERROR\_LOCATION} & RC Location Skill Error: Incorrect location of information in the passage \\\\
+\multicolumn{2}{|c|}{\textit{RC Reasoning Errors}} \\\\
+\texttt{RC\_REASONING\_ERROR\_INFERENCE} & RC Reasoning Error: Flawed inference from the passage text \\\\
+\multicolumn{2}{|c|}{\textit{RC Choice Analysis Errors}} \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_VOCAB} & RC Choice Analysis Error: Vocabulary issues in answer choices \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_SYNTAX} & RC Choice Analysis Error: Syntactical complexity in answer choices \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_LOGIC} & RC Choice Analysis Error: Logical structure of answer choices misunderstood \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_DOMAIN} & RC Choice Analysis Error: Domain-specific content in choices misunderstood \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_RELEVANCE\_JUDGEMENT} & RC Choice Analysis Error: Incorrect judgment of answer choice relevance \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_STRONG\_DISTRACTOR\_CONFUSION} & RC Choice Analysis Error: Confusion caused by strong distractor choices \\\\
+\multicolumn{2}{|c|}{\textit{RC Method Errors}} \\\\
+\texttt{RC\_METHOD\_ERROR\_SPECIFIC\_QUESTION\_TYPE\_HANDLING} & RC Method Error: Incorrect handling of specific question types \\\\
+\multicolumn{2}{|c|}{\textit{RC Reading Comprehension Difficulties (Efficiency Issue / Slow Performance)}} \\\\
+\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_VOCAB\_BOTTLENECK} & RC Reading Comprehension Difficulty: Vocabulary bottleneck \\\\
+\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_LONG\_DIFFICULT\_SENTENCE\_ANALYSIS} & RC Reading Comprehension Difficulty: Difficulty analyzing long/difficult sentences \\\\
+\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_PASSAGE\_STRUCTURE\_GRASP\_UNCLEAR} & RC Reading Comprehension Difficulty: Unclear grasp of passage structure \\\\
+\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_SPECIFIC\_DOMAIN\_BACKGROUND\_KNOWLEDGE\_LACK} & RC Reading Comprehension Difficulty: Lack of specific domain background knowledge \\\\
+\multicolumn{2}{|c|}{\textit{RC Question Understanding Difficulties (Efficiency Issue / Slow Performance)}} \\\\
+\texttt{RC\_QUESTION\_UNDERSTANDING\_DIFFICULTY\_FOCUS\_POINT\_GRASP} & RC Question Understanding Difficulty: Difficulty grasping the question's focus point \\\\
+\multicolumn{2}{|c|}{\textit{RC Location Skill Difficulties (Efficiency Issue / Slow Performance)}} \\\\
+\texttt{RC\_LOCATION\_SKILL\_DIFFICULTY\_INEFFICIENCY} & RC Location Skill Difficulty: Inefficient location of information \\\\
+\multicolumn{2}{|c|}{\textit{RC Reasoning Difficulties (Efficiency Issue / Slow Performance)}} \\\\
+\texttt{RC\_REASONING\_DIFFICULTY\_INFERENCE\_SPEED\_SLOW} & RC Reasoning Difficulty: Slow inference speed \\\\
+\multicolumn{2}{|c|}{\textit{RC Choice Analysis Difficulties (Efficiency Issue / Slow Performance)}} \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_VOCAB} & RC Choice Analysis Difficulty: Vocabulary challenges in answer choices \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_SYNTAX} & RC Choice Analysis Difficulty: Syntactical complexity in choices causing slowdown \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_LOGIC} & RC Choice Analysis Difficulty: Logical structure of choices hard to grasp \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_DOMAIN} & RC Choice Analysis Difficulty: Domain-specific content in choices hard to grasp \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_RELEVANCE\_JUDGEMENT} & RC Choice Analysis Difficulty: Difficulty judging answer choice relevance \\\\
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_STRONG\_DISTRACTOR\_ANALYSIS} & RC Choice Analysis Difficulty: Difficulty analyzing strong distractor choices \\\\
+\multicolumn{2}{|c|}{\textit{RC Method Difficulties (Efficiency Issue / Slow Performance)}} \\\\
+\texttt{RC\_METHOD\_DIFFICULTY\_SPECIFIC\_QUESTION\_TYPE\_HANDLING} & RC Method Difficulty: Difficulty handling specific question types \\\\
 \hline
-\multicolumn{2}{|c|}{\textbf{Behavioral Patterns}} \\
+\multicolumn{2}{|c|}{\textbf{Foundational Mastery}} \\\\
 \hline
-\texttt{Q\_CARELESSNESS\_DETAIL\_OMISSION} & Q Behavior: Carelessness - Detail omission/misread (Implied in Fast \& Wrong) \\
-\texttt{DI\_CARELESSNESS\_DETAIL\_OMISSION} & DI Behavior: Carelessness - Detail omission/misread (Implied in Fast \& Wrong) \\
-\texttt{BEHAVIOR\_CARELESSNESS\_ISSUE} & Behavior Pattern: Carelessness issue (overall high fast-wrong rate $>$ 25\%) \\
-\texttt{BEHAVIOR\_EARLY\_RUSHING\_FLAG\_RISK} & Behavior Pattern: Rushing early in section ($<$ 1.0 min, Note flag for review risk) \\
-\texttt{BEHAVIOR\_GUESSING\_HASTY} & Behavior Pattern: Hasty response suggesting guessing/rushing \\
+\texttt{Q\_FOUNDATIONAL\_MASTERY\_INSTABILITY\_SFE} & Q Foundational Mastery: Unstable application (Special Focus Error) \\\\
+\texttt{DI\_FOUNDATIONAL\_MASTERY\_INSTABILITY\_SFE} & DI Foundational Mastery: Unstable application (Special Focus Error) \\\\
+\texttt{FOUNDATIONAL\_MASTERY\_APPLICATION\_INSTABILITY\_SFE} & General Foundational Mastery: Application instability (Special Focus Error) \\\\
+\hline
+\multicolumn{2}{|c|}{\textbf{Efficiency Bottlenecks (Q and DI Specific)}} \\\\ % Removed generic Verbal
+\hline
+\texttt{Q\_EFFICIENCY\_BOTTLENECK\_READING} & Q Efficiency Bottleneck: Reading time (Real Context) \\\\
+\texttt{Q\_EFFICIENCY\_BOTTLENECK\_CONCEPT} & Q Efficiency Bottleneck: Concept recall/application time \\\\
+\texttt{Q\_EFFICIENCY\_BOTTLENECK\_CALCULATION} & Q Efficiency Bottleneck: Calculation time \\\\
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_READING} & DI Efficiency Bottleneck: Reading/Comprehension time (Math/Non-Math) \\\\
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_CONCEPT} & DI Efficiency Bottleneck: Concept/Formula application time (Math) \\\\
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_CALCULATION} & DI Calculation: Error in mathematical computation \\\\ % This was repeated, DI calc error is different from efficiency bottleneck
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_LOGIC} & DI Efficiency Bottleneck: Logical reasoning time (Non-Math) \\\\
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_GRAPH\_TABLE} & DI Efficiency Bottleneck: Graph/Table interpretation time \\\\
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_INTEGRATION} & DI Efficiency Bottleneck: Multi-source integration time (MSR) \\\\
+% Removed CR/RC excessive time tags as they are covered by "Difficulty" tags now
+% Removed EFFICIENCY_BOTTLENECK_[AREA] for V
+\hline
+\multicolumn{2}{|c|}{\textbf{Behavioral Patterns}} \\\\
+\hline
+\texttt{DATA\_INVALID\_SHORT\_TIME\_PRESSURE\_AFFECTED} & Data Invalid: Short time due to time pressure affecting validity \\\\
+\texttt{Q\_CARELESSNESS\_DETAIL\_OMISSION} & Q Behavior: Carelessness - Detail omission/misread (Implied in Fast \& Wrong) \\\\
+\texttt{DI\_CARELESSNESS\_DETAIL\_OMISSION} & DI Behavior: Carelessness - Detail omission/misread (Implied in Fast \& Wrong) \\\\
+\texttt{BEHAVIOR\_CARELESSNESS\_ISSUE} & Behavior Pattern: Carelessness issue (overall high fast-wrong rate > 25\\%) \\\\
+\texttt{BEHAVIOR\_EARLY\_RUSHING\_FLAG\_RISK} & Behavior Pattern: Rushing early in section (< 1.0 min, Note flag for review risk) \\\\
+\texttt{BEHAVIOR\_PATTERN\_FAST\_GUESSING\_HASTY} & Behavior Pattern: Hasty response/fast guessing pattern \\\\
 
 \end{longtable} % End of longtable environment
 
 } % End group scope for arraystretch
 % --- End of the longtable block ---
 
-\end{document} should be at the very end of your main .tex file
+\end{document} % should be at the very end of your main .tex file
