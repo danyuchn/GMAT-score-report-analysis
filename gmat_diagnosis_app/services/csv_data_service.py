@@ -177,7 +177,7 @@ def _is_duplicate_record(
                     )
                 except Exception as e:
                     # Handle potential errors if a header is missing or value conversion fails, though validation should prevent this
-                    print(f"Warning: Error preparing new record for comparison: {new_rec}, header: {h}, error: {e}")
+                    print(f"Warning: Error preparing new record for comparison: {new_rec}, error: {e}")
                     # Depending on strictness, could return True to prevent partial write, or False to allow
                     return False # Or True if strictness is required
 
@@ -193,7 +193,7 @@ def _is_duplicate_record(
                              tuple(str(existing_rec_for_chunk.get(h, '')) for h in headers_for_comparison)
                         )
                     except Exception as e:
-                        print(f"Warning: Error preparing existing record for comparison: {existing_rec_for_chunk}, header: {h}, error: {e}")
+                        print(f"Warning: Error preparing existing record for comparison: {existing_rec_for_chunk}, error: {e}")
                         is_match = False # Chunk cannot be reliably compared
                         break
                 
