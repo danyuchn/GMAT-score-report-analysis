@@ -188,24 +188,47 @@
         - **特殊關注錯誤 (`special_focus_error`)**: 
             - *定義*: 錯誤題目 (`is_correct` == `False`) 的 `question_difficulty` 低於其對應 `question_fundamental_skill` 的 `max_correct_difficulty_per_skill`[`skill`]。
             - *標記*: 若滿足條件，則標記 `special_focus_error` = `True`。
-            - *優先處理方式*: 在第七章生成練習建議和第八章輸出診斷總結時，應將標記為 `special_focus_error` = `True` 的題目及其對應的診斷參數 (`FOUNDATIONAL_MASTERY_INSTABILITY_SFE`) 和建議**優先列出或特別標註**。
+            - *優先處理方式*: 在第七章生成練習建議和第八章輸出診斷總結時，應將標記為 `special_focus_error` = `True` 的題目及其對應的診斷參數 (`FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE`) 和建議**優先列出或特別標註**。
 - **診斷流程與分析要點 (針對有效數據題目)**
     - 根據題目的時間表現 (`is_relatively_fast`, `is_slow`, `is_normal_time`) 和正確性 (`is_correct`) 進行分類診斷：
     - **1. 快而錯 (`Fast & Wrong`)**
         - 分類依據: `is_correct` == `False` 且 `is_relatively_fast` == `True`。
         - 可能原因 (診斷參數) (`CR`):
-            - `` `CR_METHOD_PROCESS_DEVIATION` ``
-            - `` `CR_METHOD_TYPE_SPECIFIC_ERROR` `` (需註明題型)
-            - `` `CR_READING_BASIC_OMISSION` ``
-            - `` `BEHAVIOR_GUESSING_HASTY` `` (若時間極短)
+            - `` `CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP` ``
+            - `` `CR_REASONING_ERROR_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` ``
+            - `` `CR_REASONING_ERROR_PREDICTION_DIRECTION` ``
+            - `` `CR_REASONING_ERROR_CORE_ISSUE_IDENTIFICATION` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT` ``
+            - `` `CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION` ``
+            - `` `CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE` `` (需註明題型)
+            - `` `BEHAVIOR_PATTERN_FAST_GUESSING_HASTY` `` (若時間極短，單題作答時間小於 0.5 分鐘)
         - 可能原因 (診斷參數) (`RC`):
-            - `` `RC_READING_INFO_LOCATION_ERROR` ``
-            - `` `RC_READING_KEYWORD_LOGIC_OMISSION` ``
-            - `` `RC_METHOD_TYPE_SPECIFIC_ERROR` `` (需註明題型)
-            - `` `BEHAVIOR_GUESSING_HASTY` `` (若時間極短)
+            - `` `RC_READING_COMPREHENSION_ERROR_VOCAB` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING` ``
+            - `` `RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT` ``
+            - `` `RC_LOCATION_SKILL_ERROR_LOCATION` ``
+            - `` `RC_REASONING_ERROR_INFERENCE` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_VOCAB` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_SYNTAX` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_LOGIC` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_DOMAIN` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION` ``
+            - `` `RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING` `` (需註明題型)
+            - `` `BEHAVIOR_PATTERN_FAST_GUESSING_HASTY` `` (若時間極短，單題作答時間小於 0.5 分鐘)
         - 主要診斷行動:
             - 首先詢問學生能否回憶該題的思考過程或遇到的問題點。
-            - 若學生無法清晰回憶具體的思考步驟或遇到的困難點，則啟用二級證據分析：查找學生近期（考前兩週至一個月）在該核心技能 (`question_fundamental_skill`) 下的快錯題目記錄，若樣本足夠（建議 >= 10題），分析其中錯誤率最高的具體子題型 (例如，是 `CR Weaken`, `RC Inference` 等，具體分類參考第四章)。
     - **2. 快而對 (`Fast & Correct`)**
         - 分類依據: `is_correct` == `True` 且 `suspiciously_fast` == `True`。
         - 觀察與提醒 (`CR` & `RC`):
@@ -216,31 +239,41 @@
     - **3. 正常時間做錯 (`Normal Time & Wrong`)** 
         - 分類依據: `is_correct` == `False` 且 `is_normal_time` == `True`。
         - 可能原因 (診斷參數) (`CR`):
-            - `` `CR_READING_DIFFICULTY_STEM` ``
-            - `` `CR_QUESTION_UNDERSTANDING_MISINTERPRETATION` ``
-            - `` `CR_REASONING_CHAIN_ERROR` ``
-            - `` `CR_REASONING_ABSTRACTION_DIFFICULTY` ``
-            - `` `CR_REASONING_PREDICTION_ERROR` ``
-            - `` `CR_REASONING_CORE_ISSUE_ID_DIFFICULTY` ``
-            - `` `CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY` ``
-            - `` `CR_AC_ANALYSIS_RELEVANCE_ERROR` ``
-            - `` `CR_AC_ANALYSIS_DISTRACTOR_CONFUSION` ``
-            - `` `CR_METHOD_TYPE_SPECIFIC_ERROR` `` (需註明題型)
-            - `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發，需註明涉及的技能)
+            - `` `CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP` ``
+            - `` `CR_REASONING_ERROR_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` ``
+            - `` `CR_REASONING_ERROR_PREDICTION_DIRECTION` ``
+            - `` `CR_REASONING_ERROR_CORE_ISSUE_IDENTIFICATION` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT` ``
+            - `` `CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION` ``
+            - `` `CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE` `` (需註明題型)
+            - `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` (若 SFE 觸發，需註明涉及的技能)
         - 可能原因 (診斷參數) (`RC`):
-            - `` `RC_READING_VOCAB_BOTTLENECK` ``
-            - `` `RC_READING_SENTENCE_STRUCTURE_DIFFICULTY` ``
-            - `` `RC_READING_PASSAGE_STRUCTURE_DIFFICULTY` ``
-            - `` `RC_READING_DOMAIN_KNOWLEDGE_GAP` ``
-            - `` `RC_READING_PRECISION_INSUFFICIENT` ``
-            - `` `RC_QUESTION_UNDERSTANDING_MISINTERPRETATION` ``
-            - `` `RC_LOCATION_ERROR_INEFFICIENCY` `` 
-            - `` `RC_REASONING_INFERENCE_WEAKNESS` ``
-            - `` `RC_AC_ANALYSIS_DIFFICULTY` ``
-            - `` `RC_METHOD_TYPE_SPECIFIC_ERROR` `` (需註明題型)
-            - `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發，需註明涉及的技能)
+            - `` `RC_READING_COMPREHENSION_ERROR_VOCAB` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING` ``
+            - `` `RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT` ``
+            - `` `RC_LOCATION_SKILL_ERROR_LOCATION` ``
+            - `` `RC_REASONING_ERROR_INFERENCE` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_VOCAB` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_SYNTAX` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_LOGIC` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_DOMAIN` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION` ``
+            - `` `RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING` `` (需註明題型)
+            - `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` (若 SFE 觸發，需註明涉及的技能)
         - 主要診斷行動:
-            - 檢查 `special_focus_error` 標記，若觸發，優先考慮 `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 參數。
+            - 檢查 `special_focus_error` 標記，若觸發，優先考慮 `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` 參數。
             - 請學生回憶具體障礙點或錯誤原因。
             - 若回憶不清或原因不明確，啟用二級證據分析：查找近期在該 `question_fundamental_skill` 下的正常時間做錯題目記錄，若樣本足夠（建議 >= 10題），分析錯誤率最高的子題型 (例如，是 `CR Assumption`, `RC Main Idea` 等，具體分類參考第四章)。
             - 觸發質化分析： 當學生表示無法確認診斷參數對應的「障礙」或「錯誤」，且教師/顧問無法通過現有信息排除至只剩一種最可能的原因時，提示學生可提供詳細解題步驟、口述錄音等質化信息，供進一步分析。
@@ -251,40 +284,111 @@
     - **5. 慢而錯 (`Slow & Wrong`)**
         - 分類依據: `is_correct` == `False` 且 `is_slow` == `True`。
         - 可能原因 (診斷參數) (`CR`):
-            - `` `CR_READING_TIME_EXCESSIVE` ``
-            - `` `CR_REASONING_TIME_EXCESSIVE` ``
-            - `` `CR_AC_ANALYSIS_TIME_EXCESSIVE` ``
-            - *（同時可能包含「正常時間做錯」中列出的根本原因參數，如 `` `CR_REASONING_CHAIN_ERROR` `` 等，需結合具體情況判斷）*
-            - `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發，需註明涉及的技能)
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_VOCAB` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_SYNTAX` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_LOGIC` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_DOMAIN` ``
+            - `` `CR_REASONING_DIFFICULTY_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` ``
+            - `` `CR_REASONING_DIFFICULTY_PREDICTION_DIRECTION_MISSING` ``
+            - `` `CR_REASONING_DIFFICULTY_CORE_ISSUE_IDENTIFICATION` ``
+            - `` `CR_REASONING_DIFFICULTY_CHOICE_RELEVANCE_JUDGEMENT` ``
+            - `` `CR_REASONING_DIFFICULTY_STRONG_DISTRACTOR_CHOICE_ANALYSIS` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_VOCAB` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_SYNTAX` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_LOGIC` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_DOMAIN` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP` ``
+            - `` `CR_REASONING_ERROR_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` ``
+            - `` `CR_REASONING_ERROR_PREDICTION_DIRECTION` ``
+            - `` `CR_REASONING_ERROR_CORE_ISSUE_IDENTIFICATION` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT` ``
+            - `` `CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION` ``
+            - `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` (若 SFE 觸發，需註明涉及的技能)
         - 可能原因 (診斷參數) (`RC`):
-            - `` `RC_READING_SPEED_SLOW_FOUNDATIONAL` ``
-            - `` `RC_METHOD_INEFFICIENT_READING` ``
-            - `` `RC_LOCATION_TIME_EXCESSIVE` ``
-            - `` `RC_REASONING_TIME_EXCESSIVE` ``
-            - `` `RC_AC_ANALYSIS_TIME_EXCESSIVE` ``
-            - *（同時可能包含「正常時間做錯」中列出的根本原因參數，如 `` `RC_READING_PASSAGE_STRUCTURE_DIFFICULTY` `` 等，需結合具體情況判斷）*
-            - `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發，需註明涉及的技能)
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_VOCAB_BOTTLENECK` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_LONG_DIFFICULT_SENTENCE_ANALYSIS` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_PASSAGE_STRUCTURE_GRASP_UNCLEAR` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_SPECIFIC_DOMAIN_BACKGROUND_KNOWLEDGE_LACK` ``
+            - `` `RC_QUESTION_UNDERSTANDING_DIFFICULTY_FOCUS_POINT_GRASP` ``
+            - `` `RC_LOCATION_SKILL_DIFFICULTY_INEFFICIENCY` ``
+            - `` `RC_REASONING_DIFFICULTY_INFERENCE_SPEED_SLOW` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_VOCAB` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_SYNTAX` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_LOGIC` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS` ``
+            - `` `RC_METHOD_DIFFICULTY_SPECIFIC_QUESTION_TYPE_HANDLING` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_VOCAB` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING` ``
+            - `` `RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT` ``
+            - `` `RC_LOCATION_SKILL_ERROR_LOCATION` ``
+            - `` `RC_REASONING_ERROR_INFERENCE` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_VOCAB` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_SYNTAX` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_LOGIC` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_DOMAIN` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION` ``
+            - `` `RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING` ``
+            - `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` (若 SFE 觸發，需註明涉及的技能)
         - 主要診斷行動:
-            - 檢查 `special_focus_error` 標記，若觸發，優先考慮 `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 參數。
+            - 檢查 `special_focus_error` 標記，若觸發，優先考慮 `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` 參數。
             - 請學生回憶具體障礙點：是哪個環節耗時最長？
             - 若學生無法回憶清楚具體題型或障礙，啟用二級證據分析：查找近期在該 `question_fundamental_skill` 下的慢錯題目記錄，若樣本足夠（建議 >= 10題），分析錯誤率最高的子題型 (例如，是 `CR Strengthen`, `RC Detail` 等，具體分類參考第四章)。
             - 觸發質化分析： 同「正常時間做錯」的觸發條件。
     - **6. 慢而對 (`Slow & Correct`)**
         - 分類依據: `is_correct` == `True` 且 `is_slow` == `True`。
         - 可能原因 (診斷參數) (`CR` & `RC`):
-            - `` `EFFICIENCY_BOTTLENECK_[AREA]` `` (需指明具體環節 AREA: READING, REASONING, LOCATION, AC_ANALYSIS)
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_VOCAB` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_SYNTAX` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_LOGIC` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_DOMAIN` ``
+            - `` `CR_REASONING_DIFFICULTY_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` ``
+            - `` `CR_REASONING_DIFFICULTY_PREDICTION_DIRECTION_MISSING` ``
+            - `` `CR_REASONING_DIFFICULTY_CORE_ISSUE_IDENTIFICATION` ``
+            - `` `CR_REASONING_DIFFICULTY_CHOICE_RELEVANCE_JUDGEMENT` ``
+            - `` `CR_REASONING_DIFFICULTY_STRONG_DISTRACTOR_CHOICE_ANALYSIS` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_VOCAB` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_SYNTAX` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_LOGIC` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_DOMAIN` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_VOCAB_BOTTLENECK` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_LONG_DIFFICULT_SENTENCE_ANALYSIS` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_PASSAGE_STRUCTURE_GRASP_UNCLEAR` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_SPECIFIC_DOMAIN_BACKGROUND_KNOWLEDGE_LACK` ``
+            - `` `RC_QUESTION_UNDERSTANDING_DIFFICULTY_FOCUS_POINT_GRASP` ``
+            - `` `RC_LOCATION_SKILL_DIFFICULTY_INEFFICIENCY` ``
+            - `` `RC_REASONING_DIFFICULTY_INFERENCE_SPEED_SLOW` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_VOCAB` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_SYNTAX` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_LOGIC` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS` ``
+            - `` `RC_METHOD_DIFFICULTY_SPECIFIC_QUESTION_TYPE_HANDLING` ``
             - *（如果題目本身難度 (`question_difficulty`) 確實很高，則慢可能是合理的）*
         - 主要診斷行動:
             - 請學生回憶效率瓶頸點：雖然做對了，但在哪個環節花費了顯著多於預期的時間？
-            - 觸發質化分析： 若學生無法清晰說明效率瓶頸，可考慮啟用質化分析以探究提速空間。
-- **輔助診斷工具與說明**
-    - **二級證據 (`Secondary Evidence`) 應用:**
-        - 定義: 指學生考前兩週至一個月內的相關練習記錄或模考數據。
-        - 作用: 在學生無法準確回憶或需要客觀數據佐證時，用於分析特定表現類型（快錯、正常錯、慢錯）下，某一核心技能 (`question_fundamental_skill`) 內的具體弱點子題型（例如，分析 `CR` 題型中是 `Weaken` 還是 `Assumption` 出錯更多，`RC` 中是 `Inference` 還是 `Detail` 題錯誤更頻繁，具體分類參考第四章）。
-        - 執行: 篩選符合條件（時間表現、正確性、核心技能）的題目，若總數 >= 10 題，則計算其中各具體子題型的錯誤率，找出錯誤率最高的子題型作為參考。若母數 < 10 題，需註明其統計參考價值有限。
-    - **質化分析 (`Qualitative Analysis`) 觸發與執行:**
-        - 觸發條件: 當學生表示無法確認診斷參數對應的「障礙」或「錯誤」，且教師/顧問根據已有數據和學生回憶無法將問題範圍縮小至一兩種最可能的根本原因時。
-        - 執行: 提示學生可以提供更詳細的解題信息，例如：逐步寫下或口述解題思考過程、錄製解題錄音/錄屏等，供教師/顧問進行更深入的個案分析。
+    - **輔助診斷工具與說明**
+        - **二級證據 (`Secondary Evidence`) 應用:**
+            - 定義: 指學生考前兩週至一個月內的相關練習記錄或模考數據。
+            - 作用: 在學生無法準確回憶或需要客觀數據佐證時，用於分析特定表現類型（快錯、正常錯、慢錯）下，某一核心技能 (`question_fundamental_skill`) 內的具體弱點子題型（例如，分析 `CR` 題型中是 `Weaken` 還是 `Assumption` 出錯更多，`RC` 中是 `Inference` 還是 `Detail` 題錯誤更頻繁，具體分類參考第四章）。
+            - 執行: 篩選符合條件（時間表現、正確性、核心技能）的題目，若總數 >= 10 題，則計算其中各具體子題型的錯誤率，找出錯誤率最高的子題型作為參考。若母數 < 10 題，需註明其統計參考價值有限。
+        - **質化分析 (`Qualitative Analysis`) 觸發與執行:**
+            - 觸發條件: 當學生表示無法確認診斷參數對應的「障礙」或「錯誤」，且教師/顧問根據已有數據和學生回憶無法將問題範圍縮小至一兩種最可能的根本原因時。
+            - 執行: 提示學生可以提供更詳細的解題信息，例如：逐步寫下或口述解題思考過程、錄製解題錄音/錄屏等，供教師/顧問進行更深入的個案分析。
 
 <aside>
 
@@ -624,56 +728,89 @@
 
 | 英文參數 (Parameter)                          | 中文描述 (Chinese Description)                         |
 |-----------------------------------------------|----------------------------------------------------|
-| **CR - Reading Comprehension**                |                                                    |
-| `CR_READING_BASIC_OMISSION`                   | CR 閱讀理解: 基礎理解疏漏                           |
-| `CR_READING_DIFFICULTY_STEM`                  | CR 閱讀理解: 題幹理解障礙 (關鍵詞/句式/邏輯/領域)     |
-| `CR_READING_TIME_EXCESSIVE`                   | CR 閱讀理解: 閱讀耗時過長                         |
-| **CR - Question Understanding**               |                                                    |
-| `CR_QUESTION_UNDERSTANDING_MISINTERPRETATION` | CR 題目理解: 提問要求把握錯誤                       |
-| **CR - Reasoning Deficiencies**             |                                                    |
-| `CR_REASONING_CHAIN_ERROR`                    | CR 推理障礙: 邏輯鏈分析錯誤 (前提/結論/關係)           |
-| `CR_REASONING_ABSTRACTION_DIFFICULTY`         | CR 推理障礙: 抽象邏輯/術語理解困難                   |
-| `CR_REASONING_PREDICTION_ERROR`               | CR 推理障礙: 預判方向錯誤或缺失                     |
-| `CR_REASONING_TIME_EXCESSIVE`                 | CR 推理障礙: 邏輯思考耗時過長                     |
-| `CR_REASONING_CORE_ISSUE_ID_DIFFICULTY`       | CR 推理障礙: 核心議題識別困難                       |
-| **CR - Answer Choice Analysis**             |                                                    |
-| `CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY`     | CR 選項辨析: 選項本身理解困難                       |
-| `CR_AC_ANALYSIS_RELEVANCE_ERROR`              | CR 選項辨析: 選項相關性判斷錯誤                     |
-| `CR_AC_ANALYSIS_DISTRACTOR_CONFUSION`         | CR 選項辨析: 強干擾選項混淆                         |
-| `CR_AC_ANALYSIS_TIME_EXCESSIVE`               | CR 選項辨析: 選項篩選耗時過長                     |
-| **CR - Method Application**                  |                                                    |
-| `CR_METHOD_PROCESS_DEVIATION`                 | CR 方法應用: 未遵循標準流程                         |
-| `CR_METHOD_TYPE_SPECIFIC_ERROR`               | CR 方法應用: 特定題型方法錯誤/不熟 (需註明題型)       |
-| **RC - Reading Comprehension**                |                                                    |
-| `RC_READING_INFO_LOCATION_ERROR`              | RC 閱讀理解: 關鍵信息定位/理解錯誤                 |
-| `RC_READING_KEYWORD_LOGIC_OMISSION`           | RC 閱讀理解: 忽略關鍵詞/邏輯                       |
-| `RC_READING_VOCAB_BOTTLENECK`                 | RC 閱讀理解: 詞彙量瓶頸                             |
-| `RC_READING_SENTENCE_STRUCTURE_DIFFICULTY`    | RC 閱讀理解: 長難句解析困難                         |
-| `RC_READING_PASSAGE_STRUCTURE_DIFFICULTY`     | RC 閱讀理解: 篇章結構把握不清                       |
-| `RC_READING_DOMAIN_KNOWLEDGE_GAP`             | RC 閱讀理解: 特定領域背景知識缺乏                   |
-| `RC_READING_SPEED_SLOW_FOUNDATIONAL`          | RC 閱讀理解: 閱讀速度慢 (基礎問題)                   |
-| `RC_READING_PRECISION_INSUFFICIENT`           | RC 閱讀精度不足 (精讀/定位問題)                     |
-| **RC - Reading Method**                       |                                                    |
-| `RC_METHOD_INEFFICIENT_READING`               | RC 閱讀方法: 閱讀方法效率低 (過度精讀)               |
-| `RC_METHOD_TYPE_SPECIFIC_ERROR`               | RC 方法應用: 特定題型方法錯誤/不熟 (需註明題型)       |
-| **RC - Question Understanding**               |                                                    |
-| `RC_QUESTION_UNDERSTANDING_MISINTERPRETATION` | RC 題目理解: 提問焦點把握錯誤                       |
-| **RC - Location Skills**                      |                                                    |
-| `RC_LOCATION_ERROR_INEFFICIENCY`              | RC 定位能力: 定位錯誤/效率低下                      |
-| `RC_LOCATION_TIME_EXCESSIVE`                  | RC 定位能力: 定位效率低下 (反覆定位)                 |
-| **RC - Reasoning Deficiencies**             |                                                    |
-| `RC_REASONING_INFERENCE_WEAKNESS`             | RC 推理障礙: 推理能力不足 (預判/細節/語氣)             |
-| `RC_REASONING_TIME_EXCESSIVE`                 | RC 推理障礙: 深度思考耗時過長                     |
-| **RC - Answer Choice Analysis**             |                                                    |
-| `RC_AC_ANALYSIS_DIFFICULTY`                   | RC 選項辨析: 選項理解/辨析困難 (含義/對應)             |
-| `RC_AC_ANALYSIS_TIME_EXCESSIVE`               | RC 選項辨析: 選項篩選耗時過長                     |
-| **Foundational Mastery (CR & RC)**            |                                                    |
-| `FOUNDATIONAL_MASTERY_INSTABILITY_SFE`        | 基礎掌握: 應用不穩定 (Special Focus Error)          |
-| **Efficiency Issues (CR & RC)**               |                                                    |
-| `EFFICIENCY_BOTTLENECK_[AREA]`                | 效率問題: [具體障礙] 導致效率低下 (需指明 Area: READING, REASONING, LOCATION, AC_ANALYSIS)     |
-| **Behavioral Patterns**                       |                                                    |
+| `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` | 基礎掌握: 應用不穩定 (Special Focus Error)          |
+| `BEHAVIOR_PATTERN_FAST_GUESSING_HASTY`        | 行為模式: 過快疑似猜題/倉促                     |
+| `DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED`   | 數據無效：用時過短（受時間壓力影響）                  |
+| **CR - Stem Understanding Errors**            | **CR 題幹理解錯誤**                                  |
+| `CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP` | CR 題幹理解錯誤：提問要求把握錯誤                 |
+| `CR_STEM_UNDERSTANDING_ERROR_VOCAB`           | CR 題幹理解錯誤：詞彙                             |
+| `CR_STEM_UNDERSTANDING_ERROR_SYNTAX`          | CR 題幹理解錯誤：句式                             |
+| `CR_STEM_UNDERSTANDING_ERROR_LOGIC`           | CR 題幹理解錯誤：邏輯                             |
+| `CR_STEM_UNDERSTANDING_ERROR_DOMAIN`          | CR 題幹理解錯誤：領域                             |
+| **CR - Reasoning Errors**                     | **CR 推理錯誤**                                    |
+| `CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP` | CR 推理錯誤: 邏輯鏈分析錯誤 (前提與結論關係)        |
+| `CR_REASONING_ERROR_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` | CR 推理錯誤: 抽象邏輯/術語理解錯誤                  |
+| `CR_REASONING_ERROR_PREDICTION_DIRECTION`     | CR 推理錯誤: 預判方向錯誤                         |
+| `CR_REASONING_ERROR_CORE_ISSUE_IDENTIFICATION` | CR 推理錯誤: 核心議題識別錯誤                      |
+| `CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT` | CR 推理錯誤: 選項相關性判斷錯誤                   |
+| `CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION` | CR 推理錯誤: 強干擾選項混淆                       |
+| **CR - Choice Understanding Errors**          | **CR 選項理解錯誤**                                |
+| `CR_CHOICE_UNDERSTANDING_ERROR_VOCAB`         | CR 選項理解錯誤: 選項詞彙理解錯誤                   |
+| `CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX`        | CR 選項理解錯誤: 選項句式理解錯誤                   |
+| `CR_CHOICE_UNDERSTANDING_ERROR_LOGIC`         | CR 選項理解錯誤: 選項邏輯理解錯誤                   |
+| `CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN`        | CR 選項理解錯誤: 選項領域理解錯誤                   |
+| **CR - Specific Question Type Weakness**      | **CR 特定題型弱點**                                |
+| `CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE` | CR 特定題型弱點: (需註明題型)                      |
+| **CR - Stem Understanding Difficulties**      | **CR 題幹理解障礙**                                |
+| `CR_STEM_UNDERSTANDING_DIFFICULTY_VOCAB`      | CR 題幹理解障礙：詞彙                             |
+| `CR_STEM_UNDERSTANDING_DIFFICULTY_SYNTAX`     | CR 題幹理解障礙：句式                             |
+| `CR_STEM_UNDERSTANDING_DIFFICULTY_LOGIC`      | CR 題幹理解障礙：邏輯                             |
+| `CR_STEM_UNDERSTANDING_DIFFICULTY_DOMAIN`     | CR 題幹理解障礙：領域                             |
+| **CR - Reasoning Difficulties**               | **CR 推理障礙**                                    |
+| `CR_REASONING_DIFFICULTY_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` | CR 推理障礙: 抽象邏輯/術語理解困難               |
+| `CR_REASONING_DIFFICULTY_PREDICTION_DIRECTION_MISSING` | CR 推理障礙: 預判方向缺失                         |
+| `CR_REASONING_DIFFICULTY_CORE_ISSUE_IDENTIFICATION` | CR 推理障礙: 核心議題識別困難                      |
+| `CR_REASONING_DIFFICULTY_CHOICE_RELEVANCE_JUDGEMENT` | CR 推理障礙: 選項相關性判斷困難                   |
+| `CR_REASONING_DIFFICULTY_STRONG_DISTRACTOR_CHOICE_ANALYSIS` | CR 推理障礙: 強干擾選項辨析困難                   |
+| **CR - Choice Understanding Difficulties**    | **CR 選項理解障礙**                                |
+| `CR_CHOICE_UNDERSTANDING_DIFFICULTY_VOCAB`    | CR 選項理解障礙: 選項詞彙理解困難                   |
+| `CR_CHOICE_UNDERSTANDING_DIFFICULTY_SYNTAX`   | CR 選項理解障礙: 選項句式理解困難                   |
+| `CR_CHOICE_UNDERSTANDING_DIFFICULTY_LOGIC`    | CR 選項理解障礙: 選項邏輯理解困難                   |
+| `CR_CHOICE_UNDERSTANDING_DIFFICULTY_DOMAIN`   | CR 選項理解障礙: 選項領域理解困難                   |
+| **RC - Reading Comprehension Errors**         | **RC 閱讀理解錯誤**                                |
+| `RC_READING_COMPREHENSION_ERROR_VOCAB`        | RC 閱讀理解錯誤: 詞彙理解錯誤                       |
+| `RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS` | RC 閱讀理解錯誤: 長難句解析錯誤                   |
+| `RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE` | RC 閱讀理解錯誤: 篇章結構理解錯誤                  |
+| `RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING` | RC 閱讀理解錯誤: 關鍵信息定位/理解錯誤             |
+| **RC - Question Understanding Errors**        | **RC 題目理解錯誤**                                |
+| `RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT` | RC 題目理解錯誤: 提問焦點理解錯誤                   |
+| **RC - Location Skill Errors**                | **RC 定位能力錯誤**                                |
+| `RC_LOCATION_SKILL_ERROR_LOCATION`            | RC 定位能力錯誤: 定位錯誤                         |
+| **RC - Reasoning Errors**                     | **RC 推理錯誤**                                    |
+| `RC_REASONING_ERROR_INFERENCE`                | RC 推理錯誤: 推理錯誤                             |
+| **RC - Choice Analysis Errors**               | **RC 選項辨析錯誤**                                |
+| `RC_CHOICE_ANALYSIS_ERROR_VOCAB`              | RC 選項辨析錯誤: 選項詞彙理解錯誤                   |
+| `RC_CHOICE_ANALYSIS_ERROR_SYNTAX`             | RC 選項辨析錯誤: 選項句式理解錯誤                   |
+| `RC_CHOICE_ANALYSIS_ERROR_LOGIC`              | RC 選項辨析錯誤: 選項邏輯理解錯誤                   |
+| `RC_CHOICE_ANALYSIS_ERROR_DOMAIN`             | RC 選項辨析錯誤: 選項領域理解錯誤                   |
+| `RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT` | RC 選項辨析錯誤: 選項相關性判斷錯誤                 |
+| `RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION` | RC 選項辨析錯誤: 強干擾選項混淆                     |
+| **RC - Method Errors**                        | **RC 方法錯誤**                                    |
+| `RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING` | RC 方法錯誤: 特定題型處理錯誤                      |
+| **RC - Reading Comprehension Difficulties**   | **RC 閱讀理解障礙**                                |
+| `RC_READING_COMPREHENSION_DIFFICULTY_VOCAB_BOTTLENECK` | RC 閱讀理解障礙: 詞彙量瓶頸                       |
+| `RC_READING_COMPREHENSION_DIFFICULTY_LONG_DIFFICULT_SENTENCE_ANALYSIS` | RC 閱讀理解障礙: 長難句解析困難                 |
+| `RC_READING_COMPREHENSION_DIFFICULTY_PASSAGE_STRUCTURE_GRASP_UNCLEAR` | RC 閱讀理解障礙: 篇章結構把握不清                |
+| `RC_READING_COMPREHENSION_DIFFICULTY_SPECIFIC_DOMAIN_BACKGROUND_KNOWLEDGE_LACK` | RC 閱讀理解障礙: 特定領域背景知識缺乏             |
+| **RC - Question Understanding Difficulties**  | **RC 題目理解障礙**                                |
+| `RC_QUESTION_UNDERSTANDING_DIFFICULTY_FOCUS_POINT_GRASP` | RC 題目理解障礙: 提問焦點把握困難                 |
+| **RC - Location Skill Difficulties**          | **RC 定位能力障礙**                                |
+| `RC_LOCATION_SKILL_DIFFICULTY_INEFFICIENCY`   | RC 定位能力障礙: 定位效率低下                     |
+| **RC - Reasoning Difficulties**               | **RC 推理障礙**                                    |
+| `RC_REASONING_DIFFICULTY_INFERENCE_SPEED_SLOW` | RC 推理障礙: 推理速度緩慢                        |
+| **RC - Choice Analysis Difficulties**         | **RC 選項辨析障礙**                                |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_VOCAB`         | RC 選項辨析障礙: 選項詞彙理解困難                   |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_SYNTAX`        | RC 選項辨析障礙: 選項句式理解困難                   |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_LOGIC`         | RC 選項辨析障礙: 選項邏輯理解困難                   |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN`        | RC 選項辨析障礙: 選項領域理解困難                   |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT` | RC 選項辨析障礙: 選項相關性判斷困難               |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS` | RC 選項辨析障礙: 強干擾選項辨析困難                 |
+| **RC - Method Difficulties**                  | **RC 方法障礙**                                    |
+| `RC_METHOD_DIFFICULTY_SPECIFIC_QUESTION_TYPE_HANDLING` | RC 方法障礙: 特定題型處理困難                    |
+| **Behavioral Patterns (Not in summary but defined in Chapter 5)** | **行為模式 (摘要中未包含但在第五章定義)**                 |
 | `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`            | 行為模式: 前期作答過快 (< 1.0 min, 注意 flag for review 風險) |
 | `BEHAVIOR_CARELESSNESS_ISSUE`                 | 行為模式: 粗心問題 (快而錯比例 > 25%)                    |
-| `BEHAVIOR_GUESSING_HASTY`                     | 行為模式: 過快疑似猜題/倉促                     |
+| **Efficiency Issues (Not in summary but defined in Chapter 3)** | **效率問題 (摘要中未包含但在第三章定義)**                 |
+| `EFFICIENCY_BOTTLENECK_[AREA]`                | 效率問題: [具體障礙] 導致效率低下 (需指明 Area: READING, REASONING, LOCATION, AC_ANALYSIS)     |
 
 （本文件結束）
