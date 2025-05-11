@@ -46,73 +46,54 @@ def display_chat_interface(session_state):
             # logging.info(f"當前聊天歷史包含 {len(session_state.chat_history)} 條消息") # Replaced st.info with logging
         
         # Debug: 顯示現有聊天歷史中的response_id (用於調試)
-        _debug_show_chat_history(session_state)
+        # _debug_show_chat_history(session_state) # Removed the call to the debug function
         
-        # 添加自定義CSS，創建固定高度的聊天容器
-        # TEMPORARILY COMMENTED OUT FOR DEBUGGING
-        # st.markdown(\"\"\"
-        # <style>
-        # .chat-container {
-        #     height: 400px;
-        #     overflow-y: auto;
-        #     border: 1px solid #e0e0e0;
-        #     border-radius: 8px;
-        #     padding: 15px;
-        #     background-color: #f8f9fa;
-        #     margin-bottom: 15px;
-        # }
-        # .chat-container::-webkit-scrollbar {
-        #     width: 6px;
-        #     background-color: #F5F5F5;
-        # }
-        # .chat-container::-webkit-scrollbar-thumb {
-        #     background-color: #CCCCCC;
-        #     border-radius: 3px;
-        # }
-        # .stChatMessage {
-        #     margin-bottom: 10px;
-        # }
-        # .chat-message-user {
-        #     background-color: #e1f5fe;
-        #     border-radius: 10px;
-        #     padding: 8px 12px;
-        #     margin: 5px 0;
-        #     max-width: 80%;
-        #     margin-left: auto;
-        #     text-align: right;
-        # }
-        # .chat-message-assistant {
-        #     background-color: #f1f1f1;
-        #     border-radius: 10px;
-        #     padding: 8px 12px;
-        #     margin: 5px 0;
-        #     max-width: 80%;
-        # }
-        # </style>
-        # \"\"\", unsafe_allow_html=True)
+        # 添加自定義CSS
+        # We will rely on st.container(height=...) for scrolling and its border=True parameter.
+        # Custom scrollbar styling might be added later if needed, targeting Streamlit's specific elements.
+        st.markdown("""
+        <style>
+        /* Minimal styling for now, st.container with border=True will provide the main structure */
+        /* We might need to adjust margins for st.chat_message if they are too tight within the container */
+        /* Example: div[data-testid='stChatMessage'] { margin-bottom: 8px !important; } */
+
+        /* Custom scrollbar styles (might need adjustment for Streamlit's specific container) */
+        /* This targets any scrollable area, which might be too broad or not specific enough */
+        /* Let's keep it commented for now to ensure basic functionality first */
+        /*
+        ::-webkit-scrollbar {
+            width: 8px;
+            background-color: #F5F5F5;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #AAAAAA;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: #777777;
+        }
+        */
+        </style>
+        """, unsafe_allow_html=True)
         
         # 在固定容器中顯示聊天歷史
-        # with st.container(): # Temporarily remove container to simplify
-        #     with st.markdown('<div class="chat-container" id="chat-container">', unsafe_allow_html=True):
-                # 使用streamlit的聊天元素顯示歷史聊天記錄
-        display_chat_history(session_state) # Display history directly
+        # Use st.container with a fixed height to make it scrollable
+        # The border=True gives a visual boundary similar to the old CSS border.
+        chat_display_area = st.container(height=800, border=True) # User previously set height to 1200px
+
+        with chat_display_area:
+            display_chat_history(session_state)
             
-            # 在聊天歷史加載後添加滾動腳本
-            # TEMPORARILY COMMENTED OUT FOR DEBUGGING
-            # st.markdown(\"\"\"
-            # <script>
-            #     function scrollChatToBottom() {
-            #         const chatContainer = document.getElementById('chat-container');
-            #         if (chatContainer) {
-            #             chatContainer.scrollTop = chatContainer.scrollHeight;
-            #         }
-            #     }
-            #     // 在完整加載後執行
-            #     window.addEventListener('load', scrollChatToBottom);
-            #     // 延遲執行以確保聊天內容已加載
-            #     setTimeout(scrollChatToBottom, 500);
-            # </script>
-            # \"\"\", unsafe_allow_html=True)
+        # JavaScript自動滾動部分暫時移除，因為 target id "chat-container" 不再存在
+        # 並且 st.container(height=...) 的內部滾動元素需要新的定位方式。
+        # st.markdown(""" 
+        # <script>
+        #     function scrollChatToBottom() { ... }
+        #     scrollChatToBottom();
+        #     setTimeout(scrollChatToBottom, 100);
+        #     setTimeout(scrollChatToBottom, 500);
+        # </script>
+        # """, unsafe_allow_html=True)
 
         # 聊天輸入在固定容器下方
         handle_chat_input(session_state)
@@ -125,10 +106,16 @@ def _debug_show_chat_history(session_state):
             for i, msg in enumerate(session_state.chat_history):
                 role = msg.get('role', 'unknown')
                 content_preview = msg.get('content', '')[:30] + '...' if len(msg.get('content', '')) > 30 else msg.get('content', '')
-                response_id = msg.get('response_id', 'N/A')
-                if response_id != 'N/A' and len(response_id) > 10:
-                    response_id = response_id[:10] + '...'
-                debug_info += f"{i}: [{role}] {content_preview} (response_id: {response_id})\n"
+                
+                # Safely get response_id, ensure it's a string before len()
+                response_id_val = msg.get('response_id') 
+                response_id_display = 'N/A'
+                if response_id_val is not None:
+                    response_id_display = str(response_id_val) # Ensure it's a string
+                    if len(response_id_display) > 10:
+                        response_id_display = response_id_display[:10] + '...'
+                
+                debug_info += f"{i}: [{role}] {content_preview} (response_id: {response_id_display})\n"
             st.text(debug_info)
             
             # 顯示當前上下文摘要
