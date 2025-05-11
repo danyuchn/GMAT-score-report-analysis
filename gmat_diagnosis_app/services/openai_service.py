@@ -321,175 +321,163 @@ def _get_dataframe_context(session_state, max_rows=100):
         return f"(無法轉換詳細數據表格: {str(e)})"
 
 def get_openai_response(current_chat_history, report_context, dataframe_context, api_key):
-    """Gets response from OpenAI using the responses API and handles conversation history.
+    """Get response from OpenAI based on chat history and context, using o4-mini.
 
     Args:
-        current_chat_history (list): The current chat history list.
-        report_context (str): The combined markdown report context.
-        dataframe_context (str): The dataframe context string.
+        current_chat_history (list): The current conversation history.
+        report_context (str): Markdown string of the GMAT report.
+        dataframe_context (str): Markdown string of the diagnostic dataframe.
         api_key (str): OpenAI API key.
 
     Returns:
-        tuple: (ai_response_text, response_id) or raises an exception.
+        tuple: (ai_response_text, response_id) or (error_message_string, None)
     """
     if not api_key:
-        raise ValueError("OpenAI API Key is missing.")
+        logging.error("OpenAI API key is missing for chat.")
+        return "錯誤：OpenAI API 金鑰未設定。", None
 
     client = openai.OpenAI(api_key=api_key)
-    
-    # 準備用於構建對話的輸入文本
-    input_text = ""
-    
-    # 找出最後一條 assistant 消息的 response_id（如果存在）
-    previous_response_id = None
-    for message in reversed(current_chat_history):
-        if message["role"] == "assistant" and "response_id" in message:
-            previous_response_id = message["response_id"]
-            break
-    
-    # 顯示最新訊息記錄
-    latest_message = current_chat_history[-1]["content"] if current_chat_history else None
-    logging.info(f"準備發送至 OpenAI 的最新訊息: {latest_message[:30]}...")
 
-    # 檢查上下文內容的有效性
-    report_context_valid = bool(report_context and report_context.strip())
-    dataframe_context_valid = bool(dataframe_context and dataframe_context.strip())
+    # Determine if this is the first user message in the session for this specific chat.
+    # A simple heuristic: if chat history has only one user message (the current one being processed)
+    # or two messages (system (if we decide to add one initially), user), it's likely the first real interaction.
+    # For robustness, let's count user messages.
+    user_message_count = sum(1 for msg in current_chat_history if msg['role'] == 'user')
 
-    logging.info(f"報告上下文有效: {report_context_valid}, 長度: {len(report_context) if report_context_valid else 0}")
-    logging.info(f"診斷試算表上下文有效: {dataframe_context_valid}, 長度: {len(dataframe_context) if dataframe_context_valid else 0}")
+    is_first_exchange = user_message_count <= 1
 
-    # 如果診斷試算表內容為空，添加警告
-    if not dataframe_context_valid:
-        logging.warning("診斷試算表內容為空，AI回應可能不完整")
-        dataframe_context = "(診斷試算表數據不可用)"
+    if is_first_exchange:
+        # First exchange: include the full report and dataframe context
+        system_prompt_content = f"""You are an expert GMAT diagnostic assistant. 
+Your goal is to help the user understand their GMAT performance based on the provided diagnostic report and data.
 
-    # 構建系統指令和對話歷史
-    chat_system_prompt = f"""You are a helpful GMAT diagnostic assistant.
-Your primary goal is to answer questions based SOLELY on the provided GMAT diagnostic report and detailed data table.
-Do NOT use any external knowledge or make assumptions beyond what is in the context.
-If the answer cannot be found in the provided report or data, state that clearly.
-
-**IMPORTANT**: You have access to both text reports and a diagnostic spreadsheet data table. Please analyze both to provide comprehensive answers.
-
-**Provided Context:**
-
-```markdown
-### Report
+Here is the user's GMAT diagnostic report:
+--- BEGIN REPORT ---
 {report_context}
-```
+--- END REPORT ---
 
-```markdown
-### Diagnostic Data Table (診斷試算表)
+Here is the user's detailed diagnostic data (questions, answers, time spent, etc.):
+--- BEGIN DATA ---
 {dataframe_context}
-```
+--- END DATA ---
 
-Answer questions about the GMAT diagnostic results in a direct, helpful, and accurate manner. 
-If answering in Chinese, use traditional Chinese characters (繁體中文).
+Answer the user's questions based on this report and data. Be concise, helpful, and refer to specific details from the report or data when possible.
+If the user asks for something not in the report or data, state that the information is unavailable.
+Maintain a conversational and supportive tone.
+"""
+    else:
+        # Subsequent exchanges: use a simpler system prompt, assuming context is maintained by conversation history.
+        system_prompt_content = """You are an expert GMAT diagnostic assistant. 
+Continue the conversation based on the provided history. Be concise, helpful, and refer to specific details from the report or data if they were mentioned earlier or are relevant.
+If the user asks for something not in the report or data that wasn't previously established, state that the information is unavailable.
+Maintain a conversational and supportive tone.
 """
 
-    # 構建系統指令和對話歷史
-    input_text = f"System: {chat_system_prompt}\n\n"
-    
-    # 添加對話歷史（最多取最近10條，避免過長）
-    history_start_idx = max(0, len(current_chat_history) - 11)  # 保留最多10輪對話
-    for i, msg in enumerate(current_chat_history[history_start_idx:], start=history_start_idx):
-        role = msg["role"]
-        content = msg["content"]
-        if role == "user":
-            input_text += f"User: {content}\n\n"
-        elif role == "assistant":
-            input_text += f"Assistant: {content}\n\n"
+    messages_for_api = [
+        {"role": "system", "content": system_prompt_content}
+    ]
+    # Append the actual chat history (user and assistant messages)
+    # We need to ensure the history format is correct for the API
+    for message in current_chat_history:
+        role = message.get("role")
+        content = message.get("content", "") # Default to empty string if content is missing
+        if not isinstance(content, str):
+            content = str(content) # Ensure content is a string
+
+        if role:
+            # Only include 'role' and 'content' keys in the message sent to the API
+            messages_for_api.append({"role": role, "content": content})
+        # No longer need the separate case for `elif message.get("role")` with empty content,
+        # as `message.get("content", "")` handles it.
+
+    # Get previous response_id if available from the last assistant message
+    previous_response_id = None
+    if len(current_chat_history) > 1:
+        # Iterate backwards to find the last assistant message with a response_id
+        for i in range(len(current_chat_history) - 1, -1, -1):
+            msg = current_chat_history[i]
+            if msg.get("role") == "assistant" and msg.get("response_id"):
+                previous_response_id = msg.get("response_id")
+                logging.info(f"Found previous_response_id: {previous_response_id[:10]}...")
+                break 
 
     try:
-        # 修復：檢查previous_response_id是否為None
-        log_info = "調用 OpenAI responses.create API"
-        if previous_response_id:
-            log_info += f"，previous_response_id: {previous_response_id[:10]}..."
-        logging.info(log_info)
+        logging.info(f"Calling OpenAI o4-mini. is_first_exchange: {is_first_exchange}. History length: {len(messages_for_api)}. Previous_id: {previous_response_id[:10] if previous_response_id else 'None'}")
         
-        # 設定API呼叫參數
-        api_params = {
-            "model": "o4-mini",  # 使用o4-mini模型
-            "input": input_text,
-            "store": True,  # 存儲對話歷史
-            "max_output_tokens": 4000,  # 增加輸出標記的最大數量
-        }
-        
-        # 如果存在前一個回應ID，加入previous_response_id參數
-        if previous_response_id:
-            api_params["previous_response_id"] = previous_response_id
-            
-        # 記錄完整的input_text長度，用於調試
-        logging.info(f"發送至OpenAI的input_text總長度: {len(input_text)} 字符")
-        
-        # 記錄最後的用戶訊息與診斷試算表長度比較
-        if latest_message:
-            logging.info(f"用戶最新訊息長度: {len(latest_message)} 字符，診斷試算表長度: {len(dataframe_context) if dataframe_context_valid else 0} 字符")
-        
-        # 調用responses API
-        response = client.responses.create(**api_params)
-        
-        # 記錄回應狀態
-        logging.info(f"OpenAI API 回應狀態: {response.status}")
-        
-        if response.status == "completed" and response.output:
-            # 提取回應文本
-            response_text = ""
-            for output_item in response.output:
-                if hasattr(output_item, 'type') and output_item.type == 'message':
-                    for content_item in output_item.content:
-                        if hasattr(content_item, 'type') and content_item.type == 'output_text':
-                            response_text += content_item.text
-
-            if not response_text.strip():
-                logging.error("OpenAI返回空回應")
-                raise ValueError("AI未提供有效的回應")
-                
-            # 獲取response_id以便下次對話使用
-            response_id = response.id
-            # 修復：安全記錄ID
-            logging.info(f"成功獲取OpenAI回應，ID: {response_id[:10] if response_id else 'N/A'}...")
-            
-            return response_text.strip(), response_id
-            
-        elif response.status == "error":
-            error_detail = response.error.get("message", "未知錯誤") if response.error else "未知錯誤"
-            logging.error(f"OpenAI API錯誤: {error_detail}")
-            raise ValueError(f"AI回應錯誤: {error_detail}")
-            
+        # Debug: Log the system prompt being used
+        if is_first_exchange:
+            logging.info("Sending request with full context in system prompt.")
         else:
-            logging.error(f"無法處理的OpenAI回應狀態: {response.status}")
-            raise ValueError("獲取AI回應時發生未知錯誤")
+            logging.info("Sending request with simplified system prompt.")
+
+        response = client.responses.create(
+            model="o4-mini", 
+            input=messages_for_api, # Pass the constructed messages list
+            # The 'o4-mini' model expects input as a list of messages, not a single prompt string.
+            # `prompt` parameter is not used with this model for chat-like interactions.
+            previous_response_id=previous_response_id, # Pass the ID for context
+            # max_output_tokens=1000 # Optional, if needed for controlling response length
+        )
+        logging.info(f"OpenAI response status: {response.status}")
+
+        if response.status == 'completed' and response.output:
+            ai_response_text = ""
+            message_block = None
+            for item in response.output:
+                if hasattr(item, 'type') and item.type == 'message':
+                    message_block = item
+                    break
             
+            if message_block and hasattr(message_block, 'content') and message_block.content:
+                for content_block in message_block.content:
+                    if hasattr(content_block, 'type') and content_block.type == 'output_text':
+                        ai_response_text += content_block.text
+
+            if not ai_response_text:
+                logging.error("OpenAI response completed but no text found.")
+                return "AI 回應為空，請稍後再試。", None
+            
+            new_response_id = response.id
+            logging.info(f"OpenAI response successful. New response_id: {new_response_id[:10] if new_response_id else 'N/A'}...")
+            return ai_response_text.strip(), new_response_id
+        
+        elif response.status == 'error':
+            error_details = response.error if response.error else "Unknown error"
+            logging.error(f"OpenAI API error: {error_details}")
+            return f"AI 服務出錯: {error_details}", None
+        else:
+            logging.error(f"OpenAI response status not completed or output empty. Status: {response.status}")
+            return f"AI 未能成功回應 (狀態: {response.status})，請稍後再試。", None
+
     except openai.AuthenticationError:
         error_msg = "OpenAI API密鑰無效"
         logging.error(error_msg)
-        raise ValueError(error_msg)
+        return error_msg, None
         
     except openai.RateLimitError:
         error_msg = "OpenAI API請求頻率過高，請稍後再試"
         logging.error(error_msg)
-        raise ValueError(error_msg)
+        return error_msg, None
         
     except openai.APIConnectionError as e:
         error_msg = f"連接OpenAI API時出錯: {e}"
         logging.error(error_msg)
-        raise ValueError(error_msg)
+        return error_msg, None
         
     except openai.APITimeoutError:
         error_msg = "OpenAI API請求超時"
         logging.error(error_msg)
-        raise ValueError(error_msg)
+        return error_msg, None
         
     except openai.BadRequestError as e:
         error_msg = f"OpenAI API請求無效: {e}"
         logging.error(error_msg)
-        raise ValueError(error_msg)
+        return error_msg, None
         
     except Exception as e:
         error_msg = f"與OpenAI API通訊時發生未知錯誤: {e}"
         logging.error(error_msg, exc_info=True)
-        raise ValueError(error_msg)
+        return error_msg, None
 
 def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: str, api_key: str) -> str:
     """
