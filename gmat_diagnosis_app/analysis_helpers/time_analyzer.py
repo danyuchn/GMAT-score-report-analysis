@@ -81,13 +81,19 @@ def _calculate_overtime_di(df_di, pressure, thresholds):
     return overtime_mask
 
 def _calculate_overtime_v(df_v, pressure, thresholds):
-    """Calculates overtime mask for V section."""
+    """Calculates overtime mask for V section with improved RC logic (方案四)."""
     overtime_mask = pd.Series(False, index=df_v.index)
     overtime_thresholds = thresholds['OVERTIME']
     cr_thresholds = overtime_thresholds['CR']
     rc_ind_threshold = overtime_thresholds['RC_INDIVIDUAL']
     rc_group_targets = overtime_thresholds['RC_GROUP_TARGET']
 
+    # 從v_modules.constants導入方案四所需常量
+    from gmat_diagnosis_app.diagnostics.v_modules.constants import (
+        RC_INDIVIDUAL_TOLERANCE_WHEN_GROUP_GOOD,
+        RC_GROUP_PERFORMANCE_CATEGORIES
+    )
+    
     # Ensure q_time_numeric exists, if not, create it from question_time
     if 'q_time_numeric' not in df_v.columns:
         df_v['q_time_numeric'] = pd.to_numeric(df_v['question_time'], errors='coerce')
@@ -96,47 +102,31 @@ def _calculate_overtime_v(df_v, pressure, thresholds):
     if not rc_cols_present:
         warnings.warn("Verbal overtime: Missing preprocessed RC columns. RC overtime calculation will be skipped.", UserWarning, stacklevel=3)
 
+    # 處理CR題型（邏輯不變）
     cr_mask = (df_v['question_type'] == 'Critical Reasoning')
     if cr_mask.any():
         threshold = cr_thresholds['pressure'] if pressure else cr_thresholds['no_pressure']
         is_cr_overtime = (df_v['q_time_numeric'] > threshold).fillna(False)
         overtime_mask.loc[cr_mask & is_cr_overtime] = True
 
+    # 處理RC題型（方案四新邏輯）
     rc_mask = (df_v['question_type'] == 'Reading Comprehension')
     if rc_mask.any() and rc_cols_present:
-        # Adjusted RC individual question time calculation
-        # Initialize adjusted_rc_time with original question_time
+        # 新增RC組表現分類列
+        df_v['rc_group_performance'] = 'unknown'
+        
+        # 計算調整後時間（扣除閱讀時間）
         df_v['adjusted_rc_time'] = df_v['q_time_numeric']
-        
-        # Identify first questions in each RC group
-        # Assuming rc_reading_time is non-zero only for the first question of a group as per prior correction
-        # or that it holds the value to be subtracted for the first question.
-        # A more robust way is to check question_position within the group if available and sorted.
-        # For now, relying on rc_reading_time structure from verbal_preprocessor.py
-        # A common approach for identifying first question of a group:
-        # df_v['is_first_in_rc_group'] = df_v.groupby('rc_group_id')['question_position'].transform(lambda x: x == x.min())
-        # However, question_position might not be globally unique or perfectly ordered if df_v is a slice.
-        # The verbal_preprocessor.py stores rc_reading_time specifically on the first question.
-        # So, if rc_reading_time > 0, it implies it is the first question and has the value to subtract.
-        
-        # To correctly identify the first question for subtraction based on our verbal_preprocessor logic for rc_reading_time:
-        # rc_reading_time is non-zero ONLY for the first question of each group.
-        first_q_rc_mask = (df_v['question_type'] == 'Reading Comprehension') & df_v['rc_group_id'].notna() & (df_v['rc_reading_time'] != 0)      
-        
+        first_q_rc_mask = rc_mask & df_v['rc_group_id'].notna() & (df_v['rc_reading_time'] != 0)      
         df_v.loc[first_q_rc_mask, 'adjusted_rc_time'] = df_v.loc[first_q_rc_mask, 'q_time_numeric'] - df_v.loc[first_q_rc_mask, 'rc_reading_time']
         
-        # Individual RC Question Overtime based on adjusted_rc_time
-        is_rc_ind_overtime = (df_v['adjusted_rc_time'] > rc_ind_threshold).fillna(False) # rc_ind_threshold is 2.0 mins as per doc
-        overtime_mask.loc[rc_mask & is_rc_ind_overtime] = True
-
-        # RC Group Overtime (based on precalculated group times)
-        # Iterate through unique group_ids for RC questions to apply group logic once per group
+        # 針對每個RC組進行評估
         unique_rc_groups = df_v.loc[rc_mask & df_v['rc_group_id'].notna(), 'rc_group_id'].unique()
         for group_id in unique_rc_groups:
             group_data = df_v[(df_v['rc_group_id'] == group_id) & rc_mask]
             if group_data.empty: continue
 
-            num_questions_in_group = group_data['rc_group_num_questions'].iloc[0] # Assuming consistent within group
+            num_questions_in_group = group_data['rc_group_num_questions'].iloc[0]
             group_total_time = group_data['rc_group_total_time'].iloc[0]
             
             target_key = f"{int(num_questions_in_group)}Q" if num_questions_in_group in [3,4] else None
@@ -144,15 +134,67 @@ def _calculate_overtime_v(df_v, pressure, thresholds):
                 group_target_times = rc_group_targets[target_key]
                 target_time_for_group = group_target_times['pressure'] if pressure else group_target_times['no_pressure']
                 
-                # RC Group overtime is defined as actual total time > target + 1 min buffer
-                if group_total_time > (target_time_for_group + 1.0):
-                    overtime_mask.loc[group_data.index] = True # Mark all questions in this group as overtime
+                # 方案四：根據整組表現分類
+                if group_total_time <= target_time_for_group:
+                    # 整組表現良好
+                    df_v.loc[group_data.index, 'rc_group_performance'] = RC_GROUP_PERFORMANCE_CATEGORIES['GOOD']
+                    
+                    # 使用更寬容的單題標準
+                    adjusted_ind_threshold = rc_ind_threshold + RC_INDIVIDUAL_TOLERANCE_WHEN_GROUP_GOOD
+                    is_rc_ind_overtime = (df_v.loc[group_data.index, 'adjusted_rc_time'] > adjusted_ind_threshold).fillna(False)
+                    overtime_mask.loc[group_data.index[is_rc_ind_overtime]] = True
+                    
+                    # 標記單題寬容度資訊
+                    df_v.loc[group_data.index, 'rc_tolerance_applied'] = True
+                    
+                elif group_total_time <= (target_time_for_group + RC_GROUP_TARGET_TIME_ADJUSTMENT):
+                    # 整組表現尚可
+                    df_v.loc[group_data.index, 'rc_group_performance'] = RC_GROUP_PERFORMANCE_CATEGORIES['ACCEPTABLE']
+                    
+                    # 使用標準閾值判斷單題
+                    is_rc_ind_overtime = (df_v.loc[group_data.index, 'adjusted_rc_time'] > rc_ind_threshold).fillna(False)
+                    overtime_mask.loc[group_data.index[is_rc_ind_overtime]] = True
+                    
+                    # 標記未應用寬容度
+                    df_v.loc[group_data.index, 'rc_tolerance_applied'] = False
+                    
+                else:
+                    # 整組表現不佳
+                    df_v.loc[group_data.index, 'rc_group_performance'] = RC_GROUP_PERFORMANCE_CATEGORIES['POOR']
+                    
+                    # 整組標記為overtime
+                    overtime_mask.loc[group_data.index] = True
+                    
+                    # 標記未應用寬容度
+                    df_v.loc[group_data.index, 'rc_tolerance_applied'] = False
+                    
+                    # 標識"元兇"（超時最嚴重的題目）
+                    time_deviations = df_v.loc[group_data.index, 'adjusted_rc_time'] - rc_ind_threshold
+                    time_deviations = time_deviations.fillna(0)
+                    if not time_deviations.empty:
+                        # 至少標記一個元兇（如果有超時的話）
+                        culprits = time_deviations[time_deviations > 0]
+                        if not culprits.empty:
+                            worst_offenders = culprits.nlargest(min(2, len(culprits))).index
+                            df_v.loc[worst_offenders, 'rc_overtime_culprit'] = True
+                            
+                            # 標記嚴重元兇（超時超過1分鐘）
+                            severe_offenders = time_deviations[time_deviations > 1.0].index
+                            df_v.loc[severe_offenders, 'rc_severe_overtime_culprit'] = True
 
-    # Clean up temp column from df_v (which is a copy)
+    # 保留這些列以供診斷使用
+    cols_to_keep = ['rc_group_performance', 'rc_tolerance_applied', 'rc_overtime_culprit', 'rc_severe_overtime_culprit', 'adjusted_rc_time']
+    for col in cols_to_keep:
+        if col in df_v.columns:
+            # 將這些診斷列複製到原始df_v
+            if col not in overtime_mask.index.names:  # 確保不是索引名稱，避免衝突
+                overtime_mask = pd.concat([overtime_mask, df_v[col]], axis=1)
+    
+    # 清理臨時列
     if 'adjusted_rc_time' in df_v.columns:
         df_v.drop(columns=['adjusted_rc_time'], inplace=True, errors='ignore')
     
-    return overtime_mask # Ensure the function returns the calculated mask
+    return overtime_mask # 返回計算的mask和診斷列
 
 def calculate_overtime(df, time_pressure_status_map):
     """
@@ -168,7 +210,8 @@ def calculate_overtime(df, time_pressure_status_map):
         time_pressure_status_map (dict): {'Q': bool, 'DI': bool, 'V': bool}
 
     Returns:
-        pd.DataFrame: DataFrame with an added boolean 'overtime' column.
+        pd.DataFrame: DataFrame with an added boolean 'overtime' column and
+                     additional diagnostic columns for RC questions.
     """
     if df.empty:
         warnings.warn("Input DataFrame is empty. Cannot calculate overtime.", UserWarning, stacklevel=2)
@@ -189,17 +232,31 @@ def calculate_overtime(df, time_pressure_status_map):
 
         df_section = df_with_overtime[section_mask].copy() # Work on a copy for this section
         pressure = time_pressure_status_map.get(section, False)
-        section_overtime_mask = pd.Series(False, index=df_section.index)
-
+        
         if section == 'Q':
             section_overtime_mask = _calculate_overtime_q(df_section, pressure, section_thresholds)
+            df_with_overtime.loc[section_mask, 'overtime'] = section_overtime_mask
+            
         elif section == 'DI':
             section_overtime_mask = _calculate_overtime_di(df_section, pressure, section_thresholds)
+            df_with_overtime.loc[section_mask, 'overtime'] = section_overtime_mask
+            
         elif section == 'V':
-            section_overtime_mask = _calculate_overtime_v(df_section, pressure, section_thresholds)
-        
-        # Update the main dataframe's 'overtime' column for the current section
-        df_with_overtime.loc[section_mask, 'overtime'] = section_overtime_mask
+            # 方案四：_calculate_overtime_v現在可能返回DataFrame而不只是Series
+            section_overtime_result = _calculate_overtime_v(df_section, pressure, section_thresholds)
+            
+            # 檢查返回值類型，提取overtime標誌和診斷資訊
+            if isinstance(section_overtime_result, pd.DataFrame):
+                # 從結果中提取overtime列
+                overtime_col = section_overtime_result.iloc[:, 0] if not section_overtime_result.empty else pd.Series(False, index=df_section.index)
+                df_with_overtime.loc[section_mask, 'overtime'] = overtime_col
+                
+                # 複製其他診斷列到主DataFrame
+                for col in section_overtime_result.columns[1:]:  # 跳過第一列（overtime）
+                    df_with_overtime.loc[section_mask, col] = section_overtime_result[col]
+            else:
+                # 舊版本兼容性：如果只返回Series
+                df_with_overtime.loc[section_mask, 'overtime'] = section_overtime_result
 
     # Clean up the temporary q_time_numeric column from the main df_with_overtime
     if 'q_time_numeric' in df_with_overtime.columns:
