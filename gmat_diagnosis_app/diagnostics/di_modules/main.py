@@ -53,7 +53,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             df_to_return = pd.DataFrame(columns=empty_cols)
             if 'Subject' not in df_to_return.columns:
                 df_to_return['Subject'] = 'DI'
-            logging.info("[run_di_diagnosis_logic] Input DataFrame is empty.")
+            # logging.info("[run_di_diagnosis_logic] Input DataFrame is empty.") # Removed by AI
             return {}, report_str, df_to_return
 
         df_di = df_di_processed.copy()
@@ -66,20 +66,20 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
 
         # 添加調試日誌：記錄原始數據
         total_questions = len(df_di)
-        logging.info(f"[DI數據追蹤] 原始數據總題數: {total_questions}")
+        # logging.info(f"[DI數據追蹤] 原始數據總題數: {total_questions}")
         if 'is_correct' in df_di.columns:
             correct_count = df_di['is_correct'].sum()
             wrong_count = total_questions - correct_count
-            logging.info(f"[DI數據追蹤] 原始數據答對題數: {correct_count}, 答錯題數: {wrong_count}")
+            # logging.info(f"[DI數據追蹤] 原始數據答對題數: {correct_count}, 答錯題數: {wrong_count}")
         if 'is_invalid' in df_di.columns:
             invalid_count = df_di['is_invalid'].sum()
             valid_count = total_questions - invalid_count
-            logging.info(f"[DI數據追蹤] 原始數據有效題數: {valid_count}, 無效題數: {invalid_count}")
+            # logging.info(f"[DI數據追蹤] 原始數據有效題數: {valid_count}, 無效題數: {invalid_count}")
             
-        logging.debug(f"[run_di_diagnosis_logic] Starting diagnosis. Input df shape: {df_di.shape}")
+        # logging.debug(f"[run_di_diagnosis_logic] Starting diagnosis. Input df shape: {df_di.shape}")
 
         # --- Chapter 0: Derivative Data Calculation & Basic Prep ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 0: Basic Prep")
+        # logging.debug("[run_di_diagnosis_logic] Chapter 0: Basic Prep")
         df_di['question_time'] = pd.to_numeric(df_di['question_time'], errors='coerce')
         if 'question_position' not in df_di.columns: df_di['question_position'] = range(len(df_di))
         else: df_di['question_position'] = pd.to_numeric(df_di['question_position'], errors='coerce')
@@ -87,19 +87,19 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         else: df_di['is_correct'] = df_di['is_correct'].astype(bool)
         if 'question_type' not in df_di.columns: df_di['question_type'] = 'Unknown Type'
         if 'msr_group_id' not in df_di.columns:
-            logging.warning("[run_di_diagnosis_logic] 'msr_group_id' column missing. MSR metrics will be NaN.")
+            logging.warning("'msr_group_id' column missing. MSR metrics will be NaN.")
             df_di['msr_group_id'] = np.nan # Ensure column exists even if empty
         if 'is_invalid' not in df_di.columns:
             df_di['is_invalid'] = False
             
         # 添加調試日誌：數據類型轉換後的狀態
-        logging.info(f"[DI數據追蹤] 數據類型轉換後 - 總題數: {len(df_di)}, 答對題數: {df_di['is_correct'].sum()}, 答錯題數: {(~df_di['is_correct']).sum()}, 無效題數: {df_di['is_invalid'].sum()}")
+        # logging.info(f"[DI數據追蹤] 數據類型轉換後 - 總題數: {len(df_di)}, 答對題數: {df_di['is_correct'].sum()}, 答錯題數: {(~df_di['is_correct']).sum()}, 無效題數: {df_di['is_invalid'].sum()}")
 
         # df_di = _calculate_msr_metrics(df_di) # Removed call, MSR metrics are now expected from preprocessor
         # logging.debug(f"[run_di_diagnosis_logic] After _calculate_msr_metrics, df shape: {df_di.shape}") # Updated name
 
         # --- Chapter 1: Time Strategy & Validity ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 1: Time Strategy & Validity")
+        # logging.debug("[run_di_diagnosis_logic] Chapter 1: Time Strategy & Validity")
         total_test_time_di = df_di['question_time'].sum(skipna=True) # Ensure NaNs are skipped
         time_diff = MAX_ALLOWED_TIME_DI - total_test_time_di
 
@@ -196,23 +196,23 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         # Initialize diagnostic_params if needed
         if 'diagnostic_params' not in df_di.columns:
             try:
-                logging.debug(f"[run_di_diagnosis_logic] Initializing 'diagnostic_params'. df_di shape: {df_di.shape}, length of list: {len(df_di)}")
+                # logging.debug(f"[run_di_diagnosis_logic] Initializing 'diagnostic_params'. df_di shape: {df_di.shape}, length of list: {len(df_di)}")
                 df_di['diagnostic_params'] = [[] for _ in range(len(df_di))]
             except Exception as e:
-                logging.error(f"[run_di_diagnosis_logic] Error initializing 'diagnostic_params': {e}", exc_info=True)
+                logging.error(f"Error initializing 'diagnostic_params': {e}", exc_info=True)
                 raise e
         else:
             try:
-                logging.debug(f"[run_di_diagnosis_logic] Ensuring 'diagnostic_params' is list. df_di shape: {df_di.shape}")
+                # logging.debug(f"[run_di_diagnosis_logic] Ensuring 'diagnostic_params' is list. df_di shape: {df_di.shape}")
                 df_di['diagnostic_params'] = df_di['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, set, tuple)) else [])
             except Exception as e:
-                logging.error(f"[run_di_diagnosis_logic] Error ensuring 'diagnostic_params' is list: {e}", exc_info=True)
+                logging.error(f"Error ensuring 'diagnostic_params' is list: {e}", exc_info=True)
                 raise e
 
         # Add invalid tag
         final_invalid_mask_di = df_di['is_invalid']
         if final_invalid_mask_di.any():
-            logging.debug(f"[run_di_diagnosis_logic] Updating 'diagnostic_params' for invalid rows in df_di. df_di shape: {df_di.shape}, number invalid: {final_invalid_mask_di.sum()}")
+            # logging.debug(f"[run_di_diagnosis_logic] Updating 'diagnostic_params' for invalid rows in df_di. df_di shape: {df_di.shape}, number invalid: {final_invalid_mask_di.sum()}")
             for idx in df_di.index[final_invalid_mask_di]:
                 try:
                     current_list = df_di.loc[idx, 'diagnostic_params']
@@ -221,15 +221,15 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
                         current_list.append(INVALID_DATA_TAG_DI)
                     df_di.loc[idx, 'diagnostic_params'] = current_list
                 except Exception as e:
-                    logging.error(f"[run_di_diagnosis_logic] Error updating 'diagnostic_params' for invalid row index {idx}: {e}", exc_info=True)
+                    logging.error(f"Error updating 'diagnostic_params' for invalid row index {idx}: {e}", exc_info=True)
                     continue
 
         # --- Mark Overtime (Vectorized Approach) on df_di ---
         try:
-            logging.debug(f"[run_di_diagnosis_logic] Initializing 'overtime' column in df_di. df_di shape: {df_di.shape}")
+            # logging.debug(f"[run_di_diagnosis_logic] Initializing 'overtime' column in df_di. df_di shape: {df_di.shape}")
             df_di['overtime'] = False
         except Exception as e:
-            logging.error(f"[run_di_diagnosis_logic] Error initializing 'overtime': {e}", exc_info=True)
+            logging.error(f"Error initializing 'overtime': {e}", exc_info=True)
             raise e
 
         thresholds = OVERTIME_THRESHOLDS[di_time_pressure_status]
@@ -254,7 +254,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         
         overall_overtime_mask = tpa_over_mask | gt_over_mask | ds_over_mask | msr_over_mask
         df_di.loc[overall_overtime_mask, 'overtime'] = True
-        logging.debug(f"[run_di_diagnosis_logic] Overtime calculated. Count: {df_di['overtime'].sum()}")
+        # logging.debug(f"[run_di_diagnosis_logic] Overtime calculated. Count: {df_di['overtime'].sum()}")
 
         # Store Chapter 1 results
         di_diagnosis_results['chapter_1'] = {
@@ -295,36 +295,36 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             'avg_time_per_type_minutes': avg_time_per_type_for_rules, # Based on valid data
             'max_correct_difficulty': max_correct_difficulty_per_combination_for_rules.to_dict() if not max_correct_difficulty_per_combination_for_rules.empty else {} # Based on valid data
         }
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 3.")
+        # logging.debug("[run_di_diagnosis_logic] Completed Chapter 3.")
 
-        # NOW, create df_di_filtered_for_analysis from the df_di that CONTAINS 'is_sfe' and other chapter 3 results
-        # This is the primary DataFrame used by subsequent chapters for aggregated analysis.
+        # --- Prepare df_di_filtered_for_analysis (used for summary and recommendations) ---
         df_di_filtered_for_analysis = df_di[~df_di['is_invalid']].copy()
+        # 添加調試日誌：記錄篩選後用於分析的數據
+        valid_count_filtered = len(df_di_filtered_for_analysis)
+        correct_count_filtered = df_di_filtered_for_analysis['is_correct'].sum()
+        wrong_count_filtered = valid_count_filtered - correct_count_filtered
+        # logging.info(f"[DI數據追蹤] 篩選出的有效數據 (df_di_filtered_for_analysis created AFTER Ch3) - 有效題數: {valid_count_filtered}, 答對題數: {correct_count_filtered}, 答錯題數: {wrong_count_filtered}")
+        # logging.info(f"[DI數據追蹤] 此df_di_filtered_for_analysis將用於生成部分匯總報告指標以及傳遞給建議生成器。")
         
-        # Logging for the newly created df_di_filtered_for_analysis
-        valid_total_filtered = len(df_di_filtered_for_analysis)
-        valid_correct_filtered = df_di_filtered_for_analysis['is_correct'].sum() if 'is_correct' in df_di_filtered_for_analysis.columns else 0
-        valid_wrong_filtered = valid_total_filtered - valid_correct_filtered
-        logging.info(f"[DI數據追蹤] 篩選出的有效數據 (df_di_filtered_for_analysis created AFTER Ch3) - 有效題數: {valid_total_filtered}, 答對題數: {valid_correct_filtered}, 答錯題數: {valid_wrong_filtered}")
-        logging.info(f"[DI數據追蹤] 此df_di_filtered_for_analysis將用於生成部分匯總報告指標以及傳遞給建議生成器。")
-        logging.debug(f"[run_di_diagnosis_logic] Created df_di_filtered_for_analysis AFTER Chapter 3. Shape: {df_di_filtered_for_analysis.shape}. Columns: {df_di_filtered_for_analysis.columns.tolist()}")
+        # Calculate overall metrics from the filtered data
+        total_correct = df_di_filtered_for_analysis['is_correct'].sum()
 
         # --- Chapter 4: Special Pattern Observation (uses df_di_filtered_for_analysis or df_di as appropriate) ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 4: Special Patterns")
+        # logging.debug("[run_di_diagnosis_logic] Chapter 4: Special Patterns")
         # avg_times_ch3_for_ch4 was originally from diagnosed_dataframe.groupby. Now use avg_time_per_type_for_rules
         pattern_analysis_results = _observe_di_patterns(df_di_filtered_for_analysis, avg_time_per_type_for_rules)
         di_diagnosis_results['chapter_4'] = pattern_analysis_results
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 4.")
+        # logging.debug("[run_di_diagnosis_logic] Completed Chapter 4.")
 
         # --- Chapter 5: Foundation Ability Override Rule (uses df_di_filtered_for_analysis) ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 5: Override Rule")
+        # logging.debug("[run_di_diagnosis_logic] Chapter 5: Override Rule")
         type_analysis_ch2_for_ch5 = di_diagnosis_results.get('chapter_2', {}).get('by_type', {})
         override_analysis = _check_foundation_override(df_di_filtered_for_analysis, type_analysis_ch2_for_ch5)
         di_diagnosis_results['chapter_5'] = override_analysis
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 5.")
+        # logging.debug("[run_di_diagnosis_logic] Completed Chapter 5.")
 
         # --- Chapter 6: Practice Planning & Recommendations (uses df_di_filtered_for_analysis or df_di) ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 6: Recommendations")
+        # logging.debug("[run_di_diagnosis_logic] Chapter 6: Recommendations")
         domain_tags_ch2_for_ch6 = di_diagnosis_results.get('chapter_2', {}).get('domain_comparison_tags', {})
         override_analysis_ch5_for_ch6 = di_diagnosis_results.get('chapter_5', {})
 
@@ -332,15 +332,15 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         if not df_di_filtered_for_analysis.empty:
             recommendations = _generate_di_recommendations(df_di_filtered_for_analysis, override_analysis_ch5_for_ch6, domain_tags_ch2_for_ch6)
         di_diagnosis_results['chapter_6'] = {'recommendations_list': recommendations}
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 6.")
+        # logging.debug("[run_di_diagnosis_logic] Completed Chapter 6.")
 
         # --- Chapter 7: Summary Report Generation ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 7: Summary Report")
+        # logging.debug("[run_di_diagnosis_logic] Chapter 7: Summary Report")
         # Update chapter 3's dataframe in results for the report generator, ensuring it's the full df_di
         di_diagnosis_results['chapter_3']['diagnosed_dataframe'] = df_di.copy()
 
         report_str = _generate_di_summary_report(di_diagnosis_results)
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 7.")
+        # logging.debug("[run_di_diagnosis_logic] Completed Chapter 7.")
         
         # Logging for final returned data (df_di will be the base for df_to_return)
         if df_to_return.empty:
@@ -350,10 +350,10 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         final_correct = df_to_return[df_to_return['is_correct']].shape[0]
         final_valid_correct = df_to_return[(df_to_return['is_correct']) & (~df_to_return['is_invalid'])].shape[0]
         final_valid_wrong = final_valid - final_valid_correct
-        logging.info(f"[DI數據追蹤] 最終返回數據 - 總題數: {final_total}, 有效題數: {final_valid}, 有效題中答對: {final_valid_correct}, 有效題中答錯: {final_valid_wrong}")
+        # logging.info(f"[DI數據追蹤] 最終返回數據 - 總題數: {final_total}, 有效題數: {final_valid}, 有效題中答對: {final_valid_correct}, 有效題中答錯: {final_valid_wrong}")
 
         # --- Final DataFrame Preparation ---
-        logging.debug("[run_di_diagnosis_logic] Final DataFrame Preparation")
+        # logging.debug("[run_di_diagnosis_logic] Final DataFrame Preparation")
         # df_to_return starts as a copy of the fully processed df_di
         df_to_return = df_di.copy()
 
@@ -418,18 +418,20 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         else:
             df_to_return['is_invalid'] = False
 
-        logging.debug(f"[run_di_diagnosis_logic] Final df_di shape before return: {df_to_return.shape}")
-        logging.debug(f"[run_di_diagnosis_logic] Columns: {df_to_return.columns.tolist()}")
+        # logging.debug(f"[run_di_diagnosis_logic] Final df_di shape before return: {df_to_return.shape}")
+        # logging.debug(f"[run_di_diagnosis_logic] Columns: {df_to_return.columns.tolist()}")
         if 'diagnostic_params_list' in df_to_return.columns:
-             logging.debug(f"[run_di_diagnosis_logic] diagnostic_params_list head:\n{df_to_return['diagnostic_params_list'].head().to_string()}")
+             # logging.debug(f"[run_di_diagnosis_logic] diagnostic_params_list head:\n{df_to_return['diagnostic_params_list'].head().to_string()}")
+             pass
         else:
-             logging.debug("[run_di_diagnosis_logic] 'diagnostic_params_list' column not found before return.")
+             # logging.debug("[run_di_diagnosis_logic] 'diagnostic_params_list' column not found before return.")
+             pass
 
-        logging.debug(f"[run_di_diagnosis_logic] Diagnosis successful. Returning df shape: {df_to_return.shape}")
+        # logging.debug(f"[run_di_diagnosis_logic] Diagnosis successful. Returning df shape: {df_to_return.shape}")
         return di_diagnosis_results, report_str, df_to_return
 
     except Exception as e: # --- Catch All Exceptions ---
-        logging.error(f"[run_di_diagnosis_logic] Unhandled exception during DI diagnosis: {e}", exc_info=True)
+        logging.error(f"Unhandled exception during DI diagnosis: {e}", exc_info=True)
         df_to_return = pd.DataFrame(columns=empty_cols)
         if 'Subject' not in df_to_return.columns:
             df_to_return['Subject'] = 'DI'

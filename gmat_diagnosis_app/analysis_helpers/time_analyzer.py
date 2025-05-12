@@ -3,6 +3,8 @@
 import pandas as pd
 import warnings
 from gmat_diagnosis_app.constants.thresholds import THRESHOLDS # Import THRESHOLDS
+import logging # Re-added import
+from gmat_diagnosis_app.constants.config import RC_GROUP_TARGET_TIME_ADJUSTMENT # 修改為絕對導入路徑
 
 def _calculate_overtime_q(df_q, pressure, thresholds):
     """Calculates overtime mask for Q section."""
@@ -214,52 +216,62 @@ def calculate_overtime(df, time_pressure_status_map):
                      additional diagnostic columns for RC questions.
     """
     if df.empty:
-        warnings.warn("Input DataFrame is empty. Cannot calculate overtime.", UserWarning, stacklevel=2)
-        df_copy = df.copy()
-        df_copy['overtime'] = False
-        return df_copy
+        return df
 
-    df_with_overtime = df.copy()
-    df_with_overtime['overtime'] = False
-    # Create q_time_numeric once on the main copy we are modifying
-    if 'q_time_numeric' not in df_with_overtime.columns: # Add if not exists
-      df_with_overtime['q_time_numeric'] = pd.to_numeric(df_with_overtime['question_time'], errors='coerce')
+    # Add 'overtime' column if it doesn't exist, initialized to False
+    if 'overtime' not in df.columns:
+        df['overtime'] = False
 
-    for section, section_thresholds in THRESHOLDS.items():
-        section_mask = (df_with_overtime['Subject'] == section)
-        if not section_mask.any():
+    # Convert question_time to numeric once for efficiency
+    if 'q_time_numeric' not in df.columns:
+        df['q_time_numeric'] = pd.to_numeric(df['question_time'], errors='coerce')
+
+    # Ensure required threshold structure exists
+    if not isinstance(THRESHOLDS, dict):
+        logging.error("THRESHOLDS configuration is invalid.")
+        return df # Return unmodified df
+
+    for subject in df['Subject'].unique():
+        subject_mask = (df['Subject'] == subject)
+        if not subject_mask.any():
             continue
 
-        df_section = df_with_overtime[section_mask].copy() # Work on a copy for this section
-        pressure = time_pressure_status_map.get(section, False)
-        
-        if section == 'Q':
-            section_overtime_mask = _calculate_overtime_q(df_section, pressure, section_thresholds)
-            df_with_overtime.loc[section_mask, 'overtime'] = section_overtime_mask
-            
-        elif section == 'DI':
-            section_overtime_mask = _calculate_overtime_di(df_section, pressure, section_thresholds)
-            df_with_overtime.loc[section_mask, 'overtime'] = section_overtime_mask
-            
-        elif section == 'V':
-            # 方案四：_calculate_overtime_v現在可能返回DataFrame而不只是Series
-            section_overtime_result = _calculate_overtime_v(df_section, pressure, section_thresholds)
-            
-            # 檢查返回值類型，提取overtime標誌和診斷資訊
-            if isinstance(section_overtime_result, pd.DataFrame):
-                # 從結果中提取overtime列
-                overtime_col = section_overtime_result.iloc[:, 0] if not section_overtime_result.empty else pd.Series(False, index=df_section.index)
-                df_with_overtime.loc[section_mask, 'overtime'] = overtime_col
-                
-                # 複製其他診斷列到主DataFrame
-                for col in section_overtime_result.columns[1:]:  # 跳過第一列（overtime）
-                    df_with_overtime.loc[section_mask, col] = section_overtime_result[col]
-            else:
-                # 舊版本兼容性：如果只返回Series
-                df_with_overtime.loc[section_mask, 'overtime'] = section_overtime_result
+        df_subj = df[subject_mask].copy() # Work on a copy for this section
+        pressure = time_pressure_status_map.get(subject, False)
+        subj_thresholds = THRESHOLDS.get(subject)
 
-    # Clean up the temporary q_time_numeric column from the main df_with_overtime
-    if 'q_time_numeric' in df_with_overtime.columns:
-        df_with_overtime.drop(columns=['q_time_numeric'], inplace=True, errors='ignore')
+        if not subj_thresholds or not isinstance(subj_thresholds.get('OVERTIME'), dict):
+            # warnings.warn(f"Invalid or missing OVERTIME thresholds for subject {subject}. Skipping overtime calculation.", UserWarning, stacklevel=2)
+            continue
+
+        overtime_mask = pd.Series(False, index=df_subj.index) # Default mask
+        calculated_columns = {} # To store columns added by helper functions
+
+        try:
+            if subject == 'Q':
+                overtime_mask = _calculate_overtime_q(df_subj, pressure, subj_thresholds)
+            elif subject == 'DI':
+                overtime_mask = _calculate_overtime_di(df_subj, pressure, subj_thresholds)
+            elif subject == 'V':
+                overtime_result = _calculate_overtime_v(df_subj, pressure, subj_thresholds)
+                if isinstance(overtime_result, pd.DataFrame):
+                    overtime_mask = overtime_result.iloc[:, 0]
+                    calculated_columns = {col: overtime_result[col] for col in overtime_result.columns[1:]}
+                else:
+                    overtime_mask = overtime_result
+
+            df.loc[subject_mask, 'overtime'] = overtime_mask
+            for col, values in calculated_columns.items():
+                df.loc[subject_mask, col] = values
+
+        except KeyError as e:
+            warnings.warn(f"Missing expected column during overtime calculation for {subject}: {e}. Skipping.", UserWarning, stacklevel=2)
+        except Exception as e:
+            logging.error(f"Error calculating overtime for {subject}: {e}", exc_info=True) # Keep this important error log
+            warnings.warn(f"Error during overtime calculation for {subject}: {e}. Results may be incomplete.", RuntimeWarning, stacklevel=2)
+
+    # Clean up the temporary numeric time column if we added it
+    if 'q_time_numeric' in df.columns and not df.columns.duplicated().any(): # Avoid error if multiple q_time_numeric somehow exist
+        df.drop(columns=['q_time_numeric'], inplace=True, errors='ignore')
         
-    return df_with_overtime 
+    return df

@@ -71,6 +71,10 @@ ERROR_FONT_COLOR = '#D32F2F'  # Red for errors
 OVERTIME_FONT_COLOR = '#0000FF'  # Blue for overtime
 INVALID_FONT_COLOR = '#A9A9A9'  # Dark Gray for invalid rows
 
+# --- Diagnosis Rules Constants (Example Section) ---
+# TODO: Review the appropriate value for this constant based on business logic.
+RC_GROUP_TARGET_TIME_ADJUSTMENT = 1.0  # Placeholder value: assumes default no adjustment
+
 # --- Column Display Configuration ---
 COLUMN_DISPLAY_CONFIG = {
     "question_position": None,  # Will be replaced in app.py
