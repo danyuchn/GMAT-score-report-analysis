@@ -69,7 +69,7 @@ def generate_q_recommendations(q_diagnosis_results, df_valid_diagnosed_q_data):
         if skill != 'Unknown Skill': # Add skill to all_skills_in_valid_data here if not done above
             triggers.append({
                 'skill': skill, 
-                'difficulty': None, 
+                'difficulty': slow.get('Difficulty'),
                 'time': slow.get('Time'), 
                 'is_overtime': True, 
                 'is_sfe': False, 
@@ -92,10 +92,31 @@ def generate_q_recommendations(q_diagnosis_results, df_valid_diagnosed_q_data):
             override_info = ch6_override.get(skill, {})
             y_agg = override_info.get('y_agg')
             z_agg = override_info.get('z_agg', 2.5)
-            if y_agg is None: # Fallback if y_agg not pre-calculated in override_info
-                trigger_difficulties = [t['difficulty'] for t in triggers if t['skill'] == skill and t['difficulty'] is not None and not pd.isna(t['difficulty'])]
-                min_diff_skill = min(trigger_difficulties) if trigger_difficulties else 0
-                y_agg = grade_difficulty_q(min_diff_skill)
+            
+            if y_agg is None: # Fallback if y_agg was None from behavioral.py
+                # First, try to find the minimum difficulty from 'error' triggers for this skill
+                error_trigger_difficulties = [
+                    t['difficulty'] for t in triggers
+                    if t['skill'] == skill and t['trigger_type'] == 'error' and
+                    t['difficulty'] is not None and not pd.isna(t['difficulty'])
+                ]
+
+                if error_trigger_difficulties:
+                    min_relevant_difficulty = min(error_trigger_difficulties)
+                    y_agg = grade_difficulty_q(min_relevant_difficulty)
+                else:
+                    # If no 'error' triggers have valid difficulty, try 'correct_slow' triggers
+                    slow_trigger_difficulties = [
+                        t['difficulty'] for t in triggers
+                        if t['skill'] == skill and t['trigger_type'] == 'correct_slow' and
+                        t['difficulty'] is not None and not pd.isna(t['difficulty'])
+                    ]
+                    if slow_trigger_difficulties:
+                        min_relevant_difficulty = min(slow_trigger_difficulties)
+                        y_agg = grade_difficulty_q(min_relevant_difficulty)
+                    else:
+                        # If neither 'error' nor 'correct_slow' triggers provide valid difficulty
+                        y_agg = "建議從基礎難度開始 (具體難度未知)"
             
             macro_rec_text = f"**優先全面鞏固基礎** (整體錯誤率或超時率 > 50%): 從 {y_agg} 難度開始, 建議限時 {z_agg} 分鐘。"
             skill_recs_list.append({'type': 'macro', 'text': macro_rec_text, 'priority': 0})

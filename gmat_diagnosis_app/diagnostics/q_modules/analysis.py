@@ -199,6 +199,7 @@ def diagnose_q_internal(df_q_valid_diagnosed):
                     'question_position': row['question_position'],
                     'Skill': row.get('question_fundamental_skill', 'Unknown Skill'),
                     'Type': row['question_type'],
+                    'Difficulty': row.get('question_difficulty', None),
                     'Time': row.get('question_time', None),
                     'Possible_Params': row.get('diagnostic_params_list', [])
                 })
