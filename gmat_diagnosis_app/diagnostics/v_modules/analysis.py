@@ -82,10 +82,6 @@ def observe_patterns(df_v):
 
 def analyze_correct_slow(df_correct, question_type):
     """Analyzes correct but slow questions for Chapter 4."""
-    # === DEBUG START - _analyze_correct_slow Entry ===
-    logging.debug("[analyze_correct_slow - %s] Entry. Input df_correct shape: %s. Overtime counts:\n%s",
-                 question_type, df_correct.shape, df_correct['overtime'].value_counts().to_string() if 'overtime' in df_correct else "Overtime col missing")
-    # === DEBUG END ===
     analysis = {
         'total_correct': 0,
         'correct_slow_count': 0,
@@ -107,10 +103,6 @@ def analyze_correct_slow(df_correct, question_type):
     slow_correct_df = df_correct[df_correct['overtime'] == True].copy()
     correct_slow_count = len(slow_correct_df)
     analysis['correct_slow_count'] = correct_slow_count
-    # === DEBUG START - _analyze_correct_slow Count ===
-    logging.debug("[analyze_correct_slow - %s] Filtered slow_correct_df shape: %s. Calculated correct_slow_count: %s",
-                 question_type, slow_correct_df.shape, correct_slow_count)
-    # === DEBUG END ===
 
     if total_correct > 0:
         analysis['correct_slow_rate'] = correct_slow_count / total_correct
@@ -152,9 +144,6 @@ def analyze_correct_slow(df_correct, question_type):
         else:
             analysis['dominant_bottleneck_type'] = 'Skill data missing'
 
-    # === DEBUG START - _analyze_correct_slow Return ===
-    logging.debug("[analyze_correct_slow - %s] Returning analysis: %s", question_type, analysis)
-    # === DEBUG END ===
     return analysis
 
 

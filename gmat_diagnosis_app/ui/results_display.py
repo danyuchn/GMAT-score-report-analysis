@@ -14,6 +14,9 @@ from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
 from gmat_diagnosis_app.services.openai_service import trim_diagnostic_tags_with_openai
 import logging
 
+# --- Force Logging Configuration ---
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
 # --- Column Display Configuration (Moved from app.py) ---
 COLUMN_DISPLAY_CONFIG = {
     "question_position": st.column_config.NumberColumn("題號", help="題目順序"),
@@ -35,6 +38,20 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     """Displays the diagnosis report, styled DataFrame, and download button for a subject."""
     tab_container.subheader(f"{subject} 科診斷報告")
     
+    try:
+        if df_subject is not None and not df_subject.empty and 'diagnostic_params_list' in df_subject.columns and 'question_type' in df_subject.columns:
+            rc_data_session = df_subject[df_subject['question_type'] == 'Reading Comprehension'][['question_position', 'diagnostic_params_list']]
+            if not rc_data_session.empty:
+                pass
+            else:
+                pass
+        elif df_subject is None or df_subject.empty:
+             pass
+        else:
+            pass
+    except Exception as log_e_session:
+         logging.error(f"記錄 Session State RC 標籤時發生錯誤: {log_e_session}")
+    
     # 準備數據表格 (對所有科目通用)
     styled_df = None
     df_to_display = None
@@ -48,15 +65,6 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         # 複製數據框以避免修改原始數據
         df_display = df_subject.copy()
         
-        # 調試信息：追蹤原始數據的無效項
-        logging.info(f"【DEBUG追蹤】{subject}科原始數據行數: {len(df_display)}")
-        if 'is_invalid' in df_display.columns:
-            invalid_sum = df_display['is_invalid'].sum() if hasattr(df_display['is_invalid'], 'sum') else 0
-            logging.info(f"【DEBUG追蹤】{subject}科原始數據is_invalid=True的行數: {invalid_sum}")
-        if 'is_manually_invalid' in df_display.columns:
-            manual_invalid_sum = df_display['is_manually_invalid'].sum() if hasattr(df_display['is_manually_invalid'], 'sum') else 0
-            logging.info(f"【DEBUG追蹤】{subject}科原始數據is_manually_invalid=True的行數: {manual_invalid_sum}")
-        
         # 確保按題號排序
         if 'question_position' in df_display.columns:
             df_display = df_display.sort_values(by='question_position').reset_index(drop=True)
@@ -68,46 +76,22 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
                 del subject_col_config['question_fundamental_skill']
             if 'question_fundamental_skill' in subject_excel_map:
                 del subject_excel_map['question_fundamental_skill']
-            logging.info(f"【DEBUG追蹤】{subject}科特殊處理：移除question_fundamental_skill欄位")
         
         # 檢查無效項數據的類型和值
         if 'is_invalid' in df_display.columns:
-            invalid_type = df_display['is_invalid'].dtype
-            logging.debug(f"{subject}科無效項數據類型: {invalid_type}")
-            
-            # 確保無效項是布爾值
             try:
-                # 使用with context避免FutureWarning
                 with pd.option_context('future.no_silent_downcasting', True):
                     df_display['is_invalid'] = df_display['is_invalid'].replace({pd.NA: False, None: False})
                     df_display['is_invalid'] = df_display['is_invalid'].infer_objects(copy=False)
                 df_display['is_invalid'] = df_display['is_invalid'].astype(bool)
-                logging.info(f"【DEBUG追蹤】{subject}科將is_invalid轉換為布爾型")
             except Exception as e:
                 tab_container.error(f"轉換無效項時出錯: {e}")
-                logging.error(f"【DEBUG追蹤】{subject}科轉換is_invalid為布爾型時出錯: {e}")
         
         # 重要修改：確保is_invalid完全以手動標記為準
         if 'is_manually_invalid' in df_display.columns:
-            logging.info(f"【DEBUG追蹤】{subject}科發現is_manually_invalid欄位")
             if 'is_invalid' in df_display.columns:
-                pre_modify_sum = df_display['is_invalid'].sum()
-                logging.info(f"【DEBUG追蹤】{subject}科修改前is_invalid=True的行數: {pre_modify_sum}")
-                
-                # 先全部設為False
                 df_display['is_invalid'] = False
-                # 只將手動標記的項設為True
                 df_display.loc[df_display['is_manually_invalid'] == True, 'is_invalid'] = True
-                
-                post_modify_sum = df_display['is_invalid'].sum()
-                logging.info(f"【DEBUG追蹤】{subject}科修改後is_invalid=True的行數: {post_modify_sum}")
-                
-                # 檢查每個被標記為True的行
-                if post_modify_sum > 0:
-                    invalid_rows = df_display[df_display['is_invalid'] == True]
-                    for idx, row in invalid_rows.iterrows():
-                        q_pos = row['question_position'] if 'question_position' in row else "未知"
-                        logging.info(f"【DEBUG追蹤】{subject}科第{idx}行(題號{q_pos})被標記為無效")
 
         # 準備數據框顯示
         cols_available = [k for k in subject_col_config.keys() if k in df_display.columns]
@@ -121,14 +105,8 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         
         # 再次確保is_invalid以手動標記為準
         if 'is_manually_invalid' in df_to_display.columns:
-            pre_display_sum = df_to_display['is_invalid'].sum()
-            logging.info(f"【DEBUG追蹤】{subject}科顯示前is_invalid=True的行數: {pre_display_sum}")
-            
             df_to_display['is_invalid'] = False
             df_to_display.loc[df_to_display['is_manually_invalid'] == True, 'is_invalid'] = True
-            
-            post_display_sum = df_to_display['is_invalid'].sum()
-            logging.info(f"【DEBUG追蹤】{subject}科顯示後is_invalid=True的行數: {post_display_sum}")
             
         # 確保is_invalid為布林值
         df_to_display['is_invalid'] = df_to_display['is_invalid'].astype(bool)
@@ -144,6 +122,18 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     # 1. 首先顯示數據表格 (所有科目)
     tab_container.subheader(f"{subject} 科詳細數據 (含診斷標籤)")
     if styled_df is not None:
+        try:
+            if 'diagnostic_params_list' in df_to_display.columns and 'question_type' in df_to_display.columns:
+                rc_data_to_log = df_to_display[df_to_display['question_type'] == 'Reading Comprehension'][['question_position', 'diagnostic_params_list']]
+                if not rc_data_to_log.empty:
+                    pass
+                else:
+                    pass
+            else:
+                 pass
+        except Exception as log_e:
+             logging.error(f"記錄 RC 標籤時發生錯誤: {log_e}")
+        
         try:
             tab_container.dataframe(
                 styled_df,
@@ -181,16 +171,12 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
                 df_for_excel['is_invalid'] = False
                 df_for_excel.loc[df_for_excel['is_manually_invalid'] == True, 'is_invalid'] = True
             else:
-                # 如果 df_for_excel 中沒有 is_invalid，則根據 is_manually_invalid 創建
                 df_for_excel['is_invalid'] = df_for_excel['is_manually_invalid']
         
         # 確保 is_invalid 列是布爾型，以便後續處理
         if 'is_invalid' in df_for_excel.columns:
             df_for_excel['is_invalid'] = df_for_excel['is_invalid'].astype(bool)
             
-        # 詳細調試信息：Excel導出前的數據狀態
-        logging.info(f"【DEBUG追蹤】{subject}科Excel導出前數據行數: {len(df_for_excel)}")
-        
         # 根據 excel_map 篩選列（在 is_invalid 更新之後）
         df_for_excel = df_for_excel[[k for k in excel_map.keys() if k in df_for_excel.columns]].copy()
         
@@ -198,86 +184,31 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         if 'question_position' in df_for_excel.columns:
             df_for_excel = df_for_excel.sort_values(by='question_position').reset_index(drop=True)
 
-        # 所有科目的Excel處理邏輯統一（不再區分V/DI/Q）
-        logging.debug(f"{subject}科Excel導出數據列: {list(df_for_excel.columns)}")
-        
-        # 確保is_invalid列一定存在，如果不存在則創建（理論上前面已經處理過了）
         if 'is_invalid' not in df_for_excel.columns:
             df_for_excel['is_invalid'] = False
-            logging.info(f"【DEBUG追蹤】{subject}科原本沒有is_invalid列，已創建")
             
-        # 記錄原始無效項數量
-        orig_invalid_sum = df_for_excel['is_invalid'].sum() if hasattr(df_for_excel['is_invalid'], 'sum') else 0
-        logging.info(f"【DEBUG追蹤】{subject}科Excel導出前is_invalid=True的行數: {orig_invalid_sum}")
-        
-        # 檢查is_invalid的數據類型
-        invalid_type = df_for_excel['is_invalid'].dtype
-        logging.info(f"【DEBUG追蹤】{subject}科Excel導出前is_invalid的數據類型: {invalid_type}")
-        
-        # UI 直接顯示調試信息（DI科目專用）
-        # 重要：確保is_invalid完全以手動標記為準（Excel導出前）
-        # 這段邏輯在前面已經處理過了，這裡的日誌是為了確認
-        if 'is_manually_invalid' in df_for_excel.columns:
-            manual_invalid_sum = df_for_excel['is_manually_invalid'].sum() if hasattr(df_for_excel['is_manually_invalid'], 'sum') else 0
-            
-            # 此處不再需要重置，因為在最開始複製和處理df_for_excel時已完成
-            # df_for_excel['is_invalid'] = False
-            
-            # df_for_excel.loc[df_for_excel['is_manually_invalid'] == True, 'is_invalid'] = True
-            
-            post_reset_sum = df_for_excel['is_invalid'].sum() if hasattr(df_for_excel['is_invalid'], 'sum') else 0
-            
-            # UI 直接顯示處理後的調試信息（DI科目專用）
-            # 記錄被標記的行的題號
-            if post_reset_sum > 0:
-                invalid_rows = df_for_excel[df_for_excel['is_invalid'] == True]
-                for idx, row in invalid_rows.iterrows():
-                    q_pos = row['question_position'] if 'question_position' in row else "未知"
-            
-            # 驗證手動標記項被正確設置 (僅記錄到日誌)
-            manual_invalid_count = df_for_excel['is_manually_invalid'].sum() if hasattr(df_for_excel['is_manually_invalid'], 'sum') else 0
-            invalid_count = df_for_excel['is_invalid'].sum() if hasattr(df_for_excel['is_invalid'], 'sum') else 0
-            if manual_invalid_count != invalid_count:
-                logging.error(f"錯誤：{subject}科Excel導出前，無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
-        
-        # Apply number formatting *before* calling to_excel if needed
         if 'question_difficulty' in df_for_excel.columns:
             df_for_excel['question_difficulty'] = pd.to_numeric(df_for_excel['question_difficulty'], errors='coerce')
         if 'question_time' in df_for_excel.columns:
             df_for_excel['question_time'] = pd.to_numeric(df_for_excel['question_time'], errors='coerce')
             
-        # Convert boolean columns to strings for Excel export
         if 'is_correct' in df_for_excel.columns:
-            df_for_excel['is_correct'] = df_for_excel['is_correct'].astype(str) # Convert TRUE/FALSE to text
+            df_for_excel['is_correct'] = df_for_excel['is_correct'].astype(str)
         if 'is_sfe' in df_for_excel.columns:
             df_for_excel['is_sfe'] = df_for_excel['is_sfe'].astype(str)
             
-        # Handle is_invalid specifically since we *just* processed it
         if 'is_invalid' in df_for_excel.columns:
-            pre_convert_sum = df_for_excel['is_invalid'].sum() if hasattr(df_for_excel['is_invalid'], 'sum') else "無法計算"
-            
-            df_for_excel['is_invalid'] = df_for_excel['is_invalid'].astype(str) # Convert TRUE/FALSE to text
-            
-            true_count = (df_for_excel['is_invalid'] == 'True').sum()
-            
-           
+            df_for_excel['is_invalid'] = df_for_excel['is_invalid'].astype(str)
 
-        # Final validation just to be sure we're exporting valid data
-        # Ensures consistent, expectable log output for is_invalid
         try:
             value_counts = df_for_excel['is_invalid'].value_counts().to_dict()
         except Exception as e:
-            pass # Was logging.warning
+            pass
             
-        # Calculate & display final invalid count in log
         invalid_count = (df_for_excel['is_invalid'] == 'True').sum() if 'is_invalid' in df_for_excel.columns else 0
                 
-        # Generate Excel and offer for download - Use function from excel_utils
-        logging.info(f"【DEBUG追蹤】{subject}科調用to_excel函數進行Excel生成")
-        excel_bytes = to_excel(df_for_excel, excel_map) # 使用科目特定的excel_map
-        logging.info(f"【DEBUG追蹤】{subject}科Excel生成完成，大小: {len(excel_bytes)} 字節")
+        excel_bytes = to_excel(df_for_excel, excel_map)
         
-        # Offer download button for Excel file - provide bytes to streamlit
         today_str = pd.Timestamp.now().strftime('%Y%m%d')
         tab_container.download_button(
             f"下載 {subject} 科詳細數據 (Excel)",
@@ -294,18 +225,15 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
 def display_total_results(tab_container):
     """顯示Total分數的百分位數和圖表分析"""
     total_data_df = st.session_state.get('total_data')
-    # Correctly check if the DataFrame is None, not a DataFrame, or empty
     if total_data_df is None or not isinstance(total_data_df, pd.DataFrame) or total_data_df.empty:
         tab_container.info("尚未設定總分數據。請在「數據輸入與分析」標籤中的「Total」頁籤設定分數。")
         return
     
-    # 獲取分數數據
     total_score = st.session_state.total_score
     q_score = st.session_state.q_score
     v_score = st.session_state.v_score
     di_score = st.session_state.di_score
     
-    # 使用 scale-percentile-simulation.ipynb 中更準確的數據集
     datasets = {
         'Quantitative': {
             'color': 'red',
@@ -348,9 +276,8 @@ def display_total_results(tab_container):
         }
     }
     
-    # 函數：根據級分找對應百分位
     def find_percentile(scale_score, dataset):
-        scale = dataset['scale'][::-1]  # 反轉為升序
+        scale = dataset['scale'][::-1]
         percentile = dataset['percentile'][::-1]
     
         if scale_score < scale[0]:
@@ -360,19 +287,15 @@ def display_total_results(tab_container):
         else:
             return np.interp(scale_score, scale, percentile)
     
-    # 計算百分位數
     q_percentile = find_percentile(q_score, datasets['Quantitative'])
     v_percentile = find_percentile(v_score, datasets['Verbal'])
     di_percentile = find_percentile(di_score, datasets['Data Insights'])
     
-    # 總分百分位數近似對應關係 (保留原有總分映射)
     total_scores = np.array([800, 770, 740, 710, 680, 650, 620, 590, 560, 530, 500, 450, 400, 350, 300, 250, 200])
     total_percentiles = np.array([99.9, 99, 97, 92, 85, 75, 65, 51, 38, 28, 18, 8, 4, 2, 1, 0.5, 0.1])
     
-    # 插值計算總分百分位數
     total_percentile = np.interp(total_score, total_scores[::-1], total_percentiles[::-1])
     
-    # 組合圖 - 單一圖表顯示所有科目數據
     tab_container.subheader("三科分數與百分位對應圖")
     
     candidate_scores = {
@@ -381,17 +304,14 @@ def display_total_results(tab_container):
         'Data Insights': di_score
     }
     
-    # 創建Plotly圖表
     fig_combined = go.Figure()
     
-    # 不同科目的顏色映射
     colors = {
         'Quantitative': 'red',
         'Verbal': 'blue',
         'Data Insights': 'black'
     }
     
-    # 繪製所有科目的百分位曲線
     for name, dataset in datasets.items():
         fig_combined.add_trace(
             go.Scatter(
@@ -404,41 +324,30 @@ def display_total_results(tab_container):
             )
         )
         
-        # 添加當前分數點
         score = candidate_scores[name]
         percentile = find_percentile(score, dataset)
         
-        # 在 plotly 中生成切線
-        # 首先準備數據用於插值
-        sorted_scale = dataset['scale'][::-1]  # 反轉為升序
+        sorted_scale = dataset['scale'][::-1]
         sorted_percentile = dataset['percentile'][::-1]
         
-        # 使用 scipy.interpolate.interp1d 代替 UnivariateSpline，因為我們只需要簡單的插值
         from scipy.interpolate import interp1d
         
-        # 計算切線所需的點
-        # 為了計算斜率，我們取點左右的數據點
         idx = np.searchsorted(sorted_scale, score)
         if idx > 0 and idx < len(sorted_scale):
-            # 計算相鄰點的斜率來近似切線斜率
             x_left = sorted_scale[idx-1]
             y_left = sorted_percentile[idx-1]
             x_right = sorted_scale[idx+1] if idx+1 < len(sorted_scale) else sorted_scale[idx]
             y_right = sorted_percentile[idx+1] if idx+1 < len(sorted_percentile) else sorted_percentile[idx]
             
-            # 計算斜率
             slope = (y_right - y_left) / (x_right - x_left)
             
-            # 定義切線範圍 (score ± 5)
             tangent_range = 5
             x_min = max(score - tangent_range, sorted_scale[0])
             x_max = min(score + tangent_range, sorted_scale[-1])
             x_tangent = np.linspace(x_min, x_max, 50)
             
-            # 計算切線上的點
             y_tangent = percentile + slope * (x_tangent - score)
             
-            # 繪製切線
             fig_combined.add_trace(
                 go.Scatter(
                     x=x_tangent,
@@ -450,7 +359,6 @@ def display_total_results(tab_container):
                 )
             )
         
-        # 添加突出顯示的分數點
         fig_combined.add_trace(
             go.Scatter(
                 x=[score],
@@ -466,7 +374,6 @@ def display_total_results(tab_container):
             )
         )
     
-    # 更新圖表布局
     fig_combined.update_layout(
         title="GMAT分數與百分位對應關係",
         xaxis_title="級分",
@@ -487,14 +394,11 @@ def display_total_results(tab_container):
         font=dict(family="Arial", size=12)
     )
     
-    # 添加網格線
     fig_combined.update_xaxes(showgrid=True, gridwidth=1, gridcolor='lightgrey')
     fig_combined.update_yaxes(showgrid=True, gridwidth=1, gridcolor='lightgrey')
     
-    # 顯示組合圖
     tab_container.plotly_chart(fig_combined, use_container_width=True)
     
-    # 新增加的部分：嵌入YouTube視頻
     tab_container.subheader("了解級分跟百分位之間的關係")
     tab_container.markdown("""
     <iframe width="560" height="315" src="https://www.youtube.com/embed/MLVT-zxaBkE?si=9SJ68LSrvvii35p-" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
@@ -520,7 +424,6 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
         report_parts.append("* 沒有可供分析的數據。")
         return "\n".join(report_parts)
 
-    # Structure for V subject based on user's example
     V_SKILL_CATEGORIES_TAGS = {
         "Analysis/Critique": {
             "CR 推理障礙": ["抽象邏輯/術語理解困難", "核心議題識別困難", "邏輯思考耗時過長", "邏輯鏈分析錯誤（前提/結論/關係）", "預判方向錯誤或缺失"],
@@ -558,16 +461,13 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
         }
     }
 
-    # Ensure required columns exist to prevent KeyErrors during groupby or access
     required_cols_q = ["Subject", "question_position", "question_type", "question_fundamental_skill", "diagnostic_params_list"]
     required_cols_v = ["Subject", "question_position", "question_fundamental_skill", "diagnostic_params_list"]
     required_cols_di = ["Subject", "question_position", "content_domain", "question_type", "diagnostic_params_list"]
 
     for subject in ["Q", "V", "DI"]:
-        # Filter for the current subject
         subject_df = df[df["Subject"] == subject].copy()
         if subject_df.empty:
-            # report_parts.append(f"#### {subject} 科目：無數據") # Optional: explicitly state no data
             continue
 
         report_parts.append(f"#### {subject} 科目分類結果：")
@@ -579,7 +479,7 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
                 report_parts.append(f"* Q科目缺少必要欄位進行分類: {', '.join(missing_columns)}")
                 continue
             grouped = subject_df.groupby(["question_type", "question_fundamental_skill"], dropna=False)
-            if not any(grouped): # Check if there are any groups
+            if not any(grouped):
                 report_parts.append("* Q科目：沒有可依據 '題型' 和 '技能' 分類的題目。")
             for (q_type, f_skill), group_data in grouped:
                 q_type_str = str(q_type) if pd.notna(q_type) else "未知題型"
@@ -601,7 +501,7 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
                 formatted_tags = [f"【{tag}】" for tag in unique_tags]
                 tags_display_str = ", ".join(formatted_tags) if formatted_tags else "無特定共同標籤"
                 report_parts.append(f"| 診斷標籤 | {tags_display_str}                             |")
-                report_parts.append("  \n") # Add spacing after each table
+                report_parts.append("  \n")
         
         elif subject == "V":
             missing_columns = [col for col in required_cols_v if col not in subject_df.columns]
@@ -634,7 +534,6 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
                     skill_map = V_SKILL_CATEGORIES_TAGS[f_skill_str]
                     has_content_for_skill = False
                     for category, predefined_tags in skill_map.items():
-                        # Find intersection of student's tags for this skill and predefined tags for this category
                         tags_to_display_for_category = sorted([tag for tag in predefined_tags if tag in student_unique_tags_for_skill])
                         if tags_to_display_for_category:
                             has_content_for_skill = True
@@ -644,14 +543,13 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
                     if not has_content_for_skill:
                          report_parts.append(f"| 無對應分類 | (此技能下未發現可匹配預定義分類的標籤) |")
                 else:
-                    # Fallback for V-skills not in V_SKILL_CATEGORIES_TAGS (should not happen if complete)
                     report_parts.append("| 類別     | 錯誤類型                                     |")
                     report_parts.append("|----------|----------------------------------------------|")
                     sorted_unique_student_tags = sorted(list(student_unique_tags_for_skill))
                     formatted_fallback_tags = [f"【{tag}】" for tag in sorted_unique_student_tags]
                     tags_display_str = ", ".join(formatted_fallback_tags) if formatted_fallback_tags else "無特定共同標籤"
                     report_parts.append(f"| 診斷標籤 | {tags_display_str}                             |")
-                report_parts.append("  \n") # Add spacing after each table
+                report_parts.append("  \n")
 
         elif subject == "DI":
             missing_columns = [col for col in required_cols_di if col not in subject_df.columns]
@@ -681,8 +579,7 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
                 formatted_tags = [f"【{tag}】" for tag in unique_tags]
                 tags_display_str = ", ".join(formatted_tags) if formatted_tags else "無特定共同標籤"
                 report_parts.append(f"| 診斷標籤 | {tags_display_str}                             |")
-                report_parts.append("  \n") # Add spacing after each table
-        # report_parts.append("  \n") # This was adding extra space between subjects, remove if tables have their own bottom margin via "  \n"
+                report_parts.append("  \n")
 
     return "\n".join(report_parts)
 
@@ -697,37 +594,27 @@ def display_results():
     if st.session_state.get("consolidated_report_text"):
         tab_titles.append("✨ AI 總結建議")
     
-    # Add subject result tabs
     tab_titles.extend([f"{subject} 科結果" for subject in SUBJECTS])
-    
-    # Add the new Edit tab
     tab_titles.append("🔧 編輯診斷標籤 & 更新AI建議")
-    
-    # Add AI Chat tab last
     tab_titles.append("💬 AI 即時問答")
 
     tabs = st.tabs(tab_titles)
     
     current_tab_index = 0
 
-    # Tab 1: Total Score Analysis
     with tabs[current_tab_index]:
         display_total_results(tabs[current_tab_index])
     current_tab_index += 1
     
-    # Tab (Optional): AI Consolidated Report
     if "✨ AI 總結建議" in tab_titles:
         with tabs[current_tab_index]:
             tabs[current_tab_index].subheader("AI 智能匯總與建議行動")
-            # Make sure to use consolidated_report_text, which is set by set_analysis_results
             report_text_to_display = st.session_state.get("consolidated_report_text", "AI總結報告生成中或不可用。")
             tabs[current_tab_index].markdown(report_text_to_display)
         current_tab_index += 1
 
-    # Tabs for Q, V, DI
     for subject in SUBJECTS: 
         report_md = st.session_state.report_dict.get(subject, f"未找到 {subject} 科的診斷報告。")
-        # Use original_processed_df if processed_df is None (e.g. after an error)
         df_for_subject_display = st.session_state.processed_df if st.session_state.processed_df is not None else st.session_state.original_processed_df
         
         df_subject = pd.DataFrame()
@@ -735,18 +622,13 @@ def display_results():
             df_subject = df_for_subject_display[df_for_subject_display['Subject'] == subject]
         
         subject_tab_title = f"{subject} 科結果"
-        # Find the correct index for the subject tab
         try:
             actual_tab_index_for_subject = tab_titles.index(subject_tab_title)
             with tabs[actual_tab_index_for_subject]:
                 display_subject_results(subject, tabs[actual_tab_index_for_subject], report_md, df_subject, COLUMN_DISPLAY_CONFIG, EXCEL_COLUMN_MAP)
         except ValueError:
-            # This case should ideally not be reached if tab_titles is constructed correctly
             st.error(f"無法找到分頁 '{subject_tab_title}'。Tab配置: {tab_titles}")
-            # Do not increment current_tab_index here, as it might mess up subsequent tab indexing if used linearly.
-            # Instead, rely on finding index directly.
 
-    # Tab for Editing Diagnostic Labels
     edit_tab_title = "🔧 編輯診斷標籤 & 更新AI建議"
     try:
         edit_tab_index = tab_titles.index(edit_tab_title)
@@ -756,50 +638,36 @@ def display_results():
             if st.session_state.original_processed_df is None:
                 tabs[edit_tab_index].info("沒有可供編輯的診斷數據。請先成功執行一次分析。")
             else:
-                # 檢查是否需要重置
                 if "reset_editable_df_requested" in st.session_state and st.session_state.reset_editable_df_requested:
-                    # 執行重置邏輯
                     st.session_state.editable_diagnostic_df = st.session_state.original_processed_df.copy(deep=True)
                     st.session_state._editable_df_source = st.session_state.original_processed_df
                     tabs[edit_tab_index].success("已重設為原始標籤。")
                     if 'generated_ai_prompts_for_edit_tab' in st.session_state:
                         del st.session_state['generated_ai_prompts_for_edit_tab']
-                    # 重置標記
                     st.session_state.reset_editable_df_requested = False
                 
-                # Initialize edited_df in session_state if it doesn't exist or if we need to reset
                 if 'editable_diagnostic_df' not in st.session_state or st.session_state.original_processed_df is not st.session_state.get('_editable_df_source'):
                     st.session_state.editable_diagnostic_df = st.session_state.original_processed_df.copy()
-                    st.session_state._editable_df_source = st.session_state.original_processed_df # Track source to detect reset needs
+                    st.session_state._editable_df_source = st.session_state.original_processed_df
 
-                # Define user-requested columns and their display order
                 user_requested_internal_names = [
                     "Subject", "question_position", "is_correct", "question_time",
                     "question_type", "content_domain", "question_fundamental_skill",
                     "is_invalid", "time_performance_category", "diagnostic_params_list"
                 ]
                 
-                # Create a DataFrame view for the editor with only these columns, in this order.
-                # Make sure all these columns actually exist in the editable_diagnostic_df.
-                # If a column is missing, this will raise a KeyError, which is good for debugging.
-                # Alternatively, one could filter `user_requested_internal_names` to only include
-                # columns that are actually present in `st.session_state.editable_diagnostic_df.columns`.
                 cols_to_display = [col for col in user_requested_internal_names if col in st.session_state.editable_diagnostic_df.columns]
                 df_for_editor = st.session_state.editable_diagnostic_df[cols_to_display].copy()
 
-                # Prepare 'diagnostic_params_list' for TextColumn: convert list to comma-separated string
                 if 'diagnostic_params_list' in df_for_editor.columns:
                     def format_tags_for_text_editor(tags_list):
                         if isinstance(tags_list, list):
-                            # Filter out None or empty strings from list before joining
                             return ", ".join(str(tag).strip() for tag in tags_list if tag and str(tag).strip())
                         if pd.isna(tags_list) or tags_list is None:
-                            return "" # Return empty string for NaN/None
-                        # If it's already a string (e.g., from previous edit), just return it after stripping
+                            return ""
                         return str(tags_list).strip()
                     df_for_editor['diagnostic_params_list'] = df_for_editor['diagnostic_params_list'].apply(format_tags_for_text_editor)
 
-                # Define column configurations for the data_editor, tailored to the new view
                 editor_column_config = {
                     "Subject": st.column_config.TextColumn("科目", disabled=True),
                     "question_position": st.column_config.NumberColumn("題號", help="題目在該科目中的順序", disabled=True),
@@ -826,7 +694,6 @@ def display_results():
 
                 tabs[edit_tab_index].markdown("**說明:** 在下方表格中修改「診斷標籤」或「時間表現」。對於「診斷標籤」，請用逗號分隔多個標籤。完成後點擊「套用變更」按鈕。")
                 
-                # --- Tag Trimming Assistant (Moved and in Expander) ---
                 tag_trimming_expander = tabs[edit_tab_index].expander("🏷️ 標籤修剪助手", expanded=False)
                 tag_trimming_expander.markdown("""
                 此工具幫助您根據對題目的具體描述，從一長串原始診斷標籤中篩選出1-2個最相關的核心標籤。
@@ -884,7 +751,7 @@ def display_results():
                     use_container_width=True,
                     num_rows="fixed", 
                     key="diagnosis_label_editor",
-                    on_change=None  # 明確設置on_change為None，避免自動回調
+                    on_change=None
                 )
 
                 if edited_df_subset_from_editor is not None:
@@ -893,7 +760,6 @@ def display_results():
                     for col_name in edited_df_subset_from_editor.columns:
                         if col_name in updated_full_df.columns:
                             if col_name == 'diagnostic_params_list':
-                                # Convert comma-separated string back to list of strings
                                 def parse_tags_from_text_editor(tags_str):
                                     if pd.isna(tags_str) or not isinstance(tags_str, str) or not tags_str.strip():
                                         return []
@@ -904,10 +770,7 @@ def display_results():
                                 updated_full_df[col_name] = edited_df_subset_from_editor[col_name]
                     
                     st.session_state.editable_diagnostic_df = updated_full_df
-                    # 不要在這裡設置標記，而是在用戶點擊按鈕時才設置
-                    # st.session_state.ai_prompts_need_regeneration = True
 
-                # Initialize 'changes_saved' if it doesn't exist, relevant for download button
                 if 'changes_saved' not in st.session_state:
                     st.session_state.changes_saved = False
 
@@ -917,7 +780,7 @@ def display_results():
                     if st.button("↺ 重設為原始標籤", key="reset_button_col", use_container_width=True):
                         st.session_state.reset_editable_df_requested = True
                         st.session_state.ai_prompts_need_regeneration = False
-                        st.session_state.changes_saved = False # Mark changes as not saved on reset
+                        st.session_state.changes_saved = False
                         st.rerun()
 
                 with col2:
@@ -925,16 +788,12 @@ def display_results():
                         st.session_state.ai_prompts_need_regeneration = True
                         st.session_state.changes_saved = True
                         tabs[edit_tab_index].success("變更已套用！AI建議將在下方更新。")
-                        # Generate and display the new diagnostic report based on edited tags
                         if st.session_state.get("editable_diagnostic_df") is not None:
                             new_report_content = generate_new_diagnostic_report(st.session_state.editable_diagnostic_df)
-                            # 保存到 session_state 中，供其他模塊使用
                             st.session_state.generated_new_diagnostic_report = new_report_content
-                            # Place the new diagnostic report inside an expander
                             with tabs[edit_tab_index].expander("新診斷報告 (根據已修剪標籤與標準分類)", expanded=False):
                                 st.markdown(new_report_content, unsafe_allow_html=True)
                         else:
-                            # If no data for the report, still show an expander with a message
                             with tabs[edit_tab_index].expander("新診斷報告 (根據已修剪標籤與標準分類)", expanded=False):
                                 st.warning("無法生成新診斷報告，因為沒有可編輯的數據。")
                 
@@ -975,7 +834,7 @@ def display_results():
                                 }
                                 df_to_export = df_to_export.rename(columns=columns_map_for_export)
                                 
-                                from gmat_diagnosis_app.utils.excel_utils import to_excel # Ensure import if not at top
+                                from gmat_diagnosis_app.utils.excel_utils import to_excel
                                 custom_excel_map_for_export = {col: col for col in df_to_export.columns}
                                 excel_bytes = to_excel(df_to_export, custom_excel_map_for_export)
                                 today_str = pd.Timestamp.now().strftime('%Y%m%d')
@@ -990,36 +849,29 @@ def display_results():
                                 )
                             except Exception as e:
                                 st.error(f"準備Excel下載時出錯: {e}")
-                                import traceback # Ensure import if not at top
+                                import traceback
                                 logging.error(f"詳細錯誤: {traceback.format_exc()}")
                         else:
                             st.warning("請先點擊「套用變更並更新質化分析輸出」按鈕儲存變更，然後再下載試算表。", icon="⚠️")
 
-                # 顯示AI提示區塊
-                # 只有在需要重新生成時才生成，已有的提示直接顯示
                 if st.session_state.get('ai_prompts_need_regeneration', False) and st.session_state.changes_saved:
                     with st.spinner("正在根據您的編輯生成AI建議..."):
-                        # 調用新實現的AI提示生成功能
                         q_prompts = ""
                         v_prompts = ""
                         di_prompts = ""
 
                         df_to_generate_prompts = st.session_state.editable_diagnostic_df
 
-                        # 調用實際的AI提示生成功能
-                        # Q Prompts
                         from gmat_diagnosis_app.diagnostics import generate_q_ai_tool_recommendations
                         q_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'Q']
                         if not q_df_subject.empty: 
                             q_prompts = generate_q_ai_tool_recommendations(q_df_subject)
                         
-                        # V Prompts
                         from gmat_diagnosis_app.diagnostics import generate_v_ai_tool_recommendations
                         v_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'V']
                         if not v_df_subject.empty: 
                             v_prompts = generate_v_ai_tool_recommendations(v_df_subject)
 
-                        # DI Prompts
                         from gmat_diagnosis_app.diagnostics import generate_di_ai_tool_recommendations
                         di_df_subject = df_to_generate_prompts[df_to_generate_prompts['Subject'] == 'DI']
                         if not di_df_subject.empty: 
@@ -1028,24 +880,20 @@ def display_results():
                         all_prompts = f"### AI 工具與提示建議 (基於您的編輯)\n\n**Quantitative (Q) 科目:**\n{q_prompts if q_prompts else '(無特定建議)'}\n\n**Verbal (V) 科目:**\n{v_prompts if v_prompts else '(無特定建議)'}\n\n**Data Insights (DI) 科目:**\n{di_prompts if di_prompts else '(無特定建議)'}"
                         
                         st.session_state.generated_ai_prompts_for_edit_tab = all_prompts
-                        st.session_state.ai_prompts_need_regeneration = False # Reset flag after generation
+                        st.session_state.ai_prompts_need_regeneration = False
                     
-                # 如果有已生成的AI提示，則顯示 (無論是否剛剛生成)
                 if 'generated_ai_prompts_for_edit_tab' in st.session_state and st.session_state.changes_saved:
                     with tabs[edit_tab_index].expander("AI 工具與提示建議 (基於您的編輯)", expanded=False):
                         st.markdown(st.session_state.generated_ai_prompts_for_edit_tab)
                 elif not st.session_state.changes_saved and 'generated_ai_prompts_for_edit_tab' in st.session_state:
-                    # If changes were not saved (e.g., after reset), still show previous AI prompts if they exist, but maybe with a note
                     with tabs[edit_tab_index].expander("AI 工具與提示建議 (顯示先前結果)", expanded=False):
                         st.info("這是基於先前套用變更時生成的建議。如需最新建議，請再次套用變更。")
                         st.markdown(st.session_state.generated_ai_prompts_for_edit_tab)
 
     except ValueError:
-        # This case should ideally not be reached if tab_titles is constructed correctly
         st.error(f"無法找到分頁 '{edit_tab_title}'。Tab配置: {tab_titles}")
         
 
-    # Tab for AI Chat - find its index
     ai_chat_tab_title = "💬 AI 即時問答"
     try:
         ai_chat_tab_index = tab_titles.index(ai_chat_tab_title)
@@ -1056,5 +904,4 @@ def display_results():
             else:
                 tabs[ai_chat_tab_index].info("請在側邊欄輸入 OpenAI API Key 以啟用 AI 問答功能。")
     except ValueError:
-        # This should not happen if it's in tab_titles
         st.error(f"無法找到分頁 '{ai_chat_tab_title}'.") 

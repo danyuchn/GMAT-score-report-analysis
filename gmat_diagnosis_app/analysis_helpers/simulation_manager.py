@@ -127,7 +127,6 @@ def run_simulation(df_input_for_sim):
 
     except Exception as e:
         st.error(f"IRT 模擬過程中出錯: {e}")
-        logging.error(f"IRT 模擬過程中出錯: {e}", exc_info=True)
         return {}, {}, {}, {}, False
 
 def prepare_dataframes_for_diagnosis(all_simulation_histories, final_thetas, 
@@ -175,46 +174,45 @@ def prepare_dataframes_for_diagnosis(all_simulation_histories, final_thetas,
             elif not sim_history_df.attrs.get('simulation_skipped', False):
                 st.warning(f"{subject}: 模擬難度數量 ({len(sim_b_values)}) 與實際題目數量 ({len(user_df_subj_sorted)}) 不符。無法分配模擬難度。", icon="⚠️")
                 user_df_subj_sorted['question_difficulty'] = np.nan
-            else: 
+            else:
                 user_df_subj_sorted['question_difficulty'] = np.nan
 
+            # --- Apply subject-specific preprocessing BEFORE calculating overtime ---
             if subject == 'V':
                 try:
+                    # Preprocess V data first, this adds rc_group_id etc. needed by calculate_overtime
                     user_df_subj_sorted = preprocess_verbal_data(user_df_subj_sorted)
-                    if not all(col in user_df_subj_sorted.columns for col in ['rc_group_id', 'rc_reading_time', 'rc_group_total_time', 'rc_group_num_questions']):
-                         st.warning(f"V科：preprocess_verbal_data 執行後，部分RC欄位仍缺失。RC 超時計算可能不準確或跳過。", icon="⚠️")
                 except Exception as e_verb_prep:
                     st.warning(f"V科：執行 verbal data preprocessing 時發生錯誤: {e_verb_prep}。RC 超時計算可能受影響。", icon="🔥")
+                    # Ensure required RC columns exist even on error for calculate_overtime safety
                     for rc_col in ['rc_group_id', 'rc_reading_time', 'rc_group_total_time', 'rc_group_num_questions']:
                         if rc_col not in user_df_subj_sorted.columns:
-                            user_df_subj_sorted[rc_col] = np.nan if 'id' in rc_col else 0
+                            # Use appropriate dtypes for safety
+                            if 'id' in rc_col: user_df_subj_sorted[rc_col] = pd.NA
+                            else: user_df_subj_sorted[rc_col] = 0.0 # Use float for time/count
             elif subject == 'DI':
                 try:
+                    # Preprocess DI data first, adds msr_group_id etc.
                     user_df_subj_sorted = preprocess_di_data(user_df_subj_sorted)
-                    if 'msr_group_total_time' not in user_df_subj_sorted.columns:
-                        logging.warning("Orchestrator: DI: 'msr_group_total_time' NOT in user_df_subj_sorted.columns AFTER preprocess_di_data!")
-                    if 'msr_group_id' not in user_df_subj_sorted.columns:
-                        st.warning(f"DI科：preprocess_di_data 執行後，'msr_group_id' 欄位仍缺失。MSR 相關計算可能不準確或跳過。", icon="⚠️")
                 except Exception as e_di_prep:
                     st.warning(f"DI科：執行 DI data preprocessing 時發生錯誤: {e_di_prep}。MSR 相關計算可能受影響。", icon="🔥")
-                    # Ensure critical MSR columns exist even on error for downstream safety, though data might be wrong
+                    # Ensure critical MSR columns exist even on error for downstream safety
                     for msr_col_critical in ['msr_group_id', 'msr_group_total_time', 'msr_reading_time', 'msr_group_num_questions', 'is_first_msr_q']:
                         if msr_col_critical not in user_df_subj_sorted.columns:
                             if 'id' in msr_col_critical: user_df_subj_sorted[msr_col_critical] = pd.NA
                             elif 'is_' in msr_col_critical: user_df_subj_sorted[msr_col_critical] = False
                             else: user_df_subj_sorted[msr_col_critical] = 0.0
 
-            # --- Calculate Overtime for the subject AFTER its specific preprocessing ---
+            # --- Calculate Overtime for the subject AFTER its specific preprocessing ---\n            # Now calculate_overtime should receive V data with rc_group_id etc.\n            # and DI data with msr_group_id etc.
             time_pressure_subj = time_pressure_map.get(subject, False)
             current_subj_pressure_map = {subject: time_pressure_subj}
             try:
-                # calculate_overtime adds the 'overtime' column to the DataFrame
+                # calculate_overtime adds the 'overtime' column and potentially 'rc_group_performance' etc.
                 user_df_subj_sorted = calculate_overtime(user_df_subj_sorted, current_subj_pressure_map)
             except Exception as overtime_calc_err:
-                st.warning(f"  {subject}: 計算 Overtime 時出錯 (在數據準備階段): {overtime_calc_err}。 'overtime' 欄位可能缺失或不正確。", icon="🔥")
+                st.warning(f"  {subject}: 計算 Overtime 時出錯 (在數據準備階段): {overtime_calc_err}。 'overtime'/'rc_group_performance' 等欄位可能缺失或不正確。", icon="🔥")
                 if 'overtime' not in user_df_subj_sorted.columns:
                     user_df_subj_sorted['overtime'] = False # Default to False if calculation failed
-            # --- End Overtime Calculation ---
 
             if 'content_domain' not in user_df_subj_sorted.columns:
                 user_df_subj_sorted['content_domain'] = 'Unknown Domain'
@@ -222,23 +220,25 @@ def prepare_dataframes_for_diagnosis(all_simulation_histories, final_thetas,
                 user_df_subj_sorted['question_fundamental_skill'] = 'Unknown Skill'
 
             cols_to_keep = [col for col in FINAL_DIAGNOSIS_INPUT_COLS if col in user_df_subj_sorted.columns]
-            # Ensure 'overtime' column is kept if it exists, as it's crucial for diagnosis.
-            if 'overtime' in user_df_subj_sorted.columns and 'overtime' not in cols_to_keep:
-                cols_to_keep.append('overtime')
+            # Ensure crucial columns added by calculate_overtime are kept.
+            crucial_cols = ['overtime', 'rc_group_performance', 'rc_tolerance_applied', 'rc_overtime_culprit', 'rc_severe_overtime_culprit']
+            for c_col in crucial_cols:
+                 if c_col in user_df_subj_sorted.columns and c_col not in cols_to_keep:
+                      cols_to_keep.append(c_col)
             
             current_df_for_list = user_df_subj_sorted[cols_to_keep]
             df_final_for_diagnosis_list.append(current_df_for_list)
 
         if analysis_success and df_final_for_diagnosis_list:
             df_final_for_diagnosis = pd.concat(df_final_for_diagnosis_list, ignore_index=True)
-            if 'msr_group_total_time' not in df_final_for_diagnosis.columns and 'DI' in df_final_for_diagnosis['Subject'].unique():
-                logging.error("CRITICAL_ERROR: Orchestrator: 'msr_group_total_time' NOT in df_final_for_diagnosis columns AFTER concat (DI data present)!")
             return df_final_for_diagnosis, True
-        elif analysis_success:
+        elif analysis_success: # df_final_for_diagnosis_list is empty but no errors occurred
             st.warning("未能準備任何科目的診斷數據。")
             return pd.DataFrame(), False
+        else: # analysis_success is False due to prior errors
+             # Errors should have been logged already
+             return pd.DataFrame(), False
             
     except Exception as e:
         st.error(f"準備科目診斷數據時出錯: {e}")
-        logging.error(f"準備科目診斷數據時出錯: {e}", exc_info=True)
-        return pd.DataFrame(), False 
+        return pd.DataFrame(), False # Return empty DataFrame and False status 

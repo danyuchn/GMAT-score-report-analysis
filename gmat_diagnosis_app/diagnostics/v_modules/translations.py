@@ -103,6 +103,17 @@ APPENDIX_A_TRANSLATION_V = {
     'BEHAVIOR_CARELESSNESS_ISSUE': "行為模式: 粗心問題 (快而錯比例高)",
     # 'BEHAVIOR_GUESSING_HASTY' is updated from MD
 
+    # --- RC整組表現相關診斷參數翻譯 ---
+    'RC_READING_SPEED_GOOD_GROUP_PERFORMANCE': "RC 閱讀速度: 整組表現良好",
+    'RC_READING_SPEED_ACCEPTABLE_GROUP_PERFORMANCE': "RC 閱讀速度: 整組表現尚可",
+    'RC_READING_SPEED_POOR_GROUP_PERFORMANCE': "RC 閱讀速度: 整組表現不佳",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MINOR_ISSUE': "RC 時間管理: 單題效率輕微問題",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MODERATE_ISSUE': "RC 時間管理: 單題效率中度問題",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MAJOR_ISSUE': "RC 時間管理: 單題效率嚴重問題",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_SEVERE_ISSUE': "RC 時間管理: 單題效率極嚴重問題",
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MINOR_ISSUE': "RC 選項辨析: 效率輕微問題",
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MODERATE_ISSUE': "RC 選項辨析: 效率中度問題",
+
     # --- VDOC Defined Core Fundamental Skills --- (Preserved)
     'Plan/Construct': "Plan/Construct",
     'Identify Stated Idea': "Identify Stated Idea",
