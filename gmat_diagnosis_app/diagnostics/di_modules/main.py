@@ -24,6 +24,19 @@ from .report_generation import _generate_di_summary_report
 
 # Rename the main processing function for clarity within the module
 def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
+    # --- FORCE LOGGING CHECK --- REMOVED by AI
+    # logging.info("!!!!!! [DI Main Entry] Entering run_di_diagnosis_logic !!!!!")
+    # try:
+    #     logging.basicConfig(level=logging.INFO,
+    #                         format='>>>> FORCE LOG CHECK %(asctime)s - %(levelname)s - %(message)s',
+    #                         force=True)
+    #     logging.info(">>>> [DI Main Entry] Forced basicConfig attempt executed.")
+    # except TypeError:
+    #      logging.basicConfig(level=logging.INFO,
+    #                         format='>>>> FORCE LOG CHECK (noforce) %(asctime)s - %(levelname)s - %(message)s')
+    #      logging.info(">>>> [DI Main Entry] Forced basicConfig (no-force) attempt executed.")
+    # logging.info(f">>>> [DI Main Entry] run_di_diagnosis_logic called with di_time_pressure_status: {di_time_pressure_status}")
+    # --- End FORCE LOGGING CHECK --- REMOVED by AI
     """
     Core diagnostic logic for Data Insights, moved from di_diagnostic.py.
     Assumes 'is_invalid' column reflects the final status after user review.
@@ -328,9 +341,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         domain_tags_ch2_for_ch6 = di_diagnosis_results.get('chapter_2', {}).get('domain_comparison_tags', {})
         override_analysis_ch5_for_ch6 = di_diagnosis_results.get('chapter_5', {})
 
-        recommendations = []
-        if not df_di_filtered_for_analysis.empty:
-            recommendations = _generate_di_recommendations(df_di_filtered_for_analysis, override_analysis_ch5_for_ch6, domain_tags_ch2_for_ch6)
+        recommendations = _generate_di_recommendations(df_di_filtered_for_analysis, override_analysis_ch5_for_ch6, domain_tags_ch2_for_ch6, time_pressure=di_time_pressure_status)
         di_diagnosis_results['chapter_6'] = {'recommendations_list': recommendations}
         # logging.debug("[run_di_diagnosis_logic] Completed Chapter 6.")
 
