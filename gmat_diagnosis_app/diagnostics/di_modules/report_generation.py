@@ -125,7 +125,8 @@ def _generate_di_summary_report(di_results):
 
     if top_other_params_codes:
         for param_code in top_other_params_codes:
-            potential_problem_lines.append(f"    * {_translate_di(param_code)}")
+            translated_param_for_b = _translate_di(param_code)
+            potential_problem_lines.append(f"    * {translated_param_for_b}")
     
     if not potential_problem_lines:
         potential_problem_lines.append("    * 未識別出明顯的核心問題模式。")
@@ -139,7 +140,9 @@ def _generate_di_summary_report(di_results):
     behavior_pattern_lines = []
     if careless_triggered_ch4:
         fast_wrong_rate_str = _format_rate(ch4.get('fast_wrong_rate', 0.0))
-        behavior_pattern_lines.append(f"    * {_translate_di('DI_BEHAVIOR_CARELESSNESS_ISSUE')}：相對快速作答的題目中，錯誤比例偏高（{fast_wrong_rate_str}），提示可能存在粗心問題。")
+        tag_to_translate_c = 'DI_BEHAVIOR__CARELESSNESS_ISSUE'
+        translated_tag_for_c = _translate_di(tag_to_translate_c)
+        behavior_pattern_lines.append(f"    * {translated_tag_for_c}：相對快速作答的題目中，錯誤比例偏高（{fast_wrong_rate_str}），提示可能存在粗心問題。")
         patterns_found = True
     if rushing_triggered_ch4:
         num_rush = len(ch4.get('early_rushing_questions', []))
