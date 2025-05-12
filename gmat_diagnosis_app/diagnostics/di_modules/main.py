@@ -265,77 +265,16 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             'overtime_thresholds_minutes': thresholds
         }
 
-        # Create filtered dataset FOR ANALYTICAL/AGGREGATION PURPOSES ONLY for some chapters
-        # The main df_di will be used for row-wise diagnostics that need all rows (like time_performance_category)
-        df_di_filtered_for_analysis = df_di[~df_di['is_invalid']].copy()
-        
-        # 添加調試日誌：篩選有效數據後的狀態
-        valid_total = len(df_di_filtered_for_analysis)
-        valid_correct = df_di_filtered_for_analysis['is_correct'].sum() if 'is_correct' in df_di_filtered_for_analysis.columns else 0
-        valid_wrong = valid_total - valid_correct
-        logging.info(f"[DI數據追蹤] 篩選出的有效數據 (df_di_filtered_for_analysis) - 有效題數: {valid_total}, 答對題數: {valid_correct}, 答錯題數: {valid_wrong}")
-        logging.info(f"[DI數據追蹤] 此df_di_filtered_for_analysis將用於生成部分匯總報告指標")
-        
-        logging.debug(f"[run_di_diagnosis_logic] Created df_di_filtered_for_analysis. Shape: {df_di_filtered_for_analysis.shape}")
-
-        # --- Chapter 2: Multidimensional Performance Analysis (uses df_di_filtered_for_analysis) ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 2: Performance Analysis")
-        domain_analysis = {}
-        type_analysis = {}
-        difficulty_analysis = {}
-        domain_comparison_tags = {
-            'poor_math_related': False, 'slow_math_related': False,
-            'poor_non_math_related': False, 'slow_non_math_related': False,
-            'significant_diff_error': False, 'significant_diff_overtime': False
-        }
-
-        if not df_di_filtered_for_analysis.empty:
-            if 'content_domain' in df_di_filtered_for_analysis.columns:
-                domain_analysis = _analyze_dimension(df_di_filtered_for_analysis, 'content_domain')
-                math_metrics = domain_analysis.get('Math Related', {})
-                non_math_metrics = domain_analysis.get('Non-Math Related', {})
-                math_errors = math_metrics.get('errors', 0)
-                non_math_errors = non_math_metrics.get('errors', 0)
-                math_overtime = math_metrics.get('overtime', 0)
-                non_math_overtime = non_math_metrics.get('overtime', 0)
-
-                if abs(math_errors - non_math_errors) >= 2:
-                    domain_comparison_tags['significant_diff_error'] = True
-                    domain_comparison_tags['poor_math_related'] = math_errors > non_math_errors
-                    domain_comparison_tags['poor_non_math_related'] = non_math_errors > math_errors
-
-                if abs(math_overtime - non_math_overtime) >= 2:
-                     domain_comparison_tags['significant_diff_overtime'] = True
-                     domain_comparison_tags['slow_math_related'] = math_overtime > non_math_overtime
-                     domain_comparison_tags['slow_non_math_related'] = non_math_overtime > math_overtime
-
-            if 'question_type' in df_di_filtered_for_analysis.columns:
-                type_analysis = _analyze_dimension(df_di_filtered_for_analysis, 'question_type')
-
-            if 'question_difficulty' in df_di_filtered_for_analysis.columns:
-                df_di_filtered_for_analysis['difficulty_grade'] = df_di_filtered_for_analysis['question_difficulty'].apply(_grade_difficulty_di)
-                difficulty_analysis = _analyze_dimension(df_di_filtered_for_analysis, 'difficulty_grade')
-
-        di_diagnosis_results['chapter_2'] = {
-            'by_domain': domain_analysis,
-            'by_type': type_analysis,
-            'by_difficulty': difficulty_analysis,
-            'domain_comparison_tags': domain_comparison_tags
-        }
-        logging.debug("[run_di_diagnosis_logic] Completed Chapter 2.")
-
-        # --- Chapter 3: Root Cause Diagnosis ---
-        logging.debug("[run_di_diagnosis_logic] Chapter 3: Root Cause Diagnosis on ALL data (df_di)")
         # Calculate avg_time_per_type and max_correct_difficulty using VALID data (df_di_filtered_for_analysis)
         avg_time_per_type_for_rules = {}
         max_correct_difficulty_per_combination_for_rules = pd.DataFrame()
-        if not df_di_filtered_for_analysis.empty:
-            if 'question_type' in df_di_filtered_for_analysis.columns:
-                avg_time_per_type_for_rules = df_di_filtered_for_analysis.groupby('question_type')['question_time'].mean().to_dict()
-            if 'content_domain' in df_di_filtered_for_analysis.columns and 'question_difficulty' in df_di_filtered_for_analysis.columns:
-                 correct_rows_valid = df_di_filtered_for_analysis['is_correct'] == True
+        if not df_di.empty:
+            if 'question_type' in df_di.columns:
+                avg_time_per_type_for_rules = df_di.groupby('question_type')['question_time'].mean().to_dict()
+            if 'content_domain' in df_di.columns and 'question_difficulty' in df_di.columns:
+                 correct_rows_valid = df_di['is_correct'] == True
                  if correct_rows_valid.any():
-                     max_correct_difficulty_per_combination_for_rules = df_di_filtered_for_analysis[correct_rows_valid].groupby(
+                     max_correct_difficulty_per_combination_for_rules = df_di[correct_rows_valid].groupby(
                          ['question_type', 'content_domain']
                      )['question_difficulty'].max().unstack(fill_value=-np.inf)
 
@@ -357,6 +296,18 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             'max_correct_difficulty': max_correct_difficulty_per_combination_for_rules.to_dict() if not max_correct_difficulty_per_combination_for_rules.empty else {} # Based on valid data
         }
         logging.debug("[run_di_diagnosis_logic] Completed Chapter 3.")
+
+        # NOW, create df_di_filtered_for_analysis from the df_di that CONTAINS 'is_sfe' and other chapter 3 results
+        # This is the primary DataFrame used by subsequent chapters for aggregated analysis.
+        df_di_filtered_for_analysis = df_di[~df_di['is_invalid']].copy()
+        
+        # Logging for the newly created df_di_filtered_for_analysis
+        valid_total_filtered = len(df_di_filtered_for_analysis)
+        valid_correct_filtered = df_di_filtered_for_analysis['is_correct'].sum() if 'is_correct' in df_di_filtered_for_analysis.columns else 0
+        valid_wrong_filtered = valid_total_filtered - valid_correct_filtered
+        logging.info(f"[DI數據追蹤] 篩選出的有效數據 (df_di_filtered_for_analysis created AFTER Ch3) - 有效題數: {valid_total_filtered}, 答對題數: {valid_correct_filtered}, 答錯題數: {valid_wrong_filtered}")
+        logging.info(f"[DI數據追蹤] 此df_di_filtered_for_analysis將用於生成部分匯總報告指標以及傳遞給建議生成器。")
+        logging.debug(f"[run_di_diagnosis_logic] Created df_di_filtered_for_analysis AFTER Chapter 3. Shape: {df_di_filtered_for_analysis.shape}. Columns: {df_di_filtered_for_analysis.columns.tolist()}")
 
         # --- Chapter 4: Special Pattern Observation (uses df_di_filtered_for_analysis or df_di as appropriate) ---
         logging.debug("[run_di_diagnosis_logic] Chapter 4: Special Patterns")

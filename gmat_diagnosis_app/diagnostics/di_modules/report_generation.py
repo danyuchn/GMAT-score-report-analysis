@@ -180,14 +180,18 @@ def _generate_di_summary_report(di_results):
             challenge_text = _translate_di("整體表現有較大提升空間") # Generic default
             direction_text = _translate_di("建議全面鞏固基礎")     # Generic default
             time_limit_text = "N/A"
+            
+            q_type_eng_for_map = original_q_type_field # Default to original field
 
             if rec_type == 'macro':
-                q_type_match_macro = re.search(r"宏觀建議 \((.*?)\):", rec_text)
+                q_type_match_macro = re.search(r"宏觀建議 \\((.*?)\\):", rec_text)
                 if q_type_match_macro:
                     q_type_eng = q_type_match_macro.group(1).strip()
                     q_type_zh = _translate_di(q_type_eng)
+                    q_type_eng_for_map = q_type_eng # Update for map lookup
+                # else q_type_eng_for_map remains original_q_type_field
 
-                challenge_match_macro = re.search(r"由於(整體表現有較大提升空間 \(錯誤率 .*?% 或 超時率 .*?%\))", rec_text)
+                challenge_match_macro = re.search(r"由於(整體表現有較大提升空間 \\(錯誤率 .*?% 或 超時率 .*?%\\))", rec_text)
                 if challenge_match_macro:
                     challenge_text = challenge_match_macro.group(1).strip()
 
@@ -196,7 +200,7 @@ def _generate_di_summary_report(di_results):
                     full_direction_text = direction_match_macro.group(1).strip()
                     direction_text = full_direction_text[len("建議"):].strip() if full_direction_text.startswith("建議") else full_direction_text
                 
-                time_limit_match_macro = re.search(r"建議限時 \*\*(.*?分鐘)\*\*", rec_text)
+                time_limit_match_macro = re.search(r"建議限時 \\*\\*(.*?分鐘)\\*\\*", rec_text)
                 if time_limit_match_macro:
                     time_limit_text = time_limit_match_macro.group(1).strip()
 
@@ -218,7 +222,7 @@ def _generate_di_summary_report(di_results):
                 target_time_str = f"{target_time_val:.1f} 分鐘"
                 
                 # Try to get the specific part from rec_text first for direction
-                direction_pattern_case = r"建議練習 \*\*(.*?)\*\* 難度題目,.*?\(最終目標時間: (.*?)\)"
+                direction_pattern_case = r"建議練習 \\*\\*(.*?)\\*\\* 難度題目,.*?\\(最終目標時間: (.*?)\\)"
                 direction_match_case = re.search(direction_pattern_case, rec_text)
                 if direction_match_case:
                     direction_text = f"建議練習 **{direction_match_case.group(1)}** 難度題目 (最終目標時間: {direction_match_case.group(2)})"
@@ -226,7 +230,7 @@ def _generate_di_summary_report(di_results):
                     direction_text = f"建議練習 **{difficulty_grade_in_rec}** 難度題目 (最終目標時間: {target_time_str})"
 
                 # Append focus note if present in rec_text (usually at the end)
-                focus_note_match = re.search(r"(\s\*\*建議增加.*?比例。\*\*)", rec_text) # Matches the bolded focus note
+                focus_note_match = re.search(r"(\s\\*\\*建議增加.*?比例。\\*\\*)", rec_text) # Matches the bolded focus note
                 if focus_note_match:
                     direction_text += focus_note_match.group(1)
 
@@ -237,35 +241,48 @@ def _generate_di_summary_report(di_results):
                     time_limit_text = f"{time_val_z:.1f} 分鐘"
                 else:
                     # Fallback regex if field not present, though direct field is better
-                    time_limit_pattern_case = r"起始練習限時建議為 \*\*(.*?)\*\*"
+                    time_limit_pattern_case = r"起始練習限時建議為 \\*\\*(.*?)\\*\\*"
                     time_limit_match_case = re.search(time_limit_pattern_case, rec_text)
                     if time_limit_match_case:
                         time_limit_text = time_limit_match_case.group(1).strip()
                     else:
                         time_limit_text = "N/A"
             
+            elif rec_type == 'exemption_note':
+                # q_type_eng_for_map is already original_q_type_field by default.
+                challenge_text = None 
+                direction_text = None 
+                time_limit_text = None
+            # No explicit 'else' needed for q_type_eng_for_map if default is original_q_type_field
+            
             # Common post-processing for time_limit_text
-            if time_limit_text != "N/A":
-                if q_type_eng == "Multi-source reasoning":
+            current_q_type_for_suffix = q_type_eng_for_map # Use the determined English q_type for suffix logic
+            if time_limit_text and time_limit_text != "N/A": # Check if not None and not N/A
+                if current_q_type_for_suffix == "Multi-source reasoning":
                     time_limit_text += "/題組"
                 else:
                     time_limit_text += "/題"
             
+            # --- New section_letter assignment logic ---
             section_letter = ""
+            if q_type_eng_for_map and q_type_eng_for_map in q_type_map:
+                section_letter = q_type_map[q_type_eng_for_map] + "."
+            # --- End new section_letter assignment logic ---
+            
             title_line_content_for_type = q_type_zh # Default to translated type
 
-            if q_type_eng:
-                q_type_eng_stripped = q_type_eng.strip()
+            # if q_type_eng: # This q_type_eng might be from macro parsing, or still original if not macro
+            #     q_type_eng_stripped = q_type_eng.strip() # q_type_eng might not be set for exemption
 
-                if q_type_eng_stripped in q_type_map:
-                    section_letter = q_type_map[q_type_eng_stripped] + "."
-                else: # Fallback for section letter if direct map fails (should be rare now)
-                    for key_eng_map, letter_map in q_type_map.items():
-                        if _translate_di(key_eng_map) in q_type_zh : 
-                            section_letter = letter_map + "."
-                            break
-                    if not section_letter:
-                        pass
+            #     if q_type_eng_stripped in q_type_map:
+            #         section_letter = q_type_map[q_type_eng_stripped] + "."
+            #     else: # Fallback for section letter if direct map fails (should be rare now)
+            #         for key_eng_map, letter_map in q_type_map.items():
+            #             if _translate_di(key_eng_map) in q_type_zh : 
+            #                 section_letter = letter_map + "."
+            #                 break
+            #         if not section_letter:
+            #             pass # section_letter remains ""
             
             if rec_type == 'case_aggregated' and rec_original.get('is_sfe'):
                 title_line_content_for_type += " (*基礎掌握不穩*)"
@@ -273,9 +290,20 @@ def _generate_di_summary_report(di_results):
             title_line = f"* **{section_letter} {title_line_content_for_type}**"
             
             report_lines.append(title_line)
-            report_lines.append(f"    * **當前挑戰：** {challenge_text}")
-            report_lines.append(f"    * **建議方向：** {direction_text}")
-            report_lines.append(f"    * **建議限時：** {time_limit_text}")
+            # --- BEGIN MODIFICATION for output --- (Applied existing user suggestion)
+            if rec_type == 'exemption_note':
+                # For exemption notes, print the specific exemption text directly
+                # rec_text here holds the actual exemption message.
+                report_lines.append(f"    * {rec_text}") 
+            else:
+                # For other types (macro, case_aggregated), print challenge, direction, time limit
+                if challenge_text: 
+                    report_lines.append(f"    * **當前挑戰：** {challenge_text}")
+                if direction_text:
+                    report_lines.append(f"    * **建議方向：** {direction_text}")
+                if time_limit_text:
+                    report_lines.append(f"    * **建議限時：** {time_limit_text}")
+            # --- END MODIFICATION for output ---
             report_lines.append("")
 
     report_lines.append("")
