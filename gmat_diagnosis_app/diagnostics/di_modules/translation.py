@@ -80,11 +80,14 @@ DI_PARAM_TO_CATEGORY = {
 
 def _translate_di(param):
     """Translates an internal DI param/skill name using APPENDIX_A_TRANSLATION_DI."""
+    result = ""
     if isinstance(param, list):
-        return [APPENDIX_A_TRANSLATION_DI.get(p, str(p)) for p in param if isinstance(p, str)]
+        result = [APPENDIX_A_TRANSLATION_DI.get(p, str(p)) for p in param if isinstance(p, str)]
     elif isinstance(param, str):
-         return APPENDIX_A_TRANSLATION_DI.get(param, param)
+         result = APPENDIX_A_TRANSLATION_DI.get(param, param)
     elif isinstance(param, bool):
-         return APPENDIX_A_TRANSLATION_DI.get(str(param), str(param))
+         result = APPENDIX_A_TRANSLATION_DI.get(str(param), str(param))
     else:
-         return str(param) 
+         result = str(param)
+         
+    return result 

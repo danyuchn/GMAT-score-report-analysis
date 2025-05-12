@@ -401,7 +401,7 @@ def _observe_di_patterns(df, avg_times):
         # 使用核心邏輯文件中定義的閾值判斷粗心問題
         if fast_wrong_rate > CARELESSNESS_THRESHOLD:
             analysis['carelessness_issue_triggered'] = True
-            analysis['triggered_behavioral_params'].append('DI_BEHAVIOR_CARELESSNESS_ISSUE')
+            analysis['triggered_behavioral_params'].append('DI_BEHAVIOR__CARELESSNESS_ISSUE')
             # Mark these questions in diagnostic_params
             if 'time_performance_category' in df.columns:
                 for idx, row in df[df['time_performance_category'] == 'Fast & Wrong'].iterrows():
