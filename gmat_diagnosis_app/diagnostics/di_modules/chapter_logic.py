@@ -93,65 +93,205 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                 max_correct_diff = max_diff_dict.get(max_correct_diff_key, -np.inf)
                 if q_diff < max_correct_diff:
                     sfe_triggered = True
-                    params.append('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+                    # Updated SFE tag
+                    params.append('DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE')
 
             # A. Data Sufficiency
             if q_type == 'Data Sufficiency':
                 if q_domain == 'Math Related':
-                    if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                    if is_slow and not is_correct: 
+                        # 添加數學相關的所有錯誤標籤
+                        params.extend(['DI_CONCEPT_APPLICATION_ERROR__MATH', 'DI_CALCULATION_ERROR__MATH'])
+                        # 添加所有閱讀理解錯誤細分標籤
+                        params.extend(['DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX', 
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH', 'DI_CALCULATION_DIFFICULTY__MATH']) 
+                    elif is_slow and is_correct: 
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH', 'DI_CALCULATION_DIFFICULTY__MATH'])
                     elif (is_normal_time or is_relatively_fast) and not is_correct:
-                        params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                        # 添加所有數學相關錯誤標籤及閱讀理解錯誤細分標籤
+                        params.extend(['DI_CONCEPT_APPLICATION_ERROR__MATH', 'DI_CALCULATION_ERROR__MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
                 elif q_domain == 'Non-Math Related':
-                    if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                    if is_slow and not is_correct: 
+                        # 添加所有非數學相關錯誤標籤和閱讀理解細分標籤
+                        params.extend(['DI_LOGICAL_REASONING_ERROR__NON_MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'])
+                    elif is_slow and is_correct: 
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'])
                     elif (is_normal_time or is_relatively_fast) and not is_correct:
-                        params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                        # 添加所有非數學相關錯誤標籤和閱讀理解細分標籤
+                        params.extend(['DI_LOGICAL_REASONING_ERROR__NON_MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+            
             # B. Two-Part Analysis
             elif q_type == 'Two-part analysis':
                  if q_domain == 'Math Related':
-                    if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                    if is_slow and not is_correct: 
+                        # 添加所有數學相關錯誤標籤和閱讀理解細分標籤
+                        params.extend(['DI_CONCEPT_APPLICATION_ERROR__MATH', 'DI_CALCULATION_ERROR__MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH', 'DI_CALCULATION_DIFFICULTY__MATH'])
+                    elif is_slow and is_correct: 
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH', 'DI_CALCULATION_DIFFICULTY__MATH'])
                     elif (is_normal_time or is_relatively_fast) and not is_correct:
-                        params.append('DI_CONCEPT_APPLICATION_ERROR')
-                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                        # 添加所有數學相關錯誤標籤和閱讀理解細分標籤
+                        params.extend(['DI_CONCEPT_APPLICATION_ERROR__MATH', 'DI_CALCULATION_ERROR__MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
                  elif q_domain == 'Non-Math Related':
-                    if is_slow and not is_correct: params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                    if is_slow and not is_correct: 
+                        # 添加所有非數學相關錯誤標籤和閱讀理解細分標籤
+                        params.extend(['DI_LOGICAL_REASONING_ERROR__NON_MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'])
+                    elif is_slow and is_correct: 
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'])
                     elif (is_normal_time or is_relatively_fast) and not is_correct:
-                        params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                        # 添加所有非數學相關錯誤標籤和閱讀理解細分標籤
+                        params.extend(['DI_LOGICAL_REASONING_ERROR__NON_MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+            
             # C. Graph & Table
             elif q_type == 'Graph and Table':
                  if q_domain == 'Math Related':
-                    if is_slow and not is_correct: params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_DATA_EXTRACTION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                    if is_slow and not is_correct: 
+                        # 添加所有數學相關錯誤標籤、圖表解讀錯誤和閱讀理解細分標籤
+                        params.extend(['DI_CONCEPT_APPLICATION_ERROR__MATH', 'DI_CALCULATION_ERROR__MATH',
+                                     'DI_GRAPH_INTERPRETATION_ERROR__GRAPH', 'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH', 'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH', 'DI_CALCULATION_DIFFICULTY__MATH'])
+                    elif is_slow and is_correct: 
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH', 'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH', 'DI_CALCULATION_DIFFICULTY__MATH'])
                     elif (is_normal_time or is_relatively_fast) and not is_correct:
-                        params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                        # 添加所有數學相關錯誤標籤、圖表解讀錯誤和閱讀理解細分標籤
+                        params.extend(['DI_CONCEPT_APPLICATION_ERROR__MATH', 'DI_CALCULATION_ERROR__MATH',
+                                     'DI_GRAPH_INTERPRETATION_ERROR__GRAPH', 'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
                  elif q_domain == 'Non-Math Related':
-                    if is_slow and not is_correct: params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                    if is_slow and not is_correct: 
+                        # 添加所有非數學相關錯誤標籤、圖表解讀錯誤和閱讀理解細分標籤
+                        params.extend(['DI_LOGICAL_REASONING_ERROR__NON_MATH',
+                                     'DI_GRAPH_INTERPRETATION_ERROR__GRAPH', 'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH', 'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'])
+                    elif is_slow and is_correct: 
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH', 'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'])
                     elif (is_normal_time or is_relatively_fast) and not is_correct:
-                        params.extend(['DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                        # 添加所有非數學相關錯誤標籤、圖表解讀錯誤和閱讀理解細分標籤
+                        params.extend(['DI_LOGICAL_REASONING_ERROR__NON_MATH',
+                                     'DI_GRAPH_INTERPRETATION_ERROR__GRAPH', 'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+            
             # D. Multi-Source Reasoning
             elif q_type == 'Multi-source reasoning':
-                if is_first_msr_q and pd.notna(msr_reading_time) and msr_reading_time > msr_reading_threshold: params.append('DI_MSR_READING_COMPREHENSION_BARRIER')
                 if q_domain == 'Math Related':
-                    if is_slow and not is_correct: params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR', 'DI_CALCULATION_ERROR'])
-                    elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_CONCEPT', 'DI_EFFICIENCY_BOTTLENECK_CALCULATION'])
+                    if is_slow and not is_correct: 
+                        # 添加所有數學相關錯誤標籤、多源整合錯誤和閱讀理解細分標籤
+                        params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR__MATH', 'DI_CALCULATION_ERROR__MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH', 'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+                                     'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH', 'DI_CALCULATION_DIFFICULTY__MATH'])
+                    elif is_slow and is_correct: 
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH', 'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+                                     'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH', 'DI_CALCULATION_DIFFICULTY__MATH'])
                     elif (is_normal_time or is_relatively_fast) and not is_correct:
-                        params.append('DI_CONCEPT_APPLICATION_ERROR')
-                        if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                        # 添加所有數學相關錯誤標籤、多源整合錯誤和閱讀理解細分標籤
+                        params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_CONCEPT_APPLICATION_ERROR__MATH', 'DI_CALCULATION_ERROR__MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
                 elif q_domain == 'Non-Math Related':
-                     if is_slow and not is_correct: params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_GRAPH_TABLE_INTERPRETATION_ERROR', 'DI_LOGICAL_REASONING_ERROR', 'DI_QUESTION_TYPE_SPECIFIC_ERROR'])
-                     elif is_slow and is_correct: params.extend(['DI_EFFICIENCY_BOTTLENECK_INTEGRATION', 'DI_EFFICIENCY_BOTTLENECK_READING', 'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE', 'DI_EFFICIENCY_BOTTLENECK_LOGIC'])
+                     if is_slow and not is_correct: 
+                        # 添加所有非數學相關錯誤標籤、多源整合錯誤和閱讀理解細分標籤
+                        params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_LOGICAL_REASONING_ERROR__NON_MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH', 'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+                                     'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'])
+                     elif is_slow and is_correct: 
+                        # 添加所有相關困難標籤
+                        params.extend(['DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY', 'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+                                     'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC', 'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+                                     'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH', 'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+                                     'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'])
                      elif (is_normal_time or is_relatively_fast) and not is_correct:
-                         params.extend(['DI_READING_COMPREHENSION_ERROR', 'DI_LOGICAL_REASONING_ERROR'])
-                         if is_relatively_fast: params.append('DI_CARELESSNESS_DETAIL_OMISSION')
+                         # 添加所有非數學相關錯誤標籤、多源整合錯誤和閱讀理解細分標籤
+                         params.extend(['DI_MULTI_SOURCE_INTEGRATION_ERROR', 'DI_LOGICAL_REASONING_ERROR__NON_MATH',
+                                     'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+                                     'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN'])
+                         if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
         # --- End Detailed Logic ---
         else: # This row IS invalid
             sfe_triggered = False # Invalid rows are not SFE by this logic
@@ -184,9 +324,14 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
             # Combine any params from earlier steps (e.g. behavioral from main) with SFE/detailed from here
             temp_combined = original_input_row_params + params
             final_params_for_row = list(dict.fromkeys(temp_combined)) # Remove duplicates
-            if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in final_params_for_row:
-                final_params_for_row.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-                final_params_for_row.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+            # Ensure new SFE tag is handled correctly
+            if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE' in final_params_for_row:
+                final_params_for_row.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE')
+                final_params_for_row.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE')
+            elif 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in final_params_for_row: # Handle if old tag somehow still present
+                 final_params_for_row.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+                 if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE' not in final_params_for_row:
+                    final_params_for_row.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE')
         
         all_diagnostic_params.append(final_params_for_row)
         all_is_sfe.append(sfe_triggered)
