@@ -55,6 +55,20 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     # --- Chapter 1: Time Pressure & Data Validity Analysis ---
     # Time pressure status is expected to be in df_q.attrs.get('time_pressure_q', False)
     q_time_pressure_status = df_q.attrs.get('time_pressure_q', False)
+    current_overtime_threshold = OVERTIME_THRESHOLDS[q_time_pressure_status]
+
+    # Calculate 'overtime' column
+    if 'question_time' in df_q.columns:
+        # Ensure question_time is numeric for comparison
+        df_q['question_time'] = pd.to_numeric(df_q['question_time'], errors='coerce')
+        # Create the 'overtime' boolean column
+        df_q['overtime'] = df_q['question_time'] > current_overtime_threshold
+        # Handle potential NaNs from coercion or if question_time was missing for some rows
+        df_q['overtime'] = df_q['overtime'].fillna(False)
+    else:
+        # If question_time column is not present, initialize 'overtime' column with False
+        # This ensures the column exists for downstream processes
+        df_q['overtime'] = pd.Series([False] * len(df_q), index=df_q.index)
 
     # Determine the mask for valid data, prioritizing 'is_manually_invalid'
     if 'is_manually_invalid' in df_q.columns:
