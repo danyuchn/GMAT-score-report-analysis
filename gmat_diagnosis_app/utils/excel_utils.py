@@ -78,23 +78,30 @@ def to_excel(df, column_map):
         df_excel = df_excel.sort_values(by='題號').reset_index(drop=True)
     
     # 轉換布爾值為字符串（更好的Excel兼容性）
-    for col in ['is_correct', 'is_sfe', 'is_invalid', 'overtime', 'is_manually_invalid']:
-        if col in df_excel.columns:
+    boolean_cols_original_names = ['is_correct', 'is_sfe', 'is_invalid', 'overtime', 'is_manually_invalid']
+    for original_name in boolean_cols_original_names:
+        # Get the column name as it actually appears in df_excel (it might have been renamed)
+        current_name_in_df_excel = local_column_map.get(original_name, original_name)
+        
+        if current_name_in_df_excel in df_excel.columns:
+            # Original logging/debugging logic for 'is_invalid' can be kept, using current_name_in_df_excel for data access
             pre_convert_value = None
             try:
-                if col == 'is_invalid':
-                    pre_convert_value = df_excel[col].sum() if hasattr(df_excel[col], 'sum') else "無法計算"
+                if original_name == 'is_invalid': # Check based on the original intent of the column
+                    # Access data using current_name_in_df_excel
+                    pre_convert_value = df_excel[current_name_in_df_excel].sum() if hasattr(df_excel[current_name_in_df_excel], 'sum') else "無法計算"
             except Exception as e:
-                pass
+                pass # Original code had commented out logging here
                 
-            df_excel[col] = df_excel[col].astype(str)
+            df_excel[current_name_in_df_excel] = df_excel[current_name_in_df_excel].astype(str)
             
             post_convert_value = None
             try:
-                if col == 'is_invalid':
-                    post_convert_value = (df_excel[col] == 'True').sum()
+                if original_name == 'is_invalid': # Check based on the original intent of the column
+                    # Access data using current_name_in_df_excel
+                    post_convert_value = (df_excel[current_name_in_df_excel] == 'True').sum()
             except Exception as e:
-                pass
+                pass # Original code had commented out logging here
     
     # 創建Excel writer
     writer = pd.ExcelWriter(output, engine='xlsxwriter')
@@ -180,7 +187,8 @@ def to_excel(df, column_map):
         if correct_col_idx is not None:
             is_correct_value = df_excel.iloc[row_num, correct_col_idx] == 'True'
             if is_correct_value:
-                worksheet.set_row(row_num + 1, None, correct_format) # +1 because Excel rows are 1-based
+                # worksheet.set_row(row_num + 1, None, correct_format) # +1 because Excel rows are 1-based # MODIFIED: Commented out to remove green background for correct answers
+                pass # No background format needed for correct answers
             else:
                 worksheet.set_row(row_num + 1, None, incorrect_format) # +1 because Excel rows are 1-based
                 
