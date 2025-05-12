@@ -139,6 +139,7 @@ def to_excel(df, column_map):
     overtime_format = workbook.add_format({'color': OVERTIME_FONT_COLOR, 'bold': True})  # 藍色文字（超時）
     invalid_format = workbook.add_format({'color': INVALID_FONT_COLOR})  # 深灰色文字（無效項）
     difficulty_format = workbook.add_format({'num_format': '0.00'})  # 難度格式（兩位小數）
+    time_format = workbook.add_format({'num_format': '0.00'})  # 用時格式（兩位小數）
     
     # 獲取列名列表和必要的欄位索引
     header_list = list(df_excel.columns)
@@ -214,6 +215,12 @@ def to_excel(df, column_map):
         difficulty_col_letter = get_column_letter(difficulty_col_idx)
         if difficulty_col_letter:
             worksheet.set_column(f'{difficulty_col_letter}:{difficulty_col_letter}', None, difficulty_format)
+            
+    # 應用用時數字格式
+    if time_col_idx is not None:
+        time_col_letter = get_column_letter(time_col_idx)
+        if time_col_letter:
+            worksheet.set_column(f'{time_col_letter}:{time_col_letter}', None, time_format)
     
     # 調整列寬
     for i, col in enumerate(header_list):
