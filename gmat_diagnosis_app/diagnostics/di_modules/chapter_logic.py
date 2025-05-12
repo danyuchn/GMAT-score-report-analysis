@@ -403,18 +403,27 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags):
     non_math_related_zh = _translate_di('Non-Math Related') # Translate once
     for q_type, override_info in override_results.items():
         if q_type in recommendations_by_type and override_info.get('override_triggered'):
-            # Check if ALL domain combinations for this q_type are exempted before skipping macro
-            # This is a subtle point: override is per type, exemption per type+domain.
-            # If a type is overridden, but all its sub-domains are exempted, then the macro rec might be skipped.
-            # Current DI doc implies override is per type, and exemption is per type+domain.
-            # If override is triggered for a type, the macro rec applies to the type as a whole,
-            # unless *all* its constituent type+domain combos are exempt.
-            # For simplicity now, if override is triggered for a type, it generates a macro recommendation for that type.
-            # The case-specific recommendations will later honor the type+domain exemption.
-            # A more complex logic would be: if q_type is overridden, check if all (q_type, domain) in exempted_type_domain_combinations.
-            # For now, proceeding with: if override on type, then macro rec for type.
-            # The original code was: if q_type in exempted_types: continue (where exempted_types was per type)
-            # This is effectively similar if we consider override takes precedence unless the whole type is somehow perfect.
+            # Check if all content domains for this q_type are exempted
+            all_domains_for_this_q_type_in_data = df_diagnosed[df_diagnosed['question_type'] == q_type]['content_domain'].unique()
+            all_domains_for_this_q_type_in_data = [d for d in all_domains_for_this_q_type_in_data if pd.notna(d)] # Filter out NaN domains
+
+            if not all_domains_for_this_q_type_in_data: # If the q_type has no actual content domains in the data
+                pass # Proceed to generate macro recommendation as we can't confirm full exemption
+            else:
+                all_sub_domains_exempted = True
+                for domain_for_q_type in all_domains_for_this_q_type_in_data:
+                    if (q_type, domain_for_q_type) not in exempted_type_domain_combinations:
+                        all_sub_domains_exempted = False
+                        break
+                
+                if all_sub_domains_exempted:
+                    logging.info(f"[DI Reco Logic] SKIPPING Macro recommendation for q_type '{q_type}' because all its sub-domains are exempted (perfect performance).")
+                    # We still add to processed_override_types because if an override was triggered,
+                    # it implies a general issue, and we might not want case recommendations
+                    # even if the macro one is suppressed due to perfect sub-domain performance.
+                    # This aligns with the existing logic of adding to processed_override_types here.
+                    processed_override_types.add(q_type) 
+                    continue # Skip generating the macro recommendation for this q_type
 
             y_agg = override_info.get('Y_agg', '未知難度')
             z_agg = override_info.get('Z_agg')
