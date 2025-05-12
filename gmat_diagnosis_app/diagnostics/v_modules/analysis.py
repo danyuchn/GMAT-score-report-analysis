@@ -406,8 +406,6 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
             # Normal time is neither relatively fast nor slow (overtime)
             if not current_is_relatively_fast and not is_slow:
                  is_normal_time = True
-        # If q_time is NaN or avg_time is inf, it won't be fast or normal by this logic;
-        # it remains slow if current_is_overtime is True, otherwise category falls to 'Normal Time' if not fast.
 
         # 3. Assign Time Performance Category (for ALL rows)
         if is_correct:
@@ -419,12 +417,49 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
             elif is_slow: current_time_performance_category = 'Slow & Wrong'
             else: current_time_performance_category = 'Normal Time & Wrong'
         
-        # For invalid rows, the time_performance_category calculated above is retained.
-        # Specific diagnostic params (SFE, detailed error types) are handled next based on validity.
-
         # Initialize diagnostic_params for current row processing
         # diagnostic_params from the input row (row.get('diagnostic_params')) are preserved if row is invalid and contains INVALID_DATA_TAG_V
         processed_diagnostic_params = [] 
+
+        # 方案四：添加基於RC整組表現的診斷（僅對RC題型）
+        if q_type == 'Reading Comprehension' and not is_invalid:
+            # 獲取RC組表現分類
+            rc_group_performance = row.get('rc_group_performance', None)
+            rc_tolerance_applied = bool(row.get('rc_tolerance_applied', False))
+            rc_overtime_culprit = bool(row.get('rc_overtime_culprit', False))
+            rc_severe_overtime_culprit = bool(row.get('rc_severe_overtime_culprit', False))
+            
+            # 基於整組表現添加特定診斷參數
+            if rc_group_performance == '良好' and rc_tolerance_applied:
+                # 整組表現良好，但單題可能稍微超時（應用了寬容度）
+                if current_is_overtime:
+                    processed_diagnostic_params.append('RC_READING_SPEED_GOOD_GROUP_PERFORMANCE')
+                    if is_correct:
+                        # 如果是正確的，表明學生有良好的理解但需要提高單題效率
+                        processed_diagnostic_params.append('RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MINOR_ISSUE')
+                    else:
+                        # 如果是錯誤的，可能是因為花了太多時間但仍未找到正確答案
+                        processed_diagnostic_params.append('RC_CHOICE_ANALYSIS_EFFICIENCY_MINOR_ISSUE')
+            
+            elif rc_group_performance == '尚可':
+                # 整組表現尚可，單題使用標準閾值判斷
+                if current_is_overtime:
+                    processed_diagnostic_params.append('RC_READING_SPEED_ACCEPTABLE_GROUP_PERFORMANCE')
+                    if is_correct:
+                        processed_diagnostic_params.append('RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MODERATE_ISSUE')
+                    else:
+                        processed_diagnostic_params.append('RC_CHOICE_ANALYSIS_EFFICIENCY_MODERATE_ISSUE')
+            
+            elif rc_group_performance == '不佳':
+                # 整組表現不佳，整組都標記為超時
+                processed_diagnostic_params.append('RC_READING_SPEED_POOR_GROUP_PERFORMANCE')
+                
+                # 如果是元兇，特別標記
+                if rc_overtime_culprit:
+                    if rc_severe_overtime_culprit:
+                        processed_diagnostic_params.append('RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_SEVERE_ISSUE')
+                    else:
+                        processed_diagnostic_params.append('RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MAJOR_ISSUE')
 
         if not is_invalid: 
             # 4. Check SFE for VALID rows

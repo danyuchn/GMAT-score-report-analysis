@@ -11,12 +11,20 @@ CR_OVERTIME_THRESHOLDS = {
     True: 2.0, # High Pressure
     False: 2.5 # Low Pressure
 }
-RC_INDIVIDUAL_Q_THRESHOLD_MINUTES = 2.0  # 用於判斷排除閱讀時間後的單題解答是否過長
+RC_INDIVIDUAL_Q_THRESHOLD_MINUTES = 1.5  # 用於判斷排除閱讀時間後的單題解答是否過長
                                         # 與 MD 文件中的 rc_individual_q_threshold 對應
                                         # 在 MD 文件中定義：用於判斷排除第一道題的閱讀時間後，單題解答時間若超過此閾值，則標記為 individual_overtime
 RC_READING_TIME_THRESHOLD_3Q = 2.0 # minutes
 RC_READING_TIME_THRESHOLD_4Q = 2.5 # minutes
 RC_GROUP_TARGET_TIME_ADJUSTMENT = 1.0 # minutes (add to target before checking group_overtime)
+
+# 方案四：RC整組表現分類和單題寬容度
+RC_INDIVIDUAL_TOLERANCE_WHEN_GROUP_GOOD = 0.5  # 整組表現良好時的單題寬容度（分鐘）
+RC_GROUP_PERFORMANCE_CATEGORIES = {
+    'GOOD': '良好',      # 總時間 ≤ 目標時間
+    'ACCEPTABLE': '尚可', # 目標時間 < 總時間 ≤ 目標時間 + 1分鐘
+    'POOR': '不佳'       # 總時間 > 目標時間 + 1分鐘
+}
 
 # RC Group Target Times (minutes) based on pressure
 RC_GROUP_TARGET_TIMES = {
@@ -85,6 +93,11 @@ V_PARAM_TO_CATEGORY = {
     'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY': 'Reading',
     'RC_READING_INFO_LOCATION_ERROR': 'Reading', # ADDED
     'RC_READING_KEYWORD_LOGIC_OMISSION': 'Reading', # ADDED
+    
+    # 方案四：新增RC整組表現相關診斷參數
+    'RC_READING_SPEED_GOOD_GROUP_PERFORMANCE': 'Reading',
+    'RC_READING_SPEED_ACCEPTABLE_GROUP_PERFORMANCE': 'Reading',
+    'RC_READING_SPEED_POOR_GROUP_PERFORMANCE': 'Reading',
 
     # Reasoning
     'CR_REASONING_CHAIN_ERROR': 'Reasoning',
@@ -107,6 +120,14 @@ V_PARAM_TO_CATEGORY = {
     'EFFICIENCY_BOTTLENECK_REASONING': 'Timing', # ADDED
     'EFFICIENCY_BOTTLENECK_LOCATION': 'Timing', # ADDED
     'EFFICIENCY_BOTTLENECK_AC_ANALYSIS': 'Timing', # ADDED
+    
+    # 方案四：新增效率相關診斷參數
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MINOR_ISSUE': 'Timing',
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MODERATE_ISSUE': 'Timing',
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MAJOR_ISSUE': 'Timing',
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_SEVERE_ISSUE': 'Timing',
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MINOR_ISSUE': 'Timing',
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MODERATE_ISSUE': 'Timing',
 
     # Process
     'CR_METHOD_TYPE_SPECIFIC_ERROR': 'Process',
@@ -122,6 +143,8 @@ V_PARAM_TO_CATEGORY = {
     'CR_AC_ANALYSIS_TIME_EXCESSIVE': 'AC_Analysis', # Also Timing
     'RC_AC_ANALYSIS_DIFFICULTY': 'AC_Analysis',
     'RC_AC_ANALYSIS_TIME_EXCESSIVE': 'AC_Analysis', # Also Timing - ADDED
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MINOR_ISSUE': 'AC_Analysis', # 方案四：跨類別參數
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MODERATE_ISSUE': 'AC_Analysis', # 方案四：跨類別參數
 
     # Question_Understanding
     'CR_QUESTION_UNDERSTANDING_MISINTERPRETATION': 'Question_Understanding',
@@ -177,6 +200,17 @@ V_TOOL_AI_RECOMMENDATIONS = {
     'RC_AC_ANALYSIS_DIFFICULTY': ["AI: Verbal-related/01_basic_explanation.md, Verbal-related/07_logical_term_explained.md"],
     'RC_AC_ANALYSIS_TIME_EXCESSIVE': ["AI: Verbal-related/03_quick_rc_tricks.md"],
     'RC_METHOD_TYPE_SPECIFIC_ERROR': ["AI: Verbal-related/01_basic_explanation.md (general), specific RC type tricks if available"],
+    
+    # 方案四：整組表現相關診斷
+    'RC_READING_SPEED_GOOD_GROUP_PERFORMANCE': ["AI: Verbal-related/03_quick_rc_tricks.md"],
+    'RC_READING_SPEED_ACCEPTABLE_GROUP_PERFORMANCE': ["AI: Verbal-related/03_quick_rc_tricks.md"],
+    'RC_READING_SPEED_POOR_GROUP_PERFORMANCE': ["Tool: Dustin_GMAT_Chunk_Reading_Coach.md", "AI: Verbal-related/03_quick_rc_tricks.md, Verbal-related/04_mindmap_passage.md"],
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MINOR_ISSUE': ["AI: Verbal-related/03_quick_rc_tricks.md"],
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MODERATE_ISSUE': ["AI: Verbal-related/03_quick_rc_tricks.md"],
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MAJOR_ISSUE': ["AI: Verbal-related/03_quick_rc_tricks.md, Verbal-related/05_evaluate_explanation.md"],
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_SEVERE_ISSUE': ["Tool: Dustin_GMAT_RC_Passage_Analyzer.md", "AI: Verbal-related/03_quick_rc_tricks.md, Verbal-related/05_evaluate_explanation.md"],
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MINOR_ISSUE': ["AI: Verbal-related/01_basic_explanation.md"],
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MODERATE_ISSUE': ["AI: Verbal-related/01_basic_explanation.md, Verbal-related/05_evaluate_explanation.md"],
 
     # Foundational Mastery / Efficiency / Behavioral
     'FOUNDATIONAL_MASTERY_INSTABILITY_SFE': ["AI: Verbal-related/01_basic_explanation.md (priority)"],
