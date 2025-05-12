@@ -10,11 +10,19 @@ import os
 import datetime
 from typing import List, Dict, Any, Optional
 
+# --- Revised Path Definition ---
+# Get the directory where this script (csv_data_service.py) is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Get the parent directory (which should be gmat_diagnosis_app)
+APP_DIR = os.path.dirname(SCRIPT_DIR)
+
+# Define file paths based on the APP_DIR
+GMAT_PERFORMANCE_DATA_FILE = os.path.join(APP_DIR, "gmat_performance_data.csv")
+STUDENT_SUBJECTIVE_REPORTS_FILE = os.path.join(APP_DIR, "student_subjective_reports.csv")
+# --- End of Revised Path Definition ---
 
 # Define constants
 APP_SUBDIRECTORY = "gmat_diagnosis_app" # Define the app subdirectory
-GMAT_PERFORMANCE_DATA_FILE = os.path.join(APP_SUBDIRECTORY, "gmat_performance_data.csv")
-STUDENT_SUBJECTIVE_REPORTS_FILE = os.path.join(APP_SUBDIRECTORY, "student_subjective_reports.csv")
 
 # Define CSV headers
 GMAT_PERFORMANCE_HEADERS = [
