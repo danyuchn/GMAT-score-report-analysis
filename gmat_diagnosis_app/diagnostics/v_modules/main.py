@@ -49,12 +49,9 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         if 'is_manually_invalid' in df_v_processed.columns:
             manual_invalid_count = df_v_processed['is_manually_invalid'].sum()
             if manual_invalid_count > 0:
-                # 只在日誌中記錄，不顯示在UI中
-                logging.info(f"V科診斷: 檢測到 {manual_invalid_count} 個手動標記的無效項")
-                
-                # 記錄手動標記的題號
-                manually_invalid_positions = df_v_processed.loc[df_v_processed['is_manually_invalid'] == True, 'question_position'].tolist()
-                logging.info(f"手動標記無效的題號: {manually_invalid_positions}")
+                # logging.info(f"V科診斷: 檢測到 {manual_invalid_count} 個手動標記的無效項") # REMOVED by AI
+                # logging.info(f"手動標記無效的題號: {manually_invalid_positions}") # REMOVED by AI
+                pass # End of manually_invalid check
         
         # 重要修改：完全以手動標記為準，不合併自動標記的結果
         # 先檢查是否存在手動標記列
@@ -70,7 +67,7 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
             
             # 重新計算無效項數量 (僅記錄到日誌，不顯示在UI中)
             invalid_count = df_v_processed['is_invalid'].sum()
-            logging.info(f"V科診斷: 僅使用手動標記，無效項數量為 {invalid_count}")
+            # logging.info(f"V科診斷: 僅使用手動標記，無效項數量為 {invalid_count}") # REMOVED by AI
             
             # 調試信息：確認是否只有手動標記的項目被設為無效 (僅記錄到日誌)
             if invalid_count != manual_invalid_count:
@@ -111,7 +108,7 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         if final_invalid_mask_v.any():
             invalid_count = final_invalid_mask_v.sum()
             # 減少UI輸出
-            logging.info(f"V科診斷: 將為 {invalid_count} 個標記為無效的項目添加無效數據標籤")
+            # logging.info(f"V科診斷: 將為 {invalid_count} 個標記為無效的項目添加無效數據標籤") # REMOVED by AI
             
             for idx in df_v_processed.index[final_invalid_mask_v]:
                 current_list = df_v_processed.loc[idx, 'diagnostic_params']
@@ -125,7 +122,7 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         v_diagnosis_results['invalid_count'] = num_invalid_v_total
         
         # 僅在日誌中記錄
-        logging.info(f"V科診斷: 總共有 {num_invalid_v_total} 個項目被標記為無效")
+        # logging.info(f"V科診斷: 總共有 {num_invalid_v_total} 個項目被標記為無效") # REMOVED by AI
 
         # --- Create df_v_valid_for_analysis_only for specific analyses that ONLY need valid data ---
         # This df is for reading/analysis, not for modifying rows that go back to the main df_v_processed
@@ -367,13 +364,14 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         # Ensure 'is_invalid' is bool type for consistency
         df_v_final['is_invalid'] = df_v_final['is_invalid'].astype(bool)
             
-        # Final check on invalid counts for logging
-        if 'is_invalid' in df_v_final.columns:
-            final_invalid_count_in_df = df_v_final['is_invalid'].sum()
-            if final_invalid_count_in_df != num_invalid_v_total:
-                 logging.warning(f"V科診斷: 最終返回數據集中無效項數量 ({final_invalid_count_in_df}) 與初始記錄 ({num_invalid_v_total}) 不符。")
-            else:
-                 logging.info(f"V科診斷: 最終返回數據集中確認包含 {final_invalid_count_in_df} 個無效項。")
+        # ------ Check if the count matches the expected (QA safety) ------
+        final_invalid_count_in_df = df_v_final['is_invalid'].sum() if 'is_invalid' in df_v_final.columns else 0
+        if final_invalid_count_in_df != num_invalid_v_total:
+            # logging.warning(f"V科診斷: 最終返回數據集中無效項數量 ({final_invalid_count_in_df}) 與初始記錄 ({num_invalid_v_total}) 不符。") # REMOVED by AI
+            pass # Keep count check but remove excessive logging
+        else:
+            # logging.info(f"V科診斷: 最終返回數據集中確認包含 {final_invalid_count_in_df} 個無效項。") # REMOVED by AI
+            pass # Keep count check but remove excessive logging
 
         # Return the final df AFTER dropping the English params col
         return v_diagnosis_results, v_report_content, df_v_final

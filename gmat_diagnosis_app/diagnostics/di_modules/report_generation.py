@@ -219,26 +219,25 @@ def _generate_di_summary_report(di_results):
                 
                 # Construct direction_text
                 difficulty_grade_in_rec = rec_original.get('difficulty_grade', '未知難度')
-                # Target times map (consider making this a global constant or passing it if it varies)
-                target_times_map_for_report = {'Data Sufficiency': 2.0, 'Two-part analysis': 3.0, 'Graph and Table': 3.0, 'Multi-source reasoning': 1.5}
-                target_time_val = target_times_map_for_report.get(q_type_eng, 2.0) # Default to 2.0 if q_type_eng not found
-                target_time_str = f"{target_time_val:.1f} 分鐘"
+                # Read the target time directly from the recommendation object
+                target_time_val = rec_original.get('target_time_minutes') # <-- READ FROM rec_original
                 
-                # Try to get the specific part from rec_text first for direction
-                direction_pattern_case = r"建議練習 \\*\\*(.*?)\\*\\* 難度題目,.*?\\(最終目標時間: (.*?)\\)"
-                direction_match_case = re.search(direction_pattern_case, rec_text)
-                if direction_match_case:
-                    direction_text = f"建議練習 **{direction_match_case.group(1)}** 難度題目 (最終目標時間: {direction_match_case.group(2)})"
-                else: # Fallback to structured data
-                    direction_text = f"建議練習 **{difficulty_grade_in_rec}** 難度題目 (最終目標時間: {target_time_str})"
+                target_time_str = "未知目標" # Default if not found
+                if pd.notna(target_time_val):
+                    target_time_str = f"{target_time_val:.1f} 分鐘" # Format the read value
+                
+                # Generate direction text using the structured difficulty and the read target time
+                direction_text = f"建議練習 **{difficulty_grade_in_rec}** 難度題目 (最終目標時間: {target_time_str})\"" # <-- USE target_time_str from rec_original
 
                 # Append focus note if present in rec_text (usually at the end)
-                focus_note_match = re.search(r"(\s\\*\\*建議增加.*?比例。\\*\\*)", rec_text) # Matches the bolded focus note
+                # Use a non-capturing group for the space and make the note optional
+                focus_note_match = re.search(r"((?:\s|^)\\*\\*建議增加.*?比例。\\*\\*)$", rec_text)
                 if focus_note_match:
-                    direction_text += focus_note_match.group(1)
+                    # Append only the captured note itself
+                    direction_text += focus_note_match.group(1) 
 
 
-                # Construct time_limit_text
+                # Construct time_limit_text (Initial suggested time)
                 time_val_z = rec_original.get('time_limit_z')
                 if pd.notna(time_val_z):
                     time_limit_text = f"{time_val_z:.1f} 分鐘"
