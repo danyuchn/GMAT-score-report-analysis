@@ -197,7 +197,7 @@
 
 <aside>
 
-**本章總結：** 我們分析了所有錯誤題目，根據其作答時間（快/慢/正常）進行分類。引入了診斷參數 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 對應 `special_focus_error` 並明確了其優先處理方式。針對不同錯誤類型，列出了可能的**英文診斷參數**（如 `` `Q_CARELESSNESS_DETAIL_OMISSION` ``, `` `Q_CONCEPT_APPLICATION_ERROR` `` 等）。同時，為無法清晰回憶錯誤原因的情況，提供了二級證據和質化分析的建議路徑。
+**本章總結：** 我們分析了所有錯誤題目，根據其作答時間（快/慢/正常）進行分類。引入了診斷參數 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 對應 `special_focus_error` 並明確了其優先處理方式。針對不同錯誤類型，列出了可能的**英文診斷參數**（如 `` `BEHAVIOR_CARELESSNESS_ISSUE` ``, `` `Q_CONCEPT_APPLICATION_ERROR` `` 等）。同時，為無法清晰回憶錯誤原因的情況，提供了二級證據和質化分析的建議路徑。
 
 **結果去向：** 這些錯誤分類、診斷參數以及 `special_focus_error` / `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 標記是後續生成具體練習建議（第七章）的關鍵依據。二級證據和質化分析的建議旨在幫助學生更深入地理解問題根源。第八章的總結報告將引用這些參數（並通過附錄翻譯）。
 
@@ -221,13 +221,13 @@
 2. **記錄與推測 (關聯診斷參數)：**
     - 記錄這些題目的 `question_position`, `question_type`, `question_fundamental_skill`, `question_time`。
     - 可能原因 (診斷參數):
-        - `` `Q_EFFICIENCY_BOTTLENECK_READING` `` (若 `question_type` == 'Real')
-        - `` `Q_EFFICIENCY_BOTTLENECK_CONCEPT` ``
-        - `` `Q_EFFICIENCY_BOTTLENECK_CALCULATION` ``
+        - `` `Q_READING_COMPREHENSION_DIFFICULTY` `` (若 `question_type` == 'Real')
+        - `` `Q_CONCEPT_APPLICATION_DIFFICULTY` ``
+        - `` `Q_CALCULATION_DIFFICULTY` ``
 
 <aside>
 
-**本章總結：**我們識別出了學生雖然做對了、但效率可能偏低的具體題目和對應的知識技能。記錄了這些「正確但超時」題目的詳細信息，並關聯了可能的**英文效率瓶頸參數** (如 `` `Q_EFFICIENCY_BOTTLENECK_CONCEPT` ``)。
+**本章總結：**我們識別出了學生雖然做對了、但效率可能偏低的具體題目和對應的知識技能。記錄了這些「正確但超時」題目的詳細信息，並關聯了可能的**英文效率瓶頸參數** (如 `` `Q_CONCEPT_APPLICATION_DIFFICULTY` ``)。
 
 **結果去向：**這些情況同樣會作為觸發點，連同其關聯的效率參數，用於在第七章生成練習建議，旨在提升學生在相關技能或題型上的解題流暢度和效率。第八章報告會總結效率問題。
 
@@ -428,9 +428,6 @@
         * `` `Q_READING_COMPREHENSION_ERROR` `` (Real) →
             * **Tool:** `Dustin_GMAT_Q_Real-Context_Converter.md`, `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
             * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/09_complex_sentence_rewrite.md` ``
-        * `` `Q_PROBLEM_UNDERSTANDING_ERROR` `` →
-            * **Tool:** `Dustin_GMAT_Q_Question_Classifier.md`, `Dustin_GMAT_Textbook_Explainer.md`
-            * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/03_test_math_concepts.md` ``, `` `Verbal-related/07_logical_term_explained.md` `` (用於 DS)
         * `` `Q_CONCEPT_APPLICATION_ERROR` `` →
             * **Tool:** `Dustin_GMAT_Q_Question_Classifier.md`, `Dustin_GMAT_Textbook_Explainer.md`
             * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/04_problem_pattern.md` ``, `` `Quant-related/05_variant_questions.md` ``
@@ -443,12 +440,12 @@
             * AI Prompt: **優先** `` `Quant-related/01_basic_explanation.md` ``；輔助 `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/05_variant_questions.md` ``。
 
     * **若診斷涉及效率瓶頸:**
-        * `` `Q_EFFICIENCY_BOTTLENECK_READING` `` (Real) →
+        * `` `Q_READING_COMPREHENSION_DIFFICULTY` `` (Real) →
             * **Tool:** `Dustin_GMAT_Chunk_Reading_Coach.md`
             * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``
-        * `` `Q_EFFICIENCY_BOTTLENECK_CONCEPT` `` →
+        * `` `Q_CONCEPT_APPLICATION_DIFFICULTY` `` →
             * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Quant-related/04_problem_pattern.md` ``
-        * `` `Q_EFFICIENCY_BOTTLENECK_CALCULATION` `` →
+        * `` `Q_CALCULATION_DIFFICULTY` `` →
             * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``
 
     * **若診斷涉及行為模式:** *(使用統一後的參數名稱)*
@@ -456,8 +453,6 @@
             * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
         * `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` →
             * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
-        * `` `Q_CARELESSNESS_DETAIL_OMISSION` `` *(此參數若保留)* →
-            * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/02_quick_math_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
 
     * **通用 Q 練習/分類/理解:**
         * **Tool:** `Dustin_GMAT_Q_Question_Classifier.md`, `Dustin_GMAT_Q_Real-Context_Converter.md`
@@ -466,3 +461,43 @@
 
 **本章總結：**我們生成了一份完全使用自然語言撰寫的最終診斷報告。報告首先總結了時間使用情況和整體表現概覽，接著深入分析了核心問題所在（特別指出了基礎掌握不穩的情況），納入了特殊的作答模式觀察，並提示了需要基礎鞏固的技能領域。報告的核心部分是呈現了詳細的、按技能分類的練習計劃（已應用豁免和側重規則）。最後，報告包含了一些引導性問題和關於如何利用二級證據、質化分析來促進自我反思和針對性改進的建議。
 **結果去向：**這份報告是整個診斷流程的最終產出，用於與學生溝通，並指導他們後續的學習和練習。
+
+---
+
+# **附錄 A：診斷標籤參數與中文對照表**
+
+## Quant (Q) 診斷標籤
+
+### 時間表現: 快且錯 (`Fast & Wrong`)
+
+* `Q_READING_COMPREHENSION_ERROR`: Q 閱讀理解錯誤：題目文字理解
+* `Q_CONCEPT_APPLICATION_ERROR`: Q 概念應用錯誤：數學觀念/公式應用
+* `Q_CALCULATION_ERROR`: Q 計算錯誤：數學計算
+* `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`: Q 基礎掌握：應用不穩定（Special Focus Error）
+* `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`: 行為模式：前期作答過快（Flag risk）
+* `BEHAVIOR_CARELESSNESS_ISSUE`: 行為模式：整體粗心問題（快而錯比例高）
+
+### 時間表現: 正常時間且錯 (`Normal Time & Wrong`)
+
+* `Q_READING_COMPREHENSION_ERROR`: Q 閱讀理解錯誤：題目文字理解
+* `Q_CONCEPT_APPLICATION_ERROR`: Q 概念應用錯誤：數學觀念/公式應用
+* `Q_CALCULATION_ERROR`: Q 計算錯誤：數學計算
+* `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`: Q 基礎掌握：應用不穩定（Special Focus Error）
+* `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`: 行為模式：前期作答過快（Flag risk）
+* `BEHAVIOR_CARELESSNESS_ISSUE`: 行為模式：整體粗心問題（快而錯比例高）
+
+### 時間表現: 慢且錯 (`Slow & Wrong`)
+
+* `Q_READING_COMPREHENSION_ERROR`: Q 閱讀理解錯誤：題目文字理解
+* `Q_CONCEPT_APPLICATION_ERROR`: Q 概念應用錯誤：數學觀念/公式應用
+* `Q_CALCULATION_ERROR`: Q 計算錯誤：數學計算
+* `Q_READING_COMPREHENSION_DIFFICULTY`: Q 閱讀理解障礙：題目文字理解困難
+* `Q_CONCEPT_APPLICATION_DIFFICULTY`: Q 概念應用障礙：數學觀念/公式應用困難
+* `Q_CALCULATION_DIFFICULTY`: Q 計算障礙：數學計算困難
+* `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`: Q 基礎掌握：應用不穩定（Special Focus Error）
+
+### 時間表現: 慢且對 (`Slow & Correct`)
+
+* `Q_READING_COMPREHENSION_DIFFICULTY`: Q 閱讀理解障礙：題目文字理解困難
+* `Q_CONCEPT_APPLICATION_DIFFICULTY`: Q 概念應用障礙：數學觀念/公式應用困難
+* `Q_CALCULATION_DIFFICULTY`: Q 計算障礙：數學計算困難
