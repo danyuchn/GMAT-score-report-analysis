@@ -216,43 +216,43 @@
         - **A.1. `Math Related`**
             - **慢而錯 (`is_slow` & `is_correct`==`False`):**
                 - *可能原因 (診斷參數)*: 
-                    - `` `DI_READING_COMPREHENSION_ERROR` `` (細分：單詞 / 句構 / 領域特定術語)
-                    - `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math - 公式導出障礙)
-                    - `` `DI_CALCULATION_ERROR` ``
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (細分：單詞 / 句構 / 領域特定術語)
+                    - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math - 公式導出障礙)
+                    - `` `DI_CALCULATION_ERROR__MATH` ``
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 遵循通用邏輯。若涉及公式/計算障礙且無法回憶，優先考慮二級證據。需學生**識別數學相關考點 (參考本章開頭列表)**。
             - **慢而對 (`is_slow` & `is_correct`==`True`):**
                 - *效率瓶頸可能點 (診斷參數)*: 
-                    - `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_CONCEPT` `` (Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` ``
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` `` (Math)
+                    - `` `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH` `` (Math)
+                    - `` `DI_CALCULATION_DIFFICULTY__MATH` ``
                 - *診斷行動*: 遵循通用邏輯。**不需**學生識別考點。
             - **正常時間做錯 (`is_normal_time` & `is_correct`==`False`) / 快而錯 (`is_relatively_fast` & `is_correct`==`False`):**
                 - *可能原因 (診斷參數)*: 
-                    - `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math - 考點不熟或應用錯誤)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發)
+                    - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math - 考點不熟或應用錯誤)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 遵循通用邏輯。需學生**識別數學相關考點 (參考本章開頭列表)**。
             - **快而對 (`is_relatively_fast` & `is_correct`==`True`):** 提醒避免粗心/被標記；若在後段則詢問是否倉促。
             - **正常時間做對 (`is_normal_time` & `is_correct`==`True`):** N/A
         - **A.2. `Non-Math Related**
             - **慢而錯 (`is_slow` & `is_correct`==`False`):**
                 - *可能原因 (診斷參數)*: 
-                    - `` `DI_READING_COMPREHENSION_ERROR` `` (細分：單詞 / 句構 / 題意)
-                    - `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math - 題目內在邏輯推理障礙)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (細分：單詞 / 句構 / 題意)
+                    - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math - 題目內在邏輯推理障礙)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 遵循通用邏輯。請學生回憶是文字理解問題還是邏輯判斷問題。
             - **慢而對 (`is_slow` & `is_correct`==`True`):**
                 - *效率瓶頸可能點 (診斷參數)*: 
-                    - `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Non-Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math)
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` `` (Non-Math)
+                    - `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math)
                 - *診斷行動*: 遵循通用邏輯。
             - **正常時間做錯 (`is_normal_time` & `is_correct`==`False`) / 快而錯 (`is_relatively_fast` & `is_correct`==`False`):**
                 - *可能原因 (診斷參數)*: 
-                    - `` `DI_READING_COMPREHENSION_ERROR` `` (文字理解疏漏/錯誤)
-                    - `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math - 題目內在邏輯應用錯誤)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (文字理解疏漏/錯誤)
+                    - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math - 題目內在邏輯應用錯誤)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 遵循通用邏輯，此處**強烈建議觸發二級證據 + 質化分析**。
             - **快而對 (`is_relatively_fast` & `is_correct`==`True`):** 同 A.1 快而對。
             - **正常時間做對 (`is_normal_time` & `is_correct`==`True`):** N/A
@@ -260,38 +260,38 @@
     - **B. Two-Part Analysis (`TPA`)** (結構同 `DS`，應用通用診斷行動邏輯)
         - **B.1. `Math Related**
             - **慢而錯 / 慢而對 / 正常時間做錯 / 快而錯 / 快而對 / 正常時間做對**
-                - *可能原因/效率瓶頸 (診斷參數)*: 參考 ``DS Math Related`` (`` `DI_READING_COMPREHENSION_ERROR` ``, `` `DI_CONCEPT_APPLICATION_ERROR` ``, `` `DI_CALCULATION_ERROR` ``, `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``, `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Math), `` `DI_EFFICIENCY_BOTTLENECK_CONCEPT` `` (Math), `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` ``)。
+                - *可能原因/效率瓶頸 (診斷參數)*: 參考 ``DS Math Related`` (`` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``, `` `DI_CONCEPT_APPLICATION_ERROR__MATH` ``, `` `DI_CALCULATION_ERROR__MATH` ``, `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` ``, `` `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH` ``, `` `DI_CALCULATION_DIFFICULTY__MATH` ``)。
                 - *診斷行動*: 應用通用邏輯，根據情況要求識別考點 **(參考本章開頭列表)** 或分析效率瓶頸。
         - **B.2. `Non-Math Related**
             - **慢而錯 / 慢而對 / 正常時間做錯 / 快而錯 / 快而對 / 正常時間做對**
-                - *可能原因/效率瓶頸 (診斷參數)*: 參考 ``DS Non-Math Related`` (`` `DI_READING_COMPREHENSION_ERROR` ``, `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math), `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``, `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Non-Math), `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math), `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (快錯時))。
+                - *可能原因/效率瓶頸 (診斷參數)*: 參考 ``DS Non-Math Related`` (`` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``, `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math), `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` ``, `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math), `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (快錯時))。
                 - *診斷行動*: 應用通用邏輯，強調在正常/快錯時進行質化分析。
 
     - **C. Graph & Table (`GT`)** (結構同 `DS`/`TPA`，應用通用診斷行動邏輯)
         - **C.1. `Math Related**
             - **慢而錯 / 慢而對 / 正常時間做錯 / 快而錯 / 快而對 / 正常時間做對**
                 - *可能原因/效率瓶頸 (診斷參數)*: 
-                    - `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` ``
-                    - `` `DI_READING_COMPREHENSION_ERROR` `` (題幹文字理解)
+                    - `` `DI_GRAPH_INTERPRETATION_ERROR__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_ERROR__TABLE` ``
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (題幹文字理解)
                     - `` `DI_DATA_EXTRACTION_ERROR` ``
-                    - `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math - 計算相關概念/公式)
-                    - `` `DI_CALCULATION_ERROR` ``
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` `` (慢而對時主要考慮)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` `` (慢而對時主要考慮)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (快錯時主要考慮)
+                    - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math - 計算相關概念/公式)
+                    - `` `DI_CALCULATION_ERROR__MATH` ``
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
+                    - `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` `` (慢而對時主要考慮)
+                    - `` `DI_CALCULATION_DIFFICULTY__MATH` `` (慢而對時主要考慮)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (快錯時主要考慮)
                 - *診斷行動*: 應用通用邏輯，要求識別數學考點 **(參考本章開頭列表)** 或圖表類型。
         - **C.2. `Non-Math Related**
             - **慢而錯 / 慢而對 / 正常時間做錯 / 快而錯 / 快而對 / 正常時間做對**
                 - *可能原因/效率瓶頸 (診斷參數)*: 
-                    - `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` ``
-                    - `` `DI_READING_COMPREHENSION_ERROR` `` (題幹文字理解)
+                    - `` `DI_GRAPH_INTERPRETATION_ERROR__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_ERROR__TABLE` ``
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (題幹文字理解)
                     - `` `DI_INFORMATION_EXTRACTION_INFERENCE_ERROR` `` (信息提取/推斷錯誤)
-                    - `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` `` (慢而對時主要考慮)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math) (慢而對時主要考慮)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (快錯時主要考慮)
+                    - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
+                    - `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` `` (慢而對時主要考慮)
+                    - `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math) (慢而對時主要考慮)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (快錯時主要考慮)
                 - *診斷行動*: 應用通用邏輯，強調在正常/快錯時進行質化分析。
 
     - **D. Multi-Source Reasoning (`MSR`)** (結構同上，應用通用診斷行動邏輯)
@@ -306,25 +306,25 @@
             - **慢而錯 (`is_slow` & `is_correct`==`False`):**
                 - *可能原因 (診斷參數)*: 
                     - `` `DI_MULTI_SOURCE_INTEGRATION_ERROR` ``
-                    - `` `DI_READING_COMPREHENSION_ERROR` ``
-                    - `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` ``
-                    - `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math)
-                    - `` `DI_CALCULATION_ERROR` ``
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``
+                    - `` `DI_GRAPH_INTERPRETATION_ERROR__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_ERROR__TABLE` ``
+                    - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math)
+                    - `` `DI_CALCULATION_ERROR__MATH` ``
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 應用通用邏輯，要求識別數學考點 **(參考本章開頭列表)**。
             - **慢而對 (`is_slow` & `is_correct`==`True`):**
                 - *效率瓶頸可能點 (診斷參數)*: 
-                    - `` `DI_EFFICIENCY_BOTTLENECK_INTEGRATION` ``
-                    - `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` ``
-                    - `` `DI_EFFICIENCY_BOTTLENECK_CONCEPT` `` (Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` ``
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION` ``
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` `` (Math)
+                    - `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` ``
+                    - `` `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH` `` (Math)
+                    - `` `DI_CALCULATION_DIFFICULTY__MATH` ``
                 - *診斷行動*: 應用通用邏輯，**不需**學生識別考點。
             - **正常時間做錯 (`is_normal_time` & `is_correct`==`False`) / 快而錯 (`is_relatively_fast` & `is_correct`==`False`):**
                 - *可能原因 (診斷參數)*: 
-                    - `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math)
+                    - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math)
                     - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 應用通用邏輯，需學生**識別數學相關考點 (參考本章開頭列表)**。
             - **快而對 (`is_relatively_fast` & `is_correct`==`True`):** 同 A.1 快而對。
             - **正常時間做對 (`is_normal_time` & `is_correct`==`True`):** N/A
@@ -332,25 +332,25 @@
             - **慢而錯 (`is_slow` & `is_correct`==`False`):**
                 - *可能原因 (診斷參數)*: 
                     - `` `DI_MULTI_SOURCE_INTEGRATION_ERROR` ``
-                    - `` `DI_READING_COMPREHENSION_ERROR` ``
-                    - `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` ``
-                    - `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``
+                    - `` `DI_GRAPH_INTERPRETATION_ERROR__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_ERROR__TABLE` ``
+                    - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math)
                     - `` `DI_QUESTION_TYPE_SPECIFIC_ERROR` `` (MSR Non-Math)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 應用通用邏輯，請學生回憶邏輯推斷障礙是否關聯 `main idea`, `supporting idea`, 或 `inference` 等 RC 子題型概念，或進行質化分析。
             - **慢而對 (`is_slow` & `is_correct`==`True`):**
                 - *效率瓶頸可能點 (診斷參數)*: 
-                    - `` `DI_EFFICIENCY_BOTTLENECK_INTEGRATION` ``
-                    - `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Non-Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` ``
-                    - `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math)
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION` ``
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` `` (Non-Math)
+                    - `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` ``
+                    - `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math)
                 - *診斷行動*: 應用通用邏輯，**不需**學生識別子題型概念。
             - **正常時間做錯 (`is_normal_time` & `is_correct`==`False`) / 快而錯 (`is_relatively_fast` & `is_correct`==`False`):**
                 - *可能原因 (診斷參數)*: 
-                    - `` `DI_READING_COMPREHENSION_ERROR` ``
-                    - `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 SFE 觸發)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``
+                    - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 應用通用邏輯，此處**強烈建議觸發二級證據 + 質化分析**，分析是否與 `main idea`, `supporting idea`, `inference` 相關。
             - **快而對 (`is_relatively_fast` & `is_correct`==`True`):** 同 A.1 快而對。
             - **正常時間做對 (`is_normal_time` & `is_correct`==`True`):** N/A
@@ -382,12 +382,12 @@
     - `num_relatively_fast_total` = 過濾數據中 `is_relatively_fast` == `True` 的總數。
     - `num_relatively_fast_incorrect` = 過濾數據中 `is_relatively_fast` == `True` 且 `is_correct` == `False` 的總數。
     - `fast_wrong_rate` = `num_relatively_fast_incorrect` / `num_relatively_fast_total` (如果 `num_relatively_fast_total` > 0)。
-    - 若 `fast_wrong_rate` > `threshold_fast_wrong_rate` (例如 0.25)，則設置診斷參數 `` `BEHAVIOR_CARELESSNESS_ISSUE` `` 為 `True`，並記錄診斷行動：「提醒學生注意粗心問題，反思是否存在審題不清、計算馬虎、選項看錯等情況。」
+    - 若 `fast_wrong_rate` > `threshold_fast_wrong_rate` (例如 0.25)，則設置診斷參數 `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` 為 `True`，並記錄診斷行動：「提醒學生注意粗心問題，反思是否存在審題不清、計算馬虎、選項看錯等情況。」
 
 2. **前期過快題目 (`early_rushing_flag_risk`)：**
     - 找出 `question_position` <= `total_number_of_questions` / 3 且 `question_time` < 1.0 分鐘的題目 (絕對標準)。
     - 記錄這些題目的 `question_position`, `question_type`, `content_domain`。
-    - 若找到任何此類題目，則設置診斷參數 `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` 為 `True`，並記錄診斷行動：「提醒學生測驗前期存在作答過快情況，可能影響準確率或遺漏關鍵信息，建議調整開局節奏，注意 flag for review 議題。」
+    - 若找到任何此類題目，則設置診斷參數 `` `DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK` `` 為 `True`，並記錄診斷行動：「提醒學生測驗前期存在作答過快情況，可能影響準確率或遺漏關鍵信息，建議調整開局節奏，注意 flag for review 議題。」
 
 <aside>
 
@@ -562,10 +562,10 @@
     *   *推薦列表 (基於診斷參數):*
 
         * **若診斷涉及閱讀理解、圖表或數據解讀錯誤:**
-            * `` `DI_READING_COMPREHENSION_ERROR` `` →
+            * `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` →
                 * **Tool:** `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Close_Reading_Coach.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
                 * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/03_quick_rc_tricks.md` `` , `` `Verbal-related/09_complex_sentence_rewrite.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
-            * `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` `` →
+            * `` `DI_GRAPH_INTERPRETATION_ERROR__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_ERROR__TABLE` `` →
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/04_problem_pattern.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
             * `` `DI_DATA_EXTRACTION_ERROR` `` (GT) →
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
@@ -573,13 +573,13 @@
                 * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `DI-related/03_msr_info_flow.md` `` (MSR)
 
         * **若診斷涉及數學概念、計算或邏輯錯誤:**
-            * `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math) →
+            * `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math) →
                 * **Tool:** `Dustin_GMAT_Textbook_Explainer.md`, `Dustin_GMAT_Q_Question_Classifier.md`
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/05_variant_questions.md` ``
-            * `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math) →
+            * `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math) →
                 * **Tool:** `Dustin_GMAT_DI_Non-math_DS_Simulator.md` (若為 DS), `Dustin_GMAT_Textbook_Explainer.md`
                 * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/02_quick_cr_tpa_tricks.md` `` , `` `Verbal-related/05_evaluate_explanation.md` ``, `` `Verbal-related/07_logical_term_explained.md` ``
-            * `` `DI_CALCULATION_ERROR` `` →
+            * `` `DI_CALCULATION_ERROR__MATH` `` →
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/02_quick_math_tricks.md` ``
 
         * **若診斷涉及 MSR 特定問題:**
@@ -594,33 +594,33 @@
             * `` `DI_QUESTION_TYPE_SPECIFIC_ERROR` `` →
                 * **Tool:** `Dustin_GMAT_DI_Non-math_DS_Simulator.md` (若為 DS-NonMath)
                 * AI Prompt: 根據具體題型選擇，如 `` `DI-related/02_quick_g&t_tricks.md` `` (GT), `` `DI-related/03_msr_info_flow.md` `` (MSR)。
-            * `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` →
+            * `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` →
                 * **Tool:** `Dustin_GMAT_Textbook_Explainer.md`
                 * AI Prompt: **優先** `` `Quant-related/01_basic_explanation.md` ``；輔助 `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/05_variant_questions.md` ``。
 
         * **若診斷涉及效率瓶頸:**
-            * `` `DI_EFFICIENCY_BOTTLENECK_READING` `` →
+            * `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` `` →
                 * **Tool:** `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Close_Reading_Coach.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
                 * AI Prompt: `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
-            * `` `DI_EFFICIENCY_BOTTLENECK_CONCEPT` `` (Math) →
+            * `` `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH` `` (Math) →
                 * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Quant-related/04_problem_pattern.md` ``
-            * `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` `` →
+            * `` `DI_CALCULATION_DIFFICULTY__MATH` `` →
                 * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``
-            * `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math) →
+            * `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math) →
                 * AI Prompt: `` `Verbal-related/02_quick_cr_tpa_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
-            * `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` `` →
+            * `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` `` →
                 * **Tool:** `GMAT_Terminator_DI_Review.md` (若課程涵蓋 GT)
                 * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
-            * `` `DI_EFFICIENCY_BOTTLENECK_INTEGRATION` `` (MSR) →
+            * `` `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION` `` (MSR) →
                 * **Tool:** `GMAT_Terminator_DI_Review.md` (若課程涵蓋 MSR), `Dustin_GMAT_Chunk_Reading_Coach.md` (若因閱讀慢)
                 * AI Prompt: `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `Verbal-related/04_mindmap_passage.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
 
         * **若診斷涉及行為模式:** 
-            * `` `BEHAVIOR_CARELESSNESS_ISSUE` `` →
+            * `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` →
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
-            * `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` →
+            * `` `DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK` `` →
                 * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
-            * `` `DI_CARELESSNESS_DETAIL_OMISSION` `` →
+            * `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` →
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
 
         * **通用 DI 複習/練習:**
@@ -633,6 +633,78 @@
 **結果去向：** ...
 
 </aside>
+
+---
+
+# **附錄 A：診斷標籤參數與中文對照表**
+
+## Data Insights (DI) 診斷標籤
+
+### 時間表現: 快且錯 (`Fast & Wrong`)
+
+* `DI_READING_COMPREHENSION_ERROR__VOCABULARY`: DI 閱讀理解錯誤: 詞彙理解
+* `DI_READING_COMPREHENSION_ERROR__SYNTAX`: DI 閱讀理解錯誤: 句式理解
+* `DI_READING_COMPREHENSION_ERROR__LOGIC`: DI 閱讀理解錯誤: 邏輯理解
+* `DI_READING_COMPREHENSION_ERROR__DOMAIN`: DI 閱讀理解錯誤: 領域理解
+* `DI_GRAPH_INTERPRETATION_ERROR__GRAPH`: DI 圖表解讀錯誤: 圖形信息解讀
+* `DI_GRAPH_INTERPRETATION_ERROR__TABLE`: DI 圖表解讀錯誤: 表格信息解讀
+* `DI_CONCEPT_APPLICATION_ERROR__MATH`: DI 概念應用 (數學) 錯誤: 數學觀念/公式應用
+* `DI_LOGICAL_REASONING_ERROR__NON_MATH`: DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷
+* `DI_CALCULATION_ERROR__MATH`: DI 計算錯誤 (數學): 數學計算
+* `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`: DI 基礎掌握: 應用不穩定 (Special Focus Error)
+* `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION`: DI 行為: 粗心 - 細節忽略/看錯
+* `DI_BEHAVIOR__CARELESSNESS_ISSUE`: DI 行為: 粗心 - 整體快錯率偏高
+* `DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK`: DI 行為: 測驗前期作答過快風險
+
+### 時間表現: 正常時間且錯 (`Normal Time & Wrong`)
+
+* `DI_READING_COMPREHENSION_ERROR__VOCABULARY`: DI 閱讀理解錯誤: 詞彙理解
+* `DI_READING_COMPREHENSION_ERROR__SYNTAX`: DI 閱讀理解錯誤: 句式理解
+* `DI_READING_COMPREHENSION_ERROR__LOGIC`: DI 閱讀理解錯誤: 邏輯理解
+* `DI_READING_COMPREHENSION_ERROR__DOMAIN`: DI 閱讀理解錯誤: 領域理解
+* `DI_GRAPH_INTERPRETATION_ERROR__GRAPH`: DI 圖表解讀錯誤: 圖形信息解讀
+* `DI_GRAPH_INTERPRETATION_ERROR__TABLE`: DI 圖表解讀錯誤: 表格信息解讀
+* `DI_CONCEPT_APPLICATION_ERROR__MATH`: DI 概念應用 (數學) 錯誤: 數學觀念/公式應用
+* `DI_LOGICAL_REASONING_ERROR__NON_MATH`: DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷
+* `DI_CALCULATION_ERROR__MATH`: DI 計算錯誤 (數學): 數學計算
+* `DI_MULTI_SOURCE_INTEGRATION_ERROR`: DI 多源整合 (MSR): 跨分頁/來源信息整合障礙
+* `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`: DI 基礎掌握: 應用不穩定 (Special Focus Error)
+
+### 時間表現: 慢且錯 (`Slow & Wrong`)
+
+* `DI_READING_COMPREHENSION_ERROR__VOCABULARY`: DI 閱讀理解錯誤: 詞彙理解
+* `DI_READING_COMPREHENSION_ERROR__SYNTAX`: DI 閱讀理解錯誤: 句式理解
+* `DI_READING_COMPREHENSION_ERROR__LOGIC`: DI 閱讀理解錯誤: 邏輯理解
+* `DI_READING_COMPREHENSION_ERROR__DOMAIN`: DI 閱讀理解錯誤: 領域理解
+* `DI_GRAPH_INTERPRETATION_ERROR__GRAPH`: DI 圖表解讀錯誤: 圖形信息解讀
+* `DI_GRAPH_INTERPRETATION_ERROR__TABLE`: DI 圖表解讀錯誤: 表格信息解讀
+* `DI_CONCEPT_APPLICATION_ERROR__MATH`: DI 概念應用 (數學) 錯誤: 數學觀念/公式應用
+* `DI_LOGICAL_REASONING_ERROR__NON_MATH`: DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷
+* `DI_CALCULATION_ERROR__MATH`: DI 計算錯誤 (數學): 數學計算
+* `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION`: DI 閱讀理解障礙: 跨分頁/來源信息整合困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY`: DI 閱讀理解障礙: 詞彙理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX`: DI 閱讀理解障礙: 句式理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC`: DI 閱讀理解障礙: 邏輯理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN`: DI 閱讀理解障礙: 領域理解困難
+* `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH`: DI 圖表解讀障礙: 圖形信息解讀困難
+* `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE`: DI 圖表解讀障礙: 表格信息解讀困難
+* `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH`: DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難
+* `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH`: DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難
+* `DI_CALCULATION_DIFFICULTY__MATH`: DI 計算 (數學) 障礙: 數學計算困難
+* `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`: DI 基礎掌握: 應用不穩定 (Special Focus Error)
+
+### 時間表現: 慢且對 (`Slow & Correct`)
+
+* `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION`: DI 閱讀理解障礙: 跨分頁/來源信息整合困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY`: DI 閱讀理解障礙: 詞彙理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX`: DI 閱讀理解障礙: 句式理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC`: DI 閱讀理解障礙: 邏輯理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN`: DI 閱讀理解障礙: 領域理解困難
+* `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH`: DI 圖表解讀障礙: 圖形信息解讀困難
+* `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE`: DI 圖表解讀障礙: 表格信息解讀困難
+* `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH`: DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難
+* `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH`: DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難
+* `DI_CALCULATION_DIFFICULTY__MATH`: DI 計算 (數學) 障礙: 數學計算困難
 
 ---
 
