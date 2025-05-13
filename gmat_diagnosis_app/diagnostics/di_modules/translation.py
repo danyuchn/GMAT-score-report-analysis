@@ -27,6 +27,7 @@ APPENDIX_A_TRANSLATION_DI = {
     'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH': "DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難",
     'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH': "DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難",
     'DI_CALCULATION_DIFFICULTY__MATH': "DI 計算 (數學) 障礙: 數學計算困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED': "DI 閱讀理解障礙: 心態失常讀不進去",
 
     # Domains, Time Pressure, Question Types, Time Performance Categories, Parameter Categories
     'Math Related': "數學相關",
