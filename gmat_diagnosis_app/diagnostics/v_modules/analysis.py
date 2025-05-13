@@ -1,8 +1,8 @@
 """
-V診斷模塊的分析功能
+分析模塊：與V診斷相關的主要分析函數
 
-此模塊包含用於V(Verbal)診斷的核心分析函數，
-用於評估學生表現和識別問題模式。
+此模塊包含用於分析文字科目(Verbal)作答數據的函數，
+主要著重於識別行為模式和應用特定的診斷規則。
 """
 
 import pandas as pd
@@ -11,7 +11,9 @@ import logging
 from gmat_diagnosis_app.diagnostics.v_modules.constants import (
     HASTY_GUESSING_THRESHOLD_MINUTES, 
     INVALID_DATA_TAG_V,
-    V_SKILL_TO_ERROR_CATEGORY
+    V_SKILL_TO_ERROR_CATEGORY,
+    RC_READING_TIME_THRESHOLD_3Q,
+    RC_READING_TIME_THRESHOLD_4Q
 )
 
 
@@ -201,7 +203,6 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
             'CR_CHOICE_UNDERSTANDING_ERROR_VOCAB',
             'CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX',
             'CR_CHOICE_UNDERSTANDING_ERROR_LOGIC',
-            'CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN',
             'CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT',
             'CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION',
             'CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE'
@@ -219,7 +220,6 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
             'CR_CHOICE_UNDERSTANDING_ERROR_VOCAB',
             'CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX',
             'CR_CHOICE_UNDERSTANDING_ERROR_LOGIC',
-            'CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN',
             'CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT',
             'CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION',
             'CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE'
@@ -250,9 +250,9 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
             'CR_CHOICE_UNDERSTANDING_ERROR_VOCAB',
             'CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX',
             'CR_CHOICE_UNDERSTANDING_ERROR_LOGIC',
-            'CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN',
             'CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT',
-            'CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION'
+            'CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION',
+            'CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE'
         ],
         ('CR', 'Slow & Correct'): [
             'CR_STEM_UNDERSTANDING_DIFFICULTY_VOCAB',
@@ -471,7 +471,65 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
             if valid_q_type_for_map:
                  # Use the time_performance_category calculated for all rows to find relevant detailed params
                  params_to_add = param_assignment_map.get((valid_q_type_for_map, current_time_performance_category), [])
-                 processed_diagnostic_params.extend(params_to_add)
+                 
+                 # RC特殊處理：根據MD檔邏輯，區分「閱讀文章超時」和「單題超時」的標籤
+                 if valid_q_type_for_map == 'RC' and (current_time_performance_category == 'Slow & Wrong' or current_time_performance_category == 'Slow & Correct'):
+                     # 不是全部添加，而是根據條件篩選
+                     rc_reading_time = row.get('rc_reading_time', 0)
+                     rc_reading_time_exists = pd.notna(rc_reading_time) and rc_reading_time > 0
+                     rc_group_num_questions = row.get('rc_group_num_questions', 0)
+                     rc_reading_time_threshold = RC_READING_TIME_THRESHOLD_3Q
+                     if rc_group_num_questions == 4:
+                         rc_reading_time_threshold = RC_READING_TIME_THRESHOLD_4Q
+                     
+                     # 判斷文章閱讀是否超時
+                     is_reading_slow = False
+                     if rc_reading_time_exists and pd.notna(rc_group_num_questions) and rc_group_num_questions > 0:
+                         if (rc_group_num_questions == 3 and rc_reading_time > RC_READING_TIME_THRESHOLD_3Q) or \
+                            (rc_group_num_questions == 4 and rc_reading_time > RC_READING_TIME_THRESHOLD_4Q):
+                             is_reading_slow = True
+                     
+                     # 篩選適用的標籤
+                     reading_time_related_tags = [
+                         'RC_READING_COMPREHENSION_DIFFICULTY_VOCAB_BOTTLENECK',
+                         'RC_READING_COMPREHENSION_DIFFICULTY_LONG_DIFFICULT_SENTENCE_ANALYSIS',
+                         'RC_READING_COMPREHENSION_DIFFICULTY_PASSAGE_STRUCTURE_GRASP_UNCLEAR',
+                         'RC_READING_COMPREHENSION_DIFFICULTY_SPECIFIC_DOMAIN_BACKGROUND_KNOWLEDGE_LACK'
+                     ]
+                     
+                     single_question_time_related_tags = [
+                         'RC_QUESTION_UNDERSTANDING_DIFFICULTY_FOCUS_POINT_GRASP',
+                         'RC_LOCATION_SKILL_DIFFICULTY_INEFFICIENCY',
+                         'RC_REASONING_DIFFICULTY_INFERENCE_SPEED_SLOW',
+                         'RC_CHOICE_ANALYSIS_DIFFICULTY_VOCAB',
+                         'RC_CHOICE_ANALYSIS_DIFFICULTY_SYNTAX',
+                         'RC_CHOICE_ANALYSIS_DIFFICULTY_LOGIC',
+                         'RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN',
+                         'RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT',
+                         'RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS',
+                         'RC_METHOD_DIFFICULTY_SPECIFIC_QUESTION_TYPE_HANDLING'
+                     ]
+                     
+                     # 只添加符合條件的標籤
+                     filtered_params = []
+                     for param in params_to_add:
+                         # 如果是閱讀文章相關標籤，只在文章閱讀超時時添加
+                         if param in reading_time_related_tags:
+                             if is_reading_slow:
+                                 filtered_params.append(param)
+                         # 如果是單題處理相關標籤，只在單題超時時添加
+                         elif param in single_question_time_related_tags:
+                             if current_is_overtime:  # 單題超時
+                                 filtered_params.append(param)
+                         # 其他標籤（包括錯誤類標籤）直接添加
+                         else:
+                             filtered_params.append(param)
+                     
+                     # 使用篩選後的標籤列表代替原來的全部標籤
+                     processed_diagnostic_params.extend(filtered_params)
+                 else:
+                     # CR和其他題型保持原有邏輯
+                     processed_diagnostic_params.extend(params_to_add)
         else:
             # For INVALID rows: current_is_sfe remains False (or its value from row if we decide to preserve it)
             # diagnostic_params: Preserve existing if it's just the invalid tag, otherwise clear detailed ones.
