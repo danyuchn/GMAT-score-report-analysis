@@ -4,7 +4,7 @@
 
 以下標籤的應用基於特定條件，可能與任何時間表現分類同時出現：
 
-* **基礎掌握: 應用不穩定 (Special Focus Error) (`FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE`)**  當題目答錯，且該題的數值難度低於學生在同一考察能力（V科目：技能點。Q科目：技能點。DI科目：題型且領域）上已正確完成題目的最高難度時觸發。此檢查僅對有效數據進行。
+* **基礎掌握: 應用不穩定 (Special Focus Error) (`FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE`/`Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`/`DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`)**  當題目答錯，且該題的數值難度低於學生在同一考察能力（V科目：技能點。Q科目：技能點。DI科目：題型且領域）上已正確完成題目的最高難度時觸發。此檢查僅對有效數據進行。
   * 觸發條件：題目答錯，且該題難度低於學生在該考察能力上已正確完成的最高難度。
 * **數據無效：用時過短（受時間壓力影響） (`DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED`)**  當題目的 `is_invalid` 標記為 `True` 時觸發。`is_invalid` 的狀態優先由 `is_manually_invalid` 列決定；若無手動標記，則可能由預處理步驟（如基於時間壓力的自動檢測）設定。此標記通常優先於其他診斷標籤。具體的標籤文本可能因科目而異（例如 V 科為 `INVALID_DATA_TAG_V`，Q 科和 DI 科為 `數據無效：用時過短（受時間壓力影響）`）。
   * 觸發條件：題目被預處理或手動標記為無效數據。
@@ -157,8 +157,8 @@
 * DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷 (`DI_LOGICAL_REASONING_ERROR__NON_MATH`)  若領域為 Non-Math Related，同上
 * DI 計算錯誤 (數學): 數學計算 (`DI_CALCULATION_ERROR__MATH`)  若領域為 Math Related，同上
 * DI 基礎掌握: 應用不穩定 (Special Focus Error) (`DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`)  觸發條件：答錯且難度低於已掌握。
-* DI 行為: 粗心 - 細節忽略/看錯 (`DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION`)  在 'Fast & Wrong' 條件下觸發，標記具體題目。
-* DI 行為: 粗心 - 整體快錯率偏高 (`DI_BEHAVIOR__CARELESSNESS_ISSUE`)  全局標籤，當整體快錯率 > 25% 時觸發 (_observe_di_patterns)。
+* DI 行為: 粗心 - 細節忽略/看錯 (`DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION`)  在 'Fast & Wrong' 條件下觸發，標記具體題目。
+* DI 行為: 粗心 - 整體快錯率偏高 (`DI_BEHAVIOR_CARELESSNESS_ISSUE`)  全局標籤，當整體快錯率 > 25% 時觸發 (_observe_di_patterns)。
 * DI 行為: 測驗前期作答過快風險 (`DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK`)  全局標籤，當存在前1/3題目用時 < 1分鐘時觸發 (_observe_di_patterns)，並標記具體題目。
 
 ### 時間表現: 正常時間且錯 (`Normal Time & Wrong`)

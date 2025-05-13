@@ -157,14 +157,14 @@ def generate_v_summary_report(v_diagnosis_results):
     
     sfe_reported = False
     if sfe_triggered_overall:
-        sfe_label = translate_v('FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+        sfe_label = translate_v('FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE')
         sfe_skills_en = sorted(list(sfe_skills_involved))
         sfe_skills_display = sfe_skills_en
         sfe_note = f"{sfe_label}" + (f"（涉及技能：{', '.join(sfe_skills_display)}）" if sfe_skills_display else "")
         report_lines.append(f"    * {sfe_note}。（註：SFE 指在已掌握技能範圍內的題目失誤）") # DI style bullet
         sfe_reported = True
 
-    core_issues_params_to_report = triggered_params_all - {'FOUNDATIONAL_MASTERY_INSTABILITY_SFE', INVALID_DATA_TAG_V, 'BEHAVIOR_EARLY_RUSHING_FLAG_RISK', 'BEHAVIOR_CARELESSNESS_ISSUE', 'BEHAVIOR_GUESSING_HASTY'}
+    core_issues_params_to_report = triggered_params_all - {'FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE', INVALID_DATA_TAG_V, 'BEHAVIOR_EARLY_RUSHING_FLAG_RISK', 'BEHAVIOR_CARELESSNESS_ISSUE', 'BEHAVIOR_GUESSING_HASTY'}
     
     reported_other_params_count = 0
     if core_issues_params_to_report:
@@ -341,8 +341,8 @@ def generate_v_summary_report(v_diagnosis_results):
         if translate_v(param_code) in current_diagnostic_labels_for_review:
             core_issue_text_for_review.append(translate_v(param_code))
     if sfe_triggered_overall: # sfe_triggered_overall is already determined
-         if translate_v('FOUNDATIONAL_MASTERY_INSTABILITY_SFE') not in core_issue_text_for_review: # Avoid duplicate
-            core_issue_text_for_review.append(translate_v('FOUNDATIONAL_MASTERY_INSTABILITY_SFE'))
+         if translate_v('FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE') not in core_issue_text_for_review: # Avoid duplicate
+            core_issue_text_for_review.append(translate_v('FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE'))
 
     if core_issue_text_for_review:
         report_lines.append(f"    * **重點關注：** 題目是否反覆涉及報告第二部分（核心表現分析）指出的核心問題：") # Adapted

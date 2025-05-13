@@ -12,9 +12,9 @@ APPENDIX_A_TRANSLATION_DI = {
     'DI_CALCULATION_ERROR__MATH': "DI 計算錯誤 (數學): 數學計算",
     'DI_MULTI_SOURCE_INTEGRATION_ERROR': "DI 多源整合 (MSR): 跨分頁/來源信息整合障礙", # Primarily for Normal Time & Wrong and Slow & Wrong
     'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE': "DI 基礎掌握: 應用不穩定 (Special Focus Error)",
-    'DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION': "DI 行為: 粗心 - 細節忽略/看錯",
-    'DI_BEHAVIOR__CARELESSNESS_ISSUE': "DI 行為: 粗心 - 整體快錯率偏高",
-    'DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK': "DI 行為: 測驗前期作答過快風險",
+    'DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION': "DI 行為: 粗心 - 細節忽略/看錯",
+    'DI_BEHAVIOR_CARELESSNESS_ISSUE': "DI 行為: 粗心 - 整體快錯率偏高",
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "DI 行為: 測驗前期作答過快風險",
 
     # Slow & Wrong / Slow & Correct (Difficulty/Barrier-based)
     'DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION': "DI 閱讀理解障礙: 跨分頁/來源信息整合困難",
@@ -74,9 +74,9 @@ DI_PARAM_TO_CATEGORY = {
     'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH': 'Concept/Application',
     'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH': 'Logic/Reasoning',
     'DI_CALCULATION_DIFFICULTY__MATH': 'Data/Calculation',
-    'DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION': 'Carelessness',
-    'DI_BEHAVIOR__CARELESSNESS_ISSUE': 'Behavioral',
-    'DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK': 'Behavioral'
+    'DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION': 'Carelessness',
+    'DI_BEHAVIOR_CARELESSNESS_ISSUE': 'Behavioral',
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': 'Behavioral'
 }
 
 def _translate_di(param):

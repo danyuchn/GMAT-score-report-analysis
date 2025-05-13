@@ -122,7 +122,7 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                                      'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
                                      'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN',
                                      'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED'])
-                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+                        if is_relatively_fast: params.append('DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION')
                 elif q_domain == 'Non-Math Related':
                     if is_slow and not is_correct: 
                         # 添加所有非數學相關錯誤標籤和閱讀理解細分標籤
@@ -147,7 +147,7 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                                      'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
                                      'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN',
                                      'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED'])
-                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+                        if is_relatively_fast: params.append('DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION')
             
             # B. Two-Part Analysis
             elif q_type == 'Two-part analysis':
@@ -175,7 +175,7 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                                      'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
                                      'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN',
                                      'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED'])
-                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+                        if is_relatively_fast: params.append('DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION')
                  elif q_domain == 'Non-Math Related':
                     if is_slow and not is_correct: 
                         # 添加所有非數學相關錯誤標籤和閱讀理解細分標籤
@@ -200,7 +200,7 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                                      'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
                                      'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN',
                                      'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED'])
-                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+                        if is_relatively_fast: params.append('DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION')
             
             # C. Graph & Table
             elif q_type == 'Graph and Table':
@@ -232,7 +232,7 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                                      'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
                                      'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN',
                                      'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED'])
-                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+                        if is_relatively_fast: params.append('DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION')
                  elif q_domain == 'Non-Math Related':
                     if is_slow and not is_correct: 
                         # 添加所有非數學相關錯誤標籤、圖表解讀錯誤和閱讀理解細分標籤
@@ -261,7 +261,7 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                                      'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
                                      'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN',
                                      'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED'])
-                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+                        if is_relatively_fast: params.append('DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION')
             
             # D. Multi-Source Reasoning
             elif q_type == 'Multi-source reasoning':
@@ -309,7 +309,7 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                                      'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
                                      'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN',
                                      'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED'])
-                        if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+                        if is_relatively_fast: params.append('DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION')
                 elif q_domain == 'Non-Math Related':
                      if is_slow and not is_correct: 
                         # 添加所有非數學相關錯誤標籤、多源整合錯誤和閱讀理解細分標籤
@@ -350,7 +350,7 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
                                       'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 'DI_READING_COMPREHENSION_ERROR__SYNTAX',
                                       'DI_READING_COMPREHENSION_ERROR__LOGIC', 'DI_READING_COMPREHENSION_ERROR__DOMAIN',
                                       'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED'])
-                         if is_relatively_fast: params.append('DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION')
+                         if is_relatively_fast: params.append('DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION')
         # --- End Detailed Logic ---
         else: # This row IS invalid
             sfe_triggered = False # Invalid rows are not SFE by this logic
@@ -387,9 +387,8 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
             if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE' in final_params_for_row:
                 final_params_for_row.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE')
                 final_params_for_row.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE')
-            elif 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in final_params_for_row: # Handle if old tag somehow still present
-                 final_params_for_row.remove('DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
-                 if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE' not in final_params_for_row:
+            elif sfe_triggered:  # If SFE isn't in the list but should be
+                if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE' not in final_params_for_row:
                     final_params_for_row.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE')
         
         all_diagnostic_params.append(final_params_for_row)
@@ -460,16 +459,16 @@ def _observe_di_patterns(df, avg_times):
         # 使用核心邏輯文件中定義的閾值判斷粗心問題
         if fast_wrong_rate > CARELESSNESS_THRESHOLD:
             analysis['carelessness_issue_triggered'] = True
-            analysis['triggered_behavioral_params'].append('DI_BEHAVIOR__CARELESSNESS_ISSUE')
+            analysis['triggered_behavioral_params'].append('DI_BEHAVIOR_CARELESSNESS_ISSUE')
             # Mark these questions in diagnostic_params
             if 'time_performance_category' in df.columns:
                 for idx, row in df[df['time_performance_category'] == 'Fast & Wrong'].iterrows():
                     if 'diagnostic_params' in df.columns:
-                        df.at[idx, 'diagnostic_params'] = list(df.at[idx, 'diagnostic_params']) + ['DI_CARELESSNESS_DETAIL_OMISSION']
+                        df.at[idx, 'diagnostic_params'] = list(df.at[idx, 'diagnostic_params']) + ['DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION']
             else:
                 for idx in df.index[fast_wrong_mask]:
                     if 'diagnostic_params' in df.columns:
-                        df.at[idx, 'diagnostic_params'] = list(df.at[idx, 'diagnostic_params']) + ['DI_CARELESSNESS_DETAIL_OMISSION']
+                        df.at[idx, 'diagnostic_params'] = list(df.at[idx, 'diagnostic_params']) + ['DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION']
 
     # 2. Early Rushing Risk (遵循核心邏輯文件第四章)
     if 'question_position' in df.columns and 'question_time' in df.columns:
