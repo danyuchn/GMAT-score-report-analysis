@@ -11,7 +11,7 @@ from gmat_diagnosis_app.diagnostics.v_modules.constants import INVALID_DATA_TAG_
 APPENDIX_A_TRANSLATION_V = {
     # --- Diagnostic Tags from verbal_diagnostic_tags_summary.md ---
     'FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE': "基礎掌握: 應用不穩定",
-    'BEHAVIOR_PATTERN_FAST_GUESSING_HASTY': "行為模式: 過快疑似猜題/倉促",
+    'BEHAVIOR_GUESSING_HASTY': "行為模式: 過快疑似猜題/倉促",
     'DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED': "數據無效：用時過短",
 
     'CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP': "CR 題幹理解錯誤：提問要求把握",

@@ -140,7 +140,7 @@ def _generate_di_summary_report(di_results):
     behavior_pattern_lines = []
     if careless_triggered_ch4:
         fast_wrong_rate_str = _format_rate(ch4.get('fast_wrong_rate', 0.0))
-        tag_to_translate_c = 'DI_BEHAVIOR__CARELESSNESS_ISSUE'
+        tag_to_translate_c = 'DI_BEHAVIOR_CARELESSNESS_ISSUE'
         translated_tag_for_c = _translate_di(tag_to_translate_c)
         behavior_pattern_lines.append(f"    * {translated_tag_for_c}：相對快速作答的題目中，錯誤比例偏高（{fast_wrong_rate_str}），提示可能存在粗心問題。")
         patterns_found = True
