@@ -6,9 +6,7 @@
 
 * **基礎掌握: 應用不穩定 (Special Focus Error) (`FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE`)**  當題目答錯，且該題的數值難度低於學生在同一考察能力（V科目：技能點。Q科目：技能點。DI科目：題型且領域）上已正確完成題目的最高難度時觸發。此檢查僅對有效數據進行。
   * 觸發條件：題目答錯，且該題難度低於學生在該考察能力上已正確完成的最高難度。
-* **行為模式: 過快疑似猜題/倉促 (`BEHAVIOR_PATTERN_FAST_GUESSING_HASTY`)**  當單題作答時間（`question_time`）小於 0.5 分鐘（`HASTY_GUESSING_THRESHOLD_MINUTES`）時觸發。此檢查僅對有效數據進行。實際代碼中使用 `BEHAVIOR_GUESSING_HASTY` 標籤。
-  * 觸發條件：單題作答時間小於 0.5 分鐘。
-* **數據無效：用時過短（受時間壓力影響） (`DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED`)**  當題目的 `is_invalid` 標記為 `True` 時觸發。`is_invalid` 的狀態優先由 `is_manually_invalid` 列決定；若無手動標記，則可能由預處理步驟（如基於時間壓力的自動檢測）設定。代碼中實際添加的標籤文本是 `INVALID_DATA_TAG_V`。
+* **數據無效：用時過短（受時間壓力影響） (`DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED`)**  當題目的 `is_invalid` 標記為 `True` 時觸發。`is_invalid` 的狀態優先由 `is_manually_invalid` 列決定；若無手動標記，則可能由預處理步驟（如基於時間壓力的自動檢測）設定。此標記通常優先於其他診斷標籤。具體的標籤文本可能因科目而異（例如 V 科為 `INVALID_DATA_TAG_V`，Q 科和 DI 科為 `數據無效：用時過短（受時間壓力影響）`）。
   * 觸發條件：題目被預處理或手動標記為無效數據。
 
 ## Critical Reasoning (CR) 診斷標籤
@@ -117,21 +115,6 @@
 * RC 選項辨析障礙: 選項領域理解困難 (`RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN`)  觸發條件僅為單題超時
 * RC 選項辨析障礙: 選項相關性判斷困難 (`RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT`)  觸發條件僅為單題超時
 * RC 選項辨析障礙: 強干擾選項辨析困難 (`RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS`)  觸發條件僅為單題超時
-* RC 方法障礙: 特定題型處理困難 (`RC_METHOD_DIFFICULTY_SPECIFIC_QUESTION_TYPE_HANDLING`) 觸發條件僅為單題超時
-* RC 閱讀理解錯誤: 詞彙理解 (`RC_READING_COMPREHENSION_ERROR_VOCAB`)
-* RC 閱讀理解錯誤: 長難句解析 (`RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS`)
-* RC 閱讀理解錯誤: 篇章結構理解 (`RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE`)
-* RC 閱讀理解錯誤: 關鍵信息定位/理解 (`RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING`)
-* RC 題目理解錯誤: 提問焦點理解 (`RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT`)
-* RC 定位能力錯誤: 定到錯誤位置 (`RC_LOCATION_SKILL_ERROR_LOCATION`)
-* RC 推理錯誤: 預想推理不符 (`RC_REASONING_ERROR_INFERENCE`)
-* RC 選項辨析錯誤: 選項詞彙理解 (`RC_CHOICE_ANALYSIS_ERROR_VOCAB`)
-* RC 選項辨析錯誤: 選項句式理解 (`RC_CHOICE_ANALYSIS_ERROR_SYNTAX`)
-* RC 選項辨析錯誤: 選項邏輯理解 (`RC_CHOICE_ANALYSIS_ERROR_LOGIC`)
-* RC 選項辨析錯誤: 選項領域理解 (`RC_CHOICE_ANALYSIS_ERROR_DOMAIN`)
-* RC 選項辨析錯誤: 選項相關性判斷 (`RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT`)
-* RC 選項辨析錯誤: 強干擾選項混淆 (`RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION`)
-* RC 方法錯誤: 特定題型處理 (`RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING`)
 
 ### 時間表現: 慢且對 (`Slow & Correct`)
  以下 RC 標籤在以下條件下觸發：題目數據有效，題型為 Reading Comprehension，且時間表現類別為 'Slow & Correct'（答對且用時慢，即在預處理階段已被標記為超時）。這些標籤通過 `analysis.py` 中的 `param_assignment_map` 統一添加，均為「困難相關標籤」（Difficulty 類）。
@@ -152,7 +135,9 @@
 * RC 方法障礙: 特定題型處理困難 (`RC_METHOD_DIFFICULTY_SPECIFIC_QUESTION_TYPE_HANDLING`) 觸發條件僅為單題超時
 
 ## Data Insights (DI) 診斷標籤
- DI 標籤的分配主要在 gmat_diagnosis_app/diagnostics/di_modules/chapter_logic.py 的 _diagnose_root_causes 和 _observe_di_patterns 函數中實現。觸發條件基於題型、內容領域、時間表現和正確性。以下規則適用於有效數據。
+ DI 標籤的分配主要在 gmat_diagnosis_app/diagnostics/di_modules/chapter_logic.py 的 _diagnose_root_causes 和 _observe_di_patterns 函數中實現。觸發條件基於題型、內容領域、時間表現和正確性。以下規則適用於被標記為有效的數據 (`is_invalid` 為 False)。
+
+ * **數據無效：用時過短（受時間壓力影響） (`INVALID_DATA_TAG_DI`)** 當題目的 `is_invalid` 標記為 `True` 時觸發。代碼中添加的標籤文本是 `數據無效：用時過短（受時間壓力影響）`。此標籤優先於其他診斷標籤。
 
 ### 時間表現: 快且錯 (`Fast & Wrong`)
  觸發條件：數據有效，時間表現類別為 'Fast & Wrong' (答錯且用時相對快 < 0.75*平均)。
@@ -160,8 +145,8 @@
 * DI 閱讀理解錯誤: 句式理解 (`DI_READING_COMPREHENSION_ERROR__SYNTAX`)  同上
 * DI 閱讀理解錯誤: 邏輯理解 (`DI_READING_COMPREHENSION_ERROR__LOGIC`)  同上
 * DI 閱讀理解錯誤: 領域理解 (`DI_READING_COMPREHENSION_ERROR__DOMAIN`)  同上
-* DI 圖表解讀錯誤: 圖形信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__GRAPH`)  若題型為 G&T，同上
-* DI 圖表解讀錯誤: 表格信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__TABLE`)  若題型為 G&T，同上
+* DI 圖表解讀錯誤: 圖形信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__GRAPH`)  若題型為 G&T/MSR，同上
+* DI 圖表解讀錯誤: 表格信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__TABLE`)  若題型為 G&T/MSR，同上
 * DI 概念應用 (數學) 錯誤: 數學觀念/公式應用 (`DI_CONCEPT_APPLICATION_ERROR__MATH`)  若領域為 Math Related，同上
 * DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷 (`DI_LOGICAL_REASONING_ERROR__NON_MATH`)  若領域為 Non-Math Related，同上
 * DI 計算錯誤 (數學): 數學計算 (`DI_CALCULATION_ERROR__MATH`)  若領域為 Math Related，同上
@@ -176,8 +161,8 @@
 * DI 閱讀理解錯誤: 句式理解 (`DI_READING_COMPREHENSION_ERROR__SYNTAX`)  同上
 * DI 閱讀理解錯誤: 邏輯理解 (`DI_READING_COMPREHENSION_ERROR__LOGIC`)  同上
 * DI 閱讀理解錯誤: 領域理解 (`DI_READING_COMPREHENSION_ERROR__DOMAIN`)  同上
-* DI 圖表解讀錯誤: 圖形信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__GRAPH`)  若題型為 G&T，同上
-* DI 圖表解讀錯誤: 表格信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__TABLE`)  若題型為 G&T，同上
+* DI 圖表解讀錯誤: 圖形信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__GRAPH`)  若題型為 G&T/MSR，同上
+* DI 圖表解讀錯誤: 表格信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__TABLE`)  若題型為 G&T/MSR，同上
 * DI 概念應用 (數學) 錯誤: 數學觀念/公式應用 (`DI_CONCEPT_APPLICATION_ERROR__MATH`)  若領域為 Math Related，同上
 * DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷 (`DI_LOGICAL_REASONING_ERROR__NON_MATH`)  若領域為 Non-Math Related，同上
 * DI 計算錯誤 (數學): 數學計算 (`DI_CALCULATION_ERROR__MATH`)  若領域為 Math Related，同上
@@ -190,18 +175,18 @@
 * DI 閱讀理解錯誤: 句式理解 (`DI_READING_COMPREHENSION_ERROR__SYNTAX`)  同上
 * DI 閱讀理解錯誤: 邏輯理解 (`DI_READING_COMPREHENSION_ERROR__LOGIC`)  同上
 * DI 閱讀理解錯誤: 領域理解 (`DI_READING_COMPREHENSION_ERROR__DOMAIN`)  同上
-* DI 圖表解讀錯誤: 圖形信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__GRAPH`)  若題型為 G&T，同上
-* DI 圖表解讀錯誤: 表格信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__TABLE`)  若題型為 G&T，同上
+* DI 圖表解讀錯誤: 圖形信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__GRAPH`)  若題型為 G&T/MSR，同上
+* DI 圖表解讀錯誤: 表格信息解讀 (`DI_GRAPH_INTERPRETATION_ERROR__TABLE`)  若題型為 G&T/MSR，同上
 * DI 概念應用 (數學) 錯誤: 數學觀念/公式應用 (`DI_CONCEPT_APPLICATION_ERROR__MATH`)  若領域為 Math Related，同上
 * DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷 (`DI_LOGICAL_REASONING_ERROR__NON_MATH`)  若領域為 Non-Math Related，同上
 * DI 計算錯誤 (數學): 數學計算 (`DI_CALCULATION_ERROR__MATH`)  若領域為 Math Related，同上
-* DI 閱讀理解障礙: 跨分頁/來源信息整合困難 (`DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION`)  若題型為 MSR，添加所有相關困難類標籤
+* DI 閱讀理解障礙: 跨分頁/來源信息整合困難 (`DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION`)  若題型為 MSR 且 **MSR 閱讀文章本身超時**，則添加此標籤 (此標籤專屬於 MSR 題型)。
 * DI 閱讀理解障礙: 詞彙理解困難 (`DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY`)  根據(題型,領域)添加所有相關困難類標籤
 * DI 閱讀理解障礙: 句式理解困難 (`DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX`)  同上
 * DI 閱讀理解障礙: 邏輯理解困難 (`DI_READING_COMPREHENSION_DIFFICULTY__LOGIC`)  同上
-* DI 閱讀理解障礙: 領域理解困難 (`DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN`)  同上
-* DI 圖表解讀障礙: 圖形信息解讀困難 (`DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH`)  若題型為 G&T，同上
-* DI 圖表解讀障礙: 表格信息解讀困難 (`DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE`)  若題型為 G&T，同上
+* DI 閱讀理解障礙: 領域理解困難 (`DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN`)  根據(題型,領域)添加所有相關困難類標籤。**此標籤在 MSR 題型中，僅當 MSR 閱讀文章本身超時方觸發；在其他題型中，則基於單題超時觸發。**
+* DI 圖表解讀障礙: 圖形信息解讀困難 (`DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH`)  若題型為 G&T/MSR，同上
+* DI 圖表解讀障礙: 表格信息解讀困難 (`DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE`)  若題型為 G&T/MSR，同上
 * DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難 (`DI_CONCEPT_APPLICATION_DIFFICULTY__MATH`)  若領域為 Math Related，同上
 * DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難 (`DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH`)  若領域為 Non-Math Related，同上
 * DI 計算 (數學) 障礙: 數學計算困難 (`DI_CALCULATION_DIFFICULTY__MATH`)  若領域為 Math Related，同上
@@ -209,53 +194,56 @@
 
 ### 時間表現: 慢且對 (`Slow & Correct`)
  觸發條件：數據有效，時間表現類別為 'Slow & Correct' (答對且用時慢)。僅添加困難類標籤。
-* DI 閱讀理解障礙: 跨分頁/來源信息整合困難 (`DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION`)  若題型為 MSR，添加所有相關困難類標籤
+* DI 閱讀理解障礙: 跨分頁/來源信息整合困難 (`DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION`)  若題型為 MSR 且 **MSR 閱讀文章本身超時**，則添加此標籤 (此標籤專屬於 MSR 題型)。
 * DI 閱讀理解障礙: 詞彙理解困難 (`DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY`)  根據(題型,領域)添加所有相關困難類標籤
 * DI 閱讀理解障礙: 句式理解困難 (`DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX`)  同上
 * DI 閱讀理解障礙: 邏輯理解困難 (`DI_READING_COMPREHENSION_DIFFICULTY__LOGIC`)  同上
-* DI 閱讀理解障礙: 領域理解困難 (`DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN`)  同上
-* DI 圖表解讀障礙: 圖形信息解讀困難 (`DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH`)  若題型為 G&T，同上
-* DI 圖表解讀障礙: 表格信息解讀困難 (`DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE`)  若題型為 G&T，同上
+* DI 閱讀理解障礙: 領域理解困難 (`DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN`)  根據(題型,領域)添加所有相關困難類標籤。**此標籤在 MSR 題型中，僅當 MSR 閱讀文章本身超時方觸發；在其他題型中，則基於單題超時觸發。**
+* DI 圖表解讀障礙: 圖形信息解讀困難 (`DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH`)  若題型為 G&T/MSR，同上
+* DI 圖表解讀障礙: 表格信息解讀困難 (`DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE`)  若題型為 G&T/MSR，同上
 * DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難 (`DI_CONCEPT_APPLICATION_DIFFICULTY__MATH`)  若領域為 Math Related，同上
 * DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難 (`DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH`)  若領域為 Non-Math Related，同上
 * DI 計算 (數學) 障礙: 數學計算困難 (`DI_CALCULATION_DIFFICULTY__MATH`)  若領域為 Math Related，同上
 
 ## Quant (Q) 診斷標籤
- Q科標籤主要基於 gmat_diagnosis_app/diagnostics/q_modules/constants.py 中的 PARAM_ASSIGNMENT_RULES 字典分配。觸發條件取決於時間表現類別（基於用時和正確性）和題目類型（Real/Pure）。以下規則適用於有效數據。
+ Q科標籤主要基於 gmat_diagnosis_app/diagnostics/q_modules/constants.py 中的 PARAM_ASSIGNMENT_RULES 字典，結合時間表現類別（基於用時和正確性）和題目類型（Real/Pure）進行分配。此外，特定的行為模式和數據有效性也會影響標籤。以下規則適用於被標記為有效的數據 (`is_invalid` 為 False)。
+
+ * **數據無效：用時過短（受時間壓力影響） (`INVALID_DATA_TAG_Q`)** 當題目的 `is_invalid` 標記為 `True` 時觸發。代碼中添加的標籤文本是 `數據無效：用時過短（受時間壓力影響）`。此標籤優先於其他診斷標籤。
 
 ### 時間表現: 快且錯 (`Fast & Wrong`)
- 觸發條件：時間表現類別為 'Fast & Wrong' (答錯且用時相對快)。
-* Q 閱讀理解錯誤：題目文字理解 (`Q_READING_COMPREHENSION_ERROR`)
-* Q 概念應用錯誤：數學觀念/公式應用 (`Q_CONCEPT_APPLICATION_ERROR`)
-* Q 計算錯誤：數學計算 (`Q_CALCULATION_ERROR`)
-* Q 基礎掌握：應用不穩定（Special Focus Error） (`Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`)  具體觸發同 DI/V 科：答錯且難度低於已掌握。
-* 行為模式：前期作答過快（Flag risk） (`BEHAVIOR_EARLY_RUSHING_FLAG_RISK`)  觸發條件同 DI 科：題目位於前三分之一且用時 < 1 分鐘。
-* 行為模式：整體粗心問題（快而錯比例高） (`BEHAVIOR_CARELESSNESS_ISSUE`)  觸發條件同 DI 科：快且錯題目佔所有快題目比例 > 25%。
+ 觸發條件：數據有效，時間表現類別為 'Fast & Wrong' (答錯且用時相對快)。
+ * Q 閱讀理解錯誤：題目文字理解 (`Q_READING_COMPREHENSION_ERROR`) (僅 REAL 題型)
+ * Q 概念應用錯誤：數學觀念/公式應用 (`Q_CONCEPT_APPLICATION_ERROR`)
+ * Q 計算錯誤：數學計算 (`Q_CALCULATION_ERROR`)
+ * Q 基礎掌握：應用不穩定（Special Focus Error） (`Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`)  觸發條件同 DI/V 科：答錯且難度低於已掌握。
 
 ### 時間表現: 正常時間且錯 (`Normal Time & Wrong`)
- 觸發條件：時間表現類別為 'Normal Time & Wrong' (答錯且用時正常)。參數列表與 'Fast & Wrong' 相同。
-* Q 閱讀理解錯誤：題目文字理解 (`Q_READING_COMPREHENSION_ERROR`)
-* Q 概念應用錯誤：數學觀念/公式應用 (`Q_CONCEPT_APPLICATION_ERROR`)
-* Q 計算錯誤：數學計算 (`Q_CALCULATION_ERROR`)
-* Q 基礎掌握：應用不穩定（Special Focus Error） (`Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`)  具體觸發同 DI/V 科：答錯且難度低於已掌握。
-* 行為模式：前期作答過快（Flag risk） (`BEHAVIOR_EARLY_RUSHING_FLAG_RISK`)  觸發條件同 DI 科：題目位於前三分之一且用時 < 1 分鐘。
-* 行為模式：整體粗心問題（快而錯比例高） (`BEHAVIOR_CARELESSNESS_ISSUE`)  觸發條件同 DI 科：快且錯題目佔所有快題目比例 > 25%。
+ 觸發條件：數據有效，時間表現類別為 'Normal Time & Wrong' (答錯且用時正常)。
+ * Q 閱讀理解錯誤：題目文字理解 (`Q_READING_COMPREHENSION_ERROR`) (僅 REAL 題型)
+ * Q 概念應用錯誤：數學觀念/公式應用 (`Q_CONCEPT_APPLICATION_ERROR`)
+ * Q 計算錯誤：數學計算 (`Q_CALCULATION_ERROR`)
+ * Q 基礎掌握：應用不穩定（Special Focus Error） (`Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`)  觸發條件同 DI/V 科：答錯且難度低於已掌握。
 
 ### 時間表現: 慢且錯 (`Slow & Wrong`)
- 觸發條件：時間表現類別為 'Slow & Wrong' (答錯且用時慢)。同時包含錯誤類和困難類標籤。
-* Q 閱讀理解錯誤：題目文字理解 (`Q_READING_COMPREHENSION_ERROR`)
-* Q 概念應用錯誤：數學觀念/公式應用 (`Q_CONCEPT_APPLICATION_ERROR`)
-* Q 計算錯誤：數學計算 (`Q_CALCULATION_ERROR`)
-* Q 閱讀理解障礙：題目文字理解困難 (`Q_READING_COMPREHENSION_DIFFICULTY`)
-* Q 概念應用障礙：數學觀念/公式應用困難 (`Q_CONCEPT_APPLICATION_DIFFICULTY`)
-* Q 計算障礙：數學計算困難 (`Q_CALCULATION_DIFFICULTY`)
-* Q 基礎掌握：應用不穩定（Special Focus Error） (`Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`)  具體觸發同 DI/V 科：答錯且難度低於已掌握。
+ 觸發條件：數據有效，時間表現類別為 'Slow & Wrong' (答錯且用時慢)。同時包含錯誤類和困難類標籤。
+ * Q 閱讀理解錯誤：題目文字理解 (`Q_READING_COMPREHENSION_ERROR`) (僅 REAL 題型)
+ * Q 概念應用錯誤：數學觀念/公式應用 (`Q_CONCEPT_APPLICATION_ERROR`)
+ * Q 計算錯誤：數學計算 (`Q_CALCULATION_ERROR`)
+ * Q 閱讀理解障礙：題目文字理解困難 (`Q_READING_COMPREHENSION_DIFFICULTY`) (僅 REAL 題型)
+ * Q 概念應用障礙：數學觀念/公式應用困難 (`Q_CONCEPT_APPLICATION_DIFFICULTY`)
+ * Q 計算障礙：數學計算困難 (`Q_CALCULATION_DIFFICULTY`)
+ * Q 基礎掌握：應用不穩定（Special Focus Error） (`Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`)  具體觸發同 DI/V 科：答錯且難度低於已掌握。
 
 ### 時間表現: 慢且對 (`Slow & Correct`)
- 觸發條件：時間表現類別為 'Slow & Correct' (答對且用時慢)。僅包含困難類標籤。
-* Q 閱讀理解障礙：題目文字理解困難 (`Q_READING_COMPREHENSION_DIFFICULTY`)
-* Q 概念應用障礙：數學觀念/公式應用困難 (`Q_CONCEPT_APPLICATION_DIFFICULTY`)
-* Q 計算障礙：數學計算困難 (`Q_CALCULATION_DIFFICULTY`)
+ 觸發條件：數據有效，時間表現類別為 'Slow & Correct' (答對且用時慢)。僅包含困難類標籤。
+ * Q 閱讀理解障礙：題目文字理解困難 (`Q_READING_COMPREHENSION_DIFFICULTY`) (僅 REAL 題型)
+ * Q 概念應用障礙：數學觀念/公式應用困難 (`Q_CONCEPT_APPLICATION_DIFFICULTY`)
+ * Q 計算障礙：數學計算困難 (`Q_CALCULATION_DIFFICULTY`)
+
+### 行為模式標籤（獨立評估）
+ 以下行為標籤由 `gmat_diagnosis_app/diagnostics/q_modules/behavioral.py` 中的邏輯獨立評估，可能作為全局性標誌或影響特定題目集的標記，而不是直接添加到上述時間表現分類的參數列表中：
+ * **行為模式：前期作答過快（Flag risk） (`BEHAVIOR_EARLY_RUSHING_FLAG_RISK`)**  觸發條件：存在位於測驗前三分之一且用時少於 1 分鐘的題目。
+ * **行為模式：整體粗心問題（快而錯比例高） (`BEHAVIOR_CARELESSNESS_ISSUE`)**  觸發條件：快且錯 (`Fast & Wrong`) 的題目數量佔所有快 (`Fast & Wrong` + `Fast & Correct`) 題目數量的比例超過 25%。
 
 ---
 
