@@ -6,30 +6,164 @@ OpenAI服務模組
 import logging
 import streamlit as st
 import openai
+from openai import OpenAI
+from tenacity import retry, stop_after_attempt, wait_random_exponential
+import os
+from ..utils.rate_limiter import get_client_ip, check_rate_limit # Import rate limiting functions
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize OpenAI client
+# It's recommended to set the API key via environment variable OPENAI_API_KEY
+# client = OpenAI()
+client = None
+api_key_env = os.environ.get("OPENAI_API_KEY")
+# if not api_key_env:
+#     logger.warning("OPENAI_API_KEY environment variable not set.")
+    # Optionally, you could allow setting it via secrets or another config method
+    # For example, using Streamlit secrets:
+    # try:
+    #     client = OpenAI(api_key=st.secrets["openai"]["api_key"])
+    # except (KeyError, FileNotFoundError):
+    #     logger.error("OpenAI API key not found in environment variables or Streamlit secrets.")
+    #     st.error("OpenAI API key not configured.")
+# else:
+    # client = OpenAI()
+
+# Decorator for retrying API calls
+@retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+def chat_completion_request_with_retry(**kwargs):
+    """Makes a request to the OpenAI API with retries on failure."""
+    if not client:
+        st.error("OpenAI 客戶端未初始化，無法處理請求。請檢查 API 金鑰配置。")
+        raise Exception("OpenAI client not initialized.") # Raise exception to stop retry
+    
+    # Rate Limiting Check
+    ip_address = get_client_ip()
+    if not check_rate_limit(ip_address):
+        st.error(f"抱歉，您今天的 API 使用次數已達上限 ({check_rate_limit.__globals__['DAILY_LIMIT']}次)。請明天再試。")
+        # Option 1: Return a specific value indicating rate limit exceeded
+        # return {"error": "rate_limit_exceeded"}
+        # Option 2: Raise a specific exception (requires handling in the calling function)
+        raise Exception("Rate limit exceeded") # This will stop the retry mechanism too
+
+    try:
+        response = client.chat.completions.create(**kwargs)
+        return response
+    except Exception as e:
+        logger.error(f"OpenAI API request failed: {e}")
+        st.warning(f"與 OpenAI 連線時發生暫時性錯誤，正在重試... ({e})")
+        raise e # Reraise exception to trigger tenacity retry
+
+def initialize_openai_client(api_key):
+    """Initializes the OpenAI client with the provided API key."""
+    global client
+    if api_key:
+        client = OpenAI(api_key=api_key)
+        logger.info("OpenAI client initialized successfully.")
+        return True
+    else:
+        logger.error("Attempted to initialize OpenAI client with an empty API key.")
+        st.error("提供的 API 金鑰無效。")
+        client = None
+        return False
+
+def get_openai_client():
+    """Returns the initialized OpenAI client."""
+    return client
+
+def generate_response(system_prompt, user_prompt, model="gpt-4o-mini", temperature=0.7, max_tokens=1500):
+    """
+    Generates a response from OpenAI using the specified prompts and parameters.
+
+    Args:
+        system_prompt (str): The system message to guide the assistant.
+        user_prompt (str): The user's message.
+        model (str): The model to use (default: "gpt-4o-mini").
+        temperature (float): Controls randomness (default: 0.7).
+        max_tokens (int): Maximum number of tokens to generate (default: 1500).
+
+    Returns:
+        str: The generated response content, or None if an error occurs or client is not initialized.
+    """
+    if not client:
+        logger.error("OpenAI client not initialized. Cannot generate response.")
+        st.error("OpenAI client 未設置，請先在側邊欄輸入您的 API 金鑰。")
+        return None
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
+
+    logger.info(f"Sending request to OpenAI model {model} with max_tokens={max_tokens}")
+    
+    try:
+        # Use the retry wrapper function for the actual API call
+        response = chat_completion_request_with_retry(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        
+        # Handle potential rate limit response if Option 1 was chosen in the wrapper
+        # if isinstance(response, dict) and response.get("error") == "rate_limit_exceeded":
+        #     logger.warning(f"Rate limit exceeded for IP (retrieved internally). User message shown.")
+        #     return None # Or another indicator
+
+        response_content = response.choices[0].message.content
+        logger.info("Received response from OpenAI.")
+        return response_content
+
+    except Exception as e:
+        # Handle rate limit exception if Option 2 was chosen in the wrapper
+        if "Rate limit exceeded" in str(e):
+             logger.warning(f"Rate limit exceeded for IP (retrieved internally). User message already shown.")
+             # Error message is already displayed by the wrapper via st.error
+        else:
+            logger.error(f"An unexpected error occurred during OpenAI API call: {e}")
+            st.error(f"呼叫 OpenAI API 時發生錯誤: {e}")
+        return None
 
 def summarize_report_with_openai(report_markdown, api_key):
     """Attempts to summarize/reformat a report using OpenAI API."""
     if not api_key:
         logging.warning("OpenAI API key is missing. Skipping summarization.")
-        return report_markdown # Return original if no key
+        return report_markdown
+
+    ip_address = get_client_ip()
+    if ip_address is None:
+        st.error("IP 位址無法確定。為確保服務安全，API 請求無法處理。若在本機執行此為正常現象。")
+        return report_markdown # Return original
+
+    # Proceed with rate limiting only if IP is known
+    if not check_rate_limit(ip_address):
+        daily_limit = check_rate_limit.__globals__.get('DAILY_LIMIT', '每日')
+        st.error(f"IP: {ip_address} - 抱歉，您今天的 API 使用次數已達整理報告文字的上限 ({daily_limit}次)。請明天再試。")
+        return report_markdown
 
     try:
-        # Ensure openai library is accessible
-        client = openai.OpenAI(api_key=api_key) # Initialize client
-        system_prompt = """You are an assistant that reformats GMAT diagnostic reports. Use uniform heading levels: Level-2 headings for all major sections (## Section Title). Level-3 headings for subsections (### Subsection Title). Reformat content into clear Markdown tables where appropriate. Fix minor grammatical errors or awkward phrasing for readability. IMPORTANT: Do NOT add or remove any substantive information or conclusions. Only reformat and polish the existing text. Output strictly in Markdown format, without code blocks.  """
+        client = openai.OpenAI(api_key=api_key)
+        system_prompt = """You are an assistant that reformats GMAT diagnostic reports. Use uniform heading 
+levels: Level-2 headings for all major sections (## Section Title). Level-3 headings for subsections (### Su
+bsection Title). Reformat content into clear Markdown tables where appropriate. Fix minor grammatical errors
+ or awkward phrasing for readability. IMPORTANT: Do NOT add or remove any substantive information or conclus
+ions. Only reformat and polish the existing text. Output strictly in Markdown format, without code blocks.
+"""
 
         response = client.chat.completions.create(
-            model="gpt-4.1-nano", # Use the specified model
+            model="gpt-4.1-nano", 
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": report_markdown}
             ],
-            # temperature=0.2 # Removed: o4-mini only supports default (1)
         )
         summarized_report = response.choices[0].message.content
-        # Basic check if response seems valid (not empty)
         if summarized_report and summarized_report.strip():
-             logging.info(f"OpenAI summarization successful for report starting with: {report_markdown[:50]}...")
+             logging.info(f"OpenAI summarization successful for report starting with: {report_markdown[:50]}\n...")
              return summarized_report.strip()
         else:
              logging.warning("OpenAI returned empty response. Using original report.")
@@ -41,7 +175,7 @@ def summarize_report_with_openai(report_markdown, api_key):
         logging.error("OpenAI AuthenticationError.")
         return report_markdown
     except openai.RateLimitError:
-        st.warning("OpenAI API 請求頻率過高，請稍後再試。暫時使用原始報告文字。", icon="⏳")
+        st.warning("OpenAI API 請求頻率過高 (服務端限制)，請稍後再試。暫時使用原始報告文字。", icon="⏳")
         logging.error("OpenAI RateLimitError.")
         return report_markdown
     except openai.APIConnectionError as e:
@@ -53,30 +187,34 @@ def summarize_report_with_openai(report_markdown, api_key):
         logging.error("OpenAI APITimeoutError.")
         return report_markdown
     except openai.BadRequestError as e:
-        # Often happens with context length issues or invalid requests
-        st.warning(f"OpenAI API 請求無效 ({e})。可能是報告過長或格式問題。暫時使用原始報告文字。", icon="❗") # Use valid emoji
+        st.warning(f"OpenAI API 請求無效 ({e})。可能是報告過長或格式問題。暫時使用原始報告文字。", icon="❗") 
         logging.error(f"OpenAI BadRequestError: {e}")
         return report_markdown
     except Exception as e:
-        st.warning(f"調用 OpenAI API 時發生未知錯誤：{e}。暫時使用原始報告文字。", icon="⚠️")
-        logging.error(f"Unknown OpenAI API error: {e}", exc_info=True)
+        # The "Rate limit exceeded" from our manual check above should handle IP-based limits.
+        # This generic exception catch is for other OpenAI errors or unexpected issues.
+        # We no longer need a specific "Rate limit exceeded" in str(e) check here for OUR limiter.
+        st.warning(f"調用 OpenAI API 整理報告時發生未知錯誤：{e}。暫時使用原始報告文字。", icon="⚠️")
+        logging.error(f"Unknown OpenAI API error during summarization: {e}", exc_info=True)
         return report_markdown
 
 def generate_ai_consolidated_report(report_dict, api_key):
-    """Generates a consolidated report of suggestions and next steps using OpenAI o4-mini.
-
-    Args:
-        report_dict (dict): Dictionary containing the diagnostic reports for each subject (Q, V, DI).
-        api_key (str): OpenAI API key.
-
-    Returns:
-        str: The generated consolidated report in Markdown, or None if an error occurs.
-    """
+    """Generates a consolidated report of suggestions and next steps using OpenAI o4-mini."""
     if not api_key:
         logging.warning("OpenAI API key missing. Skipping consolidated report generation.")
         return None
     if not report_dict:
         logging.warning("Report dictionary is empty. Skipping consolidated report generation.")
+        return None
+
+    ip_address = get_client_ip()
+    if ip_address is None:
+        st.error("IP 位址無法確定。為確保服務安全，AI 匯總報告生成請求無法處理。若在本機執行此為正常現象。")
+        return None
+
+    if not check_rate_limit(ip_address):
+        daily_limit = check_rate_limit.__globals__.get('DAILY_LIMIT', '每日')
+        st.error(f"IP: {ip_address} - 抱歉，您今天的 API 使用次數已達生成匯總報告的上限 ({daily_limit}次)。請明天再試。")
         return None
 
     client = openai.OpenAI(api_key=api_key)
@@ -106,6 +244,7 @@ Your task is to identify and extract ONLY the sections related to '練習建議'
 
     try:
         logging.info("Calling OpenAI responses.create with model o4-mini for consolidated report.")
+        # WARNING: client.responses.create might be outdated. Consider migrating to chat.completions.create.
         response = client.responses.create(
             model="o4-mini",
             input=f"""
@@ -115,9 +254,6 @@ User: 從以下 GMAT 診斷報告中提取練習建議和後續行動部分，�
 
 {full_report_text}
 """,
-            # No prompt parameter - incorporate system instructions into input instead
-            # No previous_response_id needed for this one-off task
-            # max_output_tokens=1000 # Optional: Set a limit if needed
         )
         logging.info(f"OpenAI consolidated report response received. Status: {response.status}")
 
@@ -172,8 +308,12 @@ User: 從以下 GMAT 診斷報告中提取練習建議和後續行動部分，�
         logging.error(f"OpenAI BadRequestError (consolidated report): {e}")
         return None
     except Exception as e:
-        st.warning(f"生成 AI 匯總建議時發生未知錯誤：{e}", icon="⚠️")
-        logging.error(f"Unknown error during consolidated report generation: {e}", exc_info=True)
+        if "Rate limit exceeded" in str(e):
+             logger.warning(f"Rate limit check failed unexpectedly within try block for consolidated report: {e}")
+             # Message should have been shown by the initial check
+        else:
+            st.warning(f"生成 AI 匯總建議時發生未知錯誤：{e}", icon="⚠️")
+            logging.error(f"Unknown error during consolidated report generation: {e}", exc_info=True)
         return None
 
 def get_chat_context(session_state, max_rows=100):
@@ -321,20 +461,21 @@ def _get_dataframe_context(session_state, max_rows=100):
         return f"(無法轉換詳細數據表格: {str(e)})"
 
 def get_openai_response(current_chat_history, report_context, dataframe_context, api_key):
-    """Get response from OpenAI based on chat history and context, using o4-mini.
-
-    Args:
-        current_chat_history (list): The current conversation history.
-        report_context (str): Markdown string of the GMAT report.
-        dataframe_context (str): Markdown string of the diagnostic dataframe.
-        api_key (str): OpenAI API key.
-
-    Returns:
-        tuple: (ai_response_text, response_id) or (error_message_string, None)
-    """
+    """Get response from OpenAI based on chat history and context, using o4-mini."""
     if not api_key:
         logging.error("OpenAI API key is missing for chat.")
         return "錯誤：OpenAI API 金鑰未設定。", None
+
+    ip_address = get_client_ip()
+    if ip_address is None:
+        st.error("IP 位址無法確定。為確保服務安全，聊天請求無法處理。若在本機執行此為正常現象。")
+        return "錯誤：IP 位址無法確定，無法處理請求。", None
+
+    if not check_rate_limit(ip_address):
+        daily_limit = check_rate_limit.__globals__.get('DAILY_LIMIT', '每日')
+        error_message = f"IP: {ip_address} - 抱歉，您今天的 API 使用次數已達聊天功能的上限 ({daily_limit}次)。請明天再試。"
+        st.error(error_message)
+        return error_message, None
 
     client = openai.OpenAI(api_key=api_key)
 
@@ -410,13 +551,11 @@ Maintain a conversational and supportive tone.
         else:
             logging.info("Sending request with simplified system prompt.")
 
+        # WARNING: client.responses.create might be outdated. Consider migrating to chat.completions.create.
         response = client.responses.create(
             model="o4-mini", 
-            input=messages_for_api, # Pass the constructed messages list
-            # The 'o4-mini' model expects input as a list of messages, not a single prompt string.
-            # `prompt` parameter is not used with this model for chat-like interactions.
-            previous_response_id=previous_response_id, # Pass the ID for context
-            # max_output_tokens=1000 # Optional, if needed for controlling response length
+            input=messages_for_api, 
+            previous_response_id=previous_response_id,
         )
         logging.info(f"OpenAI response status: {response.status}")
 
@@ -475,9 +614,15 @@ Maintain a conversational and supportive tone.
         return error_msg, None
         
     except Exception as e:
-        error_msg = f"與OpenAI API通訊時發生未知錯誤: {e}"
-        logging.error(error_msg, exc_info=True)
-        return error_msg, None
+        if "Rate limit exceeded" in str(e):
+             logger.warning(f"Rate limit check failed unexpectedly within try block for chat: {e}")
+             # Message should have been shown by the initial check. The return below matches the check's return.
+             daily_limit = check_rate_limit.__globals__.get('DAILY_LIMIT', '每日')
+             return f"錯誤：已達到今日聊天 API 使用上限 ({daily_limit}次)。", None
+        else:
+            error_msg = f"與OpenAI API通訊時發生未知錯誤: {e}"
+            logging.error(error_msg, exc_info=True)
+            return error_msg, None
 
 def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: str, api_key: str) -> str:
     """
@@ -499,6 +644,17 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
         return "錯誤：原始診斷標籤不能為空。"
     if not user_description.strip():
         return "錯誤：使用者描述不能為空。"
+        
+    ip_address = get_client_ip()
+    if ip_address is None:
+        st.error("IP 位址無法確定。為確保服務安全，修剪標籤請求無法處理。若在本機執行此為正常現象。")
+        return "錯誤：IP 位址無法確定，無法處理請求。"
+
+    if not check_rate_limit(ip_address):
+        daily_limit = check_rate_limit.__globals__.get('DAILY_LIMIT', '每日')
+        error_message = f"IP: {ip_address} - 抱歉，您今天的 API 使用次數已達修剪標籤功能的上限 ({daily_limit}次)。請明天再試。"
+        st.error(error_message)
+        return error_message
 
     client = openai.OpenAI(api_key=api_key)
 
@@ -518,15 +674,15 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
     user_content = f"原始診斷標籤：\n{original_tags_str}\n\n使用者描述：\n{user_description}"
 
     try:
-        logging.info("Calling OpenAI ChatCompletion for tag trimming with model gpt-3.5-turbo.")
+        logging.info("Calling OpenAI ChatCompletion for tag trimming with model gpt-4.1-mini.")
         response = client.chat.completions.create(
-            model="gpt-4.1-mini", # Using a cost-effective and capable model
+            model="gpt-4.1-mini", 
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
             ],
-            temperature=0.2, # Lower temperature for more deterministic output
-            max_tokens=100 # Expecting a short list of tags
+            temperature=0.2, 
+            max_tokens=100 
         )
         
         trimmed_suggestion = response.choices[0].message.content
@@ -554,5 +710,6 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
         logging.error(f"OpenAI BadRequestError during tag trimming: {e}")
         return f"錯誤：OpenAI API 請求無效 ({e})。可能是輸入內容問題。"
     except Exception as e:
+        # The "Rate limit exceeded" from our manual check above should handle IP-based limits.
         logging.error(f"Unknown OpenAI API error during tag trimming: {e}", exc_info=True)
-        return f"調用 OpenAI API 時發生未知錯誤：{e}。" 
+        return f"調用 OpenAI API 修剪標籤時發生未知錯誤：{e}。" 
