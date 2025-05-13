@@ -16,6 +16,7 @@ APPENDIX_A_TRANSLATION = {
     'Q_READING_COMPREHENSION_DIFFICULTY': "Q 閱讀理解障礙：題目文字理解困難",
     'Q_CONCEPT_APPLICATION_DIFFICULTY': "Q 概念應用障礙：數學觀念/公式應用困難",
     'Q_CALCULATION_DIFFICULTY': "Q 計算障礙：數學計算困難",
+    'Q_READING_COMPREHENSION_DIFFICULTY_MINDSET_BLOCKED': "Q 閱讀理解障礙：心態失常讀不進去",
 }
 
 def get_translation(param):
