@@ -16,37 +16,22 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client
-# It's recommended to set the API key via environment variable OPENAI_API_KEY
-# client = OpenAI()
 client = None
 api_key_env = os.environ.get("OPENAI_API_KEY")
-# if not api_key_env:
-#     logger.warning("OPENAI_API_KEY environment variable not set.")
-    # Optionally, you could allow setting it via secrets or another config method
-    # For example, using Streamlit secrets:
-    # try:
-    #     client = OpenAI(api_key=st.secrets["openai"]["api_key"])
-    # except (KeyError, FileNotFoundError):
-    #     logger.error("OpenAI API key not found in environment variables or Streamlit secrets.")
-    #     st.error("OpenAI API key not configured.")
-# else:
-    # client = OpenAI()
+master_key_env = os.environ.get("MASTER_KEY")
 
 # Decorator for retrying API calls
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
 def chat_completion_request_with_retry(**kwargs):
     """Makes a request to the OpenAI API with retries on failure."""
     if not client:
-        st.error("OpenAI 客戶端未初始化，無法處理請求。請檢查 API 金鑰配置。")
+        st.error("OpenAI 客戶端未初始化，無法處理請求。請檢查驗證狀態。")
         raise Exception("OpenAI client not initialized.") # Raise exception to stop retry
     
     # Rate Limiting Check
     ip_address = get_client_ip()
     if not check_rate_limit(ip_address):
         st.error(f"抱歉，您今天的 API 使用次數已達上限 ({check_rate_limit.__globals__['DAILY_LIMIT']}次)。請明天再試。")
-        # Option 1: Return a specific value indicating rate limit exceeded
-        # return {"error": "rate_limit_exceeded"}
-        # Option 2: Raise a specific exception (requires handling in the calling function)
         raise Exception("Rate limit exceeded") # This will stop the retry mechanism too
 
     try:
@@ -57,18 +42,45 @@ def chat_completion_request_with_retry(**kwargs):
         st.warning(f"與 OpenAI 連線時發生暫時性錯誤，正在重試... ({e})")
         raise e # Reraise exception to trigger tenacity retry
 
-def initialize_openai_client(api_key):
-    """Initializes the OpenAI client with the provided API key."""
+def validate_master_key(input_key):
+    """驗證提供的master key是否與環境變量中的相符"""
+    if not master_key_env:
+        logger.error("MASTER_KEY環境變量未設置")
+        return False
+    
+    # 簡單的字符串比較，正式環境可能需要更複雜的驗證方法
+    return input_key == master_key_env
+
+def initialize_openai_client_with_master_key(master_key):
+    """使用master key驗證並初始化OpenAI客戶端"""
     global client
-    if api_key:
-        client = OpenAI(api_key=api_key)
-        logger.info("OpenAI client initialized successfully.")
-        return True
-    else:
-        logger.error("Attempted to initialize OpenAI client with an empty API key.")
-        st.error("提供的 API 金鑰無效。")
+    
+    if not validate_master_key(master_key):
+        logger.error("Invalid master key provided.")
+        st.error("提供的管理金鑰無效。")
         client = None
         return False
+    
+    # 如果master key驗證成功，使用環境變量中的API key
+    if api_key_env:
+        client = OpenAI(api_key=api_key_env)
+        logger.info("OpenAI client initialized successfully with environment API key.")
+        return True
+    else:
+        logger.error("OPENAI_API_KEY environment variable not set.")
+        st.error("系統錯誤：OpenAI API 金鑰未在環境變量中設置。請聯絡系統管理員。")
+        client = None
+        return False
+
+# 保留原始方法以確保向後兼容，但內部改為使用新方法
+def initialize_openai_client(api_key):
+    """
+    已棄用：直接使用API key初始化OpenAI客戶端
+    現在轉為檢查此API key是否為有效的master key
+    """
+    global client
+    logger.warning("使用舊方法initialize_openai_client進行客戶端初始化")
+    return initialize_openai_client_with_master_key(api_key)
 
 def get_openai_client():
     """Returns the initialized OpenAI client."""
@@ -90,7 +102,7 @@ def generate_response(system_prompt, user_prompt, model="gpt-4o-mini", temperatu
     """
     if not client:
         logger.error("OpenAI client not initialized. Cannot generate response.")
-        st.error("OpenAI client 未設置，請先在側邊欄輸入您的 API 金鑰。")
+        st.error("OpenAI client 未設置，請先在側邊欄輸入有效的管理金鑰。")
         return None
 
     messages = [
@@ -109,11 +121,6 @@ def generate_response(system_prompt, user_prompt, model="gpt-4o-mini", temperatu
             max_tokens=max_tokens
         )
         
-        # Handle potential rate limit response if Option 1 was chosen in the wrapper
-        # if isinstance(response, dict) and response.get("error") == "rate_limit_exceeded":
-        #     logger.warning(f"Rate limit exceeded for IP (retrieved internally). User message shown.")
-        #     return None # Or another indicator
-
         response_content = response.choices[0].message.content
         logger.info("Received response from OpenAI.")
         return response_content
@@ -130,8 +137,27 @@ def generate_response(system_prompt, user_prompt, model="gpt-4o-mini", temperatu
 
 def summarize_report_with_openai(report_markdown, api_key):
     """Attempts to summarize/reformat a report using OpenAI API."""
-    if not api_key:
-        logging.warning("OpenAI API key is missing. Skipping summarization.")
+    # 檢查api_key是否是有效的master key
+    global client
+    original_client = client
+    
+    # 如果已通過驗證並設置了客戶端，則直接使用
+    if not client and api_key:
+        if not validate_master_key(api_key):
+            logging.warning("提供的管理金鑰無效。跳過摘要處理。")
+            return report_markdown
+        elif not api_key_env:
+            logging.warning("環境變量中未設置OPENAI_API_KEY。跳過摘要處理。")
+            return report_markdown
+        else:
+            # 臨時初始化客戶端用於此次請求
+            temp_client = OpenAI(api_key=api_key_env)
+    else:
+        # 使用已初始化的客戶端
+        temp_client = client
+
+    if temp_client is None:
+        logging.warning("無法初始化OpenAI客戶端。跳過摘要處理。")
         return report_markdown
 
     ip_address = get_client_ip()
@@ -146,7 +172,6 @@ def summarize_report_with_openai(report_markdown, api_key):
         return report_markdown
 
     try:
-        client = openai.OpenAI(api_key=api_key)
         system_prompt = """You are an assistant that reformats GMAT diagnostic reports. Use uniform heading 
 levels: Level-2 headings for all major sections (## Section Title). Level-3 headings for subsections (### Su
 bsection Title). Reformat content into clear Markdown tables where appropriate. Fix minor grammatical errors
@@ -154,7 +179,7 @@ bsection Title). Reformat content into clear Markdown tables where appropriate. 
 ions. Only reformat and polish the existing text. Output strictly in Markdown format, without code blocks.
 """
 
-        response = client.chat.completions.create(
+        response = temp_client.chat.completions.create(
             model="gpt-4.1-nano", 
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -171,7 +196,7 @@ ions. Only reformat and polish the existing text. Output strictly in Markdown fo
              return report_markdown
 
     except openai.AuthenticationError:
-        st.warning("OpenAI API Key 無效或權限不足，無法整理報告文字。請檢查側邊欄輸入或環境變數。", icon="🔑")
+        st.warning("OpenAI API 驗證失敗，無法整理報告文字。請檢查系統管理員設定的API金鑰。", icon="🔑")
         logging.error("OpenAI AuthenticationError.")
         return report_markdown
     except openai.RateLimitError:
@@ -191,20 +216,41 @@ ions. Only reformat and polish the existing text. Output strictly in Markdown fo
         logging.error(f"OpenAI BadRequestError: {e}")
         return report_markdown
     except Exception as e:
-        # The "Rate limit exceeded" from our manual check above should handle IP-based limits.
-        # This generic exception catch is for other OpenAI errors or unexpected issues.
-        # We no longer need a specific "Rate limit exceeded" in str(e) check here for OUR limiter.
         st.warning(f"調用 OpenAI API 整理報告時發生未知錯誤：{e}。暫時使用原始報告文字。", icon="⚠️")
         logging.error(f"Unknown OpenAI API error during summarization: {e}", exc_info=True)
         return report_markdown
+    finally:
+        # 確保全局客戶端狀態不受影響
+        client = original_client
 
 def generate_ai_consolidated_report(report_dict, api_key):
     """Generates a consolidated report of suggestions and next steps using OpenAI o4-mini."""
-    if not api_key:
-        logging.warning("OpenAI API key missing. Skipping consolidated report generation.")
-        return None
+    # 檢查api_key是否是有效的master key
+    global client
+    original_client = client
+    
+    # 如果沒有報告資料，直接返回
     if not report_dict:
         logging.warning("Report dictionary is empty. Skipping consolidated report generation.")
+        return None
+    
+    # 驗證master key並獲取有效的客戶端
+    if not client and api_key:
+        if not validate_master_key(api_key):
+            logging.warning("提供的管理金鑰無效。跳過匯總報告生成。")
+            return None
+        elif not api_key_env:
+            logging.warning("環境變量中未設置OPENAI_API_KEY。跳過匯總報告生成。")
+            return None
+        else:
+            # 臨時初始化客戶端用於此次請求
+            temp_client = openai.OpenAI(api_key=api_key_env)
+    else:
+        # 使用已初始化的客戶端
+        temp_client = client
+
+    if temp_client is None:
+        logging.warning("無法初始化OpenAI客戶端。跳過匯總報告生成。")
         return None
 
     ip_address = get_client_ip()
@@ -216,8 +262,6 @@ def generate_ai_consolidated_report(report_dict, api_key):
         daily_limit = check_rate_limit.__globals__.get('DAILY_LIMIT', '每日')
         st.error(f"IP: {ip_address} - 抱歉，您今天的 API 使用次數已達生成匯總報告的上限 ({daily_limit}次)。請明天再試。")
         return None
-
-    client = openai.OpenAI(api_key=api_key)
 
     # Construct the full input text from individual reports
     full_report_text = ""
@@ -245,7 +289,7 @@ Your task is to identify and extract ONLY the sections related to '練習建議'
     try:
         logging.info("Calling OpenAI responses.create with model o4-mini for consolidated report.")
         # WARNING: client.responses.create might be outdated. Consider migrating to chat.completions.create.
-        response = client.responses.create(
+        response = temp_client.responses.create(
             model="o4-mini",
             input=f"""
 System: {system_prompt}
@@ -288,7 +332,7 @@ User: 從以下 GMAT 診斷報告中提取練習建議和後續行動部分，�
             return None
 
     except openai.AuthenticationError:
-        st.warning("OpenAI API Key 無效或權限不足，無法生成匯總報告。", icon="🔑")
+        st.warning("OpenAI API 驗證失敗，無法生成匯總報告。請檢查系統管理員設定的API金鑰。", icon="🔑")
         logging.error("OpenAI AuthenticationError (consolidated report).")
         return None
     except openai.RateLimitError:
@@ -308,13 +352,12 @@ User: 從以下 GMAT 診斷報告中提取練習建議和後續行動部分，�
         logging.error(f"OpenAI BadRequestError (consolidated report): {e}")
         return None
     except Exception as e:
-        if "Rate limit exceeded" in str(e):
-             logger.warning(f"Rate limit check failed unexpectedly within try block for consolidated report: {e}")
-             # Message should have been shown by the initial check
-        else:
-            st.warning(f"生成 AI 匯總建議時發生未知錯誤：{e}", icon="⚠️")
-            logging.error(f"Unknown error during consolidated report generation: {e}", exc_info=True)
+        st.warning(f"生成 AI 匯總建議時發生未知錯誤：{e}", icon="⚠️")
+        logging.error(f"Unknown error during consolidated report generation: {e}", exc_info=True)
         return None
+    finally:
+        # 確保全局客戶端狀態不受影響
+        client = original_client
 
 def get_chat_context(session_state, max_rows=100):
     """Get combined report and dataframe context for chat."""
@@ -462,9 +505,28 @@ def _get_dataframe_context(session_state, max_rows=100):
 
 def get_openai_response(current_chat_history, report_context, dataframe_context, api_key):
     """Get response from OpenAI based on chat history and context, using o4-mini."""
-    if not api_key:
-        logging.error("OpenAI API key is missing for chat.")
-        return "錯誤：OpenAI API 金鑰未設定。", None
+    # 檢查api_key是否是有效的master key
+    global client
+    original_client = client
+    
+    # 驗證master key並獲取有效的客戶端
+    if not client and api_key:
+        if not validate_master_key(api_key):
+            logging.error("提供的管理金鑰無效。無法使用聊天功能。")
+            return "錯誤：提供的管理金鑰無效。", None
+        elif not api_key_env:
+            logging.error("環境變量中未設置OPENAI_API_KEY。無法使用聊天功能。")
+            return "錯誤：系統未配置OpenAI API金鑰。請聯絡系統管理員。", None
+        else:
+            # 臨時初始化客戶端用於此次請求
+            temp_client = openai.OpenAI(api_key=api_key_env)
+    else:
+        # 使用已初始化的客戶端
+        temp_client = client
+
+    if temp_client is None:
+        logging.error("無法初始化OpenAI客戶端。無法使用聊天功能。")
+        return "錯誤：OpenAI客戶端初始化失敗。請確認管理金鑰和系統設置。", None
 
     ip_address = get_client_ip()
     if ip_address is None:
@@ -476,8 +538,6 @@ def get_openai_response(current_chat_history, report_context, dataframe_context,
         error_message = f"IP: {ip_address} - 抱歉，您今天的 API 使用次數已達聊天功能的上限 ({daily_limit}次)。請明天再試。"
         st.error(error_message)
         return error_message, None
-
-    client = openai.OpenAI(api_key=api_key)
 
     # Determine if this is the first user message in the session for this specific chat.
     # A simple heuristic: if chat history has only one user message (the current one being processed)
@@ -552,7 +612,7 @@ Maintain a conversational and supportive tone.
             logging.info("Sending request with simplified system prompt.")
 
         # WARNING: client.responses.create might be outdated. Consider migrating to chat.completions.create.
-        response = client.responses.create(
+        response = temp_client.responses.create(
             model="o4-mini", 
             input=messages_for_api, 
             previous_response_id=previous_response_id,
@@ -589,7 +649,7 @@ Maintain a conversational and supportive tone.
             return f"AI 未能成功回應 (狀態: {response.status})，請稍後再試。", None
 
     except openai.AuthenticationError:
-        error_msg = "OpenAI API密鑰無效"
+        error_msg = "OpenAI API驗證失敗，請檢查系統管理員設定的API金鑰。"
         logging.error(error_msg)
         return error_msg, None
         
@@ -614,15 +674,12 @@ Maintain a conversational and supportive tone.
         return error_msg, None
         
     except Exception as e:
-        if "Rate limit exceeded" in str(e):
-             logger.warning(f"Rate limit check failed unexpectedly within try block for chat: {e}")
-             # Message should have been shown by the initial check. The return below matches the check's return.
-             daily_limit = check_rate_limit.__globals__.get('DAILY_LIMIT', '每日')
-             return f"錯誤：已達到今日聊天 API 使用上限 ({daily_limit}次)。", None
-        else:
-            error_msg = f"與OpenAI API通訊時發生未知錯誤: {e}"
-            logging.error(error_msg, exc_info=True)
-            return error_msg, None
+        error_msg = f"與OpenAI API通訊時發生未知錯誤: {e}"
+        logging.error(error_msg, exc_info=True)
+        return error_msg, None
+    finally:
+        # 確保全局客戶端狀態不受影響
+        client = original_client
 
 def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: str, api_key: str) -> str:
     """
@@ -632,18 +689,39 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
     Args:
         original_tags_str: A string containing the original diagnostic tags (e.g., comma-separated or list-like).
         user_description: User's description of their difficulty with the question.
-        api_key: OpenAI API key.
+        api_key: OpenAI API key or master key for authentication.
 
     Returns:
         A string containing the AI's suggested trimmed tags, or an error message.
     """
-    if not api_key:
-        logging.warning("OpenAI API key is missing for tag trimming.")
-        return "錯誤：OpenAI API 金鑰未提供。"
+    # 檢查api_key是否是有效的master key
+    global client
+    original_client = client
+    
+    # 基本檢查
     if not original_tags_str.strip():
         return "錯誤：原始診斷標籤不能為空。"
     if not user_description.strip():
         return "錯誤：使用者描述不能為空。"
+    
+    # 驗證master key並獲取有效的客戶端
+    if not client and api_key:
+        if not validate_master_key(api_key):
+            logging.warning("提供的管理金鑰無效。無法執行標籤修剪。")
+            return "錯誤：提供的管理金鑰無效。"
+        elif not api_key_env:
+            logging.warning("環境變量中未設置OPENAI_API_KEY。無法執行標籤修剪。")
+            return "錯誤：系統未配置OpenAI API金鑰。請聯絡系統管理員。"
+        else:
+            # 臨時初始化客戶端用於此次請求
+            temp_client = openai.OpenAI(api_key=api_key_env)
+    else:
+        # 使用已初始化的客戶端
+        temp_client = client
+
+    if temp_client is None:
+        logging.warning("無法初始化OpenAI客戶端。無法執行標籤修剪。")
+        return "錯誤：OpenAI客戶端初始化失敗。請確認管理金鑰和系統設置。"
         
     ip_address = get_client_ip()
     if ip_address is None:
@@ -655,8 +733,6 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
         error_message = f"IP: {ip_address} - 抱歉，您今天的 API 使用次數已達修剪標籤功能的上限 ({daily_limit}次)。請明天再試。"
         st.error(error_message)
         return error_message
-
-    client = openai.OpenAI(api_key=api_key)
 
     system_prompt = """
 您是一位專業的 GMAT 診斷標籤修剪助手。
@@ -675,7 +751,7 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
 
     try:
         logging.info("Calling OpenAI ChatCompletion for tag trimming with model gpt-4.1-mini.")
-        response = client.chat.completions.create(
+        response = temp_client.chat.completions.create(
             model="gpt-4.1-mini", 
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -696,7 +772,7 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
 
     except openai.AuthenticationError:
         logging.error("OpenAI AuthenticationError during tag trimming.")
-        return "錯誤：OpenAI API 金鑰無效或權限不足。"
+        return "錯誤：OpenAI API 驗證失敗。請檢查系統管理員設定的API金鑰。"
     except openai.RateLimitError:
         logging.error("OpenAI RateLimitError during tag trimming.")
         return "錯誤：OpenAI API 請求頻率過高，請稍後再試。"
@@ -710,6 +786,8 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
         logging.error(f"OpenAI BadRequestError during tag trimming: {e}")
         return f"錯誤：OpenAI API 請求無效 ({e})。可能是輸入內容問題。"
     except Exception as e:
-        # The "Rate limit exceeded" from our manual check above should handle IP-based limits.
         logging.error(f"Unknown OpenAI API error during tag trimming: {e}", exc_info=True)
-        return f"調用 OpenAI API 修剪標籤時發生未知錯誤：{e}。" 
+        return f"調用 OpenAI API 修剪標籤時發生未知錯誤：{e}。"
+    finally:
+        # 確保全局客戶端狀態不受影響
+        client = original_client 

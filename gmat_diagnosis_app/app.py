@@ -1,4 +1,17 @@
 # -*- coding: utf-8 -*- # Ensure UTF-8 encoding for comments/strings
+import streamlit as st
+
+# Call set_page_config as the first Streamlit command
+st.set_page_config(
+    page_title="GMAT 成績診斷平台",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+from dotenv import load_dotenv
+load_dotenv()
+
 """
 GMAT診斷應用主程序
 整合各個模組以提供完整的GMAT診斷功能
@@ -8,7 +21,6 @@ import sys
 import os
 import io
 import pandas as pd
-import streamlit as st
 import numpy as np
 import logging
 import openai
@@ -170,12 +182,12 @@ def load_sample_data_callback():
 def main():
     """Main application entry point"""
     # 設置頁面配置
-    st.set_page_config(
-        page_title="GMAT 成績診斷平台",
-        page_icon="📊",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
+    # st.set_page_config( # This block will be removed
+    #     page_title="GMAT 成績診斷平台",
+    #     page_icon="📊",
+    #     layout="wide",
+    #     initial_sidebar_state="expanded"
+    # )
     
     # Initialize session state
     init_session_state()
@@ -526,21 +538,29 @@ def main():
             
     # OpenAI設定區塊（移到上方更明顯的位置）
     with st.sidebar.expander("🤖 AI功能設定", expanded=False):
-        api_key_input = st.text_input(
-            "輸入您的 OpenAI API Key 啟用 AI 問答：",
+        master_key_input = st.text_input(
+            "輸入管理員金鑰啟用 AI 問答功能：",
             type="password",
-            key="openai_api_key_input",
-            value=st.session_state.get('openai_api_key', ''),
-            help="輸入有效金鑰並成功完成分析後，下方將出現 AI 對話框。"
+            key="master_key_input",
+            value=st.session_state.get('master_key', ''),
+            help="輸入有效管理金鑰並成功完成分析後，下方將出現 AI 對話框。管理金鑰請向系統管理員索取。"
         )
 
         # Update session state when input changes
-        if api_key_input:
-            st.session_state.openai_api_key = api_key_input
-            st.session_state.show_chat = True
-            st.session_state.chat_history = []
+        if master_key_input:
+            st.session_state.master_key = master_key_input
+            # 使用新的方法基於master key初始化OpenAI客戶端
+            from gmat_diagnosis_app.services.openai_service import initialize_openai_client_with_master_key
+            if initialize_openai_client_with_master_key(master_key_input):
+                st.session_state.show_chat = True
+                st.session_state.chat_history = []
+                st.success("管理金鑰驗證成功，AI功能已啟用！")
+            else:
+                st.session_state.show_chat = False
+                st.session_state.chat_history = []
+                st.error("管理金鑰驗證失敗，無法啟用AI功能。")
         else:
-            st.session_state.openai_api_key = None
+            st.session_state.master_key = None
             st.session_state.show_chat = False
             st.session_state.chat_history = []
 

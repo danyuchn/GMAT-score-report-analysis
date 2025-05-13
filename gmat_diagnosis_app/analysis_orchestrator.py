@@ -196,10 +196,10 @@ def run_analysis(df_combined_input):
             time.sleep(0.5)
             
             # 報告生成與整合階段
-            status_text_element.text(f"步驟 {current_step}/{total_steps}: 生成診斷報告與整合診斷結果...")
+            # status_text_element.text(f"步驟 {current_step}/{total_steps}: 生成診斷報告與整合診斷結果...")
             
             # AI匯總報告生成階段
-            if st.session_state.openai_api_key:
+            if st.session_state.master_key:
                 status_text_element.text(f"步驟 {current_step}/{total_steps}: 使用AI整理診斷內容並生成匯總建議...")
             
             if not diagnosis_success:

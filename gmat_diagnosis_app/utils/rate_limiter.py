@@ -46,8 +46,9 @@ def get_client_ip():
         # elif hasattr(session_client, '_forwarded_for_ip'): # example
         #     return session_client._forwarded_for_ip
         else:
-            st.warning("無法從客戶端資訊中直接讀取 IP 位址。請檢查 Streamlit 版本或部署方式。")
-            return None
+            st.warning("無法從客戶端資訊中直接讀取 IP 位址。將使用開發用預設 IP。")
+            # Fallback for local development (use with caution, only for trusted local env)
+            return "local_development_ip"
 
     except ImportError:
         st.error("導入 Streamlit 內部模組時發生錯誤。IP 獲取功能可能不相容目前版本。")

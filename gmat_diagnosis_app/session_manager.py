@@ -26,7 +26,7 @@ def init_session_state():
         'total_data': None, # 存儲Total頁籤的數據
         'total_plot': None, # 存儲Total頁籤的圖表
         # --- AI Chat State ---
-        'openai_api_key': None,
+        'master_key': None,
         'show_chat': False,
         'chat_history': [], # List of dicts: {"role": "user/assistant", "content": "..."}
         'chat_history_backup': [], # 備份聊天歷史，確保持久化
