@@ -38,8 +38,8 @@ def chat_completion_request_with_retry(**kwargs):
         response = client.chat.completions.create(**kwargs)
         return response
     except Exception as e:
-        logger.error(f"OpenAI API request failed: {e}")
-        st.warning(f"與 OpenAI 連線時發生暫時性錯誤，正在重試... ({e})")
+        logger.error(f"OpenAI API request failed: {repr(e)}")
+        st.warning(f"與 OpenAI 連線時發生暫時性錯誤，正在重試... ({repr(e)})")
         raise e # Reraise exception to trigger tenacity retry
 
 def validate_master_key(input_key):
@@ -127,12 +127,12 @@ def generate_response(system_prompt, user_prompt, model="gpt-4o-mini", temperatu
 
     except Exception as e:
         # Handle rate limit exception if Option 2 was chosen in the wrapper
-        if "Rate limit exceeded" in str(e):
+        if "Rate limit exceeded" in str(e): # str(e) here is for a specific string check, less likely to cause encoding error itself on common errors.
              logger.warning(f"Rate limit exceeded for IP (retrieved internally). User message already shown.")
              # Error message is already displayed by the wrapper via st.error
         else:
-            logger.error(f"An unexpected error occurred during OpenAI API call: {e}")
-            st.error(f"呼叫 OpenAI API 時發生錯誤: {e}")
+            logger.error(f"An unexpected error occurred during OpenAI API call: {repr(e)}")
+            st.error(f"呼叫 OpenAI API 時發生錯誤: {repr(e)}")
         return None
 
 def summarize_report_with_openai(report_markdown, api_key):
@@ -204,20 +204,20 @@ ions. Only reformat and polish the existing text. Output strictly in Markdown fo
         logging.error("OpenAI RateLimitError.")
         return report_markdown
     except openai.APIConnectionError as e:
-        st.warning(f"無法連接至 OpenAI API ({e})，請檢查網路連線。暫時使用原始報告文字。", icon="🌐")
-        logging.error(f"OpenAI APIConnectionError: {e}")
+        st.warning(f"無法連接至 OpenAI API ({repr(e)})，請檢查網路連線。暫時使用原始報告文字。", icon="🌐")
+        logging.error(f"OpenAI APIConnectionError: {repr(e)}")
         return report_markdown
     except openai.APITimeoutError:
         st.warning("OpenAI API 請求超時。暫時使用原始報告文字。", icon="⏱️")
         logging.error("OpenAI APITimeoutError.")
         return report_markdown
     except openai.BadRequestError as e:
-        st.warning(f"OpenAI API 請求無效 ({e})。可能是報告過長或格式問題。暫時使用原始報告文字。", icon="❗") 
-        logging.error(f"OpenAI BadRequestError: {e}")
+        st.warning(f"OpenAI API 請求無效 ({repr(e)})。可能是報告過長或格式問題。暫時使用原始報告文字。", icon="❗") 
+        logging.error(f"OpenAI BadRequestError: {repr(e)}")
         return report_markdown
     except Exception as e:
-        st.warning(f"調用 OpenAI API 整理報告時發生未知錯誤：{e}。暫時使用原始報告文字。", icon="⚠️")
-        logging.error(f"Unknown OpenAI API error during summarization: {e}", exc_info=True)
+        st.warning(f"調用 OpenAI API 整理報告時發生未知錯誤：{repr(e)}。暫時使用原始報告文字。", icon="⚠️")
+        logging.error(f"Unknown OpenAI API error during summarization: {repr(e)}", exc_info=True)
         return report_markdown
     finally:
         # 確保全局客戶端狀態不受影響
@@ -323,8 +323,8 @@ User: 從以下 GMAT 診斷報告中提取練習建議和後續行動部分，�
                 return response_text.strip()
         elif response.status == 'error':
             error_details = response.error if response.error else "Unknown error"
-            logging.error(f"OpenAI API error (consolidated report): {error_details}")
-            st.warning(f"AI 生成匯總報告時出錯：{error_details}", icon="❗")
+            logging.error(f"OpenAI API error (consolidated report): {repr(error_details)}")
+            st.warning(f"AI 生成匯總報告時出錯：{repr(error_details)}", icon="❗")
             return None
         else:
             logging.error(f"OpenAI consolidated report status not completed or output empty. Status: {response.status}")
@@ -340,20 +340,20 @@ User: 從以下 GMAT 診斷報告中提取練習建議和後續行動部分，�
         logging.error("OpenAI RateLimitError (consolidated report).")
         return None
     except openai.APIConnectionError as e:
-        st.warning(f"無法連接至 OpenAI API ({e})，無法生成匯總報告。", icon="🌐")
-        logging.error(f"OpenAI APIConnectionError (consolidated report): {e}")
+        st.warning(f"無法連接至 OpenAI API ({repr(e)})，無法生成匯總報告。", icon="🌐")
+        logging.error(f"OpenAI APIConnectionError (consolidated report): {repr(e)}")
         return None
     except openai.APITimeoutError:
         st.warning("OpenAI API 請求超時，無法生成匯總報告。", icon="⏱️")
         logging.error("OpenAI APITimeoutError (consolidated report).")
         return None
     except openai.BadRequestError as e:
-        st.warning(f"OpenAI API 請求無效 ({e})，無法生成匯總報告。", icon="❗")
-        logging.error(f"OpenAI BadRequestError (consolidated report): {e}")
+        st.warning(f"OpenAI API 請求無效 ({repr(e)})，無法生成匯總報告。", icon="❗")
+        logging.error(f"OpenAI BadRequestError (consolidated report): {repr(e)}")
         return None
     except Exception as e:
-        st.warning(f"生成 AI 匯總建議時發生未知錯誤：{e}", icon="⚠️")
-        logging.error(f"Unknown error during consolidated report generation: {e}", exc_info=True)
+        st.warning(f"生成 AI 匯總建議時發生未知錯誤：{repr(e)}", icon="⚠️")
+        logging.error(f"Unknown error during consolidated report generation: {repr(e)}", exc_info=True)
         return None
     finally:
         # 確保全局客戶端狀態不受影響
@@ -433,9 +433,9 @@ def _get_combined_report_context(session_state):
                         full_report += new_report
                         full_report += "\n\n"
                 except (ImportError, AttributeError) as ie:
-                    logging.error(f"無法導入或使用generate_new_diagnostic_report函數: {ie}")
+                    logging.error(f"無法導入或使用generate_new_diagnostic_report函數: {repr(ie)}")
         except Exception as e:
-            logging.error(f"生成新診斷報告時出錯: {e}")
+            logging.error(f"生成新診斷報告時出錯: {repr(e)}")
     
     return full_report.strip()
 
@@ -499,9 +499,9 @@ def _get_dataframe_context(session_state, max_rows=100):
         logging.info(f"成功轉換診斷試算表，輸出長度約 {len(df_context_str)} 字符")
         return df_context_str
     except Exception as e:
-        error_msg = f"Error converting dataframe to markdown context: {e}"
+        error_msg = f"Error converting dataframe to markdown context: {repr(e)}"
         logging.error(error_msg, exc_info=True)
-        return f"(無法轉換詳細數據表格: {str(e)})"
+        return f"(無法轉換詳細數據表格: {repr(e)})"
 
 def get_openai_response(current_chat_history, report_context, dataframe_context, api_key):
     """Get response from OpenAI based on chat history and context, using o4-mini."""
@@ -642,8 +642,8 @@ Maintain a conversational and supportive tone.
         
         elif response.status == 'error':
             error_details = response.error if response.error else "Unknown error"
-            logging.error(f"OpenAI API error: {error_details}")
-            return f"AI 服務出錯: {error_details}", None
+            logging.error(f"OpenAI API error: {repr(error_details)}")
+            return f"AI 服務出錯: {repr(error_details)}", None
         else:
             logging.error(f"OpenAI response status not completed or output empty. Status: {response.status}")
             return f"AI 未能成功回應 (狀態: {response.status})，請稍後再試。", None
@@ -659,7 +659,7 @@ Maintain a conversational and supportive tone.
         return error_msg, None
         
     except openai.APIConnectionError as e:
-        error_msg = f"連接OpenAI API時出錯: {e}"
+        error_msg = f"連接OpenAI API時出錯: {repr(e)}"
         logging.error(error_msg)
         return error_msg, None
         
@@ -669,12 +669,12 @@ Maintain a conversational and supportive tone.
         return error_msg, None
         
     except openai.BadRequestError as e:
-        error_msg = f"OpenAI API請求無效: {e}"
+        error_msg = f"OpenAI API請求無效: {repr(e)}"
         logging.error(error_msg)
         return error_msg, None
         
     except Exception as e:
-        error_msg = f"與OpenAI API通訊時發生未知錯誤: {e}"
+        error_msg = f"與OpenAI API通訊時發生未知錯誤: {repr(e)}"
         logging.error(error_msg, exc_info=True)
         return error_msg, None
     finally:
@@ -777,17 +777,17 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
         logging.error("OpenAI RateLimitError during tag trimming.")
         return "錯誤：OpenAI API 請求頻率過高，請稍後再試。"
     except openai.APIConnectionError as e:
-        logging.error(f"OpenAI APIConnectionError during tag trimming: {e}")
-        return f"錯誤：無法連接至 OpenAI API ({e})。"
+        logging.error(f"OpenAI APIConnectionError during tag trimming: {repr(e)}")
+        return f"錯誤：無法連接至 OpenAI API ({repr(e)})。"
     except openai.APITimeoutError:
         logging.error("OpenAI APITimeoutError during tag trimming.")
         return "錯誤：OpenAI API 請求超時。"
     except openai.BadRequestError as e:
-        logging.error(f"OpenAI BadRequestError during tag trimming: {e}")
-        return f"錯誤：OpenAI API 請求無效 ({e})。可能是輸入內容問題。"
+        logging.error(f"OpenAI BadRequestError during tag trimming: {repr(e)}")
+        return f"錯誤：OpenAI API 請求無效 ({repr(e)})。可能是輸入內容問題。"
     except Exception as e:
-        logging.error(f"Unknown OpenAI API error during tag trimming: {e}", exc_info=True)
-        return f"調用 OpenAI API 修剪標籤時發生未知錯誤：{e}。"
+        logging.error(f"Unknown OpenAI API error during tag trimming: {repr(e)}", exc_info=True)
+        return f"調用 OpenAI API 修剪標籤時發生未知錯誤：{repr(e)}。"
     finally:
         # 確保全局客戶端狀態不受影響
         client = original_client 
