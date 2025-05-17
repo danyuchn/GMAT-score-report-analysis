@@ -166,6 +166,29 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         # Prepare a copy specifically for Excel export using excel_map
         df_for_excel = df_subject.copy() # 先完整複製一份 df_subject
 
+        # Add Subject column
+        # This ensures the column exists before any filtering based on excel_map keys.
+        # The value 'subject' comes from the function parameter (e.g., 'Q', 'V', 'DI').
+        if df_subject is not None and not df_subject.empty:
+            df_for_excel.insert(0, 'Subject', subject)
+        elif df_subject is not None and df_subject.empty: # If df_subject is an empty DataFrame
+            # Ensure 'Subject' column exists with correct dtype even if DataFrame is empty
+            df_for_excel['Subject'] = pd.Series(dtype='object') 
+            # If it's truly empty and we just added the column, fill with subject if we intend to add rows later (not current logic)
+            # For now, an empty series is fine if df_subject was empty.
+            # If df_for_excel could become non-empty later and needs this value, logic would be different.
+            # However, given current flow, if df_subject is empty, df_for_excel will remain empty.
+            # If it must have a value for an empty df about to be populated:
+            if not df_for_excel.empty: # This check is a bit redundant if df_subject.empty led here
+                 df_for_excel['Subject'] = subject
+            else: # If df_for_excel is still empty (e.g. df_subject was None or empty)
+                 # Create a new DataFrame with just the Subject column if df_for_excel is completely empty
+                 # This case should ideally be handled by df_subject.copy() not returning a totally empty df if df_subject had columns
+                 # but to be safe:
+                 if df_for_excel.empty:
+                     df_for_excel = pd.DataFrame({'Subject': pd.Series([subject] if subject else [], dtype='object')})
+
+
         # 重要：確保 df_for_excel 中的 is_invalid 也以 is_manually_invalid 為準
         if 'is_manually_invalid' in df_for_excel.columns:
             if 'is_invalid' in df_for_excel.columns:
