@@ -257,13 +257,26 @@ def display_analysis_button(df_combined_input, any_validation_errors, input_dfs,
     st.divider()
     
     all_subjects_loaded_and_valid = (len([subj for subj, df in input_dfs.items() if df is not None and subj in SUBJECTS]) == len(SUBJECTS)) and (df_combined_input is not None)
+    
+    # 檢查時間壓力評估是否已填寫
+    time_pressure_keys_filled = True
+    missing_time_pressure_subjects = []
+    for subject in SUBJECTS:
+        subject_key = subject.lower()
+        time_pressure_key = f"{subject_key}_time_pressure"
+        if time_pressure_key not in st.session_state:
+            time_pressure_keys_filled = False
+            missing_time_pressure_subjects.append(subject)
 
     # Determine button state
     button_disabled = True
     button_message = ""
 
-    if all_subjects_loaded_and_valid:
+    if all_subjects_loaded_and_valid and time_pressure_keys_filled:
         button_disabled = False  # Enable button
+    elif not time_pressure_keys_filled:
+        button_message = f"請為 {'、'.join(missing_time_pressure_subjects)} 科目填寫時間壓力評估（必填）。"
+        st.warning(button_message, icon="⚠️")
     elif any_validation_errors:
         button_message = "部分科目數據驗證失敗，請修正上方標示的錯誤後再試。"
         st.error(button_message)

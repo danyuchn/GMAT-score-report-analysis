@@ -96,6 +96,26 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
         height=150,
         key=f"{subject_key}_paster"
     )
+    
+    # 添加時間壓力選擇欄位
+    tab_container.divider()
+    time_pressure_options = {"0": "否，未感覺到時間壓力", "1": "是，感覺到顯著的時間壓力"}
+    time_pressure_key = f"{subject_key}_time_pressure"
+    
+    tab_container.subheader("時間壓力評估（必填）")
+    time_pressure = tab_container.radio(
+        f"在 {subject} 科目中，您是否感受到顯著的時間壓力？",
+        options=list(time_pressure_options.keys()),
+        format_func=lambda x: time_pressure_options[x],
+        key=time_pressure_key,
+        help="此為必填項目。您的回答將有助於更準確的分析結果。"
+    )
+    
+    # 保存到 session_state
+    if time_pressure_key not in st.session_state or st.session_state[time_pressure_key] != time_pressure:
+        st.session_state[time_pressure_key] = time_pressure
+    
+    tab_container.divider()
 
     # Display required headers
     req_cols_list = required_original_cols.get(subject, [])
@@ -288,6 +308,9 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
 
             # Add Subject identifier
             final_df['Subject'] = subject
+            
+            # 添加主觀時間壓力值到數據框中
+            final_df['subjective_time_pressure'] = int(time_pressure)
 
             tab_container.success(f"{subject} 科目資料讀取與驗證成功 ({data_source_type})！")
             return final_df, data_source_type, warnings

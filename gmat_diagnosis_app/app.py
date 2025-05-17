@@ -71,7 +71,7 @@ try:
     from gmat_diagnosis_app.ui.input_tabs import setup_input_tabs, combine_input_data, display_analysis_button
     from gmat_diagnosis_app.session_manager import init_session_state, reset_session_for_new_upload, ensure_chat_history_persistence
     from gmat_diagnosis_app.analysis_orchestrator import run_analysis # Added import
-    from gmat_diagnosis_app.services.csv_data_service import add_gmat_performance_record, GMAT_PERFORMANCE_HEADERS # Added for CSV export
+    from gmat_diagnosis_app.services.csv_data_service import add_gmat_performance_record, GMAT_PERFORMANCE_HEADERS, add_subjective_report_record # Added for CSV export and new function
     
     # Import the new analysis helpers - These are likely used by analysis_orchestrator, not directly here.
     # from gmat_diagnosis_app.analysis_helpers.time_pressure_analyzer import calculate_time_pressure, calculate_and_apply_invalid_logic # Removed
@@ -494,6 +494,36 @@ def main():
                     else:
                         st.toast("沒有可附加到 gmat_performance_data.csv 的資料。", icon="ℹ️")
                     # --- End Add to CSV ---
+                    
+                    # --- 添加主觀時間壓力報告到 CSV ---
+                    subjective_reports_added = 0
+                    
+                    for subject in SUBJECTS:
+                        subject_key = subject.lower()
+                        time_pressure_key = f"{subject_key}_time_pressure"
+                        
+                        if time_pressure_key in st.session_state:
+                            time_pressure_value = int(st.session_state[time_pressure_key])
+                            test_instance_id = f"{student_id_for_batch}_{subject}_{test_date_for_batch.replace('-', '')}_upload"
+                            
+                            # 創建主觀報告記錄
+                            subjective_report = {
+                                "student_id": student_id_for_batch,
+                                "test_instance_id": test_instance_id,
+                                "gmat_section": subject,
+                                "subjective_time_pressure": time_pressure_value,
+                                "report_collection_timestamp": datetime.datetime.now().isoformat()
+                            }
+                            
+                            # 將報告寫入 CSV
+                            if add_subjective_report_record(subjective_report):
+                                subjective_reports_added += 1
+                            else:
+                                st.toast(f"添加 {subject} 科目的主觀時間壓力報告到 CSV 時發生錯誤。", icon="⚠️")
+                    
+                    if subjective_reports_added > 0:
+                        pass # 成功添加報告
+                    # --- 添加主觀時間壓力報告到 CSV 結束 ---
 
                     run_analysis(df_combined_input) # This will update diagnosis_complete and analysis_error
                 
