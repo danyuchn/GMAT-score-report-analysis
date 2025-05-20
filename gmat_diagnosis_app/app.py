@@ -12,11 +12,6 @@ st.set_page_config(
 from dotenv import load_dotenv
 load_dotenv()
 
-"""
-GMAT診斷應用主程序
-整合各個模組以提供完整的GMAT診斷功能
-"""
-
 import sys
 import os
 import io
