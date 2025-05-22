@@ -219,7 +219,6 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         )
     except Exception as e:
         tab_container.error(f"準備Excel下載時出錯: {e}")
-        import traceback
         logging.error(f"詳細錯誤: {traceback.format_exc()}")
         tab_container.info(f"如有需要，請聯繫管理員並提供以上錯誤信息。")
 
@@ -746,34 +745,157 @@ def display_results():
                         """)
                 # --- End of Tag Trimming Assistant ---
 
+                # 添加一個保存編輯器內容的callback函數
+                def save_editor_content():
+                    # 當data_editor內容變更時，此函數將被調用
+                    if "diagnosis_label_editor" in st.session_state:
+                        edited_content = st.session_state["diagnosis_label_editor"]
+                        logging.info(f"[save_editor_content] Received editor content of type: {type(edited_content)}")
+                        
+                        if edited_content is not None:
+                            updated_full_df = st.session_state.editable_diagnostic_df.copy()
+                            
+                            # 處理編輯的內容（在session_state中可能是字典格式）
+                            if isinstance(edited_content, dict):
+                                logging.info(f"[save_editor_content] Handling dictionary content with keys: {edited_content.keys()}")
+                                
+                                # 嘗試檢查其他可能的編輯數據結構
+                                if 'edited_rows' in edited_content:
+                                    edited_rows = edited_content.get('edited_rows', {})
+                                    logging.info(f"[save_editor_content] Found {len(edited_rows)} edited rows")
+                                    
+                                    if not edited_rows:
+                                        logging.info("[save_editor_content] No rows were edited")
+                                    
+                                    # 處理編輯的行
+                                    for idx_str, row_edits in edited_rows.items():
+                                        try:
+                                            # 嘗試將索引轉換為整數，用於定位DataFrame的行
+                                            idx = int(idx_str)
+                                            logging.info(f"[save_editor_content] Processing edits for row {idx}: {row_edits}")
+                                            
+                                            # 確保索引在DataFrame的有效範圍內
+                                            if 0 <= idx < len(updated_full_df):
+                                                for col_name, new_value in row_edits.items():
+                                                    if col_name in updated_full_df.columns:
+                                                        if col_name == 'diagnostic_params_list':
+                                                            if pd.isna(new_value) or not isinstance(new_value, str) or not new_value.strip():
+                                                                updated_full_df.at[idx, col_name] = []
+                                                            else:
+                                                                tags = [tag.strip() for tag in new_value.split(',') if tag.strip()]
+                                                                updated_full_df.at[idx, col_name] = tags
+                                                                logging.info(f"[save_editor_content] Updated tags for row {idx}: {tags}")
+                                                        else:
+                                                            updated_full_df.at[idx, col_name] = new_value
+                                                            logging.info(f"[save_editor_content] Updated {col_name} for row {idx} to: {new_value}")
+                                            else:
+                                                logging.warning(f"[save_editor_content] Index {idx} is out of range for DataFrame with length {len(updated_full_df)}")
+                                        except (ValueError, IndexError) as e:
+                                            logging.error(f"[save_editor_content] Error processing row with idx {idx_str}: {e}")
+                                            # 如果索引不是整數，嘗試使用DataFrame的iloc或loc進行更新
+                                            try:
+                                                if hasattr(updated_full_df, 'iloc'):
+                                                    # 嘗試使用iloc
+                                                    idx = int(idx_str)
+                                                    if 0 <= idx < len(updated_full_df):
+                                                        for col_name, new_value in row_edits.items():
+                                                            if col_name in updated_full_df.columns:
+                                                                if col_name == 'diagnostic_params_list':
+                                                                    if pd.isna(new_value) or not isinstance(new_value, str) or not new_value.strip():
+                                                                        updated_full_df.iloc[idx, updated_full_df.columns.get_loc(col_name)] = []
+                                                                    else:
+                                                                        tags = [tag.strip() for tag in new_value.split(',') if tag.strip()]
+                                                                        updated_full_df.iloc[idx, updated_full_df.columns.get_loc(col_name)] = tags
+                                                                else:
+                                                                    updated_full_df.iloc[idx, updated_full_df.columns.get_loc(col_name)] = new_value
+                                            except Exception as inner_e:
+                                                logging.error(f"[save_editor_content] Failed to update row using iloc: {inner_e}")
+                                elif 'added_rows' in edited_content:
+                                    # 處理新增的行
+                                    added_rows = edited_content.get('added_rows', [])
+                                    logging.info(f"[save_editor_content] Found {len(added_rows)} added rows")
+                                    # 這裡可以處理新增行的邏輯，但當前版本似乎不需要
+                                elif 'deleted_rows' in edited_content:
+                                    # 處理刪除的行
+                                    deleted_rows = edited_content.get('deleted_rows', [])
+                                    logging.info(f"[save_editor_content] Found {len(deleted_rows)} deleted rows")
+                                    # 這裡可以處理刪除行的邏輯，但當前版本似乎不需要
+                                else:
+                                    # 嘗試直接使用字典的值作為更新
+                                    logging.info(f"[save_editor_content] No standard edit data found. Available keys: {edited_content.keys()}")
+                                    
+                                    # 嘗試獲取數據
+                                    if hasattr(edited_content, 'values'):
+                                        # 檢查值的類型
+                                        values = edited_content.values()
+                                        if any(isinstance(value, dict) for value in values):
+                                            # 如果有字典值，嘗試搜尋診斷標籤
+                                            for key, value in edited_content.items():
+                                                if isinstance(value, dict) and 'diagnostic_params_list' in value:
+                                                    logging.info(f"[save_editor_content] Found diagnostic_params_list in edited_content[{key}]")
+                                                    # 處理診斷標籤
+                                        else:
+                                            logging.warning(f"[save_editor_content] No dictionary values found in edited_content")
+                                    else:
+                                        logging.warning(f"[save_editor_content] edited_content does not have values attribute")
+                            elif hasattr(edited_content, 'columns'):  # 如果是DataFrame格式
+                                logging.info(f"[save_editor_content] Handling DataFrame content with columns: {edited_content.columns.tolist()}")
+                                for col_name in edited_content.columns:
+                                    if col_name in updated_full_df.columns:
+                                        if col_name == 'diagnostic_params_list':
+                                            def parse_tags_from_text_editor(tags_str):
+                                                if pd.isna(tags_str) or not isinstance(tags_str, str) or not tags_str.strip():
+                                                    return []
+                                                return [tag.strip() for tag in tags_str.split(',') if tag.strip()]
+                                            
+                                            updated_full_df[col_name] = edited_content[col_name].apply(parse_tags_from_text_editor)
+                                            logging.info(f"[save_editor_content] Updated all tags in column {col_name}")
+                                        else:
+                                            updated_full_df[col_name] = edited_content[col_name]
+                                            logging.info(f"[save_editor_content] Updated entire column {col_name}")
+                            elif isinstance(edited_content, pd.DataFrame):  # 另一種檢查DataFrame的方式
+                                logging.info(f"[save_editor_content] Handling DataFrame content (instance check) with shape: {edited_content.shape}")
+                                for col_name in edited_content.columns:
+                                    if col_name in updated_full_df.columns:
+                                        if col_name == 'diagnostic_params_list':
+                                            def parse_tags_from_text_editor(tags_str):
+                                                if pd.isna(tags_str) or not isinstance(tags_str, str) or not tags_str.strip():
+                                                    return []
+                                                return [tag.strip() for tag in tags_str.split(',') if tag.strip()]
+                                            
+                                            updated_full_df[col_name] = edited_content[col_name].apply(parse_tags_from_text_editor)
+                                            logging.info(f"[save_editor_content] Updated all tags in column {col_name}")
+                                        else:
+                                            updated_full_df[col_name] = edited_content[col_name]
+                                            logging.info(f"[save_editor_content] Updated entire column {col_name}")
+                            else:
+                                logging.error(f"[save_editor_content] Unsupported content type: {type(edited_content)}")
+                            
+                            # 立即保存更新後的數據框到session_state
+                            st.session_state.editable_diagnostic_df = updated_full_df
+                            # 設置一個標誌表示有未保存的變更
+                            st.session_state.has_unsaved_changes = True
+                            logging.info(f"[save_editor_content] Successfully saved changes and updated session state")
+                        else:
+                            logging.warning("[save_editor_content] Received None as editor content")
+
                 edited_df_subset_from_editor = tabs[edit_tab_index].data_editor(
                     df_for_editor,
                     column_config=final_editor_column_config,
                     use_container_width=True,
                     num_rows="fixed", 
                     key="diagnosis_label_editor",
-                    on_change=None
+                    on_change=save_editor_content  # 使用我們的callback函數來立即保存變更
                 )
-
-                if edited_df_subset_from_editor is not None:
-                    updated_full_df = st.session_state.editable_diagnostic_df.copy()
-                    
-                    for col_name in edited_df_subset_from_editor.columns:
-                        if col_name in updated_full_df.columns:
-                            if col_name == 'diagnostic_params_list':
-                                def parse_tags_from_text_editor(tags_str):
-                                    if pd.isna(tags_str) or not isinstance(tags_str, str) or not tags_str.strip():
-                                        return []
-                                    return [tag.strip() for tag in tags_str.split(',') if tag.strip()]
-                                
-                                updated_full_df[col_name] = edited_df_subset_from_editor[col_name].apply(parse_tags_from_text_editor)
-                            else:
-                                updated_full_df[col_name] = edited_df_subset_from_editor[col_name]
-                    
-                    st.session_state.editable_diagnostic_df = updated_full_df
+                
+                # 當有未保存的變更時顯示提示
+                if st.session_state.get('has_unsaved_changes', False):
+                    tabs[edit_tab_index].info("您有未套用的變更。點擊「✓ 套用變更並更新質化分析輸出」按鈕保存並生成報告。")
 
                 if 'changes_saved' not in st.session_state:
                     st.session_state.changes_saved = False
+                if 'has_unsaved_changes' not in st.session_state:
+                    st.session_state.has_unsaved_changes = False
 
                 col1, col2, col3 = tabs[edit_tab_index].columns(3)
 
@@ -782,10 +904,13 @@ def display_results():
                         st.session_state.reset_editable_df_requested = True
                         st.session_state.ai_prompts_need_regeneration = False
                         st.session_state.changes_saved = False
+                        st.session_state.has_unsaved_changes = False
                         st.rerun()
 
                 with col2:
                     if st.button("✓ 套用變更並更新質化分析輸出", key="apply_editable_df_col", type="primary", use_container_width=True):
+                        # 如果已有未保存的變更，確保已保存到editable_diagnostic_df
+                        st.session_state.has_unsaved_changes = False
                         st.session_state.ai_prompts_need_regeneration = True
                         st.session_state.changes_saved = True
                         tabs[edit_tab_index].success("變更已套用！AI建議將在下方更新。")
@@ -800,7 +925,9 @@ def display_results():
                 
                 with col3:
                     if st.button("📥 下載修改後的試算表", key="download_edited_file_trigger_col", use_container_width=True):
-                        if st.session_state.get('changes_saved', False):
+                        if st.session_state.get('has_unsaved_changes', False):
+                            tabs[edit_tab_index].warning("您有未套用的變更。請先點擊「✓ 套用變更並更新質化分析輸出」按鈕儲存變更，然後再下載試算表。", icon="⚠️")
+                        elif st.session_state.get('changes_saved', False):
                             try:
                                 df_to_export = st.session_state.editable_diagnostic_df.copy() # Start with internal names
                                 logging.info(f"[Download Edited] Initial columns: {df_to_export.columns.tolist()}")
@@ -891,7 +1018,7 @@ def display_results():
                                 st.error(f"準備Excel下載時出錯: {e}")
                                 logging.error(f"詳細錯誤: {traceback.format_exc()}")
                         else:
-                            st.warning("請先點擊「套用變更並更新質化分析輸出」按鈕儲存變更，然後再下載試算表。", icon="⚠️")
+                            st.warning("請先點擊「✓ 套用變更並更新質化分析輸出」按鈕儲存變更，然後再下載試算表。", icon="⚠️")
 
                 if st.session_state.get('ai_prompts_need_regeneration', False) and st.session_state.changes_saved:
                     with st.spinner("正在根據您的編輯生成AI建議..."):

@@ -52,6 +52,7 @@ FINAL_DIAGNOSIS_INPUT_COLS = [
 
 # --- Excel Export Column Mapping ---
 EXCEL_COLUMN_MAP = {
+    "Subject": "科目",
     "question_position": "題號",
     "question_type": "題型",
     "question_fundamental_skill": "考察能力",
