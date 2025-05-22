@@ -7,6 +7,79 @@ import io
 import pandas as pd
 import numpy as np
 import streamlit as st
+from thefuzz import process as fuzz_process # Renamed to avoid conflict
+from thefuzz import fuzz
+
+def normalize_and_rename_headers(df, subject_key, required_cols_map, tab_container_for_warnings):
+    # Ensure all column names are strings before processing
+    df.columns = df.columns.astype(str)
+    
+    warnings = []
+    actual_columns = df.columns.tolist()
+    # Create a copy of expected columns to modify for BOM check
+    expected_original_cols = list(required_cols_map.get(subject_key, [])) # Make a copy
+    
+    if not expected_original_cols:
+        return df, warnings
+
+    rename_map = {}
+    # This set will store the *original user-provided column names* that have been successfully mapped
+    # to an expected_col. This helps avoid reusing a user's column for multiple expected_cols.
+    mapped_user_columns = set()
+
+
+    for i, expected_col in enumerate(expected_original_cols):
+        # Handle BOM specifically for 'Question' if it's an expected column.
+        # This check is a bit of a special case for 'Question'.
+        bom_question_col_name = '\\ufeffQuestion'
+        if expected_col == 'Question' and bom_question_col_name in actual_columns:
+            # If BOM version exists in actual columns, prioritize it for the 'Question' expected_col.
+            # We effectively treat bom_question_col_name as the target for this expected_col.
+            # And if a user column named 'Question' (no BOM) also exists, it will be available for other fuzzy matches.
+            if bom_question_col_name not in mapped_user_columns:
+                rename_map[bom_question_col_name] = 'Question' # Always rename to canonical 'Question'
+                mapped_user_columns.add(bom_question_col_name)
+                continue # Successfully mapped 'Question', move to next expected_col
+
+        # Create a lowercase to original case map for *available* actual columns
+        # Available columns are those not yet mapped to an expected column.
+        available_actual_cols = [col for col in actual_columns if col not in mapped_user_columns]
+        available_actual_cols_lower_map = {col.lower().strip(): col for col in available_actual_cols}
+        
+        expected_col_lower = expected_col.lower().strip()
+        matched_actual_col = None
+
+        # 1. Exact match among available columns
+        if expected_col in available_actual_cols:
+            matched_actual_col = expected_col
+        
+        # 2. Case-insensitive match among available columns
+        elif expected_col_lower in available_actual_cols_lower_map:
+            matched_actual_col = available_actual_cols_lower_map[expected_col_lower]
+            if matched_actual_col != expected_col:
+                 warnings.append(f"欄位自動匹配：輸入欄位 '{matched_actual_col}' 已通過忽略大小寫匹配至標準欄位 '{expected_col}'。")
+        
+        # 3. Fuzzy match if no direct or case-insensitive match among available columns
+        else:
+            if available_actual_cols: # Ensure there are columns to search
+                best_match_tuple = fuzz_process.extractOne(expected_col, available_actual_cols, scorer=fuzz.WRatio) # Using WRatio
+                if best_match_tuple and best_match_tuple[1] >= 85: # Confidence threshold 85%
+                    # Check if this best_match_tuple[0] (an actual user column) has already been used for another expected_col
+                    # This check is implicitly handled by `available_actual_cols` being up-to-date.
+                    matched_actual_col = best_match_tuple[0]
+                    warnings.append(f"欄位模糊匹配：輸入欄位 '{matched_actual_col}' 已通過模糊匹配（相似度 {best_match_tuple[1]}%）至標準欄位 '{expected_col}'。")
+
+        if matched_actual_col:
+            # If the matched_actual_col is different from the canonical expected_col, add to rename_map.
+            # If they are the same, no rename is needed but we still mark it as mapped.
+            if matched_actual_col != expected_col:
+                 rename_map[matched_actual_col] = expected_col
+            mapped_user_columns.add(matched_actual_col) # Add the user's column name that got mapped
+
+    if rename_map:
+        df.rename(columns=rename_map, inplace=True)
+
+    return df, warnings
 
 def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_bytes, suggest_invalid_questions, validate_dataframe, required_original_cols):
     """Handles data input, cleaning, validation, and standardization for a subject tab."""
@@ -23,10 +96,33 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
         height=150,
         key=f"{subject_key}_paster"
     )
+    
+    # 添加時間壓力選擇欄位
+    tab_container.divider()
+    time_pressure_options = {"0": "否，未感覺到時間壓力", "1": "是，感覺到顯著的時間壓力"}
+    time_pressure_key = f"{subject_key}_time_pressure"
+    
+    tab_container.subheader("時間壓力評估（必填）")
+    time_pressure = tab_container.radio(
+        f"在 {subject} 科目中，您是否感受到顯著的時間壓力？",
+        options=list(time_pressure_options.keys()),
+        format_func=lambda x: time_pressure_options[x],
+        key=time_pressure_key,
+        help="此為必填項目。您的回答將有助於更準確的分析結果。"
+    )
+    
+    # 保存到 session_state
+    if time_pressure_key not in st.session_state or st.session_state[time_pressure_key] != time_pressure:
+        st.session_state[time_pressure_key] = time_pressure
+    
+    tab_container.divider()
 
     # Display required headers
-    req_cols_str = ", ".join(f"'{c}'" for c in required_original_cols.get(subject, []))
-    tab_container.caption(f"請確保資料包含以下欄位標題 (大小寫/空格敏感): {req_cols_str}")
+    req_cols_list = required_original_cols.get(subject, [])
+    req_cols_str = ", ".join(f"'{c}'" for c in req_cols_list)
+    tab_container.caption(
+        f"系統將嘗試自動匹配欄位標頭（忽略大小寫和輕微差異）。建議的標準欄位為: {req_cols_str}。若自動匹配失敗，請確保欄位與建議一致。"
+    )
 
     temp_df = None
     source = None
@@ -49,6 +145,17 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
         try:
             # Read data, attempt flexible separator detection
             temp_df = pd.read_csv(source, sep=None, engine='python', skip_blank_lines=True)
+
+            if temp_df.empty: # Check if df is empty immediately after read
+                tab_container.warning("讀取的資料為空或格式不正確。")
+                return None, data_source_type, ["Empty or invalid data format after read."]
+
+            # ---> 新增：標準化欄位標頭 <---
+            if temp_df is not None and not temp_df.empty:
+                temp_df, header_warnings = normalize_and_rename_headers(temp_df.copy(), subject, required_original_cols, tab_container) # Pass a copy
+                for warning_msg in header_warnings:
+                    tab_container.warning(warning_msg, icon="⚠️")
+            # ---> 結束新增 <---
 
             # --- Initial Cleaning & Prep ---
             initial_rows, initial_cols = temp_df.shape
@@ -201,6 +308,9 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
 
             # Add Subject identifier
             final_df['Subject'] = subject
+            
+            # 添加主觀時間壓力值到數據框中
+            final_df['subjective_time_pressure'] = int(time_pressure)
 
             tab_container.success(f"{subject} 科目資料讀取與驗證成功 ({data_source_type})！")
             return final_df, data_source_type, warnings

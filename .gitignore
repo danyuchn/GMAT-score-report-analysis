@@ -2,8 +2,16 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.csv
 
 # Virtual Environment
 .venv/
 venv/
 ENV/ 
+
+# Environment variables
+.env 
+# 忽略CSV數據文件
+gmat_diagnosis_app/gmat_performance_data.csv
+gmat_diagnosis_app/student_subjective_reports.csv

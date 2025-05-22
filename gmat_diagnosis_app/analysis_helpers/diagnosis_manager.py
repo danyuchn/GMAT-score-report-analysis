@@ -69,8 +69,8 @@ def run_diagnosis(df_final_for_diagnosis, time_pressure_map):
                 # Attempt OpenAI Summarization
                 final_report_for_subject = subj_report  # Start with the original
                 # Retrieve api key
-                if st.session_state.openai_api_key and subj_report and "發生錯誤" not in subj_report and "未成功執行" not in subj_report:
-                    summarized_report = summarize_report_with_openai(subj_report, st.session_state.openai_api_key)
+                if st.session_state.master_key and subj_report and "發生錯誤" not in subj_report and "未成功執行" not in subj_report:
+                    summarized_report = summarize_report_with_openai(subj_report, st.session_state.master_key)
                     if summarized_report != subj_report:  # Check if summarization actually changed something
                         final_report_for_subject = summarized_report
 
@@ -96,11 +96,11 @@ def run_diagnosis(df_final_for_diagnosis, time_pressure_map):
             st.session_state.report_dict = temp_report_dict
 
             # Generate Consolidated AI Report
-            if st.session_state.openai_api_key and st.session_state.report_dict:
+            if st.session_state.master_key and st.session_state.report_dict:
                 try:
                     consolidated_report = generate_ai_consolidated_report(
                         st.session_state.report_dict,
-                        st.session_state.openai_api_key
+                        st.session_state.master_key
                     )
                     st.session_state.consolidated_report = consolidated_report
                     st.session_state.raw_reports_for_ai = temp_report_dict # Save for potential re-summarization

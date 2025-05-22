@@ -714,16 +714,16 @@ def display_results():
                 if tag_trimming_expander.button("🤖 請求 AI 修剪建議", key="trim_tags_button"):
                     if not original_tags_input.strip() or not user_description_input.strip():
                         tag_trimming_expander.warning("請同時輸入原始診斷標籤和您的描述。")
-                    elif not st.session_state.get('openai_api_key'):
-                        tag_trimming_expander.error("錯誤：OpenAI API 金鑰未在側邊欄設定。請先設定API金鑰。")
+                    elif not st.session_state.get('master_key'):
+                        tag_trimming_expander.error("錯誤：管理金鑰未在側邊欄設定或驗證失敗。請先設定有效的管理金鑰。")
                     else:
                         with st.spinner("AI 正在分析並修剪標籤...請稍候...⏳"):
-                            api_key = st.session_state.openai_api_key
+                            master_key = st.session_state.master_key
                             try:
                                 trimmed_suggestion = trim_diagnostic_tags_with_openai(
                                     original_tags_input,
                                     user_description_input,
-                                    api_key
+                                    master_key
                                 )
                                 st.session_state.trimmed_tags_suggestion = trimmed_suggestion
                             except Exception as e:
@@ -1065,9 +1065,9 @@ def display_results():
         ai_chat_tab_index = tab_titles.index(ai_chat_tab_title)
         with tabs[ai_chat_tab_index]:
             tabs[ai_chat_tab_index].subheader("與 AI 即時問答")
-            if st.session_state.get('openai_api_key'):
+            if st.session_state.get('master_key'):
                 display_chat_interface(st.session_state)
             else:
-                tabs[ai_chat_tab_index].info("請在側邊欄輸入 OpenAI API Key 以啟用 AI 問答功能。")
+                tabs[ai_chat_tab_index].info("請在側邊欄輸入有效的管理金鑰以啟用 AI 問答功能。")
     except ValueError:
         st.error(f"無法找到分頁 '{ai_chat_tab_title}'.") 

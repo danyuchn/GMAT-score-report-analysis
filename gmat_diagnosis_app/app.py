@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*- # Ensure UTF-8 encoding for comments/strings
-"""
-GMAT診斷應用主程序
-整合各個模組以提供完整的GMAT診斷功能
-"""
+import streamlit as st
+
+# Call set_page_config as the first Streamlit command
+st.set_page_config(
+    page_title="GMAT 成績診斷平台",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+from dotenv import load_dotenv
+load_dotenv()
 
 import sys
 import os
 import io
 import pandas as pd
-import streamlit as st
 import numpy as np
 import logging
 import openai
@@ -59,7 +66,7 @@ try:
     from gmat_diagnosis_app.ui.input_tabs import setup_input_tabs, combine_input_data, display_analysis_button
     from gmat_diagnosis_app.session_manager import init_session_state, reset_session_for_new_upload, ensure_chat_history_persistence
     from gmat_diagnosis_app.analysis_orchestrator import run_analysis # Added import
-    from gmat_diagnosis_app.services.csv_data_service import add_gmat_performance_record, GMAT_PERFORMANCE_HEADERS # Added for CSV export
+    from gmat_diagnosis_app.services.csv_data_service import add_gmat_performance_record, GMAT_PERFORMANCE_HEADERS, add_subjective_report_record # Added for CSV export and new function
     
     # Import the new analysis helpers - These are likely used by analysis_orchestrator, not directly here.
     # from gmat_diagnosis_app.analysis_helpers.time_pressure_analyzer import calculate_time_pressure, calculate_and_apply_invalid_logic # Removed
@@ -170,12 +177,12 @@ def load_sample_data_callback():
 def main():
     """Main application entry point"""
     # 設置頁面配置
-    st.set_page_config(
-        page_title="GMAT 成績診斷平台",
-        page_icon="📊",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
+    # st.set_page_config( # This block will be removed
+    #     page_title="GMAT 成績診斷平台",
+    #     page_icon="📊",
+    #     layout="wide",
+    #     initial_sidebar_state="expanded"
+    # )
     
     # Initialize session state
     init_session_state()
@@ -482,6 +489,36 @@ def main():
                     else:
                         st.toast("沒有可附加到 gmat_performance_data.csv 的資料。", icon="ℹ️")
                     # --- End Add to CSV ---
+                    
+                    # --- 添加主觀時間壓力報告到 CSV ---
+                    subjective_reports_added = 0
+                    
+                    for subject in SUBJECTS:
+                        subject_key = subject.lower()
+                        time_pressure_key = f"{subject_key}_time_pressure"
+                        
+                        if time_pressure_key in st.session_state:
+                            time_pressure_value = int(st.session_state[time_pressure_key])
+                            test_instance_id = f"{student_id_for_batch}_{subject}_{test_date_for_batch.replace('-', '')}_upload"
+                            
+                            # 創建主觀報告記錄
+                            subjective_report = {
+                                "student_id": student_id_for_batch,
+                                "test_instance_id": test_instance_id,
+                                "gmat_section": subject,
+                                "subjective_time_pressure": time_pressure_value,
+                                "report_collection_timestamp": datetime.datetime.now().isoformat()
+                            }
+                            
+                            # 將報告寫入 CSV
+                            if add_subjective_report_record(subjective_report):
+                                subjective_reports_added += 1
+                            else:
+                                st.toast(f"添加 {subject} 科目的主觀時間壓力報告到 CSV 時發生錯誤。", icon="⚠️")
+                    
+                    if subjective_reports_added > 0:
+                        pass # 成功添加報告
+                    # --- 添加主觀時間壓力報告到 CSV 結束 ---
 
                     run_analysis(df_combined_input) # This will update diagnosis_complete and analysis_error
                 
@@ -526,21 +563,29 @@ def main():
             
     # OpenAI設定區塊（移到上方更明顯的位置）
     with st.sidebar.expander("🤖 AI功能設定", expanded=False):
-        api_key_input = st.text_input(
-            "輸入您的 OpenAI API Key 啟用 AI 問答：",
+        master_key_input = st.text_input(
+            "輸入管理員金鑰啟用 AI 問答功能：",
             type="password",
-            key="openai_api_key_input",
-            value=st.session_state.get('openai_api_key', ''),
-            help="輸入有效金鑰並成功完成分析後，下方將出現 AI 對話框。"
+            key="master_key_input",
+            value=st.session_state.get('master_key', ''),
+            help="輸入有效管理金鑰並成功完成分析後，下方將出現 AI 對話框。管理金鑰請向系統管理員索取。"
         )
 
         # Update session state when input changes
-        if api_key_input:
-            st.session_state.openai_api_key = api_key_input
-            st.session_state.show_chat = True
-            st.session_state.chat_history = []
+        if master_key_input:
+            st.session_state.master_key = master_key_input
+            # 使用新的方法基於master key初始化OpenAI客戶端
+            from gmat_diagnosis_app.services.openai_service import initialize_openai_client_with_master_key
+            if initialize_openai_client_with_master_key(master_key_input):
+                st.session_state.show_chat = True
+                st.session_state.chat_history = []
+                st.success("管理金鑰驗證成功，AI功能已啟用！")
+            else:
+                st.session_state.show_chat = False
+                st.session_state.chat_history = []
+                st.error("管理金鑰驗證失敗，無法啟用AI功能。")
         else:
-            st.session_state.openai_api_key = None
+            st.session_state.master_key = None
             st.session_state.show_chat = False
             st.session_state.chat_history = []
 

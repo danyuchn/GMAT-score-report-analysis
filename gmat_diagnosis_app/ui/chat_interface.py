@@ -195,7 +195,7 @@ def _debug_show_chat_history(session_state):
         
 def check_chat_conditions(session_state):
     """檢查是否滿足顯示聊天的條件"""
-    if session_state.openai_api_key and session_state.diagnosis_complete:
+    if session_state.master_key and session_state.diagnosis_complete:
         return True
     return False
 
@@ -233,7 +233,7 @@ def handle_chat_input(session_state):
                     session_state.chat_history, # Pass the current history directly
                     context["report"],
                     context["dataframe"],
-                    session_state.openai_api_key
+                    session_state.master_key
                 )
                 
                 # 明確記錄response_id的獲取

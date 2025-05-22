@@ -57,6 +57,11 @@ GMAT_PERFORMANCE_HEADERS_FOR_DUPLICATE_CHECK = [
     h for h in GMAT_PERFORMANCE_HEADERS if h != "record_timestamp"
 ]
 
+# Headers for subjective report duplicate check, excluding timestamp field
+STUDENT_SUBJECTIVE_REPORTS_HEADERS_FOR_DUPLICATE_CHECK = [
+    h for h in STUDENT_SUBJECTIVE_REPORTS_HEADERS if h != "report_collection_timestamp"
+]
+
 
 def initialize_csv_files() -> None:
     """
@@ -352,12 +357,13 @@ def validate_subjective_report_record(report: Dict[str, Any]) -> bool:
 def add_subjective_report_record(report_data: Dict[str, Any]) -> bool:
     """
     Add a subjective report record to the CSV file.
+    Skips adding if the report is identical to an existing record in the file.
     
     Args:
         report_data: Dictionary containing subjective report data
                     
     Returns:
-        bool: True if the record was added successfully, False otherwise
+        bool: True if the record was added successfully or if duplicate was detected (operation considered complete), False otherwise
     """
     if not report_data:
         print("Error: Empty report data provided")
@@ -366,17 +372,38 @@ def add_subjective_report_record(report_data: Dict[str, Any]) -> bool:
     # Initialize CSV file if it doesn't exist
     initialize_csv_files()
     
+    # Convert single report to list for duplicate check function
+    report_list = [report_data]
+    
+    # Check for duplicates
+    if _is_duplicate_record(report_list, STUDENT_SUBJECTIVE_REPORTS_FILE, STUDENT_SUBJECTIVE_REPORTS_HEADERS_FOR_DUPLICATE_CHECK):
+        print(f"Duplicate subjective report detected. Skipping write for student_id: {report_data.get('student_id', 'unknown')}, test_instance_id: {report_data.get('test_instance_id', 'unknown')}")
+        # Consider this a "successful" operation in the sense that we've handled the input appropriately
+        return True
+    
     try:
         # Validate the report data
         if not validate_subjective_report_record(report_data):
             print(f"Invalid report data, not adding to CSV: {report_data}")
             return False
         
+        # Ensure the file exists with headers
+        file_exists = os.path.exists(STUDENT_SUBJECTIVE_REPORTS_FILE)
+        
+        # Open in append mode
         with open(STUDENT_SUBJECTIVE_REPORTS_FILE, 'a', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=STUDENT_SUBJECTIVE_REPORTS_HEADERS)
+            
+            # Check if file is empty or newly created to write headers
+            csvfile.seek(0, os.SEEK_END)
+            file_is_empty = csvfile.tell() == 0
+            if file_is_empty:
+                writer.writeheader()
+            
+            # Write the record to the CSV file
             writer.writerow(report_data)
         
-        print(f"Successfully added subjective report record for student {report_data['student_id']}")
+        # print(f"Successfully added subjective report record for student {report_data['student_id']}") # This line will be commented out
         return True
     except Exception as e:
         print(f"Error adding subjective report record: {e}")
