@@ -14,5 +14,8 @@ services:
     volumes: # 持久化存儲 CSV 數據文件
       - ./gmat_diagnosis_app/student_subjective_reports.csv:/app/gmat_diagnosis_app/student_subjective_reports.csv
       - ./gmat_diagnosis_app/gmat_performance_data.csv:/app/gmat_diagnosis_app/gmat_performance_data.csv
-    # environment: # Optional: if you need to pass additional environment variables
-      # - MY_VARIABLE=my_value 
+    env_file:
+      - .env
+    environment: # Load environment variables from .env file
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MASTER_KEY=${MASTER_KEY} 
