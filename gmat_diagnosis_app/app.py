@@ -427,9 +427,11 @@ def main():
                     if 'Subject' in df_combined_input.columns and 'question_time' in df_combined_input.columns:
                         for subject_name, group in df_combined_input.groupby('Subject'):
                             if subject_name in SUBJECTS: # Process only Q, V, DI
+                                # Ensure question_time is numeric before summing
+                                numeric_times = pd.to_numeric(group['question_time'], errors='coerce')
                                 section_stats[subject_name] = {
                                     'total_questions': len(group),
-                                    'total_time': group['question_time'].sum()
+                                    'total_time': numeric_times.sum()
                                 }
 
                     for index, row in df_combined_input.iterrows():
@@ -449,7 +451,11 @@ def main():
                         question_pos = row.get("question_position", index + 1)
                         record["question_id"] = f"{gmat_section}_{question_pos}_{test_date_for_batch.replace('-', '')}"
                         record["question_position"] = int(question_pos) if pd.notnull(question_pos) else index + 1
-                        record["question_time_minutes"] = float(row.get("question_time", 0.0))
+                        # Ensure question_time is numeric before converting to float
+                        question_time_val = row.get("question_time", 0.0)
+                        if isinstance(question_time_val, str):
+                            question_time_val = pd.to_numeric(question_time_val, errors='coerce')
+                        record["question_time_minutes"] = float(question_time_val) if pd.notnull(question_time_val) else 0.0
                         
                         is_correct_val = row.get("is_correct")
                         if isinstance(is_correct_val, bool):
