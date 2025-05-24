@@ -473,7 +473,9 @@ def main():
                         
                         if gmat_section in section_stats:
                             record["total_questions_in_section"] = int(section_stats[gmat_section]['total_questions'])
-                            record["total_section_time_minutes"] = float(section_stats[gmat_section]['total_time'])
+                            # Safely convert total_time to float, handle NaN values
+                            total_time_val = section_stats[gmat_section]['total_time']
+                            record["total_section_time_minutes"] = float(total_time_val) if pd.notnull(total_time_val) else 0.0
                         else:
                             record["total_questions_in_section"] = 0 # Should not happen if Subject is Q,V,DI
                             record["total_section_time_minutes"] = 0.0
