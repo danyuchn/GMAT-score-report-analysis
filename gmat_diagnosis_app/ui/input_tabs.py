@@ -102,6 +102,9 @@ def setup_input_tabs(preprocess_helpers_module):
             # 將分數DataFrame存入session state
             st.session_state.score_df = score_df
             
+            # 設置確認狀態標誌
+            st.session_state.total_scores_confirmed = True
+            
             # 顯示所選分數
             st.write("已選擇的分數:")
             st.dataframe(score_df, hide_index=True)
@@ -121,6 +124,28 @@ def setup_input_tabs(preprocess_helpers_module):
             input_dfs['Total'] = total_df
             validation_errors['Total'] = []
             data_source_types['Total'] = "滑竿設定"
+        
+        # 如果之前已經確認過分數，重新創建Total的DataFrame
+        elif st.session_state.get('total_scores_confirmed', False):
+            total_df = pd.DataFrame({
+                'question_position': [1],  # 虛擬的題號
+                'is_manually_invalid': [False],
+                'Subject': ['Total'],
+                'total_score': [total_score],
+                'q_score': [q_score],
+                'v_score': [v_score],
+                'di_score': [di_score]
+            })
+            
+            input_dfs['Total'] = total_df
+            validation_errors['Total'] = []
+            data_source_types['Total'] = "滑竿設定"
+            
+            # 顯示確認狀態
+            st.success("✅ 分數設定已確認")
+            if 'score_df' in st.session_state:
+                st.write("已選擇的分數:")
+                st.dataframe(st.session_state.score_df, hide_index=True)
     
     # 處理其他主題標籤頁
     for subject in SUBJECTS:
@@ -269,7 +294,7 @@ def display_analysis_button(df_combined_input, any_validation_errors, input_dfs,
             missing_time_pressure_subjects.append(subject)
 
     # 檢查Total頁籤的「確認分數設定」是否已按下
-    total_scores_confirmed = 'Total' in input_dfs and input_dfs['Total'] is not None
+    total_scores_confirmed = st.session_state.get('total_scores_confirmed', False)
 
     # Determine button state
     button_disabled = True
