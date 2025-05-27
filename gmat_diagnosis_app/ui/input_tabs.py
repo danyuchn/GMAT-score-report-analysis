@@ -268,12 +268,18 @@ def display_analysis_button(df_combined_input, any_validation_errors, input_dfs,
             time_pressure_keys_filled = False
             missing_time_pressure_subjects.append(subject)
 
+    # 檢查Total頁籤的「確認分數設定」是否已按下
+    total_scores_confirmed = 'Total' in input_dfs and input_dfs['Total'] is not None
+
     # Determine button state
     button_disabled = True
     button_message = ""
 
-    if all_subjects_loaded_and_valid and time_pressure_keys_filled:
+    if all_subjects_loaded_and_valid and time_pressure_keys_filled and total_scores_confirmed:
         button_disabled = False  # Enable button
+    elif not total_scores_confirmed:
+        button_message = "請先在「Total (總分與百分位)」頁籤中點擊「確認分數設定」按鈕。"
+        st.warning(button_message, icon="⚠️")
     elif not time_pressure_keys_filled:
         button_message = f"請為 {'、'.join(missing_time_pressure_subjects)} 科目填寫時間壓力評估（必填）。"
         st.warning(button_message, icon="⚠️")
