@@ -202,11 +202,9 @@ def main():
     col1, col2 = st.columns([5, 1])
     with col1:
         st.markdown("""
-        # GMAT 成績診斷平台
+        # GMAT 成績診斷平台 by Dustin
         ### 智能化個人化成績分析與學習建議系統
         """)
-        st.markdown("---")
-        st.markdown('透過數據分析深入了解您的GMAT表現，找出關鍵改進點')
     
     # 建立主要導航
     main_tabs = st.tabs(["數據輸入與分析", "結果查看"])
