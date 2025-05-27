@@ -2,15 +2,18 @@
 V科AI工具與提示建議生成模組
 
 此模塊生成基於V科標籤的AI工具和提示建議。
+使用新的診斷路由工具進行標籤匹配和建議生成。
 """
 
 import pandas as pd
+from gmat_diagnosis_app.utils.route_tool import DiagnosisRouterTool
 from gmat_diagnosis_app.diagnostics.v_modules.constants import V_TOOL_AI_RECOMMENDATIONS
 from gmat_diagnosis_app.diagnostics.v_modules.translations import APPENDIX_A_TRANSLATION_V
 
+
 def translate_zh_to_en(zh_tag: str) -> str:
     """
-    將中文標籤轉換為英文標籤
+    將中文標籤轉換為英文標籤 (保留作為模糊匹配的備選方案)
     
     Args:
         zh_tag (str): 中文標籤
@@ -33,9 +36,10 @@ def translate_zh_to_en(zh_tag: str) -> str:
     # 如果沒有匹配到，返回原始標籤
     return zh_tag
 
-def generate_v_ai_tool_recommendations(df_v: pd.DataFrame) -> str:
+
+def generate_v_ai_tool_recommendations_legacy(df_v: pd.DataFrame) -> str:
     """
-    根據V科診斷標籤生成AI工具和提示建議
+    使用原有方法生成建議 (作為備選方案)
     
     Args:
         df_v (pd.DataFrame): 包含V科目診斷標籤的數據框
@@ -106,4 +110,37 @@ def generate_v_ai_tool_recommendations(df_v: pd.DataFrame) -> str:
         return "未找到特定匹配的工具建議。建議參考GMAT官方指南中的V科相關練習和策略。"
     
     # 將所有推薦組合為一個字符串，最多顯示10條
-    return "\n".join(recommendations[:10]) 
+    return "\n".join(recommendations[:10])
+
+
+def generate_v_ai_tool_recommendations(df_v: pd.DataFrame) -> str:
+    """
+    根據V科診斷標籤生成AI工具和提示建議
+    使用新的診斷路由工具進行匹配
+    
+    Args:
+        df_v (pd.DataFrame): 包含V科目診斷標籤的數據框
+    
+    Returns:
+        str: 格式化的AI工具和提示建議文本
+    """
+    # 初始化路由工具
+    router = DiagnosisRouterTool()
+    
+    try:
+        # 使用新的路由工具生成建議
+        recommendations = router.generate_recommendations_from_dataframe(df_v, "V")
+        
+        # 如果新方法沒有找到足夠的建議，嘗試舊方法作為備選
+        if recommendations == "(未找到診斷標籤)" or recommendations.startswith("未找到特定匹配"):
+            legacy_recommendations = generate_v_ai_tool_recommendations_legacy(df_v)
+            if not legacy_recommendations.startswith("未找到特定匹配") and legacy_recommendations != "(未找到診斷標籤)":
+                recommendations = f"**使用新路由系統生成的建議：**\n{recommendations}\n\n**補充建議（基於舊系統）：**\n{legacy_recommendations}"
+        
+        return recommendations
+        
+    except Exception as e:
+        # 如果新系統出現錯誤，回退到舊系統
+        import logging
+        logging.warning(f"New route tool failed for V subject: {str(e)}, falling back to legacy method")
+        return generate_v_ai_tool_recommendations_legacy(df_v) 
