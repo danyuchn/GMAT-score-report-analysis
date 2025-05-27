@@ -213,7 +213,7 @@ def generate_v_recommendations(v_diagnosis_results, exempted_skills):
     for skill_item in all_skills_for_recs_sorted:
         recs_for_skill = recommendations_by_skill[skill_item]
         skill_display_name_item = translate_v(skill_item) 
-        output_recommendations.append({'type': 'skill_header', 'text': f"--- 技能: {skill_display_name_item} ---"})
+        output_recommendations.append({'type': 'skill_header', 'text': f"技能: {skill_display_name_item}"})
         output_recommendations.extend(recs_for_skill)
         output_recommendations.append({'type': 'spacer', 'text': ""})
 

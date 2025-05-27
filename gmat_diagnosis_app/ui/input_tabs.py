@@ -293,4 +293,4 @@ def display_analysis_button(df_combined_input, any_validation_errors, input_dfs,
             button_message = "請檢查所有科目的數據是否已成功加載且無誤。"
             st.warning(button_message, icon="⚠️")
     
-    return st.button("🔍 開始分析", type="primary", disabled=button_disabled, key="analyze_button"), button_disabled, button_message 
+    return st.button("開始分析", type="primary", disabled=button_disabled, key="analyze_button"), button_disabled, button_message 

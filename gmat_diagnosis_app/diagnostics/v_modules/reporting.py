@@ -17,7 +17,7 @@ def generate_v_summary_report(v_diagnosis_results):
     """Generates the summary report string for the Verbal section, structured similarly to DI report."""
     report_lines = []
     report_lines.append("V 科診斷報告詳情") # New overall title
-    report_lines.append("---（基於用戶數據與模擬難度分析）---")
+    report_lines.append("（基於用戶數據與模擬難度分析）")
     report_lines.append("")
 
     # Extract chapters safely
@@ -283,7 +283,7 @@ def generate_v_summary_report(v_diagnosis_results):
                     # Otherwise, format their text (though spacers usually have empty text).
                     if text_to_display:
                         # Check if this is a skill separator line
-                        if text_to_display.strip().startswith("--- 技能:") and text_to_display.strip().endswith("---"):
+                        if text_to_display.strip().startswith("技能:"):
                             report_lines.append(f"    {text_to_display.strip()}") # No bullet point, ensure stripped
                             report_lines.append("") # Add a new line after skill title
                         else:
@@ -295,7 +295,7 @@ def generate_v_summary_report(v_diagnosis_results):
                     report_lines.append(f"    {str(rec)}") # Fallback, Adjusted to no bullet
             else:
                 # Handle cases where rec is a string, potentially a skill separator
-                if isinstance(rec, str) and rec.strip().startswith("--- 技能:") and rec.strip().endswith("---"):
+                if isinstance(rec, str) and rec.strip().startswith("技能:"):
                     report_lines.append(f"    {rec.strip()}") # No bullet point, ensure stripped
                     report_lines.append("") # Add a new line after skill title
                 else:
@@ -556,7 +556,7 @@ def generate_v_ai_tool_recommendations(diagnosed_df_v_subject):
     except ImportError:
         return "  - (AI建議配置缺失，無法生成V科建議。)"
 
-    recommendation_lines.append("  --- V 科目 AI 輔助建議 ---")
+    recommendation_lines.append("  V 科目 AI 輔助建議")
     
     recommended_tools_added_for_v = False
     for param_code_or_text in sorted(list(all_triggered_param_codes)):

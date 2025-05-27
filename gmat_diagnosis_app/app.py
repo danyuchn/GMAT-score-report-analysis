@@ -4,7 +4,7 @@ import streamlit as st
 # Call set_page_config as the first Streamlit command
 st.set_page_config(
     page_title="GMAT 成績診斷平台",
-    page_icon="📊",
+    page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -189,6 +189,10 @@ def main():
     
     # 額外確保聊天歷史持久化
     ensure_chat_history_persistence()
+    
+    # Apply custom CSS styling
+    from gmat_diagnosis_app.utils.styling import apply_custom_css
+    apply_custom_css()
 
     # Initialize the success message flag for sample data pasting if it doesn't exist
     if 'sample_data_pasted_success' not in st.session_state:
@@ -197,11 +201,15 @@ def main():
     # 頁面標題與簡介區
     col1, col2 = st.columns([5, 1])
     with col1:
-        st.title('📊 GMAT 成績診斷平台 by Dustin')
+        st.markdown("""
+        # GMAT 成績診斷平台
+        ### 智能化個人化成績分析與學習建議系統
+        """)
+        st.markdown("---")
         st.markdown('透過數據分析深入了解您的GMAT表現，找出關鍵改進點')
     
     # 建立主要導航
-    main_tabs = st.tabs(["📥 數據輸入與分析", "📈 結果查看"])
+    main_tabs = st.tabs(["數據輸入與分析", "結果查看"])
     
     with main_tabs[0]:  # 數據輸入與分析標籤頁
         # 簡短使用指引（核心步驟）
@@ -262,18 +270,18 @@ def main():
                 - 您可以上傳 **CSV 檔案**（檔案大小限制 1MB）或直接從 **Excel/表格** 複製數據並貼上。
             - **必要欄位（欄位標題須完全符合，大小寫/空格敏感）：**
                 - **通用欄位:**
-                    - `Question`: 題號 (必須是從 1 開始的正整數)
-                    - `Response Time (Minutes)`: 每題作答時間 (分鐘，必須是正數，例如 1.5 或 2)
-                    - `Performance`: 作答表現 (必須是 'Correct' 或 'Incorrect' 這兩種字串)
+                    - Question: 題號 (必須是從 1 開始的正整數)
+                    - Response Time (Minutes): 每題作答時間 (分鐘，必須是正數，例如 1.5 或 2)
+                    - Performance: 作答表現 (必須是 'Correct' 或 'Incorrect' 這兩種字串)
                 - **科目特定欄位:**
-                    - `Content Domain` (Q 和 DI 科目需要):
+                    - Content Domain (Q 和 DI 科目需要):
                         - Q: 'Algebra' 或 'Arithmetic'
                         - DI: 'Math Related' 或 'Non-Math Related'
-                    - `Question Type` (Q, V, DI 都需要):
+                    - Question Type (Q, V, DI 都需要):
                         - Q: 'REAL' 或 'PURE' (注意是大寫)
                         - V: 'Critical Reasoning' 或 'Reading Comprehension'
                         - DI: 'Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table' (或 'Graphs and Tables')
-                    - `Fundamental Skills` (Q 和 V 科目需要):
+                    - Fundamental Skills (Q 和 V 科目需要):
                         - Q: 例如 'Rates/Ratio/Percent', 'Value/Order/Factors', 'Equal/Unequal/ALG', 'Counting/Sets/Series/Prob/Stats' (允許常見的英文同義詞或格式變體，系統會嘗試自動校正)
                         - V: 例如 'Plan/Construct', 'Identify Stated Idea', 'Identify Inferred Idea', 'Analysis/Critique'
             - **重要：去識別化 (De-identification)**
@@ -556,7 +564,7 @@ def main():
     st.sidebar.subheader("分析設定")
     
     # 添加範例數據導入功能
-    with st.sidebar.expander("📊 範例數據", expanded=True):
+    with st.sidebar.expander("範例數據", expanded=True):
         st.markdown("### 範例數據導入")
         st.markdown("點擊下方按鈕導入範例做題數據，方便體驗系統功能")
         
@@ -570,7 +578,7 @@ def main():
             st.session_state.sample_data_pasted_success = False # Reset flag
             
     # OpenAI設定區塊（移到上方更明顯的位置）
-    with st.sidebar.expander("🤖 AI功能設定", expanded=False):
+    with st.sidebar.expander("AI功能設定", expanded=False):
         master_key_input = st.text_input(
             "輸入管理員金鑰啟用 AI 問答功能：",
             type="password",
@@ -598,7 +606,7 @@ def main():
             st.session_state.chat_history = []
 
     # --- IRT Simulation Settings ---
-    with st.sidebar.expander("📊 IRT模擬設定", expanded=False):
+    with st.sidebar.expander("IRT模擬設定", expanded=False):
         st.session_state.initial_theta_q = st.number_input(
             "Q 科目初始 Theta 估計", 
             value=st.session_state.initial_theta_q, 
@@ -619,7 +627,7 @@ def main():
         )
 
     # --- Manual IRT Adjustment Inputs in Sidebar ---
-    with st.sidebar.expander("🔧 手動調整題目", expanded=False):
+    with st.sidebar.expander("手動調整題目", expanded=False):
         st.markdown("#### 手動調整題目正確性")
         st.markdown("（僅影響IRT模擬）")
         

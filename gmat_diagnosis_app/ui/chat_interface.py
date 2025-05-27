@@ -18,7 +18,7 @@ def display_chat_interface(session_state):
     # session_state.show_chat = show_chat # This seems redundant if session_state is passed around directly
 
     if show_chat:
-        st.subheader("💬 與 AI 對話 (基於本次報告)")
+        st.subheader("與 AI 對話 (基於本次報告)")
         
         # 添加提示信息，告知用戶 AI 可以回答的內容
         info_text = """
@@ -33,7 +33,7 @@ def display_chat_interface(session_state):
         if hasattr(session_state, 'editable_diagnostic_df') and session_state.editable_diagnostic_df is not None:
             info_text += """
             📝 **重要：** AI 將使用您已修剪標籤後的數據和完整診斷報告進行回答，
-            包括「🔧 編輯診斷標籤」頁籤中的更新內容（如果您已編輯）。
+            包括「編輯診斷標籤」頁籤中的更新內容（如果您已編輯）。
             """
         
         st.info(info_text)

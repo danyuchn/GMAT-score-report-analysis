@@ -67,10 +67,14 @@ EXCEL_COLUMN_MAP = {
     "overtime": "overtime_flag",  # Internal flag for Excel styling, will be hidden by to_excel
 }
 
-# Styling Constants
-ERROR_FONT_COLOR = '#D32F2F'  # Red for errors
-OVERTIME_FONT_COLOR = '#0000FF'  # Blue for overtime
-INVALID_FONT_COLOR = '#A9A9A9'  # Dark Gray for invalid rows
+# Styling Constants - 使用更專業的顏色配置
+ERROR_FONT_COLOR = '#e53e3e'  # 更溫和的紅色用於錯誤
+OVERTIME_FONT_COLOR = '#3182ce'  # 專業藍色用於超時
+INVALID_FONT_COLOR = '#718096'  # 適中的灰色用於無效行
+PRIMARY_COLOR = '#1f4e79'  # 主要品牌色
+SECONDARY_COLOR = '#2c5282'  # 次要品牌色
+SUCCESS_COLOR = '#38a169'  # 成功/正確的綠色
+WARNING_COLOR = '#d69e2e'  # 警告的橙色
 
 # --- Diagnosis Rules Constants (Example Section) ---
 # TODO: Review the appropriate value for this constant based on business logic.

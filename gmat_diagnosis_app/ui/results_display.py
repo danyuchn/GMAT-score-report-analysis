@@ -157,7 +157,8 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     # 3. 最後顯示診斷報告
     if report_md:
         tab_container.subheader(f"{subject} 科診斷報告詳情")
-        tab_container.markdown(report_md, unsafe_allow_html=True)
+        from gmat_diagnosis_app.utils.styling import create_report_container
+        create_report_container(report_md)
     else:
         tab_container.info(f"未找到 {subject} 科的診斷報告。")
 
@@ -476,17 +477,17 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
         if subject == "Q":
             missing_columns = [col for col in required_cols_q if col not in subject_df.columns]
             if missing_columns:
-                report_parts.append(f"* Q科目缺少必要欄位進行分類: {', '.join(missing_columns)}")
+                report_parts.append(f"**Q科目缺少必要欄位進行分類:** {', '.join(missing_columns)}")
                 continue
             grouped = subject_df.groupby(["question_type", "question_fundamental_skill"], dropna=False)
             if not any(grouped):
-                report_parts.append("* Q科目：沒有可依據 '題型' 和 '技能' 分類的題目。")
+                report_parts.append("**Q科目:** 沒有可依據 '題型' 和 '技能' 分類的題目。")
             for (q_type, f_skill), group_data in grouped:
                 q_type_str = str(q_type) if pd.notna(q_type) else "未知題型"
                 f_skill_str = str(f_skill) if pd.notna(f_skill) else "未知技能"
-                report_parts.append(f"##### Q 科目分類 (題型: {q_type_str}, 技能: {f_skill_str})")
-                report_parts.append("| 類別     | 錯誤類型                                     |")
-                report_parts.append("|----------|----------------------------------------------|")
+                report_parts.append(f"\n##### Q 科目分類")
+                report_parts.append(f"**題型:** {q_type_str} | **技能:** {f_skill_str}")
+                report_parts.append("")
                 
                 all_tags_in_group = []
                 if not group_data.empty:
@@ -498,22 +499,28 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
                             all_tags_in_group.extend([t.strip() for t in tags_for_question.split(',') if t.strip()])
                 
                 unique_tags = sorted(list(set(str(tag).strip() for tag in all_tags_in_group if tag and str(tag).strip())))
-                formatted_tags = [f"【{tag}】" for tag in unique_tags]
-                tags_display_str = ", ".join(formatted_tags) if formatted_tags else "無特定共同標籤"
-                report_parts.append(f"| 診斷標籤 | {tags_display_str}                             |")
-                report_parts.append("  \n")
+                if unique_tags:
+                    report_parts.append("| 類別 | 診斷標籤 |")
+                    report_parts.append("|------|----------|")
+                    tags_display_str = "<br>".join(unique_tags)
+                    report_parts.append(f"| 診斷發現 | {tags_display_str} |")
+                else:
+                    report_parts.append("**診斷結果:** 無特定共同標籤")
+                report_parts.append("")
         
         elif subject == "V":
             missing_columns = [col for col in required_cols_v if col not in subject_df.columns]
             if missing_columns:
-                report_parts.append(f"* V科目缺少必要欄位進行分類: {', '.join(missing_columns)}")
+                report_parts.append(f"**V科目缺少必要欄位進行分類:** {', '.join(missing_columns)}")
                 continue
             grouped = subject_df.groupby(["question_fundamental_skill"], dropna=False)
             if not any(grouped):
-                report_parts.append("* V科目：沒有可依據 '技能' 分類的題目。")
+                report_parts.append("**V科目:** 沒有可依據 '技能' 分類的題目。")
             for f_skill, group_data in grouped:
                 f_skill_str = str(f_skill) if pd.notna(f_skill) else "未知技能"
-                report_parts.append(f"##### V 科目技能分類：**{f_skill_str}**")
+                report_parts.append(f"\n##### V 科目技能分類")
+                report_parts.append(f"**技能領域:** {f_skill_str}")
+                report_parts.append("")
 
                 student_unique_tags_for_skill = set()
                 if not group_data.empty:
@@ -529,42 +536,43 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
                                     student_unique_tags_for_skill.add(t.strip())
                 
                 if f_skill_str in V_SKILL_CATEGORIES_TAGS:
-                    report_parts.append("| 類別      | 錯誤類型                                                          |")
-                    report_parts.append("| ------- | ------------------------------------------------------------- |")
+                    report_parts.append("| 類別 | 診斷發現 |")
+                    report_parts.append("|------|----------|")
                     skill_map = V_SKILL_CATEGORIES_TAGS[f_skill_str]
                     has_content_for_skill = False
                     for category, predefined_tags in skill_map.items():
                         tags_to_display_for_category = sorted([tag for tag in predefined_tags if tag in student_unique_tags_for_skill])
                         if tags_to_display_for_category:
                             has_content_for_skill = True
-                            formatted_category_tags = [f"【{tag}】" for tag in tags_to_display_for_category]
-                            joined_tags = ", ".join(formatted_category_tags)
+                            joined_tags = "<br>".join(tags_to_display_for_category)
                             report_parts.append(f"| {category} | {joined_tags} |")
                     if not has_content_for_skill:
-                         report_parts.append(f"| 無對應分類 | (此技能下未發現可匹配預定義分類的標籤) |")
+                         report_parts.append(f"| 無對應分類 | 此技能下未發現可匹配預定義分類的標籤 |")
                 else:
-                    report_parts.append("| 類別     | 錯誤類型                                     |")
-                    report_parts.append("|----------|----------------------------------------------|")
                     sorted_unique_student_tags = sorted(list(student_unique_tags_for_skill))
-                    formatted_fallback_tags = [f"【{tag}】" for tag in sorted_unique_student_tags]
-                    tags_display_str = ", ".join(formatted_fallback_tags) if formatted_fallback_tags else "無特定共同標籤"
-                    report_parts.append(f"| 診斷標籤 | {tags_display_str}                             |")
-                report_parts.append("  \n")
+                    if sorted_unique_student_tags:
+                        report_parts.append("| 類別 | 診斷標籤 |")
+                        report_parts.append("|------|----------|")
+                        tags_display_str = "<br>".join(sorted_unique_student_tags)
+                        report_parts.append(f"| 診斷發現 | {tags_display_str} |")
+                    else:
+                        report_parts.append("**診斷結果:** 無特定共同標籤")
+                report_parts.append("")
 
         elif subject == "DI":
             missing_columns = [col for col in required_cols_di if col not in subject_df.columns]
             if missing_columns:
-                report_parts.append(f"* DI科目缺少必要欄位進行分類: {', '.join(missing_columns)}")
+                report_parts.append(f"**DI科目缺少必要欄位進行分類:** {', '.join(missing_columns)}")
                 continue
             grouped = subject_df.groupby(["content_domain", "question_type"], dropna=False)
             if not any(grouped):
-                report_parts.append("* DI科目：沒有可依據 '內容領域' 和 '題型' 分類的題目。")
+                report_parts.append("**DI科目:** 沒有可依據 '內容領域' 和 '題型' 分類的題目。")
             for (c_domain, q_type), group_data in grouped:
                 c_domain_str = str(c_domain) if pd.notna(c_domain) else "未知內容領域"
                 q_type_str = str(q_type) if pd.notna(q_type) else "未知題型"
-                report_parts.append(f"##### DI 科目分類 (內容領域: {c_domain_str}, 題型: {q_type_str})")
-                report_parts.append("| 類別     | 錯誤類型                                     |")
-                report_parts.append("|----------|----------------------------------------------|")
+                report_parts.append(f"\n##### DI 科目分類")
+                report_parts.append(f"**內容領域:** {c_domain_str} | **題型:** {q_type_str}")
+                report_parts.append("")
 
                 all_tags_in_group = []
                 if not group_data.empty:
@@ -576,10 +584,14 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
                             all_tags_in_group.extend([t.strip() for t in tags_for_question.split(',') if t.strip()])
                 
                 unique_tags = sorted(list(set(str(tag).strip() for tag in all_tags_in_group if tag and str(tag).strip())))
-                formatted_tags = [f"【{tag}】" for tag in unique_tags]
-                tags_display_str = ", ".join(formatted_tags) if formatted_tags else "無特定共同標籤"
-                report_parts.append(f"| 診斷標籤 | {tags_display_str}                             |")
-                report_parts.append("  \n")
+                if unique_tags:
+                    report_parts.append("| 類別 | 診斷標籤 |")
+                    report_parts.append("|------|----------|")
+                    tags_display_str = "<br>".join(unique_tags)
+                    report_parts.append(f"| 診斷發現 | {tags_display_str} |")
+                else:
+                    report_parts.append("**診斷結果:** 無特定共同標籤")
+                report_parts.append("")
 
     return "\n".join(report_parts)
 
@@ -595,8 +607,8 @@ def display_results():
         tab_titles.append("✨ AI 總結建議")
     
     tab_titles.extend([f"{subject} 科結果" for subject in SUBJECTS])
-    tab_titles.append("🔧 編輯診斷標籤 & 更新AI建議")
-    tab_titles.append("💬 AI 即時問答")
+    tab_titles.append("編輯診斷標籤 & 更新AI建議")
+    tab_titles.append("AI 即時問答")
 
     tabs = st.tabs(tab_titles)
     
@@ -610,7 +622,8 @@ def display_results():
         with tabs[current_tab_index]:
             tabs[current_tab_index].subheader("AI 智能匯總與建議行動")
             report_text_to_display = st.session_state.get("consolidated_report_text", "AI總結報告生成中或不可用。")
-            tabs[current_tab_index].markdown(report_text_to_display)
+            from gmat_diagnosis_app.utils.styling import create_report_container
+            create_report_container(report_text_to_display)
         current_tab_index += 1
 
     for subject in SUBJECTS: 
@@ -629,7 +642,7 @@ def display_results():
         except ValueError:
             st.error(f"無法找到分頁 '{subject_tab_title}'。Tab配置: {tab_titles}")
 
-    edit_tab_title = "🔧 編輯診斷標籤 & 更新AI建議"
+    edit_tab_title = "編輯診斷標籤 & 更新AI建議"
     try:
         edit_tab_index = tab_titles.index(edit_tab_title)
         with tabs[edit_tab_index]:
@@ -694,7 +707,7 @@ def display_results():
 
                 tabs[edit_tab_index].markdown("**說明:** 在下方表格中修改「診斷標籤」或「時間表現」。對於「診斷標籤」，請用逗號分隔多個標籤。完成後點擊「套用變更」按鈕。")
                 
-                tag_trimming_expander = tabs[edit_tab_index].expander("🏷️ 標籤修剪助手", expanded=False)
+                tag_trimming_expander = tabs[edit_tab_index].expander("標籤修剪助手", expanded=False)
                 tag_trimming_expander.markdown("""
                 此工具幫助您根據對題目的具體描述，從一長串原始診斷標籤中篩選出1-2個最相關的核心標籤。
                 請在下方貼上原始標籤，並簡述您在該題遇到的困難或考場回憶。
@@ -711,7 +724,7 @@ def display_results():
                     height=100
                 )
 
-                if tag_trimming_expander.button("🤖 請求 AI 修剪建議", key="trim_tags_button"):
+                if tag_trimming_expander.button("請求 AI 修剪建議", key="trim_tags_button"):
                     if not original_tags_input.strip() or not user_description_input.strip():
                         tag_trimming_expander.warning("請同時輸入原始診斷標籤和您的描述。")
                     elif not st.session_state.get('master_key'):
@@ -924,7 +937,7 @@ def display_results():
                                 st.warning("無法生成新診斷報告，因為沒有可編輯的數據。")
                 
                 with col3:
-                    if st.button("📥 下載修改後的試算表", key="download_edited_file_trigger_col", use_container_width=True):
+                    if st.button("下載修改後的試算表", key="download_edited_file_trigger_col", use_container_width=True):
                         if st.session_state.get('has_unsaved_changes', False):
                             tabs[edit_tab_index].warning("您有未套用的變更。請先點擊「✓ 套用變更並更新質化分析輸出」按鈕儲存變更，然後再下載試算表。", icon="⚠️")
                         elif st.session_state.get('changes_saved', False):
@@ -1060,7 +1073,7 @@ def display_results():
         st.error(f"無法找到分頁 '{edit_tab_title}'。Tab配置: {tab_titles}")
         
 
-    ai_chat_tab_title = "💬 AI 即時問答"
+    ai_chat_tab_title = "AI 即時問答"
     try:
         ai_chat_tab_index = tab_titles.index(ai_chat_tab_title)
         with tabs[ai_chat_tab_index]:

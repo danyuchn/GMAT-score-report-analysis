@@ -9,6 +9,8 @@ from gmat_diagnosis_app.constants.config import (
     INVALID_FONT_COLOR
 )
 import logging
+import streamlit as st
+import re
 
 def apply_styles(row):
     """Applies styling for invalid rows, incorrect answers, and overtime."""
@@ -84,3 +86,325 @@ def apply_styles(row):
         logging.debug(f"樣式應用時出錯: {e} (row columns: {list(row.index)})")
         pass # 忽略列缺失導致的樣式錯誤
     return styles 
+
+
+def format_diagnostic_report(report_text):
+    """
+    統一改善診斷報告的markdown格式，使其更易讀且風格一致
+    
+    Args:
+        report_text (str): 原始診斷報告文字
+        
+    Returns:
+        str: 格式化後的診斷報告
+    """
+    if not report_text or not isinstance(report_text, str):
+        return report_text
+    
+    # 1. 統一標題格式
+    report_text = re.sub(r'\*\*([一二三四五六七八九十]+、[^*]+)\*\*', r'## \1', report_text)
+    
+    # 2. 改善子標題格式
+    report_text = re.sub(r'\* \*\*([A-Z]\..*?)\*\*', r'### \1', report_text)
+    
+    # 3. 統一列表項目格式
+    report_text = re.sub(r'^    \* ', '- ', report_text, flags=re.MULTILINE)
+    report_text = re.sub(r'^        \* ', '  - ', report_text, flags=re.MULTILINE)
+    report_text = re.sub(r'^            \* ', '    - ', report_text, flags=re.MULTILINE)
+    
+    # 4. 改善重要資訊的強調
+    report_text = re.sub(r'時間壓力狀態：(.+)', r'**時間壓力狀態：** \1', report_text)
+    report_text = re.sub(r'有效評分率.*?：(.+)', r'**有效評分率：** \1', report_text)
+    report_text = re.sub(r'使用的超時閾值：(.+)', r'**超時閾值：** \1', report_text)
+    
+    # 5. 改善數據呈現
+    report_text = re.sub(r'(\d+\.?\d*%)( \([^)]+\))', r'**\1**\2', report_text)
+    
+    # 6. 統一表格格式 - 確保表格周圍有適當空行
+    report_text = re.sub(r'\n(\|[^|]+\|[^|]+\|)\n', r'\n\n\1\n', report_text)
+    
+    # 7. 改善特殊標記
+    report_text = re.sub(r'Special Focus Error', '**Special Focus Error**', report_text)
+    report_text = re.sub(r'SFE', '**SFE**', report_text)
+    
+    # 8. 改善分數和百分位
+    report_text = re.sub(r'(\d{3,4})分', r'**\1分**', report_text)
+    report_text = re.sub(r'第(\d+)百分位', r'第**\1**百分位', report_text)
+    
+    # 9. 改善數據高亮
+    report_text = re.sub(r'(錯誤率|超時率|正確率).*?(\d+\.?\d*%)', r'\1：**\2**', report_text)
+    
+    # 10. 清理多餘空行
+    report_text = re.sub(r'\n{3,}', '\n\n', report_text)
+    
+    # 11. 確保段落之間有適當間距
+    report_text = re.sub(r'(\n##[^\n]+)\n([^\n])', r'\1\n\n\2', report_text)
+    report_text = re.sub(r'(\n###[^\n]+)\n([^\n])', r'\1\n\n\2', report_text)
+    
+    # 12. 改善注意事項格式
+    report_text = re.sub(r'\*\*(重要註記|重要提醒|注意事項)\*\*', r'> **\1**', report_text)
+    
+    # 13. 改善數字統計的顯示
+    report_text = re.sub(r'(\d+) 題', r'**\1** 題', report_text)
+    report_text = re.sub(r'(\d+\.?\d*) 分鐘', r'**\1** 分鐘', report_text)
+    
+    return report_text.strip()
+
+
+def apply_custom_css():
+    """Apply custom CSS styling for better UI appearance"""
+    st.markdown("""
+    <style>
+    /* 主要應用程式樣式 */
+    .main {
+        padding: 1rem 1.5rem;
+    }
+    
+    /* 標題樣式改善 */
+    h1 {
+        color: #1f4e79;
+        font-weight: 700;
+        padding-bottom: 1rem;
+        border-bottom: 3px solid #1f4e79;
+        margin-bottom: 2rem;
+    }
+    
+    h2 {
+        color: #2c5282;
+        font-weight: 600;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        padding-left: 0.5rem;
+        border-left: 4px solid #2c5282;
+    }
+    
+    h3 {
+        color: #2d3748;
+        font-weight: 600;
+        margin-top: 1.5rem;
+        margin-bottom: 0.8rem;
+    }
+    
+    /* 分頁標籤樣式 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        background-color: #f7fafc;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 3rem;
+        white-space: pre-wrap;
+        background-color: #ffffff;
+        border-radius: 0.375rem;
+        color: #4a5568;
+        font-weight: 500;
+        border: 1px solid #e2e8f0;
+        transition: all 0.2s ease;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #1f4e79 !important;
+        color: #ffffff !important;
+        border-color: #1f4e79 !important;
+    }
+    
+    /* 表格樣式改善 */
+    .stDataFrame {
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    }
+    
+    .stDataFrame [data-testid="stDataFrameColumn"] {
+        background-color: #f8fafc;
+    }
+    
+    /* 診斷報告區域樣式 */
+    .diagnostic-report {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    }
+    
+    .diagnostic-report h4 {
+        color: #1f4e79;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .diagnostic-report h5 {
+        color: #2c5282;
+        font-weight: 500;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* 診斷報告表格樣式 */
+    .diagnostic-report table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    
+    .diagnostic-report th {
+        background-color: #f7fafc;
+        color: #2d3748;
+        font-weight: 600;
+        padding: 0.75rem;
+        text-align: left;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .diagnostic-report td {
+        padding: 0.75rem;
+        border: 1px solid #e2e8f0;
+        vertical-align: top;
+    }
+    
+    .diagnostic-report tr:nth-child(even) {
+        background-color: #f8fafc;
+    }
+    
+    .diagnostic-report tr:hover {
+        background-color: #edf2f7;
+    }
+    
+    /* 訊息框樣式 */
+    .stAlert {
+        border-radius: 0.5rem;
+        border: none;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 按鈕樣式 */
+    .stButton > button {
+        border-radius: 0.375rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 側邊欄樣式 */
+    .css-1d391kg {
+        background-color: #f7fafc;
+    }
+    
+    /* 數據編輯器樣式 */
+    .stDataEditor {
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+    
+    /* 圖表樣式 */
+    .js-plotly-plot {
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 載入提示樣式 */
+    .stSpinner {
+        text-align: center;
+        padding: 2rem;
+    }
+    
+    /* 改善文字對比度 */
+    .diagnostic-report ul, .diagnostic-report ol {
+        padding-left: 1.5rem;
+        margin: 0.5rem 0;
+    }
+    
+    .diagnostic-report li {
+        margin: 0.25rem 0;
+        line-height: 1.6;
+    }
+    
+    /* 強調文字樣式 */
+    .diagnostic-report strong {
+        color: #1f4e79;
+        font-weight: 600;
+    }
+    
+    /* 代碼區塊樣式 */
+    .diagnostic-report code {
+        background-color: #f1f5f9;
+        color: #475569;
+        padding: 0.125rem 0.25rem;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+    }
+    
+    /* 層級縮排改善 */
+    .diagnostic-report ul ul {
+        margin-left: 1rem;
+    }
+    
+    .diagnostic-report ol ol {
+        margin-left: 1rem;
+    }
+    
+    /* 特殊標記樣式 */
+    .diagnostic-report .emoji {
+        margin-right: 0.25rem;
+    }
+    
+    /* 改善數據表現 */
+    .diagnostic-report .data-highlight {
+        background-color: #e6fffa;
+        color: #234e52;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-weight: 600;
+    }
+    
+    /* 警告和提示樣式 */
+    .diagnostic-report .warning {
+        background-color: #fffbeb;
+        border-left: 4px solid #f59e0b;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        border-radius: 0.25rem;
+    }
+    
+    .diagnostic-report .info {
+        background-color: #eff6ff;
+        border-left: 4px solid #3b82f6;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        border-radius: 0.25rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def create_report_container(content, title=None):
+    """Create a styled container for diagnostic reports"""
+    # 先格式化內容
+    formatted_content = format_diagnostic_report(content)
+    
+    if title:
+        st.markdown(f"""
+        <div class="diagnostic-report">
+            <h4>{title}</h4>
+            {formatted_content}
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="diagnostic-report">
+            {formatted_content}
+        </div>
+        """, unsafe_allow_html=True) 

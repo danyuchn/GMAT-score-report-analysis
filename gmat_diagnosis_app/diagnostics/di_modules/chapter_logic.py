@@ -833,9 +833,9 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags, ti
 
         # Use pre-translated domain names
         if (domain_tags.get('poor_math_related') or domain_tags.get('slow_math_related')) and has_math_case_agg:
-            focus_note += f" **建議增加 {q_type} 題型下 `{math_related_zh}` 題目的練習比例。**"
+            focus_note += f" **建議增加 {q_type} 題型下 {math_related_zh} 題目的練習比例。**"
         if (domain_tags.get('poor_non_math_related') or domain_tags.get('slow_non_math_related')) and has_non_math_case_agg:
-            focus_note += f" **建議增加 {q_type} 題型下 `{non_math_related_zh}` 題目的練習比例。**"
+            focus_note += f" **建議增加 {q_type} 題型下 {non_math_related_zh} 題目的練習比例。**"
 
         if focus_note and type_recs:
             # Find last non-macro index safely

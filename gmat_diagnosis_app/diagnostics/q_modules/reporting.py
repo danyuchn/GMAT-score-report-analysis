@@ -270,7 +270,7 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     Combines all the diagnostics into a comprehensive yet readable report.
     """
     report_lines = ["Q 科診斷報告詳情"]
-    report_lines.append("---（基於用戶數據與模擬難度分析）---")
+    report_lines.append("（基於用戶數據與模擬難度分析）")
     report_lines.append("")
     
     # 獲取各章節的診斷結果
@@ -477,7 +477,7 @@ def generate_q_ai_tool_recommendations(diagnosed_df_q_subject):
     # This function might not be available or suitable if diagnostic_params_list contains free text.
     # We will display the code/text as is from the list if translation is complex.
 
-    recommendation_lines.append("  --- Q 科目 AI 輔助建議 ---")
+    recommendation_lines.append("  Q 科目 AI 輔助建議")
     # recommendation_lines.append("  - 為了幫助您更有效地整理練習和針對性地解決問題，以下是一些基於您編輯後診斷標籤的建議：")
     
     recommended_tools_added_for_q = False

@@ -172,7 +172,7 @@ def generate_q_recommendations(q_diagnosis_results, df_valid_diagnosed_q_data):
 
     for skill in report_skill_order:
         skill_title = get_translation(skill) if skill != 'Unknown Skill' else '未知技能'
-        final_recommendations.append(f"--- 技能: {skill_title} ---")
+        final_recommendations.append(f"技能: {skill_title}")
         if skill in exempted_skills:
             final_recommendations.append(f"* 技能 {skill_title} 表現完美，已豁免練習建議。")
         elif skill in recommendations_by_skill and recommendations_by_skill[skill]:
