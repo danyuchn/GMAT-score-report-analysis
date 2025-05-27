@@ -47,9 +47,21 @@ class DiagnosisRouterTool:
             "Interactive Understanding Passage": "使用者提供一篇GMAT RC文章，我將扮演 Dustin 的 GMAT RC 文章分析器，透過5-6個有組織的邏輯順序問題來引導你理解文章。",
             "Predictive and Active Reading": "使用者提供一篇文章，我將扮演預測文本導師。我會引用第一句話，請你猜測下一句會是什麼。",
             "Enhanced reading speed": "使用者提供句子，我將自動將其劃分成邏輯上有意義的區塊，每個區塊代表一個獨立的意義單元（如主語、時間範圍、因果關係、主要論點等），以助你更好地理解句子結構。",
-            # GT/MSR/TPA共用的命令
+            # 其他命令描述
             "Sentence cracker": "使用者提供一個難以理解的句子，我會先將其簡化到九年級學生能懂的程度。然後詢問你的困難點是領域特定詞彙、一般詞彙、複雜句型，還是綜合性的。",
-            "Learn Math Concept": "使用者提供一個數學問題，我將從出題者的角度思考，指出這個問題想要測試哪些具體的數學概念，幫助你理解題目背後的考點。"
+            "Learn Math Concept": "使用者提供一個數學問題，我將從出題者的角度思考，指出這個問題想要測試哪些具體的數學概念，幫助你理解題目背後的考點。",
+            "Sentence Cracker": "使用者提供一個難以理解的句子，我會先將其簡化到九年級學生能懂的程度。然後詢問你的困難點是領域特定詞彙、一般詞彙、複雜句型，還是綜合性的。",
+            "Train your Close Reading Skill": "使用者提供短文（80-120字），我將扮演精讀教練，一次只呈現第一句話，請你理解。",
+            "Enhanced Reading Speed": "使用者提供句子，我將自動將其劃分成邏輯上有意義的區塊，每個區塊代表一個獨立的意義單元（如主語、時間範圍、因果關係、主要論點等）。",
+            "Rewrite Passage into Complex Sentences": "使用者提供一篇文章，我將保留其確切的核心含義，不任意增刪觀點、含義或細節，將其改寫成用詞艱深、風格抽象的版本。",
+            "Identify Features for applying a specific solution": "使用者提供一個特定的解題方法，我將總結哪些題目陳述的特徵出現時，可以應用此解題方法。",
+            "Classify This Question": "使用者提供問題，我將判斷其屬於相應的子類型，並進行兩次獨立判斷以確保一致性。",
+            "Passage you failed to organize": "使用者提供一篇難以組織的文章，我將為其創建一個心智圖（markdown格式），幫助你視覺化資訊間的關係。",
+            "Customize your preferred Problem-solving process and request an AI demonstration": "使用者告訴我你偏好的解題順序，我將依此判斷最短、最有效率的閱讀路徑。",
+            "Memorizing Vocabulary": "使用者提供需要記憶的單字，我將為每個單字創建包含英文單字、中文意思、詞性和例句的試算表。",
+            "Understand logical terms": "使用者提供五個答案選項，我將解釋其中每個邏輯術語的含義。",
+            "Rewrite passage into compressed sentences": "將題目中複雜的句子進行複雜化、壓縮或拆解，以幫助理解句子結構。",
+            "Finding similar questions in set": "使用者提供一個題庫和一個之前做錯的樣本問題，我將從題庫中找出使用相似概念的題目。"
         }
 
         # 標籤到科目類型的映射
@@ -156,24 +168,24 @@ class DiagnosisRouterTool:
             # PS路由表
             "PS": {
                 "Q_READING_COMPREHENSION_ERROR": [
-                    "Questions you did wrong", "Convert to real context", "Sentence cracker"
+                    "Questions you did wrong", "Rewrite passage into compressed sentences", "Convert to real context", "Sentence Cracker"
                 ],
                 "Q_CONCEPT_APPLICATION_ERROR": [
-                    "Questions you did wrong", "Learn math concepts", "Identify features for applying a specific solution",
-                    "Create variant question", "Finding Similar Questions in Set", "Classify this question", "Explain Textbook"
+                    "Questions you did wrong", "Learn Math Concept", "Identify features for applying a specific solution",
+                    "Create variant question", "Finding similar questions in set", "Classify This Question", "Explain Textbook"
                 ],
                 "Q_CALCULATION_ERROR": [
-                    "Questions you did wrong", "Create variant question", "Finding Similar Questions in Set"
+                    "Questions you did wrong", "Create variant question", "Finding similar questions in set"
                 ],
                 "Q_READING_COMPREHENSION_DIFFICULTY": [
-                    "Convert to real context", "Sentence cracker"
+                    "Rewrite passage into compressed sentences", "Convert to real context", "Sentence Cracker"
                 ],
                 "Q_CONCEPT_APPLICATION_DIFFICULTY": [
-                    "You did right but slowly", "Learn math concepts", "Identify features for applying a specific solution",
-                    "Create variant question", "Finding Similar Questions in Set", "Classify this question", "Explain Textbook"
+                    "You did right but slowly", "Learn Math Concept", "Identify features for applying a specific solution",
+                    "Create variant question", "Finding similar questions in set", "Classify This Question", "Explain Textbook"
                 ],
                 "Q_CALCULATION_DIFFICULTY": [
-                    "You did right but slowly", "Create variant question", "Finding Similar Questions in Set"
+                    "You did right but slowly", "Create variant question", "Finding similar questions in set"
                 ],
                 "Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE": [
                     "You did right but slowly", "Classify this question"
@@ -186,7 +198,7 @@ class DiagnosisRouterTool:
                     "Questions you did wrong", "Diagnostic Label List", "Memorizing Vocabularies"
                 ],
                 "RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS": [
-                    "Questions you did wrong", "Diagnostic Label List", "Rewrite passage into complex sentences", "Train your close reading skill"
+                    "Questions you did wrong", "Diagnostic Label List", "Rewrite passage into complex sentences", "Train your Close Reading Skill"
                 ],
                 "RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE": [
                     "Questions you did wrong", "Passages you fail to organize", "Diagnostic Label List",
@@ -195,19 +207,19 @@ class DiagnosisRouterTool:
                 ],
                 "RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING": [
                     "Questions you did wrong", "Passages you fail to organize", "Diagnostic Label List",
-                    "Create variant question", "Explain Textbook", "Train your close reading skill"
+                    "Create variant question", "Explain Textbook", "Train your Close Reading Skill"
                 ],
                 "RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT": [
                     "Questions you did wrong", "Diagnostic Label List", "Preparatory answer training",
-                    "Create variant question", "Classify this question", "Explain Textbook", "Train your close reading skill"
+                    "Create variant question", "Classify this Question", "Explain Textbook", "Train your Close Reading Skill"
                 ],
                 "RC_LOCATION_SKILL_ERROR_LOCATION": [
                     "Questions you did wrong", "Diagnostic Label List", "Preparatory answer training",
-                    "Classify this question", "Explain Textbook"
+                    "Classify this Question", "Explain Textbook"
                 ],
                 "RC_REASONING_ERROR_INFERENCE": [
                     "Questions you did wrong", "Examine your thoughts", "Diagnostic Label List",
-                    "Preparatory answer training", "Create variant question", "Classify this question", "Explain Textbook"
+                    "Preparatory answer training", "Create variant question", "Classify this Question", "Explain Textbook"
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_VOCAB": [
                     "Questions you did wrong", "Diagnostic Label List", "Memorizing Vocabularies"
@@ -216,31 +228,31 @@ class DiagnosisRouterTool:
                     "Questions you did wrong", "Diagnostic Label List", "Rewrite passage into complex sentences"
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_LOGIC": [
-                    "Questions you did wrong", "Diagnostic Label List", "Train your close reading skill"
+                    "Questions you did wrong", "Diagnostic Label List", "Train your Close Reading Skill"
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_DOMAIN": [
                     "Questions you did wrong", "Diagnostic Label List"
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT": [
                     "Questions you did wrong", "Diagnostic Label List", "Create variant question",
-                    "Classify this question", "Explain Textbook"
+                    "Classify this Question", "Explain Textbook"
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION": [
                     "Questions you did wrong", "Diagnostic Label List", "Create variant question",
-                    "Classify this question", "Review distractor", "Explain Textbook"
+                    "Classify this Question", "Review distractor", "Explain Textbook"
                 ],
                 "RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING": [
-                    "Questions you did wrong", "Create variant question", "Classify this question", "Explain Textbook"
+                    "Questions you did wrong", "Create variant question", "Classify this Question", "Explain Textbook"
                 ],
                 "RC_READING_COMPREHENSION_DIFFICULTY_VOCAB_BOTTLENECK": [
                     "You did right but slowly", "Memorizing Vocabularies"
                 ],
                 "RC_READING_COMPREHENSION_DIFFICULTY_LONG_DIFFICULT_SENTENCE_ANALYSIS": [
-                    "You did right but slowly", "Rewrite passage into complex sentences", "Train your close reading skill", "Enhanced reading speed"
+                    "You did right but slowly", "Rewrite passage into complex sentences", "Train your Close Reading Skill", "Enhanced Reading Speed"
                 ],
                 "RC_READING_COMPREHENSION_DIFFICULTY_PASSAGE_STRUCTURE_GRASP_UNCLEAR": [
                     "You did right but slowly", "Passages you fail to organize", "Interactive Understanding Passage",
-                    "Predictive and Active Reading", "Explain Textbook", "Enhanced reading speed"
+                    "Predictive and Active Reading", "Explain Textbook", "Enhanced Reading Speed"
                 ],
                 "RC_READING_COMPREHENSION_DIFFICULTY_SPECIFIC_DOMAIN_BACKGROUND_KNOWLEDGE_LACK": [
                     "You did right but slowly", "Rewrite Passage into GMAT style", "Train Reading for Specific Domain"
@@ -249,14 +261,14 @@ class DiagnosisRouterTool:
                     "You did right but slowly"
                 ],
                 "RC_QUESTION_UNDERSTANDING_DIFFICULTY_FOCUS_POINT_GRASP": [
-                    "You did right but slowly", "Preparatory answer training", "Classify this question",
-                    "Explain Textbook", "Train your close reading skill"
+                    "You did right but slowly", "Preparatory answer training", "Classify this Question",
+                    "Explain Textbook", "Train your Close Reading Skill"
                 ],
                 "RC_QUESTION_UNDERSTANDING_DIFFICULTY_MINDSET_BLOCKED": [
                     "You did right but slowly"
                 ],
                 "RC_LOCATION_SKILL_DIFFICULTY_INEFFICIENCY": [
-                    "You did right but slowly", "Preparatory answer training", "Classify this question", "Explain Textbook"
+                    "You did right but slowly", "Preparatory answer training", "Classify this Question", "Explain Textbook"
                 ],
                 "RC_REASONING_DIFFICULTY_INFERENCE_SPEED_SLOW": [
                     "You did right but slowly", "Examine your thoughts", "Preparatory answer training", "Explain Textbook"
@@ -268,16 +280,16 @@ class DiagnosisRouterTool:
                     "You did right but slowly", "Rewrite passage into complex sentences"
                 ],
                 "RC_CHOICE_ANALYSIS_DIFFICULTY_LOGIC": [
-                    "You did right but slowly", "Train your close reading skill"
+                    "You did right but slowly", "Train your Close Reading Skill"
                 ],
                 "RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN": [
                     "You did right but slowly", "Train Reading for Specific Domain"
                 ],
                 "RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT": [
-                    "You did right but slowly", "Classify this question", "Explain Textbook"
+                    "You did right but slowly", "Classify this Question", "Explain Textbook"
                 ],
                 "RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS": [
-                    "You did right but slowly", "Classify this question", "Review distractor", "Explain Textbook"
+                    "You did right but slowly", "Classify this Question", "Review distractor", "Explain Textbook"
                 ]
             },
             
@@ -356,72 +368,80 @@ class DiagnosisRouterTool:
             # MSR路由表
             "MSR": {
                 "DI_READING_COMPREHENSION_ERROR__VOCABULARY": [
-                    "Questions you did wrong", "Memorizing Vocabularies", "Sentence cracker"
+                    "Questions you did wrong", "Memorizing Vocabularies", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__SYNTAX": [
-                    "Questions you did wrong", "Rewrite passage into complex sentences", "Train your close reading skill", "Sentence cracker"
+                    "Questions you did wrong", "Rewrite Passage into Complex Sentences", "Train your Close Reading Skill", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__LOGIC": [
-                    "Questions you did wrong", "Train your close reading skill"
+                    "Questions you did wrong", "Train your Close Reading Skill"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__DOMAIN": [
                     "Questions you did wrong", "Train Reading for Specific Domain"
                 ],
                 "DI_GRAPH_INTERPRETATION_ERROR__GRAPH": [
-                    "Questions you did wrong", "Learn Math Concept", "Identify features for applying a specific solution",
-                    "Classify this question", "Explain Textbook"
+                    "Questions you did wrong", "Learn Math Concept", "Identify Features for applying a specific solution",
+                    "Classify This Question", "Explain Textbook"
                 ],
                 "DI_GRAPH_INTERPRETATION_ERROR__TABLE": [
-                    "Questions you did wrong", "Learn Math Concept", "Identify features for applying a specific solution",
-                    "Classify this question", "Explain Textbook"
+                    "Questions you did wrong", "Learn Math Concept", "Identify Features for applying a specific solution",
+                    "Classify This Question", "Explain Textbook"
                 ],
                 "DI_CONCEPT_APPLICATION_ERROR__MATH": [
-                    "Questions you did wrong", "Learn Math Concept", "Identify features for applying a specific solution",
-                    "Classify this question", "Explain Textbook"
+                    "Questions you did wrong", "Learn Math Concept", "Identify Features for applying a specific solution",
+                    "Classify This Question", "Explain Textbook"
                 ],
                 "DI_LOGICAL_REASONING_ERROR__NON_MATH": [
-                    "Questions you did wrong", "Classify this question", "Explain Textbook"
+                    "Questions you did wrong", "Classify This Question", "Explain Textbook"
                 ],
                 "DI_CALCULATION_ERROR__MATH": ["Questions you did wrong"],
                 "DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION": [
-                    "Passages you fail to organize"
+                    "Passage you failed to organize", "Customize your preferred Problem-solving process and request an AI demonstration"
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX": [
-                    "Rewrite passage into complex sentences", "Train your close reading skill", "Enhanced reading speed", "Sentence cracker"
+                    "Rewrite Passage into Complex Sentences", "Train your Close Reading Skill", "Enhanced Reading Speed", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__LOGIC": [
-                    "Train your close reading skill", "Enhanced reading speed"
+                    "Customize your preferred Problem-solving process and request an AI demonstration",
+                    "Train your Close Reading Skill", "Enhanced Reading Speed"
                 ],
                 "DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH": [
-                    "Learn Math Concept", "Identify features for applying a specific solution"
+                    "Learn Math Concept", "Identify Features for applying a specific solution",
+                    "Customize your preferred Problem-solving process and request an AI demonstration"
                 ],
                 "DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE": [
-                    "Learn Math Concept", "Identify features for applying a specific solution"
+                    "Learn Math Concept", "Identify Features for applying a specific solution",
+                    "Customize your preferred Problem-solving process and request an AI demonstration"
                 ],
                 "DI_CONCEPT_APPLICATION_DIFFICULTY__MATH": [
-                    "Learn Math Concept", "Identify features for applying a specific solution"
+                    "Learn Math Concept", "Identify Features for applying a specific solution",
+                    "Customize your preferred Problem-solving process and request an AI demonstration"
                 ],
-                "DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH": [],
-                "DI_CALCULATION_DIFFICULTY__MATH": [],
-                "DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE": ["Classify this question"],
+                "DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH": [
+                    "Customize your preferred Problem-solving process and request an AI demonstration"
+                ],
+                "DI_CALCULATION_DIFFICULTY__MATH": [
+                    "Customize your preferred Problem-solving process and request an AI demonstration"
+                ],
+                "DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE": ["Classify This Question"],
                 "DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN": ["Train Reading for Specific Domain"],
                 "DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY": [
-                    "Memorizing Vocabularies", "Sentence cracker"
+                    "Memorizing Vocabularies", "Sentence Cracker"
                 ]
             },
             
             # TPA路由表
             "TPA": {
                 "DI_READING_COMPREHENSION_ERROR__VOCABULARY": [
-                    "Questions you did wrong", "Examine your thoughts", "Understand Logical terms", "Memorizing Vocabularies", "Sentence cracker"
+                    "Questions you did wrong", "Examine your thoughts", "Understand logical terms", "Memorizing Vocabulary", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__SYNTAX": [
                     "Questions you did wrong", "Examine your thoughts", "Passages you fail to organize",
-                    "Rewrite passage into complex sentences", "Train your close reading skill", "Sentence cracker"
+                    "Rewrite passage into complex sentences", "Train your Close Reading Skill", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__LOGIC": [
                     "Questions you did wrong", "Examine your thoughts", "Passages you fail to organize",
-                    "Review distractor", "Classify this question", "Train your close reading skill"
+                    "Review distractor", "Classify this question", "Train your Close Reading Skill"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__DOMAIN": [
                     "Questions you did wrong", "Examine your thoughts", "Train Reading for Specific Domain"
@@ -429,24 +449,24 @@ class DiagnosisRouterTool:
                 "DI_CONCEPT_APPLICATION_ERROR__MATH": [
                     "Questions you did wrong", "Examine your thoughts", "Learn math concepts",
                     "Identify features for applying a specific solution", "Create variant question",
-                    "Finding Similar Questions in Set", "Classify this question", "Explain Textbook"
+                    "Finding similar questions in set", "Classify this question", "Explain Textbook"
                 ],
                 "DI_LOGICAL_REASONING_ERROR__NON_MATH": [
                     "Questions you did wrong", "Examine your thoughts", "Review distractor", "Classify this question", "Explain Textbook"
                 ],
                 "DI_CALCULATION_ERROR__MATH": [
-                    "Questions you did wrong", "Examine your thoughts", "Create variant question", "Finding Similar Questions in Set"
+                    "Questions you did wrong", "Examine your thoughts", "Create variant question", "Finding similar questions in set"
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY": [
-                    "You did right but slowly", "Understand Logical terms", "Memorizing Vocabularies", "Sentence cracker"
+                    "You did right but slowly", "Understand logical terms", "Memorizing Vocabulary", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX": [
                     "You did right but slowly", "Passages you fail to organize", "Rewrite passage into complex sentences",
-                    "Train your close reading skill", "Enhanced reading speed", "Sentence cracker"
+                    "Train your Close Reading Skill", "Enhanced Reading Speed", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__LOGIC": [
                     "You did right but slowly", "Passages you fail to organize", "Review distractor",
-                    "Train your close reading skill", "Enhanced reading speed"
+                    "Train your Close Reading Skill", "Enhanced Reading Speed"
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN": [
                     "You did right but slowly", "Train Reading for Specific Domain"
@@ -456,13 +476,13 @@ class DiagnosisRouterTool:
                 ],
                 "DI_CONCEPT_APPLICATION_DIFFICULTY__MATH": [
                     "You did right but slowly", "Learn math concepts", "Identify features for applying a specific solution",
-                    "Create variant question", "Finding Similar Questions in Set", "Explain Textbook"
+                    "Create variant question", "Finding similar questions in set", "Explain Textbook"
                 ],
                 "DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH": [
                     "You did right but slowly", "Review distractor", "Explain Textbook"
                 ],
                 "DI_CALCULATION_DIFFICULTY__MATH": [
-                    "You did right but slowly", "Create variant question", "Finding Similar Questions in Set"
+                    "You did right but slowly", "Create variant question", "Finding similar questions in set"
                 ]
             }
         }
@@ -655,32 +675,30 @@ class DiagnosisRouterTool:
         for tag in all_tags:
             tag_counts[tag] = tag_counts.get(tag, 0) + 1
         
+        # 按頻率排序，只保留前三個標籤
+        sorted_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+        
         # 生成建議
         recommendations = []
-        already_recommended = set()
         
-        # 按頻率排序處理標籤
-        for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True):
+        # 處理頻率最高的三個標籤
+        for tag, count in sorted_tags:
             commands = self.route_diagnosis_tag(tag, subject)
             
             if commands:
                 recommendation_text = f"**{tag}** (出現{count}次):\n"
-                tools_added = False
                 
+                # 顯示所有對應的指令，不進行過濾
                 for command in commands:
-                    if command not in already_recommended:
-                        description = self.command_descriptions.get(command, "描述暫未提供")
-                        recommendation_text += f"- **{command}**: {description}\n"
-                        already_recommended.add(command)
-                        tools_added = True
+                    description = self.command_descriptions.get(command, "描述暫未提供")
+                    recommendation_text += f"- **{command}**: {description}\n"
                 
-                if tools_added:
-                    recommendations.append(recommendation_text)
+                recommendations.append(recommendation_text)
         
         if not recommendations:
             return f"未找到特定匹配的工具建議。建議參考GMAT官方指南中的{subject}科相關練習和策略。"
         
-        return "\n".join(recommendations[:10])  # 最多顯示10條建議
+        return "\n".join(recommendations)
 
     def get_command_description(self, command_name: str) -> Optional[str]:
         """
