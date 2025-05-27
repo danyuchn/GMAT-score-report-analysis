@@ -6,7 +6,7 @@ services:
     image: gmat-diag-app:latest # Specifies the Docker image to use (the one we built earlier)
     container_name: gmat_diagnostic_container # Optional: gives a specific name to the running container
     ports:
-      - "8501:8501" # Maps port 8501 of the host to port 8501 of the container
+      - "8502:8501" # Maps port 8502 of the host to port 8501 of the container
     restart: unless-stopped # Defines the restart policy
                            # unless-stopped: restarts the container unless it was explicitly stopped
                            # always: always restarts, even if stopped manually (use with caution)
