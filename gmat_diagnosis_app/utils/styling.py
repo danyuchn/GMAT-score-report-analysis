@@ -195,6 +195,8 @@ def apply_custom_css():
     
     .stTabs [data-baseweb="tab"] {
         height: 3rem;
+        min-width: 8rem;
+        padding: 0.5rem 1.25rem;
         white-space: pre-wrap;
         background-color: #ffffff;
         border-radius: 0.375rem;
