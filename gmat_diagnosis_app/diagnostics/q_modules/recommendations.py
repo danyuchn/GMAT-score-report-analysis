@@ -8,7 +8,11 @@ Q診斷模塊的建議生成功能
 import pandas as pd
 # Use i18n system instead of the old translation function
 from gmat_diagnosis_app.i18n import translate as t
-from gmat_diagnosis_app.diagnostics.q_modules.utils import grade_difficulty_q, calculate_practice_time_limit
+from gmat_diagnosis_app.diagnostics.q_modules.utils import (
+    grade_difficulty_q, 
+    calculate_time_limit_from_avg,
+    map_difficulty_to_label
+)
 
 
 def generate_q_recommendations(q_diagnosis_results, df_valid_diagnosed_q_data):
@@ -117,9 +121,9 @@ def generate_q_recommendations(q_diagnosis_results, df_valid_diagnosed_q_data):
                         y_agg = grade_difficulty_q(min_relevant_difficulty)
                     else:
                         # If neither 'error' nor 'correct_slow' triggers provide valid difficulty
-                        y_agg = "建議從基礎難度開始 (具體難度未知)"
+                        y_agg = t('start_from_basic_difficulty')
             
-            macro_rec_text = f"**優先全面鞏固基礎** (整體錯誤率或超時率 > 50%): 從 {y_agg} 難度開始, 建議限時 {z_agg} 分鐘。"
+            macro_rec_text = t('macro_comprehensive_foundation').format(y_agg, z_agg)
             skill_recs_list.append({'type': 'macro', 'text': macro_rec_text, 'priority': 0})
             processed_override_skills.add(skill)
         
@@ -139,25 +143,33 @@ def generate_q_recommendations(q_diagnosis_results, df_valid_diagnosed_q_data):
                 if difficulty is not None and not pd.isna(difficulty):
                     y = grade_difficulty_q(difficulty)
                 
-                z = calculate_practice_time_limit(time, is_overtime_trigger)
+                z = calculate_time_limit_from_avg(time, is_overtime_trigger)
                 priority = 1 if is_sfe_trigger else (2 if trigger.get('trigger_type') == 'error' else 3)
-                trigger_context = f"第 {q_position_trigger} 題相關"
-                if trigger.get('trigger_type') == 'correct_slow': trigger_context += " (正確但慢)"
+                trigger_context = t('question_related_trigger').format(q_position_trigger)
+                if trigger.get('trigger_type') == 'correct_slow': 
+                    trigger_context += t('correct_but_slow_marker')
 
-                practice_details = f"練習 {y}, 限時 {z} 分鐘。"
-                if trigger.get('trigger_type') == 'correct_slow': practice_details = f"練習 {y}, 限時 {z} 分鐘 (提升速度)。"
+                practice_details = t('practice_details').format(y, z)
+                if trigger.get('trigger_type') == 'correct_slow': 
+                    practice_details = t('practice_details_speed').format(y, z)
                 
                 case_rec_text = f"{trigger_context}: {practice_details}"
-                if is_sfe_trigger: case_rec_text = f"*基礎掌握不穩* {case_rec_text}"
-                if z > 4.0: case_rec_text += " **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效**"
+                if is_sfe_trigger: 
+                    case_rec_text = t('foundation_instability_marker').format(case_rec_text)
+                if z > 4.0: 
+                    case_rec_text += t('practice_volume_warning')
+                
                 skill_recs_list.append({'type': 'case', 'text': case_rec_text, 'priority': priority})
             
             if skill_recs_list: # Only add adjustment if there are case recommendations
                 adjustment_text = ""
-                if poor_real and has_real_trigger: adjustment_text += " **Real題比例建議佔總練習題量2/3。**"
-                if slow_pure and has_pure_trigger: adjustment_text += " **建議此考點練習題量增加。**"
-                if adjustment_text:
-                    adj_text_full = f"整體練習註記: {adjustment_text.strip()}"
+                if poor_real and has_real_trigger: 
+                    adjustment_text += t('real_questions_ratio_note')
+                if slow_pure and has_pure_trigger: 
+                    adjustment_text += t('increase_practice_volume_note')
+                
+                if adjustment_text.strip():
+                    adj_text_full = t('overall_practice_notes').format(adjustment_text.strip())
                     # Find the last case recommendation to append this note to, or add as separate
                     if skill_recs_list and skill_recs_list[-1]['type'] == 'case':
                         skill_recs_list[-1]['text'] += adjustment_text
@@ -172,18 +184,18 @@ def generate_q_recommendations(q_diagnosis_results, df_valid_diagnosed_q_data):
     report_skill_order = sorted(list(all_skills_in_valid_data.union(set(recommendations_by_skill.keys()))), key=lambda s: (0 if s in processed_override_skills else 1, 0 if s in exempted_skills else 1, s))
 
     for skill in report_skill_order:
-        skill_title = t(skill) if skill != 'Unknown Skill' else '未知技能'
-        final_recommendations.append(f"技能: {skill_title}")
+        skill_title = t(skill) if skill != 'Unknown Skill' else t('Unknown Skill')
+        final_recommendations.append(t('skill_label').format(skill_title))
         if skill in exempted_skills:
-            final_recommendations.append(f"* 技能 {skill_title} 表現完美，已豁免練習建議。")
+            final_recommendations.append(t('skill_perfect_exemption').format(skill_title))
         elif skill in recommendations_by_skill and recommendations_by_skill[skill]:
             for rec in recommendations_by_skill[skill]:
                 final_recommendations.append(f"* {rec['text']}")
         elif skill not in processed_override_skills: # Not exempted, no specific recs, not overridden -> should not happen if logic is correct
-            final_recommendations.append(f"* (關於技能 {skill_title} 無特定建議，請參考整體總結。)")
+            final_recommendations.append(t('no_specific_skill_recommendation').format(skill_title))
         final_recommendations.append("")
     
     if not final_recommendations:
-        final_recommendations.append("根據本次分析，未產生具體的量化練習建議。請參考整體診斷總結。")
+        final_recommendations.append(t('no_quantitative_recommendations'))
     
     return final_recommendations 

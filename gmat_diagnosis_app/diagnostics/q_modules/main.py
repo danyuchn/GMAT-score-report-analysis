@@ -247,6 +247,6 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     # If summary_report is generated, it's preferred. Otherwise, main_report (which is now empty or placeholder).
     final_report_str = summary_report if include_summary_report and summary_report is not None else main_report
     if final_report_str is None: # Ensure final_report_str is never None
-        final_report_str = "報告生成被禁用或遇到問題。" # Default message if no report is generated
+        final_report_str = t('report_generation_disabled') # Default message if no report is generated
     
     return results, final_report_str, df_diagnosed 

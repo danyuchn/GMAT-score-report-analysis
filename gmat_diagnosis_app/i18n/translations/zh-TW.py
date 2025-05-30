@@ -112,5 +112,133 @@ TRANSLATIONS = {
     'difficulty': "難度",
     'skill': "技能",
     'position': "位置",
-    'type': "類型"
+    'type': "類型",
+    
+    # Q Diagnostic Reporting - Hardcoded Chinese text from reporting.py
+    'q_report_title': "Q 科診斷報告詳情",
+    'q_report_subtitle': "（基於用戶數據與模擬難度分析）",
+    'report_overview_feedback': "**一、 報告總覽與即時反饋**",
+    'time_strategy_assessment': "* **A. 作答時間與策略評估**",
+    'time_pressure_status_label': "時間壓力狀態：",
+    'overtime_threshold_used': "使用的超時閾值：",
+    'minutes': "分鐘",
+    'important_notes': "* **B. 重要註記**",
+    'manual_invalid_data_count': "手動標記無效數據題數：",
+    'valid_score_rate': "有效評分率（基於手動無效排除）：",
+    'yes': "有",
+    'no': "無",
+    
+    'core_performance_analysis': "**二、 核心表現分析**",
+    'content_domain_overview': "* **A. 內容領域表現概覽**",
+    'by_question_type': "* **按題型 (Real vs Pure):**",
+    'real_performance_poor': "Real 題目表現較差：錯誤率顯著高於 Pure 題目",
+    'pure_performance_poor': "Pure 題目表現較差：錯誤率顯著高於 Real 題目",
+    'real_slower': "Real 題目較慢：超時率顯著高於 Pure 題目",
+    'pure_slower': "Pure 題目較慢：超時率顯著高於 Pure 題目",
+    'no_significant_difference': "Real 和 Pure 題型表現無顯著差異",
+    'error_difficulty_distribution': "* **錯誤難度分佈:**",
+    'questions_count': "題",
+    
+    'core_issues_diagnosis': "**三、 核心問題診斷**",
+    'high_frequency_potential_issues': "* **B. 高頻潛在問題點**",
+    'sfe_attention_note': "尤其需要注意的是，在一些已掌握技能範圍內的基礎或中等難度題目上出現了失誤",
+    'sfe_skills_involved': "，涉及技能:",
+    'sfe_stability_problem': "，這表明在這些知識點的應用上可能存在穩定性問題。",
+    'careless_tendency': "傾向於快速作答但出錯，可能涉及",
+    'concept_understanding_issue': "花費了較長時間但仍無法解決部分問題，或對問題理解存在偏差，可能涉及",
+    'calculation_error_cause': "計算錯誤也是失分原因",
+    'reading_comprehension_barrier': "Real題的文字信息理解可能存在障礙",
+    'efficiency_time_consumption': "部分題目雖然做對，但在{}等環節耗時過長 ({})，反映了應用效率有待提升。",
+    'no_core_issues_identified': "未識別出主要的核心問題模式。",
+    'reading_real_questions': "Real題閱讀",
+    'concept_thinking': "概念思考",
+    'calculation_process': "計算過程",
+    'or': " 或 ",
+    
+    'special_behavioral_patterns': "* **C. 特殊行為模式觀察**",
+    'early_rushing_warning': "測驗開始階段的部分題目作答速度較快，建議注意保持穩定的答題節奏，避免潛在的 \"flag for review\" 風險。",
+    'carelessness_analysis': "分析顯示，「快而錯」的情況佔比較高 ({})，提示可能需要關注答題的仔細程度，減少粗心錯誤。",
+    'no_special_patterns': "未發現明顯的特殊作答模式。",
+    
+    'practice_consolidation': "**三、 練習建議與基礎鞏固**",
+    'priority_consolidation_skills': "* **A. 優先鞏固技能**",
+    'core_skills_consolidation': "對於 [**{}**] 這些核心技能，由於整體表現顯示出較大的提升空間，建議優先進行系統性的基礎鞏固，而非僅針對個別錯題練習。",
+    'no_skill_override_triggered': "未觸發需要優先進行基礎鞏固的技能覆蓋規則。",
+    
+    'overall_practice_direction': "* **B. 整體練習方向**",
+    'sfe_priority_note': "(注意：涉及「**基礎掌握不穩**」的建議已優先列出)",
+    'no_specific_practice_recommendations': "無具體練習建議生成。",
+    
+    'follow_up_action_guidance': "**四、 後續行動與深度反思指引**",
+    'guided_reflection_prompts': "* **B. 引導性反思提示 (針對特定技能與表現)**",
+    'reflection_instruction': "找尋【{}】【{}】的考前做題紀錄，找尋【{}】的題目，檢討並反思自己是否有：",
+    'problems_category': "等問題。",
+    'default_reflection_prompt': "找尋考前做題紀錄中的錯題，按照【基礎技能】【題型】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。",
+    
+    'practice_record_review': "* **A. 檢視練習記錄 (二級證據參考)**",
+    'review_purpose': "* **目的：** 當您無法準確回憶具體的錯誤原因、涉及的知識點，或需要更客觀的數據來確認問題模式時。",
+    'review_method': "* **方法：** 建議您按照以上引導反思查看近期的練習記錄，整理相關錯題或超時題目。",
+    'key_focus': "* **重點關注：** 題目是否反覆涉及報告第三部分指出的核心問題：",
+    'key_focus_general': "* **重點關注：** 根據核心表現分析，留意常見錯誤類型。",
+    'sample_insufficient_note': "* **注意：** 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。",
+    'no_secondary_evidence_needed': "(本次分析未發現需要二級證據深入探究的問題點，或數據不足)",
+    
+    'advanced_assistance': "**五、 尋求進階協助 (質化分析)**",
+    'qualitative_analysis_suggestion': "* **建議：** 如果您對報告中指出的某些問題仍感困惑，可以嘗試 **提供 2-3 題相關錯題的詳細解題流程跟思路範例** ，供顧問進行更深入的個案分析。",
+    
+    # Utility functions translations
+    'unknown_difficulty': "未知難度 (Unknown)",
+    'low_difficulty': "低難度 (Low) / 505+",
+    'mid_difficulty_555': "中難度 (Mid) / 555+",
+    'mid_difficulty_605': "中難度 (Mid) / 605+",
+    'mid_difficulty_655': "中難度 (Mid) / 655+",
+    'high_difficulty_705': "高難度 (High) / 705+",
+    'high_difficulty_805': "高難度 (High) / 805+",
+    'unknown_difficulty_short': "未知難度",
+    
+    # Main diagnosis module translations
+    'report_generation_disabled': "報告生成被禁用或遇到問題。",
+    
+    # AI prompts module translations
+    'no_data_for_analysis': "(無數據可供分析)",
+    'no_diagnostic_tags_found': "(未找到診斷標籤)",
+    
+    # Recommendations module translations
+    'macro_comprehensive_foundation': "**優先全面鞏固基礎** (整體錯誤率或超時率 > 50%): 從 {} 難度開始, 建議限時 {} 分鐘。",
+    'start_from_basic_difficulty': "建議從基礎難度開始 (具體難度未知)",
+    'question_related_trigger': "第 {} 題相關",
+    'correct_but_slow_marker': " (正確但慢)",
+    'practice_details': "練習 {}, 限時 {} 分鐘。",
+    'practice_details_speed': "練習 {}, 限時 {} 分鐘 (提升速度)。",
+    'foundation_instability_marker': "*基礎掌握不穩* {}",
+    'practice_volume_warning': " **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效**",
+    'real_questions_ratio_note': " **Real題比例建議佔總練習題量2/3。**",
+    'increase_practice_volume_note': " **建議此考點練習題量增加。**",
+    'overall_practice_notes': "整體練習註記: {}",
+    'skill_label': "技能: {}",
+    'skill_perfect_exemption': "* 技能 {} 表現完美，已豁免練習建議。",
+    'no_specific_skill_recommendation': "* (關於技能 {} 無特定建議，請參考整體總結。)",
+    'no_quantitative_recommendations': "根據本次分析，未產生具體的量化練習建議。請參考整體診斷總結。",
+    
+    # Time performance categories
+    'fast_wrong': "快錯",
+    'slow_wrong': "慢錯",
+    'normal_time_wrong': "正常時間錯",
+    
+    # Problem categories for reflection
+    'carelessness_problems': "粗心問題",
+    'reading_comprehension_problems': "閱讀理解問題",
+    'calculation_problems': "計算問題",
+    'concept_application_problems': "概念應用問題",
+    'efficiency_problems': "效率問題",
+    'problem_types': "問題類型",
+    
+    # AI tool recommendations
+    'q_ai_tool_recommendations': "Q 科目 AI 輔助建議",
+    'q_no_data_for_ai': "(Q科無數據可生成AI建議。)",
+    'q_missing_diagnostic_params': "(Q科數據缺少 'diagnostic_params_list' 欄位，無法生成AI建議。)",
+    'q_no_specific_ai_recommendations': "(根據您的Q科編輯，未觸發特定的工具或 AI 提示建議。)",
+    'q_ai_missing_config': "(AI建議配置缺失，無法生成Q科建議。)",
+    'ai_diagnosis_involves': "**若診斷涉及【{}】:**",
+    'general_gmat_q_tool_suggestion': "未找到特定匹配的工具建議。建議參考GMAT官方指南中的Q科相關練習和策略。"
 } 
