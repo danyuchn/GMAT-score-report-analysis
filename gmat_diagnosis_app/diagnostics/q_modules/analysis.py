@@ -11,7 +11,8 @@ import logging # Add logging import
 from gmat_diagnosis_app.diagnostics.q_modules.constants import (
     INVALID_DATA_TAG_Q,
     PARAM_ASSIGNMENT_RULES,
-    DEFAULT_INCORRECT_PARAMS
+    DEFAULT_INCORRECT_PARAMS,
+    RELATIVELY_FAST_MULTIPLIER
 )
 
 # # Configure basic logging # Removed by AI
@@ -40,7 +41,7 @@ def diagnose_q_root_causes(df, avg_times, max_diffs):
     numeric_time = pd.to_numeric(df['question_time'], errors='coerce')
     
     # Determine if relatively fast
-    df['is_relatively_fast'] = (numeric_time < (df['avg_time_for_type'] * 0.75)).replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
+    df['is_relatively_fast'] = (numeric_time < (df['avg_time_for_type'] * RELATIVELY_FAST_MULTIPLIER)).replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
     
     # Determine if slow
     df['is_slow'] = df['overtime'].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)

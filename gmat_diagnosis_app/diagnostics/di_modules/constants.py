@@ -1,9 +1,24 @@
-# --- DI-Specific Constants (from Markdown Chapter 0 & 1) ---
-MAX_ALLOWED_TIME_DI = 45.0  # minutes
-TOTAL_QUESTIONS_DI = 20
-TIME_PRESSURE_THRESHOLD_DI = 3.0  # minutes difference
-INVALID_TIME_THRESHOLD_MINUTES = 0.5  # 修改為 0.5 分鐘，與核心邏輯文件第一章疑似放棄的標準一致
-INVALID_DATA_TAG_DI = "數據無效：用時過短（受時間壓力影響）" # Added invalid tag
+"""
+DI診斷常數模塊
+
+此模塊包含所有用於DI(Data Insights)診斷的常量、閾值和參數映射。
+"""
+
+# 從統一常數檔案匯入共通常數
+from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
+
+# DI基本常數
+MAX_ALLOWED_TIME_DI = 45  # 測驗上限時間（分鐘）
+TOTAL_QUESTIONS_DI = 20  # 題目總數
+TIME_PRESSURE_THRESHOLD_DI = 3.0  # 時間差閾值（分鐘）
+
+# 使用統一常數
+INVALID_TIME_THRESHOLD_MINUTES = COMMON_TIME_CONSTANTS['INVALID_TIME_THRESHOLD_MINUTES']
+SUSPICIOUS_FAST_MULTIPLIER = COMMON_TIME_CONSTANTS['SUSPICIOUS_FAST_MULTIPLIER']
+RELATIVELY_FAST_MULTIPLIER = COMMON_TIME_CONSTANTS['RELATIVELY_FAST_MULTIPLIER']
+CARELESSNESS_THRESHOLD = COMMON_TIME_CONSTANTS['CARELESSNESS_THRESHOLD']
+
+INVALID_DATA_TAG_DI = "數據無效：用時過短（受時間壓力影響）"
 
 # Overtime thresholds (minutes) based on time pressure
 OVERTIME_THRESHOLDS = {
@@ -24,12 +39,6 @@ OVERTIME_THRESHOLDS = {
         'MSR_SINGLE_Q': 1.5  # Single question threshold often kept constant
     }
 }
-
-# 添加用於判斷異常快速作答的標準（核心邏輯文件第一章）
-SUSPICIOUS_FAST_MULTIPLIER = 0.5  # 用於計算相對於前三分之一平均的閾值
-
-# 添加粗心閾值（核心邏輯文件第四章）
-CARELESSNESS_THRESHOLD = 0.25  # 快錯率超過25%判定為粗心 
 
 # 添加前期過快題目絕對時間閾值 (核心邏輯文件第四章)
 EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES = 1.0 # 分鐘 

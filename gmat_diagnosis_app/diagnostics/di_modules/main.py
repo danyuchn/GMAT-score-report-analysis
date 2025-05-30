@@ -21,6 +21,8 @@ from .chapter_logic import (
     _diagnose_root_causes, _observe_di_patterns, _check_foundation_override, _generate_di_recommendations
 )
 from .report_generation import _generate_di_summary_report
+from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
+from gmat_diagnosis_app.analysis_helpers.time_analyzer import calculate_first_third_average_time_per_type
 
 # Rename the main processing function for clarity within the module
 def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
@@ -121,16 +123,9 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         df_di['suspiciously_fast'] = False # This column might be redundant after full invalid logic
         
         # 計算考試前三分之一各題型平均時間 (first_third_average_time_per_type)
-        first_third_average_time_per_type = {}
-        if 'question_position' in df_di.columns and 'question_time' in df_di.columns and 'question_type' in df_di.columns:
-            positions = df_di['question_position'].sort_values().unique()
-            if len(positions) > 0: # Ensure positions is not empty
-                first_third_q_count = max(1, len(positions) // 3)
-                first_third_positions = positions[:first_third_q_count]
-                
-                first_third_df = df_di[df_di['question_position'].isin(first_third_positions)].copy() # Use .copy() to avoid SettingWithCopyWarning
-                if not first_third_df.empty:
-                    first_third_average_time_per_type = first_third_df.groupby('question_type')['question_time'].mean().to_dict()
+        first_third_average_time_per_type = calculate_first_third_average_time_per_type(
+            df_di, ['DS', 'TPA', 'MSR', 'GT', 'Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
+        )
 
         # 舊的 suspiciously_fast 邏輯 (基於全局平均) 可以被新的 is_invalid 邏輯覆蓋或移除
         # For now, we comment it out as the new invalid logic is more comprehensive

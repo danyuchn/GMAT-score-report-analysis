@@ -26,7 +26,7 @@ def analyze_behavioral_patterns(df_q_valid_diagnosed):
         first_third_end = max(1, len(positions) // 3)
         first_third_positions = positions[:first_third_end]
         
-        # 在前三分之一題目中找出作答時間 < 1.0 分鐘的題目
+        # 在前三分之一題目中找出作答時間 < 1.0 分鐘的題目（絕對標準）
         first_third_mask = df_q_valid_diagnosed['question_position'].isin(first_third_positions)
         df_first_third = df_q_valid_diagnosed[first_third_mask]
         df_first_third_fast = df_first_third[df_first_third['question_time'] < 1.0]
@@ -36,19 +36,32 @@ def analyze_behavioral_patterns(df_q_valid_diagnosed):
             early_rushing_items = df_first_third_fast['question_position'].tolist()
     
     # 粗心問題評估
-    # 獲取時間表現分類為"Fast & Wrong"的題目數量
-    fast_wrong_count = df_q_valid_diagnosed[df_q_valid_diagnosed['time_performance_category'] == 'Fast & Wrong'].shape[0]
+    # 按照MD文檔第五章：計算相對快速作答中錯誤的比例
+    # 需要重新計算相對快速作答，因為analysis.py中的is_relatively_fast已被移除
     
-    # 獲取所有"Fast"相關分類的題目總數（Fast & Wrong + Fast & Correct）
-    all_fast_count = df_q_valid_diagnosed[df_q_valid_diagnosed['time_performance_category'].str.startswith('Fast')].shape[0]
+    # 計算各題型平均時間（用於確定相對快速）
+    avg_times_by_type = df_q_valid_diagnosed.groupby('question_type')['question_time'].mean().to_dict()
     
-    # 計算快錯率：所有快速作答中錯誤的比例
-    if all_fast_count > 0:
-        fast_wrong_rate = fast_wrong_count / all_fast_count
+    # 標記相對快速作答（按第三章定義：< 平均時間 * 0.75）
+    df_temp = df_q_valid_diagnosed.copy()
+    df_temp['avg_time_for_type'] = df_temp['question_type'].map(avg_times_by_type).fillna(2.0)
+    df_temp['is_relatively_fast'] = df_temp['question_time'] < (df_temp['avg_time_for_type'] * 0.75)
+    
+    # 計算相對快速作答的總數和錯誤數
+    num_relatively_fast_total = df_temp['is_relatively_fast'].sum()
+    num_relatively_fast_incorrect = df_temp[
+        (df_temp['is_relatively_fast']) & (df_temp['is_correct'] == False)
+    ].shape[0]
+    
+    # 計算快錯率：相對快速作答中錯誤的比例
+    if num_relatively_fast_total > 0:
+        fast_wrong_rate = num_relatively_fast_incorrect / num_relatively_fast_total
         # 使用 CARELESSNESS_THRESHOLD 常數作為閾值
         if fast_wrong_rate > CARELESSNESS_THRESHOLD:
             carelessness_issue = True
-            
+    else:
+        fast_wrong_rate = 0.0
+    
     # 整理結果
     return {
         "early_rushing_flag": early_rushing_flag, 

@@ -1,6 +1,18 @@
 # -*- coding: utf-8 -*-
 """Centralized Thresholds for GMAT Diagnosis App."""
 
+# --- Common Time-related Constants ---
+COMMON_TIME_CONSTANTS = {
+    'SUSPICIOUS_FAST_MULTIPLIER': 0.5,  # 相對於前三分之一平均時間的倍數，判斷相對倉促
+    'RELATIVELY_FAST_MULTIPLIER': 0.75,  # 相對於全體平均時間的倍數，判斷相對快速作答
+    'INVALID_TIME_THRESHOLD_MINUTES': 0.5,  # 判斷為疑似放棄的閾值（分鐘）
+    'ABSOLUTE_FAST_THRESHOLD_MINUTES': 1.0,  # 判斷為絕對倉促的閾值（分鐘）
+    'CARELESSNESS_THRESHOLD': 0.25,  # 快錯率超過25%判定為粗心
+    'SKILL_OVERRIDE_THRESHOLD': 0.5,  # 技能覆蓋規則閾值（50%）
+    'TARGET_PRACTICE_TIME_MINUTES': 2.0,  # 練習建議的目標時間
+    'MACRO_PRACTICE_TIME_MINUTES': 2.5   # 宏觀建議的固定限時
+}
+
 THRESHOLDS = {
     'Q': {
         'TOTAL_QUESTIONS': 21,

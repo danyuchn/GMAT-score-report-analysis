@@ -275,3 +275,34 @@ def calculate_overtime(df, time_pressure_status_map):
         df.drop(columns=['q_time_numeric'], inplace=True, errors='ignore')
         
     return df
+
+def calculate_first_third_average_time_per_type(df, question_types):
+    """
+    統一計算前期平均時間的函數，供各科目模組使用
+    
+    Args:
+        df (DataFrame): 包含題目數據的DataFrame
+        question_types (list): 要計算的題目類型列表
+    
+    Returns:
+        dict: 各題目類型的前期平均時間 {type: avg_time}
+    """
+    first_third_average_time_per_type = {}
+    
+    if 'question_position' not in df.columns or 'question_time' not in df.columns or 'question_type' not in df.columns:
+        # 如果缺少必要欄位，返回預設值
+        return {q_type: 2.0 for q_type in question_types}
+    
+    total_questions = len(df)
+    first_third_end = total_questions // 3
+    df_first_third = df[df['question_position'] <= first_third_end]
+    
+    for q_type in question_types:
+        type_data = df_first_third[df_first_third['question_type'] == q_type]
+        if not type_data.empty:
+            avg_time = type_data['question_time'].mean()
+            first_third_average_time_per_type[q_type] = avg_time if not pd.isna(avg_time) else 2.0
+        else:
+            first_third_average_time_per_type[q_type] = 2.0
+    
+    return first_third_average_time_per_type

@@ -31,20 +31,27 @@ def map_difficulty_to_label(difficulty):
     else: return t('unknown_difficulty')  # 處理超出預期範圍的難度值
 
 
-def calculate_time_limit_from_avg(avg_time, is_overtime=False):
+def calculate_time_limit_from_avg(question_time, is_overtime=False):
     """
-    根據平均時間計算建議的限時。
-    使用向下取整到最近的0.5倍數的函數計算起始限時，
-    並設定目標時間為2.0分鐘。
-    """
-    target_time = 2.0
+    根據MD文檔第七章統一計算規則計算建議的限時。
     
-    # 計算基本時間：如果超時，則減少0.5分鐘
-    base_time = avg_time - 0.5 if is_overtime else avg_time
+    Args:
+        question_time: 原始題目作答時間 (T)
+        is_overtime: 是否為超時題目
+    
+    Returns:
+        建議的練習限時 (Z)
+    """
+    target_time = 2.0  # 目標時間
+    
+    # 計算base_time：如果是超時（is_slow），則T - 0.5，否則T
+    base_time = question_time - 0.5 if is_overtime else question_time
+    
     # 向下取整到最近的0.5倍數
-    time_limit = math.floor(base_time * 2) / 2
+    z_raw = math.floor(base_time * 2) / 2
+    
     # 確保不低於目標時間
-    time_limit = max(time_limit, target_time)
+    time_limit = max(z_raw, target_time)
     
     return time_limit
 

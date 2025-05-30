@@ -1,11 +1,22 @@
 """
-V診斷模塊的常量和參數映射
+V診斷模塊的常量
 
-此模塊包含所有用於V(Verbal)診斷的常量、閾值和參數映射，
-用於診斷報告生成和分析。
+此模塊包含V(Verbal)診斷所需的所有常量、閾值和參數映射。
 """
 
+# 從統一常數檔案匯入共通常數
+from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
+
 # --- V-Specific Constants ---
+# 使用統一常數
+V_SUSPICIOUS_FAST_MULTIPLIER = COMMON_TIME_CONSTANTS['SUSPICIOUS_FAST_MULTIPLIER']
+CARELESSNESS_THRESHOLD = COMMON_TIME_CONSTANTS['CARELESSNESS_THRESHOLD']
+
+# V特定的常數
+MAX_ALLOWED_TIME_V = 45  # 測驗上限時間（分鐘）
+TOTAL_QUESTIONS_V = 23  # 題目總數
+TIME_PRESSURE_THRESHOLD_V = 3.0  # 時間差閾值（分鐘）
+
 # CR Overtime Thresholds (minutes) based on pressure
 CR_OVERTIME_THRESHOLDS = {
     True: 2.0, # High Pressure
@@ -43,7 +54,6 @@ V_INVALID_TIME_ABANDONED = 0.5 # minutes (as per V-Doc Ch1 Invalid rule)
 V_INVALID_TIME_HASTY_MIN = 1.0 # minutes (as per V-Doc Ch1 Invalid rule)
 HASTY_GUESSING_THRESHOLD_MINUTES = 0.5 # minutes (Used for BEHAVIOR_GUESSING_HASTY tag in Ch3)
 INVALID_DATA_TAG_V = "數據無效：用時過短（受時間壓力影響）"
-V_SUSPICIOUS_FAST_MULTIPLIER = 0.5 # 標記過快可疑題目的乘數
 
 # Map fundamental skills (expected in data) to broader error categories for Chapter 3
 V_SKILL_TO_ERROR_CATEGORY = {

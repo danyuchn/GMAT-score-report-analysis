@@ -10,10 +10,14 @@ from collections import defaultdict
 
 from gmat_diagnosis_app.diagnostics.q_modules.constants import (
     OVERTIME_THRESHOLDS,
-    INVALID_DATA_TAG_Q
+    INVALID_DATA_TAG_Q,
+    INVALID_TIME_THRESHOLD_MINUTES,
+    ABSOLUTE_FAST_THRESHOLD_MINUTES,
+    SUSPICIOUS_FAST_MULTIPLIER
 )
 # Use i18n system instead of the old translation function
 from gmat_diagnosis_app.i18n import translate as t
+from gmat_diagnosis_app.analysis_helpers.time_analyzer import calculate_first_third_average_time_per_type
 from gmat_diagnosis_app.diagnostics.q_modules.analysis import diagnose_q_root_causes, diagnose_q_internal
 from gmat_diagnosis_app.diagnostics.q_modules.behavioral import analyze_behavioral_patterns, analyze_skill_override
 from gmat_diagnosis_app.diagnostics.q_modules.recommendations import generate_q_recommendations
@@ -71,6 +75,61 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
         # This ensures the column exists for downstream processes
         df_q['overtime'] = pd.Series([False] * len(df_q), index=df_q.index)
 
+    # Calculate first third average time per type (MD Doc Chapter 0)
+    first_third_average_time_per_type = calculate_first_third_average_time_per_type(df_q, ['Real', 'Pure'])
+
+    # Update invalid data detection logic according to MD Doc Chapter 1
+    if q_time_pressure_status:  # Only mark invalid data if time pressure exists
+        # 修正：計算測驗最後 1/3 的題目（MD文檔第一章）
+        total_questions = len(df_q)
+        last_third_size = total_questions // 3
+        last_third_start_position = total_questions - last_third_size + 1
+        
+        # 獲取實際的題目位置範圍
+        all_positions = sorted(df_q['question_position'].unique())
+        if len(all_positions) >= last_third_size:
+            last_third_positions = all_positions[-last_third_size:]
+            last_third_questions = df_q[df_q['question_position'].isin(last_third_positions)]
+        else:
+            # 如果題目數少於計算的1/3，則檢查所有題目
+            last_third_questions = df_q
+        
+        invalid_mask = pd.Series([False] * len(df_q), index=df_q.index)
+        
+        for idx, row in last_third_questions.iterrows():
+            question_time = pd.to_numeric(row.get('question_time'), errors='coerce')
+            question_type = row.get('question_type')
+            
+            if pd.isna(question_time):
+                continue
+                
+            # Check abnormally fast response criteria
+            abnormally_fast = False
+            
+            # Standard 1: Suspected abandonment (< 0.5 min)
+            if question_time < INVALID_TIME_THRESHOLD_MINUTES:
+                abnormally_fast = True
+            
+            # Standard 2: Absolutely rushed (< 1.0 min)
+            elif question_time < ABSOLUTE_FAST_THRESHOLD_MINUTES:
+                abnormally_fast = True
+            
+            # Standard 3 & 4: Relative to first third average
+            elif question_type in first_third_average_time_per_type:
+                first_third_avg = first_third_average_time_per_type[question_type]
+                if question_time < (first_third_avg * SUSPICIOUS_FAST_MULTIPLIER):
+                    abnormally_fast = True
+            
+            if abnormally_fast:
+                invalid_mask[idx] = True
+        
+        # Update is_invalid column
+        df_q['is_invalid'] = invalid_mask
+    else:
+        # If no time pressure, ensure is_invalid column exists but is False
+        if 'is_invalid' not in df_q.columns:
+            df_q['is_invalid'] = False
+
     # Determine the mask for valid data, prioritizing 'is_manually_invalid'
     if 'is_manually_invalid' in df_q.columns:
         manual_invalid_mask = df_q['is_manually_invalid'].fillna(False).astype(bool)
@@ -80,11 +139,9 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
         # This is a critical step: if is_manually_invalid exists, it should be the source of truth for 'is_invalid' state.
         df_q['is_invalid'] = manual_invalid_mask 
     elif 'is_invalid' in df_q.columns:
-        # Fallback to is_invalid if is_manually_invalid is not present
-        # Logging a warning might be useful here in a real scenario
-        print("Warning: 'is_manually_invalid' column not found. Falling back to 'is_invalid' for filtering Q data.")
+        # Use the automatically calculated is_invalid from above logic
         valid_data_mask = ~df_q['is_invalid'].fillna(False).astype(bool)
-        num_manual_invalid_q = df_q['is_invalid'].sum() # In this case, it reflects total invalid based on the fallback
+        num_manual_invalid_q = df_q['is_invalid'].sum()
     else:
         # No invalid column, assume all are valid
         print("Warning: Neither 'is_manually_invalid' nor 'is_invalid' column found. Assuming all Q data is valid.")
