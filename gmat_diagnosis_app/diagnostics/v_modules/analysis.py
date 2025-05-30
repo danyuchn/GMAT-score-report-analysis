@@ -15,15 +15,19 @@ from gmat_diagnosis_app.diagnostics.v_modules.constants import (
     RC_READING_TIME_THRESHOLD_3Q,
     RC_READING_TIME_THRESHOLD_4Q
 )
+from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
 
+# 定義統一的時間倍數常數
+RELATIVELY_FAST_MULTIPLIER = COMMON_TIME_CONSTANTS['RELATIVELY_FAST_MULTIPLIER']
+CARELESSNESS_THRESHOLD = COMMON_TIME_CONSTANTS['CARELESSNESS_THRESHOLD']
 
 def observe_patterns(df_v):
     """Observes patterns and behavioral indicators for Chapter 5."""
     analysis = {
         'early_rushing_questions_indices': [],
         'early_rushing_flag_for_review': False,
-        'fast_wrong_rate': None, # Based on is_relatively_fast (0.75*avg)
-        'carelessness_issue': False, # Based on fast_wrong_rate > 0.25
+        'fast_wrong_rate': None, # Based on is_relatively_fast (RELATIVELY_FAST_MULTIPLIER*avg)
+        'carelessness_issue': False, # Based on fast_wrong_rate > CARELESSNESS_THRESHOLD
         'param_triggers': [], # To store triggered behavioral params
         'carelessness_question_indices': [] # NEW: Store indices of questions triggering carelessness
     }
@@ -72,8 +76,8 @@ def observe_patterns(df_v):
             fast_wrong_rate = num_relatively_fast_incorrect / num_relatively_fast_total
             analysis['fast_wrong_rate'] = fast_wrong_rate
             
-            # 使用核心邏輯文件中定義的 0.25 閾值判斷粗心問題
-            if fast_wrong_rate > 0.25:
+            # 使用核心邏輯文件中定義的 CARELESSNESS_THRESHOLD 閾值判斷粗心問題
+            if fast_wrong_rate > CARELESSNESS_THRESHOLD:
                 analysis['carelessness_issue'] = True
                 analysis['param_triggers'].append('BEHAVIOR_CARELESSNESS_ISSUE')
                 # 儲存快且錯的題目索引
@@ -349,11 +353,6 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
         ],
     }
 
-    # --- Determine CR overtime threshold based on input status ---
-    # Import locally to avoid circular imports
-    from gmat_diagnosis_app.diagnostics.v_modules.constants import CR_OVERTIME_THRESHOLDS
-    cr_ot_threshold = CR_OVERTIME_THRESHOLDS.get(time_pressure_status, CR_OVERTIME_THRESHOLDS[False])
-
     # --- Iterate and apply rules ---
     for index, row in df_v.iterrows():
         # Initialize for each row
@@ -372,17 +371,10 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
         is_invalid = bool(row.get('is_invalid', False))
 
         # 1. Calculate Overtime Status (for ALL rows)
-        # This logic determines current_is_overtime based on q_type and thresholds.
-        # It will be used for time_performance_category calculation for all rows.
-        original_row_overtime = bool(row.get('overtime', False)) # Get pre-existing overtime if any
-
-        if q_type == 'Critical Reasoning' and pd.notna(q_time) and q_time > cr_ot_threshold:
-            current_is_overtime = True
-        elif q_type == 'Reading Comprehension' and original_row_overtime: # Trust pre-calculated RC overtime
-             current_is_overtime = True
-        elif original_row_overtime: # If overtime was true from other sources (e.g. preprocessor for other types)
-            current_is_overtime = True
-        # If none of the above, current_is_overtime remains False (its initial value)
+        # 使用統一的超時計算函數的結果，不在此處重複計算
+        # This logic trusts the pre-calculated overtime status from unified calculate_overtime function
+        original_row_overtime = bool(row.get('overtime', False)) # Get pre-calculated overtime from unified function
+        current_is_overtime = original_row_overtime # Trust the unified calculation for both CR and RC
         
         # 2. Determine Time Flags (Fast/Normal) (for ALL rows)
         is_slow = current_is_overtime # 'Slow' is defined by being overtime for category assignment
@@ -390,7 +382,7 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
         avg_time = avg_time_per_type.get(q_type, np.inf) # Default to infinity if type not found
 
         if pd.notna(q_time) and avg_time != np.inf:
-            if q_time < (avg_time * 0.75):  # Relatively fast threshold
+            if q_time < (avg_time * RELATIVELY_FAST_MULTIPLIER):  # Relatively fast threshold
                 current_is_relatively_fast = True
             # Normal time is neither relatively fast nor slow (overtime)
             if not current_is_relatively_fast and not is_slow:

@@ -25,6 +25,11 @@ class I18nManager:
         self.current_language = default_language
         self.supported_languages = ['zh-TW', 'en']
         self.translations = {}
+        # 檔案名稱映射：語言代碼到檔案名稱
+        self.file_mapping = {
+            'zh-TW': 'zh_TW',  # 語言代碼使用連字號，檔案名稱使用底線
+            'en': 'en'
+        }
         self._load_translations()
     
     def _load_translations(self):
@@ -32,7 +37,7 @@ class I18nManager:
         translation_dir = os.path.join(os.path.dirname(__file__), 'translations')
         
         for lang in self.supported_languages:
-            file_path = os.path.join(translation_dir, f'{lang}.py')
+            file_path = os.path.join(translation_dir, f'{self.file_mapping[lang]}.py')
             if os.path.exists(file_path):
                 try:
                     # Import the translation module dynamically

@@ -11,6 +11,128 @@ Correct:
 [Insert corrected code or logic]
 ```
 
+## V Diagnosis Logic Compliance Issues (2025-01-28)
+
+Mistake: Missing RC overtime calculation based on time pressure status
+Wrong:
+No RC group target time calculation based on time_pressure_status in V modules
+Correct:
+Need to implement RC group target time calculation:
+```python
+# In constants.py or analysis.py
+RC_GROUP_TARGET_TIMES = {
+    True: {  # High Pressure
+        3: 6.0,
+        4: 8.0
+    },
+    False: {  # Low Pressure
+        3: 7.0,
+        4: 9.0
+    }
+}
+```
+
+Mistake: Missing RC group overtime and individual overtime logic
+Wrong:
+Only using pre-calculated overtime flag for RC without proper group/individual distinction
+Correct:
+Need to implement proper RC overtime calculation:
+1. group_overtime: if group_total_time > (rc_group_target_time + 1.0)
+2. individual_overtime: if adjusted_rc_time > 2.0 (rc_individual_q_threshold)
+3. RC question is "slow" if group_overtime == True OR individual_overtime == True
+
+Mistake: Inconsistent question_type mapping in analysis
+Wrong:
+Using full question type names 'Critical Reasoning' and 'Reading Comprehension' in some places
+Correct:
+MD document specifies mapping: 'Critical Reasoning' → 'CR', 'Reading Comprehension' → 'RC'
+Should standardize the mapping or ensure consistent usage throughout
+
+Mistake: Missing first_third_average_time_per_type calculation for V diagnosis
+Wrong:
+V diagnosis doesn't calculate first_third_average_time_per_type for invalid data detection
+Correct:
+Should calculate first_third_average_time_per_type for both CR and RC types for standard 3 & 4 invalid detection criteria
+
+## V Diagnosis Logic Compliance Fixed (2025-01-28)
+
+Fixed: Added unified first_third_average_time_per_type calculation to V diagnosis
+Applied:
+Added import and calculation in gmat_diagnosis_app/diagnostics/v_modules/main.py:
+```python
+from gmat_diagnosis_app.analysis_helpers.time_analyzer import calculate_first_third_average_time_per_type
+
+# In run_v_diagnosis_processed function:
+first_third_average_time_per_type = calculate_first_third_average_time_per_type(
+    df_v_processed, ['Critical Reasoning', 'Reading Comprehension']
+)
+```
+
+Fixed: Removed duplicate CR overtime calculation in apply_ch3_diagnostic_rules
+Applied:
+Modified gmat_diagnosis_app/diagnostics/v_modules/analysis.py to trust unified calculate_overtime function:
+```python
+# Old code (duplicated calculation):
+if q_type == 'Critical Reasoning' and pd.notna(q_time) and q_time > cr_ot_threshold:
+    current_is_overtime = True
+elif q_type == 'Reading Comprehension' and original_row_overtime:
+    current_is_overtime = True
+
+# New code (unified approach):
+original_row_overtime = bool(row.get('overtime', False)) # Get pre-calculated overtime from unified function
+current_is_overtime = original_row_overtime # Trust the unified calculation for both CR and RC
+```
+
+Fixed: RC overtime logic already implemented in unified time_analyzer.py
+Status:
+RC group/individual overtime distinction is properly implemented in analysis_helpers/time_analyzer.py with:
+- RC_GROUP_TARGET_TIMES correctly defined based on pressure status
+- group_overtime and individual_overtime calculations
+- RC方案四 implementation with group performance categories
+- RC tolerance logic for good group performance
+
+Fixed: Implemented complete four abnormally fast response criteria for V diagnosis
+Applied:
+Updated gmat_diagnosis_app/constants/thresholds.py to include V section invalid detection thresholds:
+```python
+'V': {
+    'TIME_PRESSURE_DIFF_MIN': 3.0,  # V 科目時間壓力閾值（分鐘）
+    'LAST_THIRD_FRACTION': 2/3,  # 檢查測驗最後 1/3 的題目
+    'INVALID_ABANDONED_MIN': 0.5,  # 標準1：疑似放棄閾值（分鐘）
+    'INVALID_HASTY_MIN': 1.0,  # 標準2：絕對倉促閾值（分鐘）
+    'INVALID_TAG': "數據無效：用時過短（V：受時間壓力影響）"
+}
+```
+
+Updated gmat_diagnosis_app/data_validation/invalid_suggestion.py to implement four criteria:
+1. Standard 1: Suspected abandonment (< 0.5 min)
+2. Standard 2: Absolutely rushed (< 1.0 min)  
+3. Standard 3 & 4: Relative to first third average time (only check in last 1/3 of test)
+4. Uses unified calculate_first_third_average_time_per_type function for consistency
+
+Fixed: Replaced hardcoded 0.75 multiplier with unified RELATIVELY_FAST_MULTIPLIER constant
+Applied:
+Modified gmat_diagnosis_app/diagnostics/v_modules/analysis.py:
+```python
+# Added import and constant definition
+from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
+RELATIVELY_FAST_MULTIPLIER = COMMON_TIME_CONSTANTS['RELATIVELY_FAST_MULTIPLIER']
+
+# Replaced hardcoded value
+if q_time < (avg_time * RELATIVELY_FAST_MULTIPLIER):  # Relatively fast threshold
+```
+
+Fixed: Replaced hardcoded 0.25 carelessness threshold with unified CARELESSNESS_THRESHOLD constant
+Applied:
+Modified gmat_diagnosis_app/diagnostics/v_modules/analysis.py:
+```python
+# Added constant definition
+CARELESSNESS_THRESHOLD = COMMON_TIME_CONSTANTS['CARELESSNESS_THRESHOLD']
+
+# Replaced hardcoded value and updated comments
+if fast_wrong_rate > CARELESSNESS_THRESHOLD:
+```
+
 ## GMAT Q Diagnosis Logic Corrections (2025-01-28)
 
 Mistake: Missing first third average time calculation
@@ -162,5 +284,150 @@ Update all import statements to use centralized i18n system:
 ```python
 from gmat_diagnosis_app.i18n import translate as t
 ```
+
+## V Diagnosis Logic Compliance Status (2025-01-28) - COMPLETED
+
+All V section implementation issues have been resolved and aligned with gmat-v-score-logic-dustin-v1.4.md standards:
+
+✅ RC_INDIVIDUAL_Q_THRESHOLD_MINUTES corrected to 2.0 minutes
+✅ Unified first_third_average_time_per_type calculation implemented
+✅ Complete four abnormally fast response criteria implemented for invalid data detection
+✅ Unified overtime calculation logic properly integrated (no duplicate CR overtime calculation)
+✅ Hardcoded multipliers (0.75, 0.25) replaced with unified constants
+✅ Question type mapping consistency verified (Critical Reasoning ↔ CR, Reading Comprehension ↔ RC)
+✅ RC overtime logic confirmed working in unified time_analyzer.py
+✅ All syntax checks passed
+
+V section diagnosis is now fully compliant with MD document Chapter 1 requirements.
+
+## Python Import Syntax Issues (2025-01-28)
+
+Mistake: Python module import error with hyphenated filenames
+Wrong:
+Translation file named "zh-TW.py" causing import error "無法解析匯入 gmat_diagnosis_app.i18n.translations.zh_TW"
+Python cannot import modules with hyphens in filenames using dot notation.
+Correct:
+Renamed translation file from "zh-TW.py" to "zh_TW.py" to comply with Python import syntax.
+Updated i18n system to map language codes to filenames:
+```python
+# In gmat_diagnosis_app/i18n/__init__.py
+self.file_mapping = {
+    'zh-TW': 'zh_TW',  # 語言代碼使用連字號，檔案名稱使用底線
+    'en': 'en'
+}
+file_path = os.path.join(translation_dir, f'{self.file_mapping[lang]}.py')
+```
+
+This allows language codes to use hyphens (zh-TW) while filenames use underscores (zh_TW.py) for Python compatibility.
+
+## V Diagnosis Translation Missing Keys (2025-01-28)
+
+Mistake: V診斷報告中顯示英文鍵值而非中文翻譯
+Wrong:
+部分診斷參數缺少中文翻譯，導致報告中顯示原始英文鍵值：
+- CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP
+- CR_STEM_UNDERSTANDING_ERROR_VOCAB  
+- CR_STEM_UNDERSTANDING_ERROR_SYNTAX
+- RC_READING_COMPREHENSION_ERROR_VOCAB
+- 'Slow & Correct' 時間表現類別翻譯缺失
+Correct:
+在 gmat_diagnosis_app/i18n/translations/zh_TW.py 中添加完整翻譯：
+```python
+'CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP': "CR 題幹理解錯誤：提問要求把握",
+'CR_STEM_UNDERSTANDING_ERROR_VOCAB': "CR 題幹理解錯誤：詞彙",
+'CR_STEM_UNDERSTANDING_ERROR_SYNTAX': "CR 題幹理解錯誤：句式",
+'RC_READING_COMPREHENSION_ERROR_VOCAB': "RC 閱讀理解錯誤：詞彙",
+'Slow & Correct': "慢對",
+```
+修正方法：使用腳本動態添加翻譯，確保所有診斷參數都有對應的中文翻譯。
+
+## V Diagnosis English Translation Missing Keys (2025-01-28)
+
+Mistake: Missing V diagnosis report section translations in English dictionary
+Wrong:
+Many V section report keys were present in zh_TW.py but missing in en.py, causing English reports to display raw keys instead of translations:
+- v_special_behavior_observation
+- v_careless_advice  
+- v_practice_advice_and_consolidation
+- v_prioritize_skill_consolidation
+- v_overall_practice_direction
+- v_subsequent_action_and_deep_reflection
+- v_guided_reflection
+- v_seek_advanced_assistance
+And many more V-specific keys
+
+Correct:
+Added missing English translations to gmat_diagnosis_app/i18n/translations/en.py:
+```python
+# Missing V report sections that appear in your English report but are not translated
+'v_special_behavior_observation': "* **D. Special Behavioral Pattern Observations**",
+'v_careless_advice': "Analysis shows that \"fast and wrong\" situations account for a high proportion ({}), suggesting the need to focus on response carefulness",
+'v_practice_advice_and_consolidation': "**III. Practice Recommendations and Foundation Consolidation**",
+'v_prioritize_skill_consolidation': "* **A. Priority Consolidation Skills**",
+'v_overall_practice_direction': "* **B. Overall Practice Direction**",
+'v_subsequent_action_and_deep_reflection': "**IV. Follow-up Action and Deep Reflection Guidance**",
+'v_guided_reflection': "* **B. Guided Reflection Prompts (Targeting Specific Skills and Performance)**",
+'v_seek_advanced_assistance': "**V. Seeking Advanced Assistance (Qualitative Analysis)**",
+# And many more diagnostic parameter translations
+```
+
+Mistake: Missing V diagnostic parameter translations in English dictionary
+Wrong:
+Diagnostic parameters like CR_STEM_UNDERSTANDING_ERROR_* and RC_CHOICE_ANALYSIS_ERROR_* were missing English translations
+Correct:
+Added comprehensive diagnostic parameter translations for CR and RC error/difficulty types in en.py dictionary
+
+## V Diagnosis English Translation Missing Keys - COMPLETED (2025-01-28)
+
+Status: ✅ FULLY RESOLVED
+- Added 80+ missing V section translation keys to English dictionary
+- All V report sections now have proper English translations
+- All CR/RC diagnostic parameters now have English translations  
+- Time performance categories (Fast & Wrong, Slow & Correct, etc.) translations completed
+- Tested and verified all translations work correctly in both languages
+- V section English reports will now display proper translations instead of raw keys
+
+Key additions include:
+- V report structure translations (v_special_behavior_observation, v_practice_advice_and_consolidation, etc.)
+- V reflection and guidance translations (v_guided_reflection, v_seek_advanced_assistance, etc.)
+- CR diagnostic parameters (CR_STEM_UNDERSTANDING_ERROR_*, CR_REASONING_ERROR_*, etc.)
+- RC diagnostic parameters (RC_CHOICE_ANALYSIS_ERROR_*, RC_READING_COMPREHENSION_ERROR_*, etc.)
+- Time performance categories (Slow & Correct, Fast & Wrong, etc.)
+
+## V Diagnosis Chinese Translation Missing Keys - COMPLETED (2025-01-28)
+
+Mistake: Missing V diagnosis diagnostic parameters translations in Chinese dictionary
+Wrong:
+Several CR diagnostic parameters were missing Chinese translations, causing Chinese reports to display raw English keys:
+- CR_STEM_UNDERSTANDING_ERROR_LOGIC
+- CR_STEM_UNDERSTANDING_ERROR_DOMAIN
+- v_overall_practice_direction
+- v_review_practice_record
+And behavioral pattern keys like "行為模式: 粗心問題 (快而錯比例高)"
+
+Additionally, new translations were initially added outside the TRANSLATIONS dictionary closing brace, making them ineffective.
+
+Correct:
+1. Added missing Chinese translations to gmat_diagnosis_app/i18n/translations/zh_TW.py:
+```python
+'CR_STEM_UNDERSTANDING_ERROR_LOGIC': "CR 題幹理解錯誤：邏輯",
+'CR_STEM_UNDERSTANDING_ERROR_DOMAIN': "CR 題幹理解錯誤：領域",
+'v_overall_practice_direction': "* **B. 整體練習方向**",
+'v_review_practice_record': "* **A. 檢視練習記錄（二級證據參考）**",
+'行為模式: 粗心問題 (快而錯比例高)': "行為模式: 粗心問題 (快而錯比例高)",
+'應用不穩定 (**SFE**)：已掌握技能應用不穩定': "應用不穩定 (**SFE**)：已掌握技能應用不穩定",
+'RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
+'RC 閱讀速度差：整組表現不佳': "RC 閱讀速度差：整組表現不佳",
+```
+
+2. Fixed dictionary structure issue: Moved new translations from outside the closing `}` to inside the TRANSLATIONS dictionary.
+
+3. Tested and verified all translations work correctly with the i18n system.
+
+Status: ✅ FULLY RESOLVED
+- All CR diagnostic parameters now have proper Chinese translations
+- V report structure keys properly translated
+- Behavioral pattern translations working correctly
+- Dictionary structure corrected to ensure all translations are loaded
 
 --- 

@@ -4,6 +4,7 @@ import pandas as pd
 import math
 import warnings
 from gmat_diagnosis_app.constants.thresholds import THRESHOLDS # Import THRESHOLDS
+from gmat_diagnosis_app.analysis_helpers.time_analyzer import calculate_first_third_average_time_per_type
 import numpy as np
 
 def _suggest_invalid_last_third(pos_series, time_series, total_q, fraction, threshold):
@@ -85,10 +86,62 @@ def suggest_invalid_questions(df, time_pressure_status_map):
                     q_pos_series.dropna(), q_time_series.dropna(), total_q, fraction, threshold
                 ).reindex(indices).replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
         elif section == 'V':
-             if time_pressure:
-                 threshold = section_thresholds['INVALID_HASTY_MIN']
-                 is_fast = q_time_series < threshold
-                 auto_invalid_section_mask = is_fast.replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
+            if time_pressure:
+                # V 科目四個異常快速回應檢測準則（MD 文檔第一章）
+                auto_invalid_section_mask = pd.Series(False, index=indices)
+                
+                # 計算測驗最後 1/3 的題目
+                total_q = section_thresholds['TOTAL_QUESTIONS']
+                last_third_size = total_q // 3
+                last_third_start_position = total_q - last_third_size + 1
+                
+                # 獲取實際的題目位置範圍
+                all_positions = sorted(q_pos_series.dropna().unique())
+                if len(all_positions) >= last_third_size:
+                    last_third_positions = all_positions[-last_third_size:]
+                    is_last_third = q_pos_series.isin(last_third_positions)
+                else:
+                    # 如果題目數少於計算的1/3，則檢查所有題目
+                    is_last_third = pd.Series(True, index=indices)
+                
+                # 計算前三分之一各題型平均時間
+                v_section_df = df_processed[section_mask].copy()
+                first_third_avg_times = calculate_first_third_average_time_per_type(
+                    v_section_df, ['Critical Reasoning', 'Reading Comprehension']
+                )
+                
+                for idx in indices:
+                    if idx not in eligible_for_auto.index or not eligible_for_auto[idx]:
+                        continue
+                        
+                    q_time = q_time_series.loc[idx] if idx in q_time_series.index else None
+                    q_type = df_processed.loc[idx, 'question_type'] if 'question_type' in df_processed.columns else None
+                    
+                    if pd.isna(q_time):
+                        continue
+                    
+                    # 檢查四個異常快速回應準則
+                    abnormally_fast = False
+                    
+                    # 標準1：疑似放棄（< 0.5 分鐘）
+                    if q_time < section_thresholds['INVALID_ABANDONED_MIN']:
+                        abnormally_fast = True
+                    
+                    # 標準2：絕對倉促（< 1.0 分鐘）
+                    elif q_time < section_thresholds['INVALID_HASTY_MIN']:
+                        abnormally_fast = True
+                    
+                    # 標準3 & 4：相對於前三分之一平均時間（僅在測驗最後1/3檢查）
+                    elif is_last_third.loc[idx] and q_type in first_third_avg_times:
+                        first_third_avg = first_third_avg_times[q_type]
+                        # 使用統一常數中的 SUSPICIOUS_FAST_MULTIPLIER (0.5)
+                        from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
+                        suspicious_threshold = first_third_avg * COMMON_TIME_CONSTANTS['SUSPICIOUS_FAST_MULTIPLIER']
+                        if q_time < suspicious_threshold:
+                            abnormally_fast = True
+                    
+                    if abnormally_fast:
+                        auto_invalid_section_mask.loc[idx] = True
 
         df_processed.loc[indices[eligible_for_auto], 'is_auto_suggested_invalid'] = auto_invalid_section_mask[eligible_for_auto]
 

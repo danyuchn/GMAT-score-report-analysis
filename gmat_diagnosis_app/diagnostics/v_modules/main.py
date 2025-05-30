@@ -12,6 +12,8 @@ import logging
 from gmat_diagnosis_app.diagnostics.v_modules.constants import INVALID_DATA_TAG_V, V_SUSPICIOUS_FAST_MULTIPLIER, RC_READING_TIME_THRESHOLD_3Q, RC_READING_TIME_THRESHOLD_4Q
 # Use i18n system instead of the old translation function
 from gmat_diagnosis_app.i18n import translate as t
+# 添加統一的時間分析函數
+from gmat_diagnosis_app.analysis_helpers.time_analyzer import calculate_first_third_average_time_per_type
 from gmat_diagnosis_app.diagnostics.v_modules.utils import (
     grade_difficulty_v, 
     analyze_dimension, 
@@ -103,6 +105,11 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
             if col not in df_v_processed.columns: df_v_processed[col] = False
         if 'time_performance_category' not in df_v_processed.columns: df_v_processed['time_performance_category'] = ''
 
+        # --- 計算前三分之一各題型平均時間 (first_third_average_time_per_type) ---
+        # MD 文檔第一章無效數據檢測標準 3 和 4 所需要的計算
+        first_third_average_time_per_type = calculate_first_third_average_time_per_type(
+            df_v_processed, ['Critical Reasoning', 'Reading Comprehension']
+        )
 
         # --- Add Tag based on FINAL 'is_invalid' status ---
         final_invalid_mask_v = df_v_processed['is_invalid']

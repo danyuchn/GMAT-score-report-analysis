@@ -22,7 +22,7 @@ CR_OVERTIME_THRESHOLDS = {
     True: 2.0, # High Pressure
     False: 2.5 # Low Pressure
 }
-RC_INDIVIDUAL_Q_THRESHOLD_MINUTES = 1.5  # 用於判斷排除閱讀時間後的單題解答是否過長
+RC_INDIVIDUAL_Q_THRESHOLD_MINUTES = 2.0  # 用於判斷排除閱讀時間後的單題解答是否過長 (MD文檔標準)
                                         # 與 MD 文件中的 rc_individual_q_threshold 對應
                                         # 在 MD 文件中定義：用於判斷排除第一道題的閱讀時間後，單題解答時間若超過此閾值，則標記為 individual_overtime
 RC_READING_TIME_THRESHOLD_3Q = 2.0 # minutes

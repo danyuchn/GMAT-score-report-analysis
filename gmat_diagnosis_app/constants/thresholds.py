@@ -41,8 +41,11 @@ THRESHOLDS = {
     'V': {
         'TOTAL_QUESTIONS': 23,
         'MAX_ALLOWED_TIME': 45.0,
-        'INVALID_HASTY_MIN': 1.0, 
-        'INVALID_TAG': "數據無效：用時過短（V：用時低於下限）", 
+        'TIME_PRESSURE_DIFF_MIN': 3.0,  # V 科目時間壓力閾值（分鐘）
+        'LAST_THIRD_FRACTION': 2/3,  # 檢查測驗最後 1/3 的題目
+        'INVALID_ABANDONED_MIN': 0.5,  # 標準1：疑似放棄閾值（分鐘）
+        'INVALID_HASTY_MIN': 1.0,  # 標準2：絕對倉促閾值（分鐘）
+        'INVALID_TAG': "數據無效：用時過短（V：受時間壓力影響）", 
         'OVERTIME': {
             'CR': {'pressure': 2.0, 'no_pressure': 2.5},
             'RC_INDIVIDUAL': 2.0,
