@@ -110,6 +110,7 @@ def suggest_invalid_questions(df, time_pressure_status_map):
                     v_section_df, ['Critical Reasoning', 'Reading Comprehension']
                 )
                 
+                # 標準1-3：個別題目檢測
                 for idx in indices:
                     if idx not in eligible_for_auto.index or not eligible_for_auto[idx]:
                         continue
@@ -120,7 +121,7 @@ def suggest_invalid_questions(df, time_pressure_status_map):
                     if pd.isna(q_time):
                         continue
                     
-                    # 檢查四個異常快速回應準則
+                    # 檢查前三個異常快速回應準則
                     abnormally_fast = False
                     
                     # 標準1：疑似放棄（< 0.5 分鐘）
@@ -131,7 +132,7 @@ def suggest_invalid_questions(df, time_pressure_status_map):
                     elif q_time < section_thresholds['INVALID_HASTY_MIN']:
                         abnormally_fast = True
                     
-                    # 標準3 & 4：相對於前三分之一平均時間（僅在測驗最後1/3檢查）
+                    # 標準3：相對於前三分之一平均時間（僅在測驗最後1/3檢查）
                     elif is_last_third.loc[idx] and q_type in first_third_avg_times:
                         first_third_avg = first_third_avg_times[q_type]
                         # 使用統一常數中的 SUSPICIOUS_FAST_MULTIPLIER (0.5)
@@ -142,6 +143,65 @@ def suggest_invalid_questions(df, time_pressure_status_map):
                     
                     if abnormally_fast:
                         auto_invalid_section_mask.loc[idx] = True
+                
+                # 標準四：RC題組倉促檢測（獨立於個別題目檢測）
+                # 檢測RC組內是否有≥2個題目屬於前述標準1-3的倉促情況
+                rc_cols_present = all(c in df_processed.columns for c in ['rc_group_id'])
+                if rc_cols_present and 'question_type' in df_processed.columns:
+                    from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
+                    
+                    # 找出所有RC題目
+                    rc_mask = (df_processed['question_type'] == 'Reading Comprehension') & section_mask
+                    rc_data = df_processed[rc_mask].copy()
+                    
+                    if not rc_data.empty and 'rc_group_id' in rc_data.columns:
+                        # 按RC組分組檢查
+                        for group_id in rc_data['rc_group_id'].unique():
+                            if pd.isna(group_id):
+                                continue
+                                
+                            group_mask = (rc_data['rc_group_id'] == group_id)
+                            group_data = rc_data[group_mask]
+                            
+                            if len(group_data) < 2:  # 組內題目太少，跳過
+                                continue
+                            
+                            # 計算該組內符合標準1-3的題目數量
+                            hasty_count = 0
+                            for _, row in group_data.iterrows():
+                                row_idx = row.name
+                                if row_idx not in eligible_for_auto.index or not eligible_for_auto.loc[row_idx]:  # 跳過手動標記的題目
+                                    continue
+                                    
+                                q_time = row['q_time_numeric']
+                                if pd.isna(q_time):
+                                    continue
+                                
+                                # 檢查是否符合標準1-3
+                                is_hasty = False
+                                
+                                # 標準1：疑似放棄（< 0.5 分鐘）
+                                if q_time < section_thresholds['INVALID_ABANDONED_MIN']:
+                                    is_hasty = True
+                                # 標準2：絕對倉促（< 1.0 分鐘）  
+                                elif q_time < section_thresholds['INVALID_HASTY_MIN']:
+                                    is_hasty = True
+                                # 標準3：相對倉促（僅在最後1/3檢查）
+                                elif row_idx in is_last_third.index and is_last_third.loc[row_idx] and 'Reading Comprehension' in first_third_avg_times:
+                                    first_third_avg = first_third_avg_times['Reading Comprehension']
+                                    suspicious_threshold = first_third_avg * COMMON_TIME_CONSTANTS['SUSPICIOUS_FAST_MULTIPLIER']
+                                    if q_time < suspicious_threshold:
+                                        is_hasty = True
+                                
+                                if is_hasty:
+                                    hasty_count += 1
+                            
+                            # 如果該RC組有≥2個倉促題目，標記整組為無效
+                            if hasty_count >= 2:
+                                group_indices = group_data.index
+                                for group_idx in group_indices:
+                                    if group_idx in eligible_for_auto.index and eligible_for_auto.loc[group_idx]:
+                                        auto_invalid_section_mask.loc[group_idx] = True
 
         df_processed.loc[indices[eligible_for_auto], 'is_auto_suggested_invalid'] = auto_invalid_section_mask[eligible_for_auto]
 

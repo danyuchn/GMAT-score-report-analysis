@@ -813,4 +813,59 @@
 | **Efficiency Issues (Not in summary but defined in Chapter 3)** | **效率問題 (摘要中未包含但在第三章定義)**                 |
 | `EFFICIENCY_BOTTLENECK_[AREA]`                | 效率問題: [具體障礙] 導致效率低下 (需指明 Area: READING, REASONING, LOCATION, AC_ANALYSIS)     |
 
+### **RC 題目的時間壓力診斷**
+
+**實施方案：方案四 - 整組表現分級制（已實現）**
+
+整組表現分級制結合了整組時間控制與單題表現的平衡評估：
+
+**步驟 1：計算調整時間**
+- 對於每個RC組的第一題：`adjusted_rc_time` = `question_time` - `rc_reading_time`
+- 對於同組其他題目：`adjusted_rc_time` = `question_time`（無需調整）
+
+**步驟 2：整組表現分類**
+根據整組總時間與目標時間的比較，將RC組分為三個等級：
+
+1. **整組表現「良好」**
+   - 條件：`rc_group_total_time` ≤ `rc_group_target_time`
+   - 單題寬容度：標準閾值 + 0.5分鐘
+   - 邏輯：整組控制良好時，允許個別題目有適度彈性
+
+2. **整組表現「尚可」**
+   - 條件：`rc_group_target_time` < `rc_group_total_time` ≤ (`rc_group_target_time` + 1分鐘)
+   - 單題寬容度：標準閾值（2.0分鐘）
+   - 邏輯：整組略超標但仍可接受，維持正常標準
+
+3. **整組表現「不佳」**
+   - 條件：`rc_group_total_time` > (`rc_group_target_time` + 1分鐘)
+   - 處理：整組所有題目均標記為 `overtime`
+   - 元兇識別：標記超時最嚴重的1-2個題目為主要責任題目
+
+**步驟 3：目標時間設定**
+- 3題組：高壓6分鐘，低壓7分鐘
+- 4題組：高壓8分鐘，低壓9分鐘
+
+**步驟 4：診斷輸出**
+新增以下診斷欄位：
+- `rc_group_performance`：整組表現等級（良好/尚可/不佳）
+- `rc_tolerance_applied`：是否應用了寬容度
+- `rc_overtime_culprit`：是否為超時元兇
+- `rc_severe_overtime_culprit`：是否為嚴重超時元兇（超時>1分鐘）
+
+**RC 目標時間**：
+
+```yaml
+RC_GROUP_TARGET_TIMES:
+  有時間壓力:
+    3題組: 6.0分鐘
+    4題組: 8.0分鐘
+  無時間壓力:
+    3題組: 7.0分鐘
+    4題組: 9.0分鐘
+```
+
+**單題閾值**：
+- 基準閾值：2.0分鐘（調整後時間）
+- 寬容閾值：2.5分鐘（整組良好時適用）
+
 （本文件結束）
