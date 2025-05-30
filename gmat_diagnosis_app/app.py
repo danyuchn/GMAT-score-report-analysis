@@ -194,6 +194,9 @@ def main():
     from gmat_diagnosis_app.utils.styling import apply_custom_css
     apply_custom_css()
 
+    # Import i18n functions
+    from gmat_diagnosis_app.i18n import translate
+
     # Initialize the success message flag for sample data pasting if it doesn't exist
     if 'sample_data_pasted_success' not in st.session_state:
         st.session_state.sample_data_pasted_success = False
@@ -201,17 +204,17 @@ def main():
     # 頁面標題與簡介區
     col1, col2 = st.columns([5, 1])
     with col1:
-        st.markdown("""
-        # GMAT 成績診斷平台 by Dustin
-        ### 智能化個人化成績分析與學習建議系統
+        st.markdown(f"""
+        # {translate('main_title')}
+        ### {translate('main_subtitle')}
         """)
     
     # 建立主要導航
-    main_tabs = st.tabs(["數據輸入與分析", "結果查看"])
+    main_tabs = st.tabs([translate('data_input_tab'), translate('results_view_tab')])
     
     with main_tabs[0]:  # 數據輸入與分析標籤頁
         # 簡短使用指引（核心步驟）
-        with st.expander("快速使用指南 👉", expanded=False):
+        with st.expander(translate('quick_guide'), expanded=False):
             st.markdown("""
             1. **準備數據**: 確保有Quantitative、Verbal和Data Insights三科目的數據
             2. **輸入數據**: 在下方四個標籤中分別上傳或貼上數據，以及在Total頁籤中調整分數
@@ -559,30 +562,61 @@ def main():
             """)
             
     # --- Sidebar Settings ---
-    st.sidebar.subheader("分析設定")
+    st.sidebar.subheader(translate('analysis_settings'))
+    
+    # --- Language Selection ---
+    with st.sidebar.expander(translate('language_selection'), expanded=True):
+        # Language selection
+        language_options = {
+            'zh-TW': '繁體中文',
+            'en': 'English'
+        }
+        
+        current_lang = st.session_state.get('current_language', 'zh-TW')
+        
+        selected_language = st.selectbox(
+            translate('select_language'),
+            options=list(language_options.keys()),
+            format_func=lambda x: language_options[x],
+            index=list(language_options.keys()).index(current_lang),
+            key="language_selector"
+        )
+        
+        # Update language if changed
+        if selected_language != current_lang:
+            st.session_state.current_language = selected_language
+            st.session_state.language_changed = True
+            
+            # Update the i18n system
+            from gmat_diagnosis_app.i18n import set_language
+            set_language(selected_language)
+            
+            success_msg = translate('language_updated') + " / Language updated!" if selected_language == 'zh-TW' else "Language updated! / " + translate('language_updated')
+            st.success(success_msg)
+            st.rerun()  # Trigger rerun to apply language changes
     
     # 添加範例數據導入功能
-    with st.sidebar.expander("範例數據", expanded=True):
-        st.markdown("### 範例數據導入")
-        st.markdown("點擊下方按鈕導入範例做題數據，方便體驗系統功能")
+    with st.sidebar.expander(translate('sample_data'), expanded=True):
+        st.markdown(f"### {translate('sample_data_import')}")
+        st.markdown(translate('sample_data_description'))
         
-        st.button("一鍵導入範例數據", 
+        st.button(translate('load_sample_data'), 
                   key="load_sample_data_pasted", 
                   use_container_width=True,
                   on_click=load_sample_data_callback) # Use on_click callback
 
         if st.session_state.get('sample_data_pasted_success', False):
-            st.success("範例數據已成功填入各科目的文本框！請檢查「數據輸入與分析」頁面。")
+            st.success(translate('sample_data_loaded_success'))
             st.session_state.sample_data_pasted_success = False # Reset flag
             
     # OpenAI設定區塊（移到上方更明顯的位置）
-    with st.sidebar.expander("AI功能設定", expanded=False):
+    with st.sidebar.expander(translate('ai_settings'), expanded=False):
         master_key_input = st.text_input(
-            "輸入管理員金鑰啟用 AI 問答功能：",
+            translate('master_key_prompt'),
             type="password",
             key="master_key_input",
             value=st.session_state.get('master_key', ''),
-            help="輸入有效管理金鑰並成功完成分析後，下方將出現 AI 對話框。管理金鑰請向系統管理員索取。"
+            help=translate('master_key_help')
         )
 
         # Update session state when input changes
@@ -593,18 +627,18 @@ def main():
             if initialize_openai_client_with_master_key(master_key_input):
                 st.session_state.show_chat = True
                 st.session_state.chat_history = []
-                st.success("管理金鑰驗證成功，AI功能已啟用！")
+                st.success(translate('master_key_success'))
             else:
                 st.session_state.show_chat = False
                 st.session_state.chat_history = []
-                st.error("管理金鑰驗證失敗，無法啟用AI功能。")
+                st.error(translate('master_key_failed'))
         else:
             st.session_state.master_key = None
             st.session_state.show_chat = False
             st.session_state.chat_history = []
 
     # --- IRT Simulation Settings ---
-    with st.sidebar.expander("IRT模擬設定", expanded=False):
+    with st.sidebar.expander(translate('irt_simulation_settings'), expanded=False):
         st.session_state.initial_theta_q = st.number_input(
             "Q 科目初始 Theta 估計", 
             value=st.session_state.initial_theta_q, 
@@ -625,58 +659,58 @@ def main():
         )
 
     # --- Manual IRT Adjustment Inputs in Sidebar ---
-    with st.sidebar.expander("手動調整題目", expanded=False):
-        st.markdown("#### 手動調整題目正確性")
-        st.markdown("（僅影響IRT模擬）")
+    with st.sidebar.expander(translate('manual_adjustments'), expanded=False):
+        st.markdown(f"#### {translate('manual_adjustments_description')}")
+        st.markdown(translate('manual_adjustments_note'))
         
         # 使用標籤頁節省空間
         q_tab, v_tab, di_tab = st.tabs(["Q", "V", "DI"])
         
         with q_tab:
             st.session_state.q_incorrect_to_correct_qns = st.text_input(
-                "由錯改對題號", 
+                translate('incorrect_to_correct'), 
                 value=st.session_state.q_incorrect_to_correct_qns,
-                placeholder="例: 1,5,10",
+                placeholder=translate('example_format'),
                 key="q_i_to_c_input"
             )
             st.session_state.q_correct_to_incorrect_qns = st.text_input(
-                "由對改錯題號", 
+                translate('correct_to_incorrect'), 
                 value=st.session_state.q_correct_to_incorrect_qns,
-                placeholder="例: 2,7,12",
+                placeholder=translate('example_format'),
                 key="q_c_to_i_input"
             )
         
         with v_tab:
             st.session_state.v_incorrect_to_correct_qns = st.text_input(
-                "由錯改對題號", 
+                translate('incorrect_to_correct'), 
                 value=st.session_state.v_incorrect_to_correct_qns,
-                placeholder="例: 1,5,10",
+                placeholder=translate('example_format'),
                 key="v_i_to_c_input"
             )
             st.session_state.v_correct_to_incorrect_qns = st.text_input(
-                "由對改錯題號", 
+                translate('correct_to_incorrect'), 
                 value=st.session_state.v_correct_to_incorrect_qns,
-                placeholder="例: 2,7,12",
+                placeholder=translate('example_format'),
                 key="v_c_to_i_input"
             )
         
         with di_tab:
             st.session_state.di_incorrect_to_correct_qns = st.text_input(
-                "由錯改對題號", 
+                translate('incorrect_to_correct'), 
                 value=st.session_state.di_incorrect_to_correct_qns,
-                placeholder="例: 1,5,10",
+                placeholder=translate('example_format'),
                 key="di_i_to_c_input"
             )
             st.session_state.di_correct_to_incorrect_qns = st.text_input(
-                "由對改錯題號", 
+                translate('correct_to_incorrect'), 
                 value=st.session_state.di_correct_to_incorrect_qns,
-                placeholder="例: 2,7,12",
+                placeholder=translate('example_format'),
                 key="di_c_to_i_input"
             )
     
     # 頁尾信息
     st.markdown("---")
-    st.caption("有問題或建議？請前往 [GitHub Issues](https://github.com/danyuchn/GMAT-score-report-analysis/issues) 提交反饋")
+    st.caption(f"{translate('footer_feedback')} [{translate('footer_github')}](https://github.com/danyuchn/GMAT-score-report-analysis/issues) {translate('footer_submit')}")
 
 if __name__ == "__main__":
     main() 

@@ -8,7 +8,8 @@ Q科AI工具與提示建議生成模組
 import pandas as pd
 from gmat_diagnosis_app.utils.route_tool import DiagnosisRouterTool
 from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMMENDATIONS
-from gmat_diagnosis_app.diagnostics.q_modules.translations import APPENDIX_A_TRANSLATION
+# Use i18n system instead of the old translation dictionary
+from gmat_diagnosis_app.i18n import translate as t, get_available_languages
 
 
 def translate_zh_to_en(zh_tag: str) -> str:
@@ -21,19 +22,28 @@ def translate_zh_to_en(zh_tag: str) -> str:
     Returns:
         str: 對應的英文標籤，如果找不到則返回原標籤
     """
-    # 構建反向映射字典 (中文 -> 英文)
-    reverse_translation = {v: k for k, v in APPENDIX_A_TRANSLATION.items()}
+    # Build reverse mapping dictionary using i18n system
+    # Get all available translations from i18n system
+    from gmat_diagnosis_app.i18n.translations.zh_TW import TRANSLATIONS as ZH_TRANSLATIONS
+    from gmat_diagnosis_app.i18n.translations.en import TRANSLATIONS as EN_TRANSLATIONS
     
-    # 嘗試查找完全匹配的中文標籤
+    # Create reverse mapping (Chinese -> English key)
+    reverse_translation = {}
+    for key in ZH_TRANSLATIONS:
+        if key in EN_TRANSLATIONS:
+            zh_text = ZH_TRANSLATIONS[key]
+            reverse_translation[zh_text] = key
+    
+    # Try to find exact match for Chinese tag
     if zh_tag in reverse_translation:
         return reverse_translation[zh_tag]
     
-    # 嘗試部分匹配 (中文標籤可能只是完整翻譯的一部分)
-    for zh, en in reverse_translation.items():
+    # Try partial match (Chinese tag might be part of complete translation)
+    for zh, en_key in reverse_translation.items():
         if zh_tag in zh:
-            return en
+            return en_key
     
-    # 如果沒有匹配到，返回原始標籤
+    # If no match found, return original tag
     return zh_tag
 
 

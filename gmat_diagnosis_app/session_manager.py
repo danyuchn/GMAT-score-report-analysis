@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Manages session state for the GMAT Diagnosis App."""
 import streamlit as st
+from gmat_diagnosis_app.i18n import set_language, get_language
 
 def init_session_state():
     """Initialize session state variables with default values"""
@@ -39,11 +40,20 @@ def init_session_state():
         'di_correct_to_incorrect_qns': '',
         # --- Editable Diagnosis Labels State ---
         'original_processed_df': None, # Backup of the original processed_df
-        'ai_prompts_need_regeneration': False # Flag to indicate if AI prompts need to be regenerated
+        'editable_diagnostic_df': None, # Editable copy for diagnosis label modification
+        'ai_prompts_need_regeneration': False,
+        # --- Language State ---
+        'current_language': 'zh-TW', # Default to Traditional Chinese
+        'language_changed': False # Track if language has been changed
     }
+    
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+    
+    # Initialize the i18n system with the current language
+    if 'current_language' in st.session_state:
+        set_language(st.session_state.current_language)
     
     # 保持聊天歷史持久化
     if 'chat_history' in st.session_state and 'chat_history_backup' in st.session_state:

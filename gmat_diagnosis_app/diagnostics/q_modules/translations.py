@@ -1,11 +1,14 @@
 """
-Q診斷模塊的翻譯功能
+Q診斷模塊的翻譯功能 (已棄用)
 
-此模塊包含用於Q(Quantitative)診斷的翻譯字典和相關函數，
-用於在診斷過程中將英文術語翻譯為中文。
+此模塊包含用於Q(Quantitative)診斷的翻譯字典和相關函數。
+已棄用：請使用新的i18n系統 (gmat_diagnosis_app.i18n)
 """
 
-# --- Q Appendix A Translation ---
+import warnings
+
+# --- Q Appendix A Translation (DEPRECATED) ---
+# 已棄用：請使用 gmat_diagnosis_app.i18n 系統
 APPENDIX_A_TRANSLATION = {
     'Q_READING_COMPREHENSION_ERROR': "Q 閱讀理解錯誤：題目文字理解",
     'Q_CONCEPT_APPLICATION_ERROR': "Q 概念應用錯誤：數學觀念/公式應用",
@@ -20,5 +23,25 @@ APPENDIX_A_TRANSLATION = {
 }
 
 def get_translation(param):
-    """Helper to get Chinese description, returns param name if not found."""
+    """
+    Helper to get Chinese description, returns param name if not found.
+    
+    DEPRECATED: This function is deprecated. Please use the new i18n system:
+    
+    from gmat_diagnosis_app.i18n import translate as t
+    translated_text = t(param)
+    
+    Args:
+        param (str): Parameter key to translate
+        
+    Returns:
+        str: Translated text or original param if not found
+    """
+    warnings.warn(
+        "get_translation() is deprecated. Use 'from gmat_diagnosis_app.i18n import translate as t' instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    
+    # Fallback to old translation for backward compatibility
     return APPENDIX_A_TRANSLATION.get(param, param) 

@@ -6,7 +6,8 @@ Q診斷模塊的報告生成功能
 """
 
 import pandas as pd
-from gmat_diagnosis_app.diagnostics.q_modules.translations import get_translation
+# Use i18n system instead of the old translation function
+from gmat_diagnosis_app.i18n import translate as t
 from gmat_diagnosis_app.diagnostics.q_modules.utils import format_rate, map_difficulty_to_label
 from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMMENDATIONS
 
@@ -16,7 +17,7 @@ def generate_report_section3(triggered_params_translated, sfe_triggered, sfe_ski
     lines = ["**三、 核心問題診斷**"]
     lines.append("")
     lines.append("* **B. 高頻潛在問題點**")
-    sfe_param_translated = get_translation('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
+    sfe_param_translated = t('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
 
     if sfe_triggered:
         sfe_note = f"尤其需要注意的是，在一些已掌握技能範圍內的基礎或中等難度題目上出現了失誤 (**{sfe_param_translated}**)"
@@ -27,14 +28,14 @@ def generate_report_section3(triggered_params_translated, sfe_triggered, sfe_ski
         lines.append(f"    * {sfe_note}，這表明在這些知識點的應用上可能存在穩定性問題。")
 
     core_issue_summary = []
-    param_careless_detail = get_translation('Q_CARELESSNESS_DETAIL_OMISSION')
-    param_concept_app = get_translation('Q_CONCEPT_APPLICATION_ERROR')
-    param_calculation = get_translation('Q_CALCULATION_ERROR')
-    param_problem_under = get_translation('Q_PROBLEM_UNDERSTANDING_ERROR')
-    param_reading_comp = get_translation('Q_READING_COMPREHENSION_ERROR')
-    param_eff_reading = get_translation('Q_EFFICIENCY_BOTTLENECK_READING')
-    param_eff_concept = get_translation('Q_EFFICIENCY_BOTTLENECK_CONCEPT')
-    param_eff_calc = get_translation('Q_EFFICIENCY_BOTTLENECK_CALCULATION')
+    param_careless_detail = t('Q_CARELESSNESS_DETAIL_OMISSION')
+    param_concept_app = t('Q_CONCEPT_APPLICATION_ERROR')
+    param_calculation = t('Q_CALCULATION_ERROR')
+    param_problem_under = t('Q_PROBLEM_UNDERSTANDING_ERROR')
+    param_reading_comp = t('Q_READING_COMPREHENSION_ERROR')
+    param_eff_reading = t('Q_EFFICIENCY_BOTTLENECK_READING')
+    param_eff_concept = t('Q_EFFICIENCY_BOTTLENECK_CONCEPT')
+    param_eff_calc = t('Q_EFFICIENCY_BOTTLENECK_CALCULATION')
 
     if param_careless_detail in triggered_params_translated:
         core_issue_summary.append(f"傾向於快速作答但出錯，可能涉及**{param_careless_detail}**。")
@@ -69,8 +70,8 @@ def generate_report_section4(ch5_patterns):
     lines = []
     lines.append("* **C. 特殊行為模式觀察**")
     pattern_found = False
-    param_early_rush = get_translation('Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
-    param_careless_issue = get_translation('Q_BEHAVIOR_CARELESSNESS_ISSUE')
+    param_early_rush = t('Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
+    param_careless_issue = t('Q_BEHAVIOR_CARELESSNESS_ISSUE')
 
     if ch5_patterns.get('early_rushing_flag', False):
         lines.append(f"    * 測驗開始階段的部分題目作答速度較快，建議注意保持穩定的答題節奏，避免潛在的 \"flag for review\" 風險。 (**{param_early_rush}**)")
@@ -206,7 +207,7 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
                         params_zh = []
                         for p_code in cat_params:
                             try:
-                                translated = get_translation(p_code)
+                                translated = t(p_code)
                                 params_zh.append(translated)
                             except:
                                 params_zh.append(p_code)
@@ -238,11 +239,11 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
         core_issue_text = []
         param_to_emphasize = ["Q_CARELESSNESS_DETAIL_OMISSION", "Q_CONCEPT_APPLICATION_ERROR", "Q_CALCULATION_ERROR", "Q_READING_COMPREHENSION_ERROR"]
         for param in param_to_emphasize:
-            if get_translation(param) in triggered_params_translated:
-                core_issue_text.append(get_translation(param))
+            if t(param):
+                core_issue_text.append(t(param))
         
         if sfe_skills_involved:
-            core_issue_text.append(get_translation("Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE"))
+            core_issue_text.append(t("Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE"))
         
         if core_issue_text:
             lines.append(f"    * **重點關注：** 題目是否反覆涉及報告第三部分指出的核心問題：")
@@ -363,7 +364,7 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     if triggered_params_english:
         for param_code in triggered_params_english:
             try:
-                translated = get_translation(param_code)
+                translated = t(param_code)
                 triggered_params_translated.append(translated)
             except:
                 triggered_params_translated.append(param_code)

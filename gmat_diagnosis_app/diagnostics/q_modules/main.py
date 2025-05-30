@@ -12,7 +12,8 @@ from gmat_diagnosis_app.diagnostics.q_modules.constants import (
     OVERTIME_THRESHOLDS,
     INVALID_DATA_TAG_Q
 )
-from gmat_diagnosis_app.diagnostics.q_modules.translations import get_translation
+# Use i18n system instead of the old translation function
+from gmat_diagnosis_app.i18n import translate as t
 from gmat_diagnosis_app.diagnostics.q_modules.analysis import diagnose_q_root_causes, diagnose_q_internal
 from gmat_diagnosis_app.diagnostics.q_modules.behavioral import analyze_behavioral_patterns, analyze_skill_override
 from gmat_diagnosis_app.diagnostics.q_modules.recommendations import generate_q_recommendations
@@ -111,11 +112,11 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     # with root causes applied. 'diagnose_q_root_causes' needs to correctly handle 'is_invalid' internally.
     df_diagnosed = diagnose_q_root_causes(df_q.copy(), avg_times_by_type, max_diffs_by_skill) # Pass a copy of df_q
     
-    # 首先處理所有數據的診斷參數翻譯（包括無效數據）
+    # Process diagnostic parameters translation for all data (including invalid data)
     if 'diagnostic_params' in df_diagnosed.columns:
-        # 將所有診斷參數從英文代碼轉換為中文標籤
+        # Convert all diagnostic parameters from English codes to localized labels using i18n
         df_diagnosed['diagnostic_params_list'] = df_diagnosed['diagnostic_params'].apply(
-            lambda params_list: [get_translation(param) for param in (params_list if isinstance(params_list, list) else [])]
+            lambda params_list: [t(param) for param in (params_list if isinstance(params_list, list) else [])]
         )
 
     # For the rest of the analysis, focus on valid data with diagnosis
@@ -162,8 +163,8 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
             if skill and not pd.isna(skill):
                 skill_to_positions[skill].append(position)
     
-    # Translate parameter codes to readable descriptions
-    triggered_params_translated = {get_translation(code) for code in triggered_params}
+    # Translate parameter codes to readable descriptions using i18n
+    triggered_params_translated = {t(code) for code in triggered_params}
     
     # Find if SFE is triggered and in which skills
     sfe_param_code = 'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'

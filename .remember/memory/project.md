@@ -1,0 +1,48 @@
+# Project Memory - User Preferences and Rules
+
+This file stores user preferences and custom rules for the GMAT Score Report Analysis project.
+
+## Language Preferences
+- Primary language: 繁體中文 (Traditional Chinese)
+- Secondary language: English
+- Comments in code: English
+- Documentation: 繁體中文
+
+## Code Style Preferences
+- Python: PEP 8 style
+- Function names: snake_case
+- Class names: PascalCase
+- Constants: UPPER_SNAKE_CASE
+- Import style: individual imports preferred
+- Comments: English with descriptive naming
+
+## Translation System
+- Use i18n system for all user-facing text
+- Support Traditional Chinese and English
+- Keep original logic intact when implementing translations
+- Preserve data flow and function signatures
+- Language switching implemented in sidebar with real-time updates
+- UI elements are fully translatable via the i18n system
+
+## GMAT Diagnosis Specific Rules
+- Never modify diagnostic logic or numerical values
+- Preserve all function call signatures
+- Keep data validation intact
+- Maintain error handling patterns
+
+## I18n Implementation Details
+- Language selector placed in sidebar expander at the top
+- Session state tracks current language and language changes
+- Translation system supports both Traditional Chinese and English
+- Real-time language switching with st.rerun() for immediate updates
+- All UI text keys stored in translation dictionaries in /i18n/translations/
+- Translation function imported as 'translate' throughout the application
+
+## Recent Implementations
+- ✅ I18n bilingual system setup completed
+- ✅ Language switching button implemented in sidebar
+- ✅ Translation system integrated into main UI elements
+- ✅ Session state management for language preferences added
+- ✅ Real-time language switching functionality working
+
+--- 

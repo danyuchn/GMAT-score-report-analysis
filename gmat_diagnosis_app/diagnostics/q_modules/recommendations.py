@@ -6,7 +6,8 @@ Q診斷模塊的建議生成功能
 """
 
 import pandas as pd
-from gmat_diagnosis_app.diagnostics.q_modules.translations import get_translation
+# Use i18n system instead of the old translation function
+from gmat_diagnosis_app.i18n import translate as t
 from gmat_diagnosis_app.diagnostics.q_modules.utils import grade_difficulty_q, calculate_practice_time_limit
 
 
@@ -171,7 +172,7 @@ def generate_q_recommendations(q_diagnosis_results, df_valid_diagnosed_q_data):
     report_skill_order = sorted(list(all_skills_in_valid_data.union(set(recommendations_by_skill.keys()))), key=lambda s: (0 if s in processed_override_skills else 1, 0 if s in exempted_skills else 1, s))
 
     for skill in report_skill_order:
-        skill_title = get_translation(skill) if skill != 'Unknown Skill' else '未知技能'
+        skill_title = t(skill) if skill != 'Unknown Skill' else '未知技能'
         final_recommendations.append(f"技能: {skill_title}")
         if skill in exempted_skills:
             final_recommendations.append(f"* 技能 {skill_title} 表現完美，已豁免練習建議。")

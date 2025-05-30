@@ -1,0 +1,56 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Super Memory Rules
+
+<Quote about memory>
+
+For every chat request, the first step must be to read and refer to two memory files: one for recording errors and their corrections (located at `.remember/memory/self.md`), and another for storing user preferences and custom rules (located at `.remember/memory/project.md`). Before generating each response, these two files must be read to ensure adherence to known rules, user preferences, and to avoid repeating past mistakes. Furthermore, after the task is completed, updating these two files as needed is an essential step to ensure continuous improvement of knowledge and its application to subsequent requests.
+
+<File Storage Paths>
+
+Methods for errors and their corrections are stored in the `.remember/memory/self.md` file. User-specific preferences and project custom rules are stored in the `.remember/memory/project.md` file. These two files are vital components for the system's normal operation, and they need to be referenced and updated with every request.
+
+<Main Objective>
+
+Cursor's goal is to avoid repeating known mistakes by persistently storing corrections and learning. To achieve this, the system uses two memory files:
+
+`.remember/memory/self.md`: Records all encountered errors and their correction methods.
+`.remember/memory/project.md`: Records user preferences and custom rules for specific projects. All responses must strictly refer to these files to achieve efficient, accurate results that meet user expectations.
+
+<Must Adhere to User Preferences and Project Rules>
+
+Before each request, the system needs to read the `.remember/memory/project.md` file to understand user preferences and custom rules. This may include information such as:
+
+User's choice of different tools, for example, preferring Yarn over npm, or choosing TypeScript instead of JavaScript.
+User's code style, naming conventions, file formats, or specific technology stack requirements. All generated responses must strictly adhere to these preferences and rules defined by the user in this file. If the user introduces new preferences, this file needs to be updated promptly to ensure the correctness of future requests.
+
+<Correction Principle: Learning from Mistakes>
+
+When an error is detected or a deprecated warning is received, the following steps must be followed:
+
+First, identify the error or suboptimal output, confirming the issue by comparing it against best practices or user preferences.
+Then, correct the error and provide the correct solution that meets expectations.
+Finally, record the error and its correction method in the `.remember/memory/self.md` file to avoid repeating similar issues in the future. These records should include a brief description of the error, the incorrect code or logic, and the corrected code or logic, using the format illustrated in the <Format Example>.
+
+<Format Example>
+Mistake: [Short Description]
+Wrong:
+[Insert incorrect code or logic]
+Correct:
+[Insert corrected code or logic]
+</Format Example>
+
+<Mechanism to Avoid Repeating Mistakes>
+
+Before providing a solution or code, the `.remember/memory/self.md` file must first be checked for existing correction records for related errors. If a similar error is found to have been resolved, the solution must be provided according to the recorded correction method to avoid re-generating the same error. Additionally, it is recommended to log the application of the solution (as debugging or additional information).
+
+<Keeping Memory Files Clean and Updated>
+
+To ensure the effectiveness of the memory system, the `.remember/memory/self.md` and `.remember/memory/project.md` files need to be regularly cleaned and updated. When a better correction method is found, the original correction record should be replaced. At the same time, to make the files easy to maintain, content should be categorized with clear headings and grouped by topic. Furthermore, information in the memory files should be generalizable, avoiding overly specific details, to ensure that stored knowledge can be efficiently reused.
+
+<Execution Requirements>
+
+If, after handling an error, the relevant memory files are not read or updated, this will be considered a serious error, potentially leading to a decline in response quality or results that do not meet user expectations. In all response generation processes, following stored knowledge and preferences, and updating and maintaining the memory files, is a non-negotiable part of the process.

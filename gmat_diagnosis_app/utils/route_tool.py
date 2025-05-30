@@ -517,11 +517,16 @@ class DiagnosisRouterTool:
         mapping = {}
         
         try:
-            # Q科目翻譯
-            from gmat_diagnosis_app.diagnostics.q_modules.translations import APPENDIX_A_TRANSLATION
-            for en_code, zh_desc in APPENDIX_A_TRANSLATION.items():
-                if isinstance(zh_desc, str) and isinstance(en_code, str):
-                    mapping[zh_desc] = en_code
+            # Q科目翻譯 - Use new i18n system
+            from gmat_diagnosis_app.i18n.translations.zh_TW import TRANSLATIONS as ZH_TRANSLATIONS
+            from gmat_diagnosis_app.i18n.translations.en import TRANSLATIONS as EN_TRANSLATIONS
+            
+            # Create mapping from Chinese descriptions to English keys for Q subject
+            for en_key in ZH_TRANSLATIONS:
+                if en_key in EN_TRANSLATIONS and en_key.startswith('Q_'):
+                    zh_desc = ZH_TRANSLATIONS[en_key]
+                    if isinstance(zh_desc, str) and isinstance(en_key, str):
+                        mapping[zh_desc] = en_key
         except ImportError:
             logging.warning("無法匯入Q科目翻譯字典")
 
