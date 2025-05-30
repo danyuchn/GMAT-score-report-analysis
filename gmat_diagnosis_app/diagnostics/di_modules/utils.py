@@ -1,4 +1,5 @@
 import pandas as pd
+from gmat_diagnosis_app.i18n import translate as t
 
 # --- DI-Specific Helper Functions ---
 
@@ -13,18 +14,18 @@ def _grade_difficulty_di(difficulty):
     """Grades difficulty based on DI-Doc Chapter 2/6 rules."""
     # Ensure input is numeric before comparison
     difficulty_numeric = pd.to_numeric(difficulty, errors='coerce')
-    if pd.isna(difficulty_numeric): return "未知難度"
+    if pd.isna(difficulty_numeric): return t('unknown_difficulty')
     
     # 難度分級邏輯，與核心邏輯文件第二章保持一致
-    if difficulty_numeric <= -1: return "低難度 (Low) / 505+"
-    if -1 < difficulty_numeric <= 0: return "中難度 (Mid) / 555+"
-    if 0 < difficulty_numeric <= 1: return "中難度 (Mid) / 605+"
-    if 1 < difficulty_numeric <= 1.5: return "中難度 (Mid) / 655+"
-    if 1.5 < difficulty_numeric <= 1.95: return "高難度 (High) / 705+"
-    if 1.95 < difficulty_numeric <= 2: return "高難度 (High) / 805+"
+    if difficulty_numeric <= -1: return t('low_difficulty')
+    if -1 < difficulty_numeric <= 0: return t('mid_difficulty_555')
+    if 0 < difficulty_numeric <= 1: return t('mid_difficulty_605')
+    if 1 < difficulty_numeric <= 1.5: return t('mid_difficulty_655')
+    if 1.5 < difficulty_numeric <= 1.95: return t('high_difficulty_705')
+    if 1.95 < difficulty_numeric <= 2: return t('high_difficulty_805')
     
     # 處理超出範圍的情況
-    return "未知難度"
+    return t('unknown_difficulty')
 
 def _analyze_dimension(df_filtered, dimension_col):
     """Analyzes performance metrics grouped by a specific dimension column."""

@@ -430,4 +430,33 @@ Status: ✅ FULLY RESOLVED
 - Behavioral pattern translations working correctly
 - Dictionary structure corrected to ensure all translations are loaded
 
+## DI Diagnosis i18n Implementation Completed (2025-01-28)
+
+Fixed: Successfully migrated DI diagnostic modules from custom translation system to unified i18n system
+Applied:
+1. Added comprehensive DI translations to unified i18n system:
+   - Added ~100+ DI translation keys to zh_TW.py and en.py
+   - Covered all diagnostic parameters, report sections, AI prompts, and utility functions
+   - Maintained consistency with existing V/Q module translation patterns
+
+2. Updated all DI module files to use unified i18n system:
+   - main.py: Replaced `from .translation import _translate_di` with `from gmat_diagnosis_app.i18n import translate as t`
+   - report_generation.py: Updated all hardcoded Chinese text to use translation keys
+   - ai_prompts.py: Converted AI tool recommendations and error messages
+   - utils.py: Updated difficulty grading function to use i18n
+   - chapter_logic.py: Replaced _translate_di calls with t() function calls
+   - constants.py: Removed hardcoded INVALID_DATA_TAG_DI, now uses 'di_invalid_data_tag' key
+
+3. Replaced INVALID_DATA_TAG_DI constant usage:
+   - Removed from constants.py and all import statements
+   - Updated all references to use t('di_invalid_data_tag') instead
+   - Maintained functionality while enabling bilingual support
+
+4. Verified implementation:
+   - All files compile without syntax errors
+   - i18n translations work correctly for both Chinese and English
+   - Real-time language switching capability maintained via session state
+
+Status: DI diagnostic report now fully supports bilingual output with unified i18n system, following same pattern as V/Q modules.
+
 --- 

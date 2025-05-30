@@ -75,4 +75,33 @@ This file stores user preferences and custom rules for the GMAT Score Report Ana
 - ✅ V skills mapping: Plan/Construct → "計劃/構建", Identify Stated Idea → "識別明確觀點"
 - Translation coverage: Complete for all user-facing text in V diagnosis module
 
+## DI Diagnosis i18n Implementation Status (2025-01-28)
+
+**Status: COMPLETED ✅**
+
+Successfully migrated DI diagnostic modules from custom translation system to unified i18n system:
+
+### Implementation Summary:
+1. **Translation Keys Added**: ~100+ DI translation keys added to both zh_TW.py and en.py
+2. **Files Updated**: All DI module files converted to use `from gmat_diagnosis_app.i18n import translate as t`
+3. **Constant Migration**: Replaced INVALID_DATA_TAG_DI with i18n key 'di_invalid_data_tag'
+4. **Functionality Verified**: All files compile successfully and i18n translations work correctly
+
+### Files Modified:
+- `main.py`: Updated imports and error messages
+- `report_generation.py`: Converted all hardcoded Chinese text to translation keys
+- `ai_prompts.py`: Updated AI tool recommendations and error messages
+- `utils.py`: Updated difficulty grading function
+- `chapter_logic.py`: Replaced _translate_di calls with t() function calls
+- `constants.py`: Removed hardcoded constants, now uses i18n keys
+- `zh_TW.py` & `en.py`: Added comprehensive DI translations
+
+### Technical Approach:
+- Followed exact same pattern as V/Q modules
+- Maintained all existing functionality while enabling bilingual support
+- Real-time language switching capability via session state
+- Consistent translation key naming convention
+
+**Result**: DI diagnostic report now fully supports bilingual output with unified i18n system, matching V/Q module implementation patterns.
+
 --- 

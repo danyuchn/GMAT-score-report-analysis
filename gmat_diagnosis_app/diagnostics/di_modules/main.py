@@ -7,22 +7,28 @@ import logging
 
 # Import from sibling modules within di_modules
 from .constants import (
-    MAX_ALLOWED_TIME_DI, TIME_PRESSURE_THRESHOLD_DI, INVALID_DATA_TAG_DI,
-    INVALID_TIME_THRESHOLD_MINUTES, OVERTIME_THRESHOLDS, SUSPICIOUS_FAST_MULTIPLIER
+    MAX_ALLOWED_TIME_DI, TIME_PRESSURE_THRESHOLD_DI,
+    OVERTIME_THRESHOLDS, 
+    EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES,
+    SUSPICIOUS_FAST_MULTIPLIER,
+    INVALID_TIME_THRESHOLD_MINUTES
 )
 from .utils import (
     # _calculate_msr_metrics, # Removed import
     _analyze_dimension, _grade_difficulty_di
 )
-from .translation import (
-    _translate_di # Only translation function needed directly in main logic?
-)
+# Import only needed items from translation.py, or keep for backward compatibility
+# from .translation import (
+#     _translate_di # Only translation function needed directly in main logic?
+# )
 from .chapter_logic import (
     _diagnose_root_causes, _observe_di_patterns, _check_foundation_override, _generate_di_recommendations
 )
 from .report_generation import _generate_di_summary_report
 from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
 from gmat_diagnosis_app.analysis_helpers.time_analyzer import calculate_first_third_average_time_per_type
+# Add unified i18n system import
+from gmat_diagnosis_app.i18n import translate as t
 
 # Rename the main processing function for clarity within the module
 def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
@@ -54,7 +60,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         pd.DataFrame: The processed DI DataFrame with added diagnostic columns.
     """
     di_diagnosis_results = {}
-    report_str = "Data Insights (DI) 診斷過程中發生錯誤。"
+    report_str = t('report_generation_disabled')  # Use translation for error message
     df_to_return = pd.DataFrame() # Default empty DataFrame
     empty_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type',
                   'question_fundamental_skill', 'content_domain', 'Subject', 'is_invalid',
@@ -64,7 +70,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
 
     try: # --- Start Main Try Block ---
         if df_di_processed.empty:
-            report_str = "Data Insights (DI) 部分無數據可供診斷。"
+            report_str = t('di_ai_analysis_unavailable')  # Use translation for no data message
             df_to_return = pd.DataFrame(columns=empty_cols)
             if 'Subject' not in df_to_return.columns:
                 df_to_return['Subject'] = 'DI'
@@ -75,9 +81,9 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         
         # Initialize time_performance_category early on df_di
         if 'time_performance_category' not in df_di.columns:
-            df_di['time_performance_category'] = 'Unknown' # Default, will be calculated
+            df_di['time_performance_category'] = t('Unknown') # Default, will be calculated
         else: # Ensure it handles empty strings if already present
-            df_di['time_performance_category'] = df_di['time_performance_category'].replace({'': 'Unknown', pd.NA: 'Unknown', None: 'Unknown', np.nan: 'Unknown'})
+            df_di['time_performance_category'] = df_di['time_performance_category'].replace({'': t('Unknown'), pd.NA: t('Unknown'), None: t('Unknown'), np.nan: t('Unknown')})
 
         # 添加調試日誌：記錄原始數據
         total_questions = len(df_di)
@@ -224,13 +230,11 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             for idx in df_di.index[final_invalid_mask_di]:
                 try:
                     current_list = df_di.loc[idx, 'diagnostic_params']
-                    if not isinstance(current_list, list): current_list = []
-                    if INVALID_DATA_TAG_DI not in current_list:
-                        current_list.append(INVALID_DATA_TAG_DI)
-                    df_di.loc[idx, 'diagnostic_params'] = current_list
+                    if t('di_invalid_data_tag') not in current_list:
+                        current_list.append(t('di_invalid_data_tag'))
+                        df_di.loc[idx, 'diagnostic_params'] = current_list
                 except Exception as e:
-                    logging.error(f"Error updating 'diagnostic_params' for invalid row index {idx}: {e}", exc_info=True)
-                    continue
+                    logging.error(f"Error updating diagnostic_params for invalid row at index {idx}: {e}", exc_info=True)
 
         # --- Mark Overtime (Vectorized Approach) on df_di ---
         try:
@@ -370,7 +374,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
                 lambda x: list(x) if isinstance(x, (list, tuple, set)) else ([] if pd.isna(x) else [x] if isinstance(x, str) else [])
             )
             df_to_return['diagnostic_params_list_chinese'] = df_to_return['diagnostic_params'].apply(
-                lambda params_list: _translate_di(params_list)
+                lambda params_list: [t(param) for param in params_list] if isinstance(params_list, list) else []
             )
             if 'diagnostic_params' in df_to_return.columns: df_to_return = df_to_return.drop(columns=['diagnostic_params'])
             if 'diagnostic_params_list_chinese' in df_to_return.columns: df_to_return = df_to_return.rename(columns={'diagnostic_params_list_chinese': 'diagnostic_params_list'})
@@ -378,13 +382,13 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             df_to_return['diagnostic_params_list'] = [[] for _ in range(len(df_to_return))]
 
         if 'time_performance_category' not in df_to_return.columns:
-            df_to_return['time_performance_category'] = 'Unknown'
+            df_to_return['time_performance_category'] = t('Unknown')
         
         # Ensure `time_performance_category` for invalid rows is NOT overwritten to 'Invalid/Excluded' here.
         # It should retain the value calculated by _diagnose_root_causes.
         # Fill NA or empty strings with 'Unknown' if _diagnose_root_causes didn't assign a category.
         with pd.option_context('future.no_silent_downcasting', True):
-            df_to_return['time_performance_category'] = df_to_return['time_performance_category'].replace({pd.NA: 'Unknown', None: 'Unknown', np.nan: 'Unknown', '': 'Unknown'})
+            df_to_return['time_performance_category'] = df_to_return['time_performance_category'].replace({pd.NA: t('Unknown'), None: t('Unknown'), np.nan: t('Unknown'), '': t('Unknown')})
             df_to_return['time_performance_category'] = df_to_return['time_performance_category'].infer_objects(copy=False)
         
         if 'is_sfe' in df_to_return.columns:
@@ -406,11 +410,11 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
 
         cols_to_fill_na = ['is_sfe', 'time_performance_category']
         # Adjust fill_values for time_performance_category
-        fill_values = {'is_sfe': False, 'time_performance_category': 'Unknown'} # Changed from 'Invalid/Excluded'
+        fill_values = {'is_sfe': False, 'time_performance_category': t('Unknown')} # Changed from 'Invalid/Excluded'
         with pd.option_context('future.no_silent_downcasting', True):
             for col in cols_to_fill_na:
                 if col in df_to_return.columns:
-                    fill_value = fill_values.get(col, 'Unknown')
+                    fill_value = fill_values.get(col, t('Unknown'))
                     # 使用替代方法避免FutureWarning
                     if fill_value == False:
                         df_to_return[col] = df_to_return[col].replace({pd.NA: False, None: False, np.nan: False})
@@ -441,4 +445,4 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         df_to_return = pd.DataFrame(columns=empty_cols)
         if 'Subject' not in df_to_return.columns:
             df_to_return['Subject'] = 'DI'
-        return {}, f"DI 診斷過程中發生未預期錯誤: {e}", df_to_return 
+        return {}, t('di_diagnosis_error_message'), df_to_return 

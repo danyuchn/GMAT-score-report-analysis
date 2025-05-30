@@ -10,9 +10,8 @@ from .constants import (
     CARELESSNESS_THRESHOLD,
     TOTAL_QUESTIONS_DI, # Import TOTAL_QUESTIONS_DI
     EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES, # Import new constant
-    INVALID_DATA_TAG_DI # Ensure this is imported
 )
-from .translation import _translate_di # Needed later for other functions
+from gmat_diagnosis_app.i18n import translate as t # Use unified i18n system
 from .utils import _grade_difficulty_di, _format_rate
 
 
@@ -354,30 +353,30 @@ def _diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
         # --- End Detailed Logic ---
         else: # This row IS invalid
             sfe_triggered = False # Invalid rows are not SFE by this logic
-            # params list should be empty or contain only INVALID_DATA_TAG_DI
-            # The INVALID_DATA_TAG_DI is usually added in main.py to the original 'diagnostic_params' column.
+            # params list should be empty or contain only invalid tag
+            # The invalid tag is usually added in main.py to the original 'diagnostic_params' column.
             # Here, we ensure that if this function is solely responsible for 'params', it reflects invalidity.
             existing_row_params = row.get('diagnostic_params', [])
-            if isinstance(existing_row_params, list) and INVALID_DATA_TAG_DI in existing_row_params:
-                params = [INVALID_DATA_TAG_DI]
+            if isinstance(existing_row_params, list) and t('di_invalid_data_tag') in existing_row_params:
+                params = [t('di_invalid_data_tag')]
             elif not params: # If no SFE was added (because it's invalid), and params is empty
-                params = [INVALID_DATA_TAG_DI]
+                params = [t('di_invalid_data_tag')]
             # current_time_performance_category is already calculated for all rows and will be used.
 
-        # Ensure INVALID_DATA_TAG_DI is handled correctly if added by main.py
+        # Ensure invalid tag is handled correctly if added by main.py
         # and merge with params calculated here (which are empty if invalid_row is true and no SFE)
         original_input_row_params = row.get('diagnostic_params', [])
         if not isinstance(original_input_row_params, list): original_input_row_params = []
 
         final_params_for_row = []
         if is_invalid_row:
-            # For invalid rows, the params list should primarily be [INVALID_DATA_TAG_DI].
+            # For invalid rows, the params list should primarily be [invalid_tag].
             # If main.py already put it in original_input_row_params, use that.
-            if INVALID_DATA_TAG_DI in original_input_row_params:
-                final_params_for_row = [p for p in original_input_row_params if p == INVALID_DATA_TAG_DI] # Keep only this tag if others exist
-                if not final_params_for_row: final_params_for_row = [INVALID_DATA_TAG_DI] # Ensure it's there
+            if t('di_invalid_data_tag') in original_input_row_params:
+                final_params_for_row = [p for p in original_input_row_params if p == t('di_invalid_data_tag')] # Keep only this tag if others exist
+                if not final_params_for_row: final_params_for_row = [t('di_invalid_data_tag')] # Ensure it's there
             else:
-                final_params_for_row = [INVALID_DATA_TAG_DI]
+                final_params_for_row = [t('di_invalid_data_tag')]
             # sfe_triggered is already False for invalid rows at this point if it came from this function's logic
         else: # Valid row
             # Combine any params from earlier steps (e.g. behavioral from main) with SFE/detailed from here
@@ -624,8 +623,8 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags, ti
                 exempted_type_domain_combinations.add((q_type, domain))
 
     # Macro Recommendations
-    math_related_zh = _translate_di('Math Related') # Translate once
-    non_math_related_zh = _translate_di('Non-Math Related') # Translate once
+    math_related_zh = t('Math Related') # Translate once
+    non_math_related_zh = t('Non-Math Related') # Translate once
     for q_type, override_info in override_results.items():
         if q_type in recommendations_by_type and override_info.get('override_triggered'):
             # Check if all content domains for this q_type are exempted
@@ -757,11 +756,11 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags, ti
                     target_time_text = f"{target_time_minutes:.1f} 分鐘" # Final target time text
                     group_sfe = group_df['is_sfe'].any()
                     diag_params_codes = set().union(*[s for s in group_df['diagnostic_params'] if isinstance(s, list)]) # More concise set union
-                    translated_params_list = _translate_di(list(diag_params_codes)) # Translate here if needed for text, else done later
+                    translated_params_list = t(list(diag_params_codes)) # Translate here if needed for text, else done later
 
                     problem_desc = "錯誤或超時"
                     sfe_prefix = "*基礎掌握不穩* " if group_sfe else ""
-                    translated_domain = _translate_di(domain) # Translate domain
+                    translated_domain = t(domain) # Translate domain
 
                     rec_text = f"{sfe_prefix}針對 **{translated_domain}** 領域的 **{q_type}** 題目 ({problem_desc})，"
                     rec_text += f"建議練習 **{y_grade}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。"
@@ -796,8 +795,8 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags, ti
 
     for q_type, domain in sorted_exemptions:
         if pd.isna(q_type) or pd.isna(domain): continue
-        exempt_type_zh = _translate_di(q_type)
-        exempt_domain_zh = _translate_di(domain)
+        exempt_type_zh = t(q_type)
+        exempt_domain_zh = t(domain)
         final_recommendations.append({
             'type': 'exemption_note',
             'text': f"**{exempt_domain_zh}** 領域的 **{exempt_type_zh}** 題目表現完美，已豁免練習建議。",

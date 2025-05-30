@@ -8,6 +8,7 @@ DI科AI工具與提示建議生成模組
 import pandas as pd
 from gmat_diagnosis_app.utils.route_tool import DiagnosisRouterTool
 from gmat_diagnosis_app.diagnostics.di_modules.constants import DI_TOOL_AI_RECOMMENDATIONS
+from gmat_diagnosis_app.i18n import translate as t
 from gmat_diagnosis_app.diagnostics.di_modules.translation import APPENDIX_A_TRANSLATION_DI
 
 
@@ -48,7 +49,7 @@ def generate_di_ai_tool_recommendations_legacy(df_di: pd.DataFrame) -> str:
         str: 格式化的AI工具和提示建議文本
     """
     if df_di.empty:
-        return "(無數據可供分析)"
+        return f"({t('di_ai_analysis_unavailable')})"
     
     # 收集所有診斷標籤
     all_tags = []
@@ -58,7 +59,7 @@ def generate_di_ai_tool_recommendations_legacy(df_di: pd.DataFrame) -> str:
     
     # 如果沒有標籤，返回空
     if not all_tags:
-        return "(未找到診斷標籤)"
+        return f"({t('di_ai_analysis_unavailable')})"
     
     # 計算每個標籤的出現頻率
     tag_counts = {}
@@ -89,7 +90,7 @@ def generate_di_ai_tool_recommendations_legacy(df_di: pd.DataFrame) -> str:
     already_recommended = set()  # 用於追踪已經推薦的工具，避免重複
     
     for tag, tools, count in matched_tags:
-        recommendation_text = f"**{tag}** (出現{count}次):\n"
+        recommendation_text = f"**{tag}** ({t('v_appears_times').format(count)}):\n"
         
         tools_added = False
         for tool in tools:
@@ -104,7 +105,7 @@ def generate_di_ai_tool_recommendations_legacy(df_di: pd.DataFrame) -> str:
     
     # 如果沒有匹配的推薦，提供一個通用建議
     if not recommendations:
-        return "未找到特定匹配的工具建議。建議參考GMAT官方指南中的DI科相關練習和策略。"
+        return t('di_ai_fallback_message')
     
     # 將所有推薦組合為一個字符串，最多顯示10條
     return "\n".join(recommendations[:10])
@@ -129,10 +130,10 @@ def generate_di_ai_tool_recommendations(df_di: pd.DataFrame) -> str:
         recommendations = router.generate_recommendations_from_dataframe(df_di, "DI")
         
         # 如果新方法沒有找到足夠的建議，嘗試舊方法作為備選
-        if recommendations == "(未找到診斷標籤)" or recommendations.startswith("未找到特定匹配"):
+        if recommendations == f"({t('di_ai_analysis_unavailable')})" or recommendations.startswith(t('di_ai_fallback_message')):
             legacy_recommendations = generate_di_ai_tool_recommendations_legacy(df_di)
-            if not legacy_recommendations.startswith("未找到特定匹配") and legacy_recommendations != "(未找到診斷標籤)":
-                recommendations = f"**使用新路由系統生成的建議：**\n{recommendations}\n\n**補充建議（基於舊系統）：**\n{legacy_recommendations}"
+            if not legacy_recommendations.startswith(t('di_ai_fallback_message')) and legacy_recommendations != f"({t('di_ai_analysis_unavailable')})":
+                recommendations = f"**{t('di_ai_recommendation_context')}**\n{recommendations}\n\n**{t('v_ai_combined_recommendations')}**\n{legacy_recommendations}"
         
         return recommendations
         

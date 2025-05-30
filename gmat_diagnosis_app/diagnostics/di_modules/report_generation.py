@@ -3,18 +3,18 @@ import logging
 import re
 import os
 
-from .translation import (
-    _translate_di,
-    DI_PARAM_CATEGORY_ORDER, DI_PARAM_TO_CATEGORY
-)
+# Replace old translation system with unified i18n system
+from gmat_diagnosis_app.i18n import translate as t
 from .utils import _format_rate
 from .constants import (
-    MAX_ALLOWED_TIME_DI, INVALID_DATA_TAG_DI
+    MAX_ALLOWED_TIME_DI
 )
+# Import needed constants from translation.py for parameter categorization
+from .translation import DI_PARAM_CATEGORY_ORDER, DI_PARAM_TO_CATEGORY
 
 def _generate_di_summary_report(di_results):
     """Generates the summary report string for the Data Insights section based on the new structure."""
-    report_lines = ["DI 科診斷報告詳情", "---（基於用戶數據與模擬難度分析）---", ""] # Added main title
+    report_lines = [t('di_report_title'), t('di_report_subtitle'), ""] # Added main title
 
     ch1 = di_results.get('chapter_1', {})
     ch2 = di_results.get('chapter_2', {})
@@ -25,8 +25,8 @@ def _generate_di_summary_report(di_results):
     diagnosed_df = ch3.get('diagnosed_dataframe')
 
     # Pre-translate common terms
-    math_related_zh = _translate_di('Math Related')
-    non_math_related_zh = _translate_di('Non-Math Related')
+    math_related_zh = t('Math Related')
+    non_math_related_zh = t('Non-Math Related')
 
     # Prepare data for reflection mapping and param counts
     all_triggered_params = set()
@@ -65,75 +65,75 @@ def _generate_di_summary_report(di_results):
     sfe_code = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'
 
     # --- I. 報告總覽與即時反饋 ---
-    report_lines.append("**一、 報告總覽與即時反饋**")
+    report_lines.append(t('di_report_overview_feedback'))
     report_lines.append("") # Add spacing
 
     # A. 作答時間與策略評估
-    report_lines.append("* **A. 作答時間與策略評估**")
-    tp_status = _translate_di(ch1.get('time_pressure', 'Unknown'))
+    report_lines.append(t('di_time_strategy_assessment'))
+    tp_status = t(ch1.get('time_pressure', 'Unknown'))
     total_time = ch1.get('total_test_time_minutes', 0)
     time_diff = ch1.get('time_difference_minutes', 0)
-    report_lines.append(f"    * **整體作答時間：** {total_time:.2f} 分鐘 (允許 {MAX_ALLOWED_TIME_DI:.1f} 分鐘，剩餘 {time_diff:.2f} 分鐘)")
-    report_lines.append(f"    * **時間壓力感知：** {tp_status}") # Removed bold from value as per new format
+    report_lines.append(t('di_total_test_time').format(total_time, MAX_ALLOWED_TIME_DI, time_diff))
+    report_lines.append(t('di_time_pressure_perception').format(tp_status))
 
     # B. 重要註記
-    report_lines.append("* **B. 重要註記**")
+    report_lines.append(t('di_important_notes'))
     manual_invalid_count = 0
     if diagnosed_df is not None and 'is_manually_invalid' in diagnosed_df.columns:
         manual_invalid_count = diagnosed_df['is_manually_invalid'].astype(bool).sum()
     if manual_invalid_count > 0:
-        report_lines.append(f"    * 您手動標記了 {manual_invalid_count} 題為無效，這些題目已從部分細化分析中排除。")
+        report_lines.append(f"    * {t('di_manual_invalid_count').format(manual_invalid_count)}")
     else:
-        report_lines.append("    * 無手動標記為無效的題目。")
+        report_lines.append(f"    * {t('di_no_manual_invalid')}")
     report_lines.append("")
 
     # --- II. 核心表現分析 ---
-    report_lines.append("**二、 核心表現分析**")
+    report_lines.append(t('di_core_performance_analysis'))
     report_lines.append("")
 
     # A. 內容領域表現概覽
-    report_lines.append("* **A. 內容領域表現概覽**")
+    report_lines.append(t('di_content_domain_overview'))
     domain_tags = ch2.get('domain_comparison_tags', {})
     domain_comparison_lines = []
     if domain_tags.get('significant_diff_error') or domain_tags.get('significant_diff_overtime'):
-        if domain_tags.get('poor_math_related'): domain_comparison_lines.append(f"    * {math_related_zh}領域的錯誤率明顯更高。") # Removed bold from math_related_zh for content
-        if domain_tags.get('poor_non_math_related'): domain_comparison_lines.append(f"    * {non_math_related_zh}領域的錯誤率明顯更高。")
-        if domain_tags.get('slow_math_related'): domain_comparison_lines.append(f"    * {math_related_zh}領域的超時率明顯更高。")
-        if domain_tags.get('slow_non_math_related'): domain_comparison_lines.append(f"    * {non_math_related_zh}領域的超時率明顯更高。")
+        if domain_tags.get('poor_math_related'): domain_comparison_lines.append(f"    * {t('di_math_related_poor_error').format(math_related_zh)}")
+        if domain_tags.get('poor_non_math_related'): domain_comparison_lines.append(f"    * {t('di_non_math_related_poor_error').format(non_math_related_zh)}")
+        if domain_tags.get('slow_math_related'): domain_comparison_lines.append(f"    * {t('di_math_related_poor_overtime').format(math_related_zh)}")
+        if domain_tags.get('slow_non_math_related'): domain_comparison_lines.append(f"    * {t('di_non_math_related_poor_overtime').format(non_math_related_zh)}")
     else:
-        domain_comparison_lines.append(f"    * {math_related_zh}與{non_math_related_zh}領域的表現在錯誤率和超時率上無顯著差異。")
+        domain_comparison_lines.append(f"    * {t('di_no_significant_domain_difference').format(math_related_zh, non_math_related_zh)}")
     if not domain_comparison_lines: # Fallback if no specific tags but differences were expected
-        domain_comparison_lines.append(f"    * 請參考詳細數據分析各領域表現。") # Generic fallback
+        domain_comparison_lines.append(f"    * {t('di_refer_detailed_analysis')}") # Generic fallback
     report_lines.extend(domain_comparison_lines)
 
 
     # B. 高頻潛在問題點
-    report_lines.append("* **B. 高頻潛在問題點**")
+    report_lines.append(t('di_high_frequency_issues'))
     potential_problem_lines = []
     if sfe_triggered and diagnosed_df is not None and 'is_sfe' in diagnosed_df.columns:
         valid_df_sfe = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy() # Renamed to avoid conflict
         sfe_rows = valid_df_sfe[valid_df_sfe['is_sfe'] == True]
         if not sfe_rows.empty:
-            sfe_label = _translate_di(sfe_code)
-            potential_problem_lines.append(f"    * {sfe_label} (註：SFE 指在已掌握難度範圍內題目失誤)")
+            sfe_label = t(sfe_code)
+            potential_problem_lines.append(f"    * {sfe_label} {t('di_sfe_note')}")
 
 
     top_other_params_codes = []
     if not param_counts_all.empty:
-        filtered_param_counts = param_counts_all[~param_counts_all.index.isin([sfe_code, INVALID_DATA_TAG_DI])]
+        filtered_param_counts = param_counts_all[~param_counts_all.index.isin([sfe_code])]
         top_other_params_codes = filtered_param_counts.head(2).index.tolist()
 
     if top_other_params_codes:
         for param_code in top_other_params_codes:
-            translated_param_for_b = _translate_di(param_code)
+            translated_param_for_b = t(param_code)
             potential_problem_lines.append(f"    * {translated_param_for_b}")
     
     if not potential_problem_lines:
-        potential_problem_lines.append("    * 未識別出明顯的核心問題模式。")
+        potential_problem_lines.append(f"    * {t('di_no_obvious_core_issues')}")
     report_lines.extend(potential_problem_lines)
 
     # C. 特殊行為模式觀察
-    report_lines.append("* **C. 特殊行為模式觀察**")
+    report_lines.append(t('di_special_behavioral_patterns'))
     careless_triggered_ch4 = ch4.get('carelessness_issue_triggered')
     rushing_triggered_ch4 = ch4.get('early_rushing_risk_triggered')
     patterns_found = False
@@ -141,26 +141,26 @@ def _generate_di_summary_report(di_results):
     if careless_triggered_ch4:
         fast_wrong_rate_str = _format_rate(ch4.get('fast_wrong_rate', 0.0))
         tag_to_translate_c = 'DI_BEHAVIOR_CARELESSNESS_ISSUE'
-        translated_tag_for_c = _translate_di(tag_to_translate_c)
-        behavior_pattern_lines.append(f"    * {translated_tag_for_c}：相對快速作答的題目中，錯誤比例偏高（{fast_wrong_rate_str}），提示可能存在粗心問題。")
+        translated_tag_for_c = t(tag_to_translate_c)
+        behavior_pattern_lines.append(f"    * {translated_tag_for_c}{t('di_carelessness_pattern').format(fast_wrong_rate_str)}")
         patterns_found = True
     if rushing_triggered_ch4:
         num_rush = len(ch4.get('early_rushing_questions', []))
-        behavior_pattern_lines.append(f"    * {_translate_di('DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')}：測驗前期（{num_rush} 題）出現作答時間過短（<1分鐘）的情況，可能影響準確率。")
+        behavior_pattern_lines.append(f"    * {t('DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')}{t('di_early_rushing_pattern').format(num_rush)}")
         patterns_found = True
     if not patterns_found:
-        behavior_pattern_lines.append("    * 未發現明顯的粗心或前期過快等負面行為模式。")
+        behavior_pattern_lines.append(f"    * {t('di_no_negative_patterns')}")
     report_lines.extend(behavior_pattern_lines)
     report_lines.append("")
 
 
     # --- III. 宏觀練習建議 (按題型) ---
-    report_lines.append("**三、 宏觀練習建議 (按題型)**")
+    report_lines.append(t('di_macro_practice_suggestions'))
     report_lines.append("")
     recommendations = ch6.get('recommendations_list', [])
     
     if not recommendations:
-        report_lines.append("* 根據當前分析，暫無特別的練習建議。請保持全面複習。")
+        report_lines.append(f"* {t('di_no_practice_recommendations')}")
     else:
         q_type_map = {
             "Data Sufficiency": "A", "Two-part analysis": "B", # Corrected "Two-part analysis" to "Two-part analysis"
@@ -177,11 +177,11 @@ def _generate_di_summary_report(di_results):
 
             q_type_eng = ""
             q_type_eng_stripped = ""
-            q_type_zh = _translate_di(original_q_type_field)
+            q_type_zh = t(original_q_type_field)
 
             # Default texts, primarily for macro or as fallback
-            challenge_text = _translate_di("整體表現有較大提升空間") # Generic default
-            direction_text = _translate_di("建議全面鞏固基礎")     # Generic default
+            challenge_text = t('di_overall_improvement_space') # Generic default
+            direction_text = t('di_comprehensive_foundation_consolidation')     # Generic default
             time_limit_text = "N/A"
             
             q_type_eng_for_map = original_q_type_field # Default to original field
@@ -190,7 +190,7 @@ def _generate_di_summary_report(di_results):
                 q_type_match_macro = re.search(r"宏觀建議 \\((.*?)\\):", rec_text)
                 if q_type_match_macro:
                     q_type_eng = q_type_match_macro.group(1).strip()
-                    q_type_zh = _translate_di(q_type_eng)
+                    q_type_zh = t(q_type_eng)
                     q_type_eng_for_map = q_type_eng # Update for map lookup
                 # else q_type_eng_for_map remains original_q_type_field
 
@@ -212,9 +212,9 @@ def _generate_di_summary_report(di_results):
 
                 # Construct challenge_text from structured fields or parse rec_text
                 sfe_prefix = "*基礎掌握不穩* " if rec_original.get('is_sfe') else ""
-                domain_in_rec = _translate_di(rec_original.get('domain', '未知領域'))
-                # q_type_in_rec_zh = _translate_di(rec_original.get('question_type', '未知題型')) # q_type_zh is already this
-                problem_desc_in_rec = _translate_di("錯誤或超時")
+                domain_in_rec = t(rec_original.get('domain', 'Unknown Domain'))
+                # q_type_in_rec_zh = t(rec_original.get('question_type', 'Unknown Type')) # q_type_zh is already this
+                problem_desc_in_rec = t('di_unknown_value')
                 challenge_text = f"{sfe_prefix}針對 **{domain_in_rec}** 領域的 **{q_type_zh}** 題目 ({problem_desc_in_rec})"
                 
                 # Construct direction_text
@@ -248,7 +248,7 @@ def _generate_di_summary_report(di_results):
                     if time_limit_match_case:
                         time_limit_text = time_limit_match_case.group(1).strip()
                     else:
-                        time_limit_text = "N/A"
+                        time_limit_text = t('di_na')
             
             elif rec_type == 'exemption_note':
                 # q_type_eng_for_map is already original_q_type_field by default.
@@ -259,7 +259,7 @@ def _generate_di_summary_report(di_results):
             
             # Common post-processing for time_limit_text
             current_q_type_for_suffix = q_type_eng_for_map # Use the determined English q_type for suffix logic
-            if time_limit_text and time_limit_text != "N/A": # Check if not None and not N/A
+            if time_limit_text and time_limit_text != t('di_na'): # Check if not None and not N/A
                 if current_q_type_for_suffix == "Multi-source reasoning":
                     time_limit_text += "/題組"
                 else:
@@ -322,12 +322,12 @@ def _generate_di_summary_report(di_results):
         report_lines.append("    * **方法：** 按照以上指引查看近期練習記錄，整理相關錯題或超時題目。")
 
         core_issue_texts_for_review = []
-        if sfe_triggered: core_issue_texts_for_review.append(_translate_di(sfe_code))
+        if sfe_triggered: core_issue_texts_for_review.append(t(sfe_code))
         if 'top_other_params_codes' in locals() and top_other_params_codes: # Use already defined list
-             core_issue_texts_for_review.extend([_translate_di(p) for p in top_other_params_codes])
+             core_issue_texts_for_review.extend([t(p) for p in top_other_params_codes])
         
-        # Filter out any INVALID_DATA_TAG if it accidentally got included
-        filtered_core_issues_for_review = [issue for issue in core_issue_texts_for_review if issue != _translate_di(INVALID_DATA_TAG_DI)]
+        # Generate review guidance text
+        filtered_core_issues_for_review = [issue for issue in core_issue_texts_for_review if issue != t('di_invalid_data_tag')]
 
         if filtered_core_issues_for_review:
              report_lines.append(f"    * **重點關注：** 題目是否反覆涉及報告第二部分（核心表現分析）指出的核心問題：")
@@ -361,13 +361,13 @@ def _generate_di_summary_report(di_results):
 
 
             for (time_perf, domain, q_type), group in combined_groups:
-                if time_perf in ['Normal Time & Correct', 'Fast & Correct', _translate_di('Normal Time & Correct'), _translate_di('Fast & Correct')]: # Check both Eng and Zh
+                if time_perf in ['Normal Time & Correct', 'Fast & Correct', t('Normal Time & Correct'), t('Fast & Correct')]: # Check both Eng and Zh
                     continue
 
                 all_diagnostic_params_group = [] # Renamed
                 for params_list in group['diagnostic_params']:
                     if isinstance(params_list, list):
-                        all_diagnostic_params_group.extend(p for p in params_list if p != INVALID_DATA_TAG_DI) # Filter invalid tag
+                        all_diagnostic_params_group.extend(p for p in params_list if p != t('di_invalid_data_tag')) # Filter invalid tag
 
                 if all_diagnostic_params_group:
                     unique_params = sorted(list(set(all_diagnostic_params_group))) # Sort for consistent order
@@ -380,14 +380,14 @@ def _generate_di_summary_report(di_results):
                                 params_in_cat.append(param)
                         if params_in_cat:
                              # Ensure params within a category are also sorted if desired
-                            params_by_category[_translate_di(category_eng)] = sorted([_translate_di(p) for p in params_in_cat])
+                            params_by_category[t(category_eng)] = sorted([t(p) for p in params_in_cat])
 
 
                     if params_by_category: # Only add if there are categorized params
                          reflection_prompts_data.append({
-                            "time_perf_zh": _translate_di(time_perf),
-                            "domain_zh": _translate_di(domain),
-                            "q_type_zh": _translate_di(q_type),
+                            "time_perf_zh": t(time_perf),
+                            "domain_zh": t(domain),
+                            "q_type_zh": t(q_type),
                             "categories": params_by_category
                         })
     

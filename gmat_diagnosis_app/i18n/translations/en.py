@@ -199,6 +199,142 @@ TRANSLATIONS = {
     # Main diagnosis module translations
     'report_generation_disabled': "Report generation is disabled or encountered issues.",
     
+    # === DI Diagnostic Translations ===
+    
+    # DI Diagnostic Parameters - Error Types (Fast & Wrong / Normal Time & Wrong)
+    'DI_READING_COMPREHENSION_ERROR__VOCABULARY': "DI Reading Comprehension Error: Vocabulary Understanding",
+    'DI_READING_COMPREHENSION_ERROR__SYNTAX': "DI Reading Comprehension Error: Syntax Understanding",
+    'DI_READING_COMPREHENSION_ERROR__LOGIC': "DI Reading Comprehension Error: Logic Understanding",
+    'DI_READING_COMPREHENSION_ERROR__DOMAIN': "DI Reading Comprehension Error: Domain Understanding",
+    'DI_GRAPH_INTERPRETATION_ERROR__GRAPH': "DI Graph Interpretation Error: Graph Information Reading",
+    'DI_GRAPH_INTERPRETATION_ERROR__TABLE': "DI Graph Interpretation Error: Table Information Reading",
+    'DI_CONCEPT_APPLICATION_ERROR__MATH': "DI Concept Application (Math) Error: Mathematical Concept/Formula Application",
+    'DI_LOGICAL_REASONING_ERROR__NON_MATH': "DI Logical Reasoning (Non-Math) Error: Question Internal Logic Reasoning/Judgment",
+    'DI_CALCULATION_ERROR__MATH': "DI Calculation Error (Math): Mathematical Calculation",
+    'DI_MULTI_SOURCE_INTEGRATION_ERROR': "DI Multi-Source Integration (MSR): Cross-page/Source Information Integration Barrier",
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE': "DI Foundation Mastery: Application Instability (Special Focus Error)",
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': "DI Foundation Mastery: Application Instability (Special Focus Error)",
+    'DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION': "DI Behavior: Carelessness - Detail Omission/Misreading",
+    'DI_BEHAVIOR_CARELESSNESS_ISSUE': "DI Behavior: Carelessness - Overall High Fast-Wrong Rate",
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "DI Behavior: Early Test Phase Too Fast Risk",
+    
+    # DI Diagnostic Parameters - Difficulty Types (Slow & Wrong / Slow & Correct)
+    'DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION': "DI Reading Comprehension Difficulty: Cross-page/Source Information Integration Difficulty",
+    'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY': "DI Reading Comprehension Difficulty: Vocabulary Understanding Difficulty",
+    'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX': "DI Reading Comprehension Difficulty: Syntax Understanding Difficulty",
+    'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC': "DI Reading Comprehension Difficulty: Logic Understanding Difficulty",
+    'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN': "DI Reading Comprehension Difficulty: Domain Understanding Difficulty",
+    'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH': "DI Graph Interpretation Difficulty: Graph Information Reading Difficulty",
+    'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE': "DI Graph Interpretation Difficulty: Table Information Reading Difficulty",
+    'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH': "DI Concept Application (Math) Difficulty: Mathematical Concept/Formula Application Difficulty",
+    'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH': "DI Logical Reasoning (Non-Math) Difficulty: Question Internal Logic Reasoning/Judgment Difficulty",
+    'DI_CALCULATION_DIFFICULTY__MATH': "DI Calculation (Math) Difficulty: Mathematical Calculation Difficulty",
+    'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED': "DI Reading Comprehension Difficulty: Mental Block Unable to Read",
+    
+    # DI Content Domains and Categories
+    'Math Related': "Math Related",
+    'Non-Math Related': "Non-Math Related",
+    'Unknown Domain': "Unknown Domain",
+    
+    # DI Question Types
+    'Data Sufficiency': 'Data Sufficiency',
+    'Two-part analysis': 'Two-part analysis',
+    'Multi-source reasoning': 'Multi-source reasoning',
+    'Graph and Table': 'Graph and Table',
+    'Unknown Type': 'Unknown Type',
+    
+    # DI Time Performance Categories
+    'Fast & Wrong': "Fast & Wrong",
+    'Slow & Wrong': "Slow & Wrong",
+    'Normal Time & Wrong': "Normal Time & Wrong",
+    'Slow & Correct': "Slow & Correct",
+    'Fast & Correct': "Fast & Correct",
+    'Normal Time & Correct': "Normal Time & Correct",
+    'Invalid/Excluded': "Invalid/Excluded",
+    
+    # DI Parameter Categories
+    'SFE': 'Foundation Mastery',
+    'Reading/Interpretation': 'Reading/Interpretation',
+    'Concept/Application': 'Concept/Application',
+    'Data/Calculation': 'Data/Calculation',
+    'Logic/Reasoning': 'Logic/Reasoning',
+    'Multi-Source': 'Multi-Source Integration',
+    'Efficiency': 'Efficiency Issues',
+    'Carelessness': 'Carelessness Issues',
+    'Behavioral': 'Behavioral Patterns',
+    
+    # DI Time Pressure Status
+    'High': "High",
+    'Low': "Low",
+    'True': "Time Pressure Present",
+    'False': "No Time Pressure",
+    
+    # DI Report Structure - Main Sections
+    'di_report_title': "DI Section Diagnostic Report Details",
+    'di_report_subtitle': "(Based on User Data and Simulated Difficulty Analysis)",
+    'di_report_overview_feedback': "**I. Report Overview and Immediate Feedback**",
+    'di_time_strategy_assessment': "* **A. Response Time and Strategy Assessment**",
+    'di_important_notes': "* **B. Important Notes**",
+    'di_core_performance_analysis': "**II. Core Performance Analysis**",
+    'di_content_domain_overview': "* **A. Content Domain Performance Overview**",
+    'di_high_frequency_issues': "* **B. High-Frequency Potential Issues**",
+    'di_special_behavioral_patterns': "* **C. Special Behavioral Pattern Observations**",
+    'di_macro_practice_suggestions': "**III. Macro Practice Suggestions (By Question Type)**",
+    
+    # DI Report - Time and Strategy Assessment
+    'di_total_test_time': "**Overall Response Time:** {:.2f} minutes (allowed {:.1f} minutes, remaining {:.2f} minutes)",
+    'di_time_pressure_perception': "**Time Pressure Perception:** {}",
+    'di_manual_invalid_count': "You manually marked {} questions as invalid, which have been excluded from detailed analysis.",
+    'di_no_manual_invalid': "No questions manually marked as invalid.",
+    
+    # DI Report - Domain Performance
+    'di_math_related_poor_error': "{} domain has significantly higher error rate.",
+    'di_non_math_related_poor_error': "{} domain has significantly higher error rate.",
+    'di_math_related_poor_overtime': "{} domain has significantly higher overtime rate.",
+    'di_non_math_related_poor_overtime': "{} domain has significantly higher overtime rate.",
+    'di_no_significant_domain_difference': "No significant difference in error rate and overtime rate between {} and {} domains.",
+    'di_refer_detailed_analysis': "Please refer to detailed data analysis for domain performance.",
+    
+    # DI Report - Potential Issues
+    'di_sfe_note': "(Note: SFE refers to errors on questions within mastered difficulty range)",
+    'di_no_obvious_core_issues': "No obvious core problem patterns identified.",
+    
+    # DI Report - Behavioral Patterns
+    'di_carelessness_pattern': ": Error rate is high among relatively fast-answered questions ({}), suggesting possible carelessness issues.",
+    'di_early_rushing_pattern': ": Early test phase ({} questions) showed too short response times (<1 minute), which may affect accuracy.",
+    'di_no_negative_patterns': "No obvious negative behavioral patterns such as carelessness or early rushing found.",
+    
+    # DI Report - Practice Recommendations
+    'di_no_practice_recommendations': "Based on current analysis, no specific practice recommendations. Please maintain comprehensive review.",
+    'di_overall_improvement_space': "Overall performance has significant room for improvement",
+    'di_comprehensive_foundation_consolidation': "Recommend comprehensive foundation consolidation",
+    'di_macro_recommendation_prefix': "Macro Recommendation",
+    'di_due_to_performance': "Due to",
+    'di_error_rate_or_overtime_rate': "(error rate {}% or overtime rate {}%)",
+    'di_recommend_systematic_practice': ", recommend systematic practice",
+    'di_time_limit_suggestion': "Suggested time limit: {}",
+    'di_specific_recommendation_prefix': "Specific Recommendation",
+    'di_focus_on_fundamental_skills': "Focus on fundamental skills: {}",
+    'di_na': "N/A",
+    
+    # DI AI Prompts and Recommendations
+    'di_ai_analysis_available': "AI Deep Analysis Available",
+    'di_ai_analysis_unavailable': "AI Deep Analysis Currently Unavailable",
+    'di_ai_recommendation_context': "Recommended analysis tools based on DI diagnosis results:",
+    'di_ai_tool_context': "Recommended AI tools based on your diagnostic labels: {}",
+    'di_ai_fallback_message': "If AI tools are inaccessible, please refer to the diagnostic report for manual analysis.",
+    
+    # DI Utility Functions
+    'di_format_rate_percent': "{}%",
+    'di_unknown_value': "Unknown",
+    
+    # Additional DI Constants
+    'di_invalid_data_tag': "Invalid Data: Too Short Response Time (DI: Affected by Time Pressure)",
+    'di_max_allowed_time': "45.0",
+    
+    # DI main module
+    'di_diagnosis_error_message': "An unexpected error occurred during DI diagnosis",
+    
     # AI prompts module translations
     'no_data_for_analysis': "(No data available for analysis)",
     'no_diagnostic_tags_found': "(No diagnostic tags found)",

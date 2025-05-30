@@ -533,4 +533,130 @@ TRANSLATIONS = {
     '應用不穩定 (**SFE**)：已掌握技能應用不穩定': "應用不穩定 (**SFE**)：已掌握技能應用不穩定",
     'RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
     'RC 閱讀速度差：整組表現不佳': "RC 閱讀速度差：整組表現不佳",
+
+    # === DI Diagnostic Translations ===
+    
+    # DI Diagnostic Parameters - Error Types (Fast & Wrong / Normal Time & Wrong)
+    'DI_READING_COMPREHENSION_ERROR__VOCABULARY': "DI 閱讀理解錯誤: 詞彙理解",
+    'DI_READING_COMPREHENSION_ERROR__SYNTAX': "DI 閱讀理解錯誤: 句式理解",
+    'DI_READING_COMPREHENSION_ERROR__LOGIC': "DI 閱讀理解錯誤: 邏輯理解",
+    'DI_READING_COMPREHENSION_ERROR__DOMAIN': "DI 閱讀理解錯誤: 領域理解",
+    'DI_GRAPH_INTERPRETATION_ERROR__GRAPH': "DI 圖表解讀錯誤: 圖形信息解讀",
+    'DI_GRAPH_INTERPRETATION_ERROR__TABLE': "DI 圖表解讀錯誤: 表格信息解讀",
+    'DI_CONCEPT_APPLICATION_ERROR__MATH': "DI 概念應用 (數學) 錯誤: 數學觀念/公式應用",
+    'DI_LOGICAL_REASONING_ERROR__NON_MATH': "DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷",
+    'DI_CALCULATION_ERROR__MATH': "DI 計算錯誤 (數學): 數學計算",
+    'DI_MULTI_SOURCE_INTEGRATION_ERROR': "DI 多源整合 (MSR): 跨分頁/來源信息整合障礙",
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE': "DI 基礎掌握: 應用不穩定 (Special Focus Error)",
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': "DI 基礎掌握: 應用不穩定 (Special Focus Error)",
+    'DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION': "DI 行為: 粗心 - 細節忽略/看錯",
+    'DI_BEHAVIOR_CARELESSNESS_ISSUE': "DI 行為: 粗心 - 整體快錯率偏高",
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "DI 行為: 測驗前期作答過快風險",
+    # DI Diagnostic Parameters - Difficulty Types (Slow & Wrong / Slow & Correct)
+    'DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION': "DI 閱讀理解障礙: 跨分頁/來源信息整合困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY': "DI 閱讀理解障礙: 詞彙理解困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX': "DI 閱讀理解障礙: 句式理解困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC': "DI 閱讀理解障礙: 邏輯理解困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN': "DI 閱讀理解障礙: 領域理解困難",
+    'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH': "DI 圖表解讀障礙: 圖形信息解讀困難",
+    'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE': "DI 圖表解讀障礙: 表格信息解讀困難",
+    'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH': "DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難",
+    'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH': "DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難",
+    'DI_CALCULATION_DIFFICULTY__MATH': "DI 計算 (數學) 障礙: 數學計算困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED': "DI 閱讀理解障礙: 心態失常讀不進去",
+     # DI Content Domains and Categories
+    'Math Related': "數學相關",
+    'Non-Math Related': "非數學相關",
+    'Unknown Domain': "未知領域",
+    
+    # DI Question Types
+    'Data Sufficiency': 'Data Sufficiency',
+    'Two-part analysis': 'Two-part analysis',
+    'Multi-source reasoning': 'Multi-source reasoning',
+    'Graph and Table': 'Graph and Table',
+    'Unknown Type': '未知類型',
+        # DI Parameter Categories
+    'SFE': '基礎掌握',
+    'Reading/Interpretation': '閱讀/解讀',
+    'Concept/Application': '概念/應用',
+    'Data/Calculation': '數據/計算',
+    'Logic/Reasoning': '邏輯/推理',
+    'Multi-Source': '多源整合',
+    'Efficiency': '效率問題',
+    'Carelessness': '粗心問題',
+    'Behavioral': '行為模式',
+       # DI Time Pressure Status
+    'High': "高",
+    'Low': "低",
+    'True': "有時間壓力",
+    'False': "無時間壓力",
+       # DI Report Structure - Main Sections
+    'di_report_title': "DI 科診斷報告詳情",
+    'di_report_subtitle': "（基於用戶數據與模擬難度分析）",
+    'di_report_overview_feedback': "**一、 報告總覽與即時反饋**",
+    'di_time_strategy_assessment': "* **A. 作答時間與策略評估**",
+    'di_important_notes': "* **B. 重要註記**",
+    'di_core_performance_analysis': "**二、 核心表現分析**",
+    'di_content_domain_overview': "* **A. 內容領域表現概覽**",
+    'di_high_frequency_issues': "* **B. 高頻潛在問題點**",
+    'di_special_behavioral_patterns': "* **C. 特殊行為模式觀察**",
+    'di_macro_practice_suggestions': "**三、 宏觀練習建議 (按題型)**",
+       # DI Report - Time and Strategy Assessment
+    'di_total_test_time': "**整體作答時間：** {:.2f} 分鐘 (允許 {:.1f} 分鐘，剩餘 {:.2f} 分鐘)",
+    'di_time_pressure_perception': "**時間壓力感知：** {}",
+    'di_manual_invalid_count': "您手動標記了 {} 題為無效，這些題目已從部分細化分析中排除。",
+    'di_no_manual_invalid': "無手動標記為無效的題目。",
+       # DI Report - Domain Performance
+    'di_math_related_poor_error': "{} 領域的錯誤率明顯更高。",
+    'di_non_math_related_poor_error': "{} 領域的錯誤率明顯更高。",
+    'di_math_related_poor_overtime': "{} 領域的超時率明顯更高。",
+    'di_non_math_related_poor_overtime': "{} 領域的超時率明顯更高。",
+    'di_no_significant_domain_difference': "{}與{}領域的表現在錯誤率和超時率上無顯著差異。",
+    'di_refer_detailed_analysis': "請參考詳細數據分析各領域表現。",
+       # DI Report - Potential Issues
+    'di_sfe_note': "(註：SFE 指在已掌握難度範圍內題目失誤)",
+    'di_no_obvious_core_issues': "未識別出明顯的核心問題模式。",
+    
+    # DI Report - Behavioral Patterns
+    'di_carelessness_pattern': "：相對快速作答的題目中，錯誤比例偏高（{}），提示可能存在粗心問題。",
+    'di_early_rushing_pattern': "：測驗前期（{} 題）出現作答時間過短（<1分鐘）的情況，可能影響準確率。",
+    'di_no_negative_patterns': "未發現明顯的粗心或前期過快等負面行為模式。",
+    
+    # DI Report - Practice Recommendations
+    'di_no_practice_recommendations': "根據當前分析，暫無特別的練習建議。請保持全面複習。",
+    'di_overall_improvement_space': "整體表現有較大提升空間",
+    'di_comprehensive_foundation_consolidation': "建議全面鞏固基礎",
+    'di_macro_recommendation_prefix': "宏觀建議",
+    'di_due_to_performance': "由於",
+    'di_error_rate_or_overtime_rate': "(錯誤率 {}% 或 超時率 {}%)",
+    'di_recommend_systematic_practice': "，建議進行系統性練習",
+    'di_time_limit_suggestion': "建議時限：{}",
+    'di_specific_recommendation_prefix': "特定建議",
+    'di_focus_on_fundamental_skills': "著重基礎技能：{}",
+    'di_na': "N/A",
+    
+    # DI AI Prompts and Recommendations
+    'di_ai_analysis_available': "AI 深度分析可用",
+    'di_ai_analysis_unavailable': "AI 深度分析暫不可用",
+    'di_ai_recommendation_context': "基於 DI 診斷結果的推薦分析工具：",
+    'di_ai_tool_context': "推薦的 AI 工具基於您的診斷標籤：{}",
+    'di_ai_fallback_message': "若無法訪問 AI 工具，請參考診斷報告進行手動分析。",
+    # DI Utility Functions
+    'di_format_rate_percent': "{}%",
+    'di_unknown_value': "未知",
+    # Additional DI Constants
+    'di_invalid_data_tag': "數據無效：用時過短（DI：受時間壓力影響）",
+    'di_max_allowed_time': "45.0",
+    
+    # DI main module
+    'di_diagnosis_error_message': "DI 診斷過程中發生未預期錯誤",
+    
+    # === End DI Diagnostic Translations ===
+    
+    # AI prompts module translations
+    'v_ai_no_data_analysis': "(無數據可供分析)",
+    'v_ai_no_diagnostic_tags': "(未找到診斷標籤)",
+    'v_ai_tag_count_format': "**{}** (出現{}次):\n",
+    'v_ai_no_specific_recommendations': "未找到特定匹配的工具建議。建議參考GMAT官方指南中的V科相關練習和策略。",
+    'v_ai_combined_recommendations': "**使用新路由系統生成的建議：**\n{}\n\n**補充建議（基於舊系統）：**\n{}",
 } 
