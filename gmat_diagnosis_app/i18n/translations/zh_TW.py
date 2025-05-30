@@ -528,13 +528,27 @@ TRANSLATIONS = {
     'CR_STEM_UNDERSTANDING_ERROR_DOMAIN': "CR 題幹理解錯誤：領域",
     
     # Additional behavioral patterns translations
-    '行為模式: 粗心問題 (快而錯比例高)': "行為模式: 粗心問題 (快而錯比例高)",
-    '粗心問題 (快而錯比例高)': "粗心問題 (快而錯比例高)",
-    '應用不穩定 (**SFE**)：已掌握技能應用不穩定': "應用不穩定 (**SFE**)：已掌握技能應用不穩定",
-    'RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
-    'RC 閱讀速度差：整組表現不佳': "RC 閱讀速度差：整組表現不佳",
+# Fixed behavioral patterns translations - ONLY ENGLISH KEYS
+    'behavioral_pattern_carelessness_full': "行為模式: 粗心問題 (快而錯比例高)",
+    'carelessness_issue_high_fast_wrong_ratio': "粗心問題 (快而錯比例高)",
+    'application_instability_sfe': "應用不穩定 (**SFE**)：已掌握技能應用不穩定",
+    'rc_timing_individual_question_efficiency_severe_issue_full': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
+    'rc_reading_speed_poor_group_performance_poor': "RC 閱讀速度差：整組表現不佳",
 
-    # === DI Diagnostic Translations ===
+    # Additional missing keys found in English version
+    'Application Instability (**SFE**): Mastered skill application instability': "應用不穩定 (**SFE**)：已掌握技能應用不穩定",
+    'Behavioral Pattern: Carelessness Issue (High fast-wrong ratio)': "行為模式: 粗心問題 (快而錯比例高)",
+    'Invalid/Excluded': "無效/已排除",
+    'RC Reading Speed Poor: Group performance poor': "RC 閱讀速度差：整組表現不佳",
+    'RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
+    'v_qualitative_analysis_suggestion': "**建議：** 如果您對報告中指出的某些問題仍感困惑，可以嘗試 **提供 2-3 題相關錯題的詳細解題流程跟思路範例** ，供顧問進行更深入的個案分析。",
+
+    # New English translation keys for failing Chinese strings
+    'rc_timing_individual_question_efficiency_severe_issue_full': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
+    'carelessness_issue_high_fast_wrong_ratio': "粗心問題 (快而錯比例高)",
+    'rc_reading_speed_poor_group_performance_poor': "RC 閱讀速度差：整組表現不佳",
+
+    # === End DI Diagnostic Translations ===
     
     # DI Diagnostic Parameters - Error Types (Fast & Wrong / Normal Time & Wrong)
     'DI_READING_COMPREHENSION_ERROR__VOCABULARY': "DI 閱讀理解錯誤: 詞彙理解",
@@ -570,10 +584,10 @@ TRANSLATIONS = {
     'Unknown Domain': "未知領域",
     
     # DI Question Types
-    'Data Sufficiency': 'Data Sufficiency',
-    'Two-part analysis': 'Two-part analysis',
-    'Multi-source reasoning': 'Multi-source reasoning',
-    'Graph and Table': 'Graph and Table',
+    'Data Sufficiency': 'Data Sufficiency 充分性題',
+    'Two-part analysis': 'Two-part analysis 雙部分分析題',
+    'Multi-source reasoning': 'Multi-source reasoning 多源推理題',
+    'Graph and Table': 'Graph and Table 圖表題',
     'Unknown Type': '未知類型',
         # DI Parameter Categories
     'SFE': '基礎掌握',

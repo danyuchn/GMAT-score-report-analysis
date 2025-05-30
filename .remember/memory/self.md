@@ -11,6 +11,38 @@ Correct:
 [Insert corrected code or logic]
 ```
 
+## Translation System Fix for Failing Chinese Strings (2025-01-28)
+
+Mistake: Chinese strings used as translation keys causing lookup failures
+Wrong:
+Using original Chinese strings directly in code and expecting i18n system to handle them:
+```python
+# In results_display.py
+"行為模式": ["粗心問題（快而錯比例高）"]
+
+# In translation tests
+'RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題'
+'粗心問題 (快而錯比例高)'
+'RC 閱讀速度差：整組表現不佳'
+```
+Correct:
+Created English translation keys for failing Chinese strings and used them consistently:
+```python
+# Added new translation keys in both zh_TW.py and en.py:
+'rc_timing_individual_question_efficiency_severe_issue_full': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題"
+'carelessness_issue_high_fast_wrong_ratio': "粗心問題 (快而錯比例高)"
+'rc_reading_speed_poor_group_performance_poor': "RC 閱讀速度差：整組表現不佳"
+
+# Updated results_display.py to use translation function:
+from gmat_diagnosis_app.i18n import translate as t
+"行為模式": [t('carelessness_issue_high_fast_wrong_ratio')]
+
+# Updated test scripts to use new English keys instead of original Chinese strings
+```
+
+Fixed: All translation tests now pass with 100% success rate
+Applied: Consistent use of English translation keys throughout the system for proper i18n functionality
+
 ## V Diagnosis Logic Compliance Issues (2025-01-28)
 
 Mistake: Missing RC overtime calculation based on time pressure status

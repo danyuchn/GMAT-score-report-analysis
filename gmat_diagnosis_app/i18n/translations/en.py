@@ -661,4 +661,23 @@ TRANSLATIONS = {
     'RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue': "RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue",
     'Behavioral Pattern: Carelessness Issue (High fast-wrong ratio)': "Behavioral Pattern: Carelessness Issue (High fast-wrong ratio)",
     'Application Instability (**SFE**): Mastered skill application instability': "Application Instability (**SFE**): Mastered skill application instability",
+    
+    # Additional missing keys found in Chinese version
+    'RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題': "RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue",
+    'RC 閱讀速度差：整組表現不佳': "RC Reading Speed Poor: Group performance poor",
+    '應用不穩定 (**SFE**)：已掌握技能應用不穩定': "Application Instability (**SFE**): Mastered skill application instability",
+    '粗心問題 (快而錯比例高)': "Carelessness Issue (High fast-wrong ratio)",
+    '行為模式: 粗心問題 (快而錯比例高)': "Behavioral Pattern: Carelessness Issue (High fast-wrong ratio)",
+    
+    # Time performance categories that may be missing
+    'Invalid/Excluded': "Invalid/Excluded",
+
+    # New English translation keys for failing Chinese strings
+    'rc_timing_individual_question_efficiency_severe_issue_full': "RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue",
+    'carelessness_issue_high_fast_wrong_ratio': "Carelessness Issue (High fast-wrong ratio)",
+    'rc_reading_speed_poor_group_performance_poor': "RC Reading Speed Poor: Group performance poor",
+
+    # Fixed behavioral patterns translations - ENGLISH TRANSLATIONS
+    'behavioral_pattern_carelessness_full': "Behavioral Pattern: Carelessness Issue (High fast-wrong ratio)",
+    'application_instability_sfe': "Application Instability (**SFE**): Mastered skill application instability",
 } 

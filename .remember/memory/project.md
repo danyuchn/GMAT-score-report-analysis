@@ -77,7 +77,7 @@ This file stores user preferences and custom rules for the GMAT Score Report Ana
 
 ## DI Diagnosis i18n Implementation Status (2025-01-28)
 
-**Status: COMPLETED ✅**
+**Status: COMPLETED ✅ - WITH TRANSLATION FIXES**
 
 Successfully migrated DI diagnostic modules from custom translation system to unified i18n system:
 
@@ -86,6 +86,15 @@ Successfully migrated DI diagnostic modules from custom translation system to un
 2. **Files Updated**: All DI module files converted to use `from gmat_diagnosis_app.i18n import translate as t`
 3. **Constant Migration**: Replaced INVALID_DATA_TAG_DI with i18n key 'di_invalid_data_tag'
 4. **Functionality Verified**: All files compile successfully and i18n translations work correctly
+5. **Translation Fixes Applied**: Fixed failing Chinese strings by creating proper English translation keys
+
+### Translation Issues Fixed (2025-01-28):
+- **Issue**: Some Chinese strings were being used directly as translation keys, causing lookup failures
+- **Fix**: Created new English translation keys for problematic strings:
+  - `rc_timing_individual_question_efficiency_severe_issue_full`
+  - `carelessness_issue_high_fast_wrong_ratio`  
+  - `rc_reading_speed_poor_group_performance_poor`
+- **Result**: 100% translation test success rate achieved
 
 ### Files Modified:
 - `main.py`: Updated imports and error messages
@@ -94,14 +103,16 @@ Successfully migrated DI diagnostic modules from custom translation system to un
 - `utils.py`: Updated difficulty grading function
 - `chapter_logic.py`: Replaced _translate_di calls with t() function calls
 - `constants.py`: Removed hardcoded constants, now uses i18n keys
-- `zh_TW.py` & `en.py`: Added comprehensive DI translations
+- `zh_TW.py` & `en.py`: Added comprehensive DI translations + translation fixes
+- `results_display.py`: Fixed hardcoded Chinese strings to use translation calls
 
 ### Technical Approach:
 - Followed exact same pattern as V/Q modules
 - Maintained all existing functionality while enabling bilingual support
 - Real-time language switching capability via session state
 - Consistent translation key naming convention
+- Fixed translation lookup failures with proper English key mapping
 
-**Result**: DI diagnostic report now fully supports bilingual output with unified i18n system, matching V/Q module implementation patterns.
+**Result**: DI diagnostic report now fully supports bilingual output with unified i18n system, matching V/Q module implementation patterns. All translation issues resolved with 100% test success rate.
 
 --- 

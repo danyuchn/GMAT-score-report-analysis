@@ -12,6 +12,7 @@ from gmat_diagnosis_app.utils.excel_utils import to_excel
 from gmat_diagnosis_app.constants.config import SUBJECTS, EXCEL_COLUMN_MAP
 from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
 from gmat_diagnosis_app.services.openai_service import trim_diagnostic_tags_with_openai
+from gmat_diagnosis_app.i18n import translate as t
 import logging
 import traceback # Added for more detailed error logging in download
 
@@ -444,7 +445,7 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
             "RC 方法應用": ["特定題型（需回憶或二級證據釐清）"],
             "基礎掌握": ["應用不穩定（Special Focus Error）"],
             "效率問題": ["信息定位環節導致效率低下", "推理分析環節導致效率低下", "選項辨析環節導致效率低下", "閱讀理解環節導致效率低下"],
-            "行為模式": ["粗心問題（快而錯比例高）"]
+            "行為模式": [t('carelessness_issue_high_fast_wrong_ratio')]
         },
         "Identify Stated Idea": {
             "效率問題": ["信息定位環節導致效率低下", "推理分析環節導致效率低下", "選項辨析環節導致效率低下", "閱讀理解環節導致效率低下"],
@@ -458,7 +459,7 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
             "CR 題目理解": ["提問要求把握錯誤"],
             "基礎掌握": ["應用不穩定（Special Focus Error）"],
             "效率問題": ["推理分析環節導致效率低下", "選項辨析環節導致效率低下", "閱讀理解環節導致效率低下"],
-            "行為模式": ["粗心問題（快而錯比例高）"]
+            "行為模式": [t('carelessness_issue_high_fast_wrong_ratio')]
         }
     }
 
