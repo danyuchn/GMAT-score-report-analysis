@@ -104,4 +104,63 @@ Created unified approach:
 2. Unified function in `analysis_helpers/time_analyzer.py` -> calculate_first_third_average_time_per_type()
 3. All modules import from unified sources
 
+## I18n Implementation Best Practices (2025-01-28)
+
+Mistake: Inconsistent import patterns for translation system
+Wrong:
+Mixed import styles across modules:
+```python
+from gmat_diagnosis_app.diagnostics.v_modules.translations import translate_v as t
+from gmat_diagnosis_app.i18n.translate import translate
+```
+Correct:
+Standardized import pattern across all modules:
+```python
+from gmat_diagnosis_app.i18n import translate as t
+```
+
+Mistake: Leaving hardcoded Chinese text in user-facing functions
+Wrong:
+```python
+report_lines.append("V 科診斷報告詳情")
+rec_text = f"針對【{skill_display_name}】建議練習【{y_grade}】難度題目"
+```
+Correct:
+Convert all hardcoded text to translation keys:
+```python
+report_lines.append(t('v_report_title'))
+rec_text = t('v_practice_recommendation_template').format(sfe_prefix, skill_display_name, y_grade, z_text, target_time_text)
+```
+
+Mistake: Not adding comprehensive translation coverage for new modules
+Wrong:
+Converting only some functions while leaving others with hardcoded text
+Correct:
+Systematic conversion approach:
+1. Add all required translation keys to both zh-TW.py and en.py
+2. Convert all user-facing strings in all module files
+3. Test key functions to ensure translations work
+4. Follow the same pattern as previously completed Q section
+
+Mistake: Inconsistent translation key naming
+Wrong:
+Mixed naming conventions for translation keys
+Correct:
+Follow consistent naming pattern:
+- Module prefix: 'v_' for V section, 'q_' for Q section
+- Descriptive names: 'v_report_title', 'v_practice_recommendations'
+- Parameter codes: 'CR_READING_BASIC_OMISSION', 'RC_READING_SPEED_SLOW_FOUNDATIONAL'
+
+Mistake: Forgetting to update import statements when converting translation systems
+Wrong:
+Keeping old import statements after implementing i18n:
+```python
+from gmat_diagnosis_app.diagnostics.v_modules.translations import translate_v
+```
+Correct:
+Update all import statements to use centralized i18n system:
+```python
+from gmat_diagnosis_app.i18n import translate as t
+```
+
 --- 

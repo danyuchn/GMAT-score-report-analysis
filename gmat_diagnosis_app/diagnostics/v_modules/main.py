@@ -10,7 +10,8 @@ import logging
 # import streamlit as st # Removed this unused top-level import
 
 from gmat_diagnosis_app.diagnostics.v_modules.constants import INVALID_DATA_TAG_V, V_SUSPICIOUS_FAST_MULTIPLIER, RC_READING_TIME_THRESHOLD_3Q, RC_READING_TIME_THRESHOLD_4Q
-from gmat_diagnosis_app.diagnostics.v_modules.translations import translate_v
+# Use i18n system instead of the old translation function
+from gmat_diagnosis_app.i18n import translate as t
 from gmat_diagnosis_app.diagnostics.v_modules.utils import (
     grade_difficulty_v, 
     analyze_dimension, 
@@ -211,7 +212,7 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         if 'diagnostic_params' in df_v_processed.columns:
             # Ensure the lambda handles non-list inputs gracefully
             df_v_processed['diagnostic_params_list'] = df_v_processed['diagnostic_params'].apply(
-                lambda params: [translate_v(p) for p in params if isinstance(p, str)] if isinstance(params, list) else []
+                lambda params: [t(p) for p in params if isinstance(p, str)] if isinstance(params, list) else []
             )
         else:
             # Initialize if 'diagnostic_params' somehow got dropped
@@ -304,7 +305,7 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
                              current_translated = df_v_processed.loc[index, 'diagnostic_params_list']
                              if not isinstance(current_translated, list):
                                  current_translated = []
-                             translated_tag = translate_v('BEHAVIOR_CARELESSNESS_ISSUE')
+                             translated_tag = t('BEHAVIOR_CARELESSNESS_ISSUE')
                              if translated_tag not in current_translated:
                                  new_translated_list = current_translated + [translated_tag]
                                  df_v_processed.at[index, 'diagnostic_params_list'] = new_translated_list
@@ -377,4 +378,4 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         return v_diagnosis_results, v_report_content, df_v_final
     except Exception as e:
         logging.error(f"Error in run_v_diagnosis_processed: {e}", exc_info=True)
-        return {}, "Verbal (V) 部分診斷過程中發生錯誤。", pd.DataFrame() 
+        return {}, t('v_diagnosis_error_message'), pd.DataFrame() 
