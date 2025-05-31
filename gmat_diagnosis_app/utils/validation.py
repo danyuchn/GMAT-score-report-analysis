@@ -1,6 +1,6 @@
 """
-驗證模組
-提供數據驗證和處理的功能
+Data validation module
+Provides data validation and processing functionality
 """
 
 import re
@@ -10,6 +10,7 @@ from gmat_diagnosis_app.constants.validation_rules import (
 )
 from gmat_diagnosis_app.constants.config import REQUIRED_ORIGINAL_COLS
 from thefuzz import process, fuzz # Changed from fuzzywuzzy to thefuzz
+from gmat_diagnosis_app.i18n import translate as t
 
 def preprocess_skill(skill):
     """Lowercase, strip, collapse spaces for skill matching."""
@@ -31,7 +32,7 @@ def validate_dataframe(df, subject):
         missing_cols.remove('Question') # Don't report 'Question' if BOM version is present and required
 
     if missing_cols:
-        errors.append(f"資料缺少必要欄位: {', '.join(missing_cols)}。請檢查欄位標頭。")
+        errors.append(t('validation_missing_required_columns').format(', '.join(missing_cols)))
         return errors, warnings # Stop if essential columns are missing
 
     # 2. Validate cell values row by row
@@ -103,7 +104,7 @@ def validate_dataframe(df, subject):
                                 if score >= 85: # Fuzzy match threshold
                                     correct_value = match
                                     is_valid = True
-                                    warnings.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 值 '{value_str_stripped}' 透過模糊比對修正為 '{correct_value}'。")
+                                    warnings.append(t('validation_fuzzy_match_correction').format(index + 1, current_col_name, value_str_stripped, correct_value))
                                 else:
                                     is_valid = False
 
@@ -144,7 +145,7 @@ def validate_dataframe(df, subject):
                                 if preprocessed_match in skill_map: # Ensure the fuzzy matched skill is valid after preprocessing
                                     correct_value = skill_map[preprocessed_match] # Use the canonical form
                                     is_valid = True
-                                    warnings.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 值 '{value_str_stripped}' 透過模糊比對修正為 '{correct_value}'。")
+                                    warnings.append(t('validation_fuzzy_match_correction').format(index + 1, current_col_name, value_str_stripped, correct_value))
                                 else:
                                     # This case is unlikely if skill_map is comprehensive but good for safety
                                     is_valid = False
@@ -178,7 +179,7 @@ def validate_dataframe(df, subject):
                                     else:
                                         correct_value = match
                                     is_valid = True
-                                    warnings.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 值 '{value_str_stripped}' 透過模糊比對修正為 '{correct_value}'。")
+                                    warnings.append(t('validation_fuzzy_match_correction').format(index + 1, current_col_name, value_str_stripped, correct_value))
                                 else:
                                     is_valid = False
                             else:
@@ -191,16 +192,16 @@ def validate_dataframe(df, subject):
                             df.loc[index, current_col_name] = correct_value
                             # st.toast(f"Row {index+1}, Col '{current_col_name}': Auto-corrected '{value_str_stripped}' to '{correct_value}'") # Optional user feedback
                         except Exception as e:
-                            errors.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 自動修正時出錯 ({e})。")
+                            errors.append(t('validation_auto_correction_error').format(index + 1, current_col_name, e))
                             is_valid = False # Mark invalid if correction fails
 
                     elif not is_valid:
                         # Improve error message for list failures
                         allowed_str = ", ".join(f"'{v}'" for v in allowed_values_list)
-                        error_detail += f" 允許的值: {allowed_str} (大小寫/格式可能不符)。"
+                        error_detail += t('validation_allowed_values_error').format(allowed_str)
 
                 # --- Record Error ---
                 if not is_valid:
-                    errors.append(f"第 {index + 1} 行, 欄位 '{current_col_name}': 值 '{value}' 無效。{error_detail}")
+                    errors.append(t('validation_invalid_value_error').format(index + 1, current_col_name, value, error_detail))
 
     return errors, warnings 

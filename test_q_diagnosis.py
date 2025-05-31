@@ -1,4 +1,5 @@
 from gmat_diagnosis_app.diagnostics.q_diagnostic import diagnose_q
+from gmat_diagnosis_app.i18n import translate as t
 import pandas as pd
 
 # 創建一個簡單的測試數據
@@ -21,7 +22,7 @@ test_data = {
 }
 
 df = pd.DataFrame(test_data)
-print("開始Q診斷測試...")
+print("Q診斷測試開始...")
 try:
     results, report, df_diagnosed = diagnose_q(df, include_summary_report=True)
     print('測試完成，診斷報告生成成功')

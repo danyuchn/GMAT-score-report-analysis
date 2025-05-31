@@ -1,16 +1,17 @@
 """
-聊天界面模組
-提供AI聊天對話功能
+Chat interface module
+Provides AI chat conversation functionality
 """
 
 import streamlit as st
 import logging
 from gmat_diagnosis_app.services.openai_service import get_chat_context, get_openai_response
 from gmat_diagnosis_app.session_manager import ensure_chat_history_persistence
+from gmat_diagnosis_app.i18n import translate as t
 
 def display_chat_interface(session_state):
-    """顯示聊天界面，處理訊息交換"""
-    # 確保聊天歷史持久化 (在最開始調用一次)
+    """Display chat interface and handle message exchange"""
+    # Ensure chat history persistence (called once at the beginning)
     ensure_chat_history_persistence()
     
     # Check conditions to show chat
@@ -18,27 +19,18 @@ def display_chat_interface(session_state):
     # session_state.show_chat = show_chat # This seems redundant if session_state is passed around directly
 
     if show_chat:
-        st.subheader("與 AI 對話 (基於本次報告)")
+        st.subheader(t('chat_with_ai_title'))
         
-        # 添加提示信息，告知用戶 AI 可以回答的內容
-        info_text = """
-        AI 助手可以回答有關您的診斷報告和測試數據的問題。您可以詢問：
-        - 關於報告中具體內容的解釋
-        - 關於診斷試算表中的數據分析
-        - 特定題型或難度的表現
-        - 時間分配和準確率的問題
-        """
+        # Add prompt information to tell users what AI can answer
+        info_text = t('chat_ai_capabilities_info')
         
-        # 如果存在修剪標籤後的數據，告知用戶
+        # If trimmed data exists, inform the user
         if hasattr(session_state, 'editable_diagnostic_df') and session_state.editable_diagnostic_df is not None:
-            info_text += """
-            📝 **重要：** AI 將使用您已修剪標籤後的數據和完整診斷報告進行回答，
-            包括「編輯診斷標籤」頁籤中的更新內容（如果您已編輯）。
-            """
+            info_text += "\n" + t('chat_trimmed_data_notice')
         
         st.info(info_text)
         
-        # 確保聊天歷史存在
+        # Ensure chat history exists
         if 'chat_history' not in session_state:
             session_state.chat_history = []
             # logging.info("已初始化新的聊天歷史") # Replaced st.info with logging
@@ -99,10 +91,10 @@ def display_chat_interface(session_state):
         handle_chat_input(session_state)
         
 def _debug_show_chat_history(session_state):
-    """顯示完整的聊天歷史信息（僅用於調試）"""
-    with st.expander("顯示聊天歷史調試信息", expanded=False):
+    """Display complete chat history information (for debugging only)"""
+    with st.expander(t('chat_debug_history_title'), expanded=False):
         if session_state.chat_history:
-            debug_info = "聊天歷史:\n"
+            debug_info = t('chat_debug_history_label') + "\n"
             for i, msg in enumerate(session_state.chat_history):
                 role = msg.get('role', 'unknown')
                 content_preview = msg.get('content', '')[:30] + '...' if len(msg.get('content', '')) > 30 else msg.get('content', '')
@@ -118,80 +110,80 @@ def _debug_show_chat_history(session_state):
                 debug_info += f"{i}: [{role}] {content_preview} (response_id: {response_id_display})\n"
             st.text(debug_info)
             
-            # 顯示當前上下文摘要
-            st.markdown("##### 當前聊天上下文摘要")
+            # Display current context summary
+            st.markdown("##### " + t('chat_debug_current_context'))
             try:
                 context = get_chat_context(session_state)
                 
-                # 顯示數據來源信息
+                # Display data source information
                 if hasattr(session_state, 'editable_diagnostic_df') and session_state.editable_diagnostic_df is not None:
-                    st.success("目前使用的是**修剪標籤後的數據表格**進行聊天")
+                    st.success(t('chat_debug_using_trimmed_data'))
                 else:
-                    st.info("目前使用的是原始數據表格進行聊天 (未進行標籤修剪)")
+                    st.info(t('chat_debug_using_original_data'))
                 
-                # 顯示報告摘要
+                # Display report summary
                 if context["report"]:
                     report_preview = context["report"][:200] + "..." if len(context["report"]) > 200 else context["report"]
-                    st.text(f"報告文字 ({len(context['report'])} 字符):\n{report_preview}")
+                    st.text(t('chat_debug_report_text').format(len(context['report'])) + f"\n{report_preview}")
                 else:
-                    st.text("沒有報告文字")
+                    st.text(t('chat_debug_no_report'))
                 
-                # 顯示診斷試算表摘要
+                # Display diagnostic table summary
                 if context["dataframe"] and context["dataframe"] != "(無詳細數據表格)":
                     df_preview = context["dataframe"].split("\n")[:5]
                     df_preview = "\n".join(df_preview) + "\n..."
-                    st.text(f"診斷試算表 ({len(context['dataframe'])} 字符):\n{df_preview}")
+                    st.text(t('chat_debug_diagnostic_table').format(len(context['dataframe'])) + f"\n{df_preview}")
                 else:
-                    st.text(f"診斷試算表: {context['dataframe']}")
+                    st.text(f"{t('chat_debug_diagnostic_table').format(0)}: {context['dataframe']}")
                     
-                # 新增：顯示錯題和無效題的統計信息
+                # New: Display statistics for wrong and invalid questions
                 if "dataframe" in context and context["dataframe"] != "(無詳細數據表格)":
-                    st.markdown("##### 數據統計")
+                    st.markdown("##### " + t('chat_debug_data_statistics'))
                     lines = context["dataframe"].split("\n")
                     
-                    # 調試：顯示前幾行數據格式以便觀察
+                    # Debug: Display first few lines of data format for observation
                     if len(lines) > 5:
-                        st.text("數據格式示例（前 3 行）:")
+                        st.text(t('chat_debug_data_format_example'))
                         for i in range(min(3, len(lines))):
                             st.text(lines[i])
                     
-                    # 使用更靈活的方式識別科目
+                    # Use more flexible way to identify subjects
                     di_lines = [line for line in lines if " DI " in line or "|DI|" in line or "| DI|" in line or "|DI |" in line]
                     q_lines = [line for line in lines if " Q " in line or "|Q|" in line or "| Q|" in line or "|Q |" in line]
                     v_lines = [line for line in lines if " V " in line or "|V|" in line or "| V|" in line or "|V |" in line]
                     
-                    # 顯示識別到的各科題目數
-                    st.text(f"識別到的行數：DI={len(di_lines)}, Q={len(q_lines)}, V={len(v_lines)}")
+                    # Display identified question counts for each subject
+                    st.text(t('chat_debug_identified_rows').format(len(di_lines), len(q_lines), len(v_lines)))
                     
-                    # 分析 DI 部分
+                    # Analyze DI section
                     di_total = len(di_lines)
                     di_invalid = len([line for line in di_lines if "Yes" in line and "is_invalid" in line])
                     di_valid = di_total - di_invalid
                     di_correct = len([line for line in di_lines if "Yes" in line and "is_correct" in line])
                     di_wrong = di_valid - di_correct
                     
-                    # 分析 Q 部分
+                    # Analyze Q section
                     q_total = len(q_lines)
                     q_invalid = len([line for line in q_lines if "Yes" in line and "is_invalid" in line])
                     q_valid = q_total - q_invalid
                     q_correct = len([line for line in q_lines if "Yes" in line and "is_correct" in line])
                     q_wrong = q_valid - q_correct
                     
-                    # 分析 V 部分
+                    # Analyze V section
                     v_total = len(v_lines)
                     v_invalid = len([line for line in v_lines if "Yes" in line and "is_invalid" in line])
                     v_valid = v_total - v_invalid
                     v_correct = len([line for line in v_lines if "Yes" in line and "is_correct" in line])
                     v_wrong = v_valid - v_correct
                     
-                    # 顯示統計
-                    st.text(f"DI: 總題數={di_total}, 有效題數={di_valid}, 無效題數={di_invalid}, 答對={di_correct}, 答錯={di_wrong}")
-                    st.text(f"Q:  總題數={q_total}, 有效題數={q_valid}, 無效題數={q_invalid}, 答對={q_correct}, 答錯={q_wrong}")
-                    st.text(f"V:  總題數={v_total}, 有效題數={v_valid}, 無效題數={v_invalid}, 答對={v_correct}, 答錯={v_wrong}")
+                    # Display statistics
+                    st.text(t('chat_debug_di_stats').format(di_total, di_valid, di_invalid, di_correct, di_wrong))
+                    st.text(t('chat_debug_q_stats').format(q_total, q_valid, q_invalid, q_correct, q_wrong))
+                    st.text(t('chat_debug_v_stats').format(v_total, v_valid, v_invalid, v_correct, v_wrong))
             except Exception as e:
-                st.text(f"無法獲取上下文摘要: {e}")
+                st.text(t('chat_debug_context_error').format(e))
         else:
-            st.text("目前沒有聊天歷史記錄")
+            st.text(t('chat_debug_no_history'))
         
 def check_chat_conditions(session_state):
     """檢查是否滿足顯示聊天的條件"""
@@ -210,24 +202,24 @@ def display_chat_history(session_state):
             st.markdown(content) # Use markdown for potential formatting in content
 
 def handle_chat_input(session_state):
-    """處理用戶輸入和AI回應"""
-    if prompt := st.chat_input("針對報告和數據提問..."):
-        # 添加用戶消息到歷史
+    """Handle user input and AI response"""
+    if prompt := st.chat_input(t('chat_input_placeholder')):
+        # Add user message to history
         session_state.chat_history.append({"role": "user", "content": prompt})
         
-        # 調試輸出
+        # Debug output
         # logging.info(f"添加用戶消息後歷史長度: {len(session_state.chat_history)}") # Replaced st.info with logging
         
-        # 準備上下文並呼叫OpenAI
-        with st.spinner("AI思考中..."):
+        # Prepare context and call OpenAI
+        with st.spinner(t('chat_ai_thinking')):
             try:
-                # 獲取上下文
+                # Get context
                 context = get_chat_context(session_state)
                 
-                # 顯示調試信息
+                # Display debug information
                 # logging.info(f"發送至API的聊天歷史長度: {len(session_state.chat_history)}") # Replaced st.info with logging
                 
-                # 呼叫OpenAI - 確保傳遞完整聊天歷史以獲取previous_response_id
+                # Call OpenAI - ensure passing complete chat history to get previous_response_id
                 logging.info(f"準備調用OpenAI，聊天歷史長度: {len(session_state.chat_history)}")
                 ai_response_text, response_id = get_openai_response(
                     session_state.chat_history, # Pass the current history directly
@@ -236,34 +228,34 @@ def handle_chat_input(session_state):
                     session_state.master_key
                 )
                 
-                # 明確記錄response_id的獲取
+                # Explicitly record response_id acquisition
                 logging.info(f"已獲得OpenAI回應，response_id: {response_id[:10] if response_id else 'N/A'}... (長度:{len(response_id) if response_id else 0})")
-                st.success(f"AI回應已生成，ID: {response_id[:8] if response_id else 'N/A'}...")
+                st.success(t('chat_response_generated').format(response_id[:8] if response_id else 'N/A'))
 
-                # 添加AI回應到歷史，確保包含response_id
+                # Add AI response to history, ensure including response_id
                 session_state.chat_history.append({
                     "role": "assistant",
                     "content": ai_response_text,
-                    "response_id": response_id  # 儲存ID用於下一次對話
+                    "response_id": response_id  # Store ID for next conversation
                 })
                 
-                # 顯示更新後的聊天歷史長度
+                # Display updated chat history length
                 # logging.info(f"更新後的聊天歷史長度: {len(session_state.chat_history)}") # Replaced st.info with logging
                 
-                # st.session_state 會自動保存，不需要手動賦值回 st.session_state.chat_history = session_state.chat_history
-                # 除非 session_state 不是 st.session_state 的直接引用
+                # st.session_state will automatically save, no need to manually assign back to st.session_state.chat_history = session_state.chat_history
+                # unless session_state is not a direct reference to st.session_state
                 
-                # 使用JavaScript重新加載頁面以更新聊天並滾動到底部
+                # Use JavaScript to reload page to update chat and scroll to bottom
                 st.rerun()
 
             except Exception as e:
-                error_message = f"呼叫 AI 時出錯: {e}"
+                error_message = t('chat_api_error').format(e)
                 logging.error(f"OpenAI調用錯誤: {e}", exc_info=True)
-                # 添加錯誤訊息到歷史，沒有response_id
+                # Add error message to history, no response_id
                 session_state.chat_history.append({"role": "assistant", "content": error_message})
                                 
                 st.error(error_message)
                 st.rerun()
                 
-    # 不再需要在末尾調用 ensure_chat_history_persistence() 因為 rerun 後會在 display_chat_interface 開頭調用
+    # No longer need to call ensure_chat_history_persistence() at the end because rerun will call it at the beginning of display_chat_interface
     # ensure_chat_history_persistence() 

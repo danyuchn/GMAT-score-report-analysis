@@ -224,6 +224,9 @@ TRANSLATIONS = {
     'fast_wrong': "快錯",
     'slow_wrong': "慢錯",
     'normal_time_wrong': "正常時間錯",
+    'fast_correct': "快對",
+    'normal_time_correct': "正常時間對",
+    'slow_correct': "慢對",
     
     # Problem categories for reflection
     'carelessness_problems': "粗心問題",
@@ -258,15 +261,19 @@ TRANSLATIONS = {
     'CR_AC_ANALYSIS_TIME_EXCESSIVE': "CR 選項分析時間過長：選項分析效率問題",
     'CR_METHOD_TYPE_SPECIFIC_ERROR': "CR 方法特定類型錯誤：特定題型方法錯誤",
     'CR_METHOD_PROCESS_DEVIATION': "CR 方法流程偏差：解題流程偏差",
+    'CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP': "CR 題幹理解錯誤：提問要求把握",
+    'CR_STEM_UNDERSTANDING_ERROR_VOCAB': "CR 題幹理解錯誤：詞彙",
+    'CR_STEM_UNDERSTANDING_ERROR_SYNTAX': "CR 題幹理解錯誤：句式",
     
     # V Diagnostic Parameters - RC (Reading Comprehension)
     'RC_READING_SPEED_SLOW_FOUNDATIONAL': "RC 閱讀速度慢基礎：基礎閱讀速度問題",
-    'RC_READING_COMPREHENSION_BARRIER': "RC 閱讀理解障礙：閱讀理解困難",
+    'RC_READING_COMPREHENSION_BARRIER': "RC 閱讀理解障礙：文章理解困難",
     'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY': "RC 閱讀句子結構困難：句子結構理解困難",
+    'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY': "RC 閱讀文章結構困難：文章結構理解困難",
+    'RC_READING_COMPREHENSION_ERROR_VOCAB': "RC 閱讀理解錯誤：詞彙",
     'RC_READING_DOMAIN_KNOWLEDGE_GAP': "RC 閱讀領域知識差距：背景知識不足",
     'RC_READING_VOCAB_BOTTLENECK': "RC 閱讀詞彙瓶頸：詞彙理解困難",
     'RC_READING_PRECISION_INSUFFICIENT': "RC 閱讀精確度不足：閱讀精確度問題",
-    'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY': "RC 閱讀文章結構困難：文章結構理解困難",
     'RC_READING_INFO_LOCATION_ERROR': "RC 閱讀信息定位錯誤：信息定位失誤",
     'RC_READING_KEYWORD_LOGIC_OMISSION': "RC 閱讀關鍵詞邏輯遺漏：關鍵詞邏輯忽略",
     'RC_READING_SPEED_GOOD_GROUP_PERFORMANCE': "RC 閱讀速度良好：整組表現良好",
@@ -406,10 +413,11 @@ TRANSLATIONS = {
     'v_no_secondary_evidence': "(本次分析未發現需要二級證據深入探究的問題點，或數據不足)",
     'v_reflection_direction': "檢討方向： 找尋考前做題紀錄中此類題目，檢討並反思自己是否有：",
     'Fast & Wrong': "快錯",
-    'Slow & Wrong': "慢錯", 
+    'Slow & Wrong': "慢錯",
     'Normal Time & Wrong': "正常時間錯",
     'Fast & Correct': "快對",
     'Normal Time & Correct': "正常時間對",
+    'Slow & Correct': "慢對",
     
     # Additional V reporting strings found in code
     'v_no_obvious_behavioral_patterns': "未發現明顯的特殊作答模式。",
@@ -417,7 +425,6 @@ TRANSLATIONS = {
     'v_skill_separator_prefix': "技能:",
     'v_problems_conclusion': "等問題。",
     'v_default_reflection_prompt': "找尋考前做題紀錄中的錯題和超時題，按照【題型】【內容領域】【時間表現】【診斷標籤】等維度進行分析和反思，找出系統性的問題和改進方向。",
-    'v_qualitative_analysis_suggestion': "**建議：** 如果您對報告中指出的某些問題仍感困惑，可以嘗試**提供 2-3 題相關錯題的詳細解題流程跟思路範例**，供顧問進行更深入的個案分析。",
     'v_analysis_clear_note': "目前分析結果較為清晰，若仍有疑問可隨時提出。",
     'v_slow_correct_format': "：{} 題正確但慢（佔比 {}）。平均難度 {}，平均耗時 {} 分鐘。相關技能：{}。",
     
@@ -456,6 +463,211 @@ TRANSLATIONS = {
     'v_diagnosis_error_message': "Verbal (V) 部分診斷過程中發生錯誤。",
     
     # V ai_prompts module
+    'v_ai_no_data_analysis': "(無數據可供分析)",
+    'v_ai_no_diagnostic_tags': "(未找到診斷標籤)",
+    'v_ai_tag_count_format': "**{}** (出現{}次):\n",
+    'v_ai_no_specific_recommendations': "未找到特定匹配的工具建議。建議參考GMAT官方指南中的V科相關練習和策略。",
+    'v_ai_combined_recommendations': "**使用新路由系統生成的建議：**\n{}\n\n**補充建議（基於舊系統）：**\n{}",
+    
+    # Additional missing CR diagnostic parameters
+    'CR_CHOICE_UNDERSTANDING_ERROR_LOGIC': "CR 選項理解錯誤：邏輯",
+    'CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX': "CR 選項理解錯誤：句式",
+    'CR_CHOICE_UNDERSTANDING_ERROR_VOCAB': "CR 選項理解錯誤：詞彙",
+    'CR_REASONING_ERROR_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING': "CR 推理錯誤：抽象邏輯術語理解",
+    'CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT': "CR 推理錯誤：選項相關性判斷",
+    'CR_REASONING_ERROR_CORE_ISSUE_IDENTIFICATION': "CR 推理錯誤：核心問題識別",
+    'CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP': "CR 推理錯誤：邏輯鏈分析前提結論關係",
+    'CR_REASONING_ERROR_PREDICTION_DIRECTION': "CR 推理錯誤：預測方向",
+    'CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION': "CR 推理錯誤：強幹擾選項混淆",
+    'CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE': "CR 特定題型弱點：Note類型",
+    'CR_CHOICE_UNDERSTANDING_DIFFICULTY_DOMAIN': "CR 選項理解困難：領域",
+    'CR_CHOICE_UNDERSTANDING_DIFFICULTY_LOGIC': "CR 選項理解困難：邏輯",
+    'CR_CHOICE_UNDERSTANDING_DIFFICULTY_SYNTAX': "CR 選項理解困難：句式",
+    'CR_CHOICE_UNDERSTANDING_DIFFICULTY_VOCAB': "CR 選項理解困難：詞彙",
+    'CR_REASONING_DIFFICULTY_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING': "CR 推理困難：抽象邏輯術語理解",
+    'CR_REASONING_DIFFICULTY_CHOICE_RELEVANCE_JUDGEMENT': "CR 推理困難：選項相關性判斷",
+    'CR_REASONING_DIFFICULTY_CORE_ISSUE_IDENTIFICATION': "CR 推理困難：核心問題識別",
+    'CR_REASONING_DIFFICULTY_PREDICTION_DIRECTION_MISSING': "CR 推理困難：預測方向缺失",
+    'CR_REASONING_DIFFICULTY_STRONG_DISTRACTOR_CHOICE_ANALYSIS': "CR 推理困難：強幹擾選項分析",
+    'CR_STEM_UNDERSTANDING_DIFFICULTY_DOMAIN': "CR 題幹理解困難：領域",
+    'CR_STEM_UNDERSTANDING_DIFFICULTY_LOGIC': "CR 題幹理解困難：邏輯",
+    'CR_STEM_UNDERSTANDING_DIFFICULTY_SYNTAX': "CR 題幹理解困難：句式",
+    'CR_STEM_UNDERSTANDING_DIFFICULTY_VOCAB': "CR 題幹理解困難：詞彙",
+    
+    # Additional missing RC diagnostic parameters
+    'RC_CHOICE_ANALYSIS_ERROR_DOMAIN': "RC 選項分析錯誤：領域",
+    'RC_CHOICE_ANALYSIS_ERROR_LOGIC': "RC 選項分析錯誤：邏輯",
+    'RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT': "RC 選項分析錯誤：相關性判斷",
+    'RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION': "RC 選項分析錯誤：強幹擾混淆",
+    'RC_CHOICE_ANALYSIS_ERROR_SYNTAX': "RC 選項分析錯誤：句式",
+    'RC_CHOICE_ANALYSIS_ERROR_VOCAB': "RC 選項分析錯誤：詞彙",
+    'RC_LOCATION_SKILL_ERROR_LOCATION': "RC 定位技能錯誤：定位",
+    'RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING': "RC 方法錯誤：特定題型處理",
+    'RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT': "RC 問題理解錯誤：焦點",
+    'RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING': "RC 閱讀理解錯誤：關鍵信息定位理解",
+    'RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS': "RC 閱讀理解錯誤：長難句分析",
+    'RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE': "RC 閱讀理解錯誤：文章結構",
+    'RC_REASONING_ERROR_INFERENCE': "RC 推理錯誤：推斷",
+    'RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN': "RC 選項分析困難：領域",
+    'RC_CHOICE_ANALYSIS_DIFFICULTY_LOGIC': "RC 選項分析困難：邏輯",
+    'RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT': "RC 選項分析困難：相關性判斷",
+    'RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS': "RC 選項分析困難：強幹擾分析",
+    'RC_CHOICE_ANALYSIS_DIFFICULTY_SYNTAX': "RC 選項分析困難：句式",
+    'RC_CHOICE_ANALYSIS_DIFFICULTY_VOCAB': "RC 選項分析困難：詞彙",
+    'RC_LOCATION_SKILL_DIFFICULTY_INEFFICIENCY': "RC 定位技能困難：效率低",
+    'RC_METHOD_DIFFICULTY_SPECIFIC_QUESTION_TYPE_HANDLING': "RC 方法困難：特定題型處理",
+    'RC_QUESTION_UNDERSTANDING_DIFFICULTY_FOCUS_POINT_GRASP': "RC 問題理解困難：焦點把握",
+    'RC_REASONING_DIFFICULTY_INFERENCE_SPEED_SLOW': "RC 推理困難：推斷速度慢",
+    
+    # Missing V report section translations
+    'v_overall_practice_direction': "* **B. 整體練習方向**",
+    'v_review_practice_record': "* **A. 檢視練習記錄（二級證據參考）**",
+    
+    # Critical missing diagnostic parameters from user report
+    'CR_STEM_UNDERSTANDING_ERROR_LOGIC': "CR 題幹理解錯誤：邏輯",
+    'CR_STEM_UNDERSTANDING_ERROR_DOMAIN': "CR 題幹理解錯誤：領域",
+    
+    # Additional behavioral patterns translations
+# Fixed behavioral patterns translations - ONLY ENGLISH KEYS
+    'behavioral_pattern_carelessness_full': "行為模式: 粗心問題 (快而錯比例高)",
+    'carelessness_issue_high_fast_wrong_ratio': "粗心問題 (快而錯比例高)",
+    'application_instability_sfe': "應用不穩定 (**SFE**)：已掌握技能應用不穩定",
+    'rc_timing_individual_question_efficiency_severe_issue_full': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
+    'rc_reading_speed_poor_group_performance_poor': "RC 閱讀速度差：整組表現不佳",
+
+    # Additional missing keys found in English version
+    'Application Instability (**SFE**): Mastered skill application instability': "應用不穩定 (**SFE**)：已掌握技能應用不穩定",
+    'Behavioral Pattern: Carelessness Issue (High fast-wrong ratio)': "行為模式: 粗心問題 (快而錯比例高)",
+    'Invalid/Excluded': "無效/已排除",
+    'RC Reading Speed Poor: Group performance poor': "RC 閱讀速度差：整組表現不佳",
+    'RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
+    'v_qualitative_analysis_suggestion': "**建議：** 如果您對報告中指出的某些問題仍感困惑，可以嘗試 **提供 2-3 題相關錯題的詳細解題流程跟思路範例** ，供顧問進行更深入的個案分析。",
+
+    # New English translation keys for failing Chinese strings
+    'rc_timing_individual_question_efficiency_severe_issue_full': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
+    'carelessness_issue_high_fast_wrong_ratio': "粗心問題 (快而錯比例高)",
+    'rc_reading_speed_poor_group_performance_poor': "RC 閱讀速度差：整組表現不佳",
+
+    # === End DI Diagnostic Translations ===
+    
+    # DI Diagnostic Parameters - Error Types (Fast & Wrong / Normal Time & Wrong)
+    'DI_READING_COMPREHENSION_ERROR__VOCABULARY': "DI 閱讀理解錯誤: 詞彙理解",
+    'DI_READING_COMPREHENSION_ERROR__SYNTAX': "DI 閱讀理解錯誤: 句式理解",
+    'DI_READING_COMPREHENSION_ERROR__LOGIC': "DI 閱讀理解錯誤: 邏輯理解",
+    'DI_READING_COMPREHENSION_ERROR__DOMAIN': "DI 閱讀理解錯誤: 領域理解",
+    'DI_GRAPH_INTERPRETATION_ERROR__GRAPH': "DI 圖表解讀錯誤: 圖形信息解讀",
+    'DI_GRAPH_INTERPRETATION_ERROR__TABLE': "DI 圖表解讀錯誤: 表格信息解讀",
+    'DI_CONCEPT_APPLICATION_ERROR__MATH': "DI 概念應用 (數學) 錯誤: 數學觀念/公式應用",
+    'DI_LOGICAL_REASONING_ERROR__NON_MATH': "DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷",
+    'DI_CALCULATION_ERROR__MATH': "DI 計算錯誤 (數學): 數學計算",
+    'DI_MULTI_SOURCE_INTEGRATION_ERROR': "DI 多源整合 (MSR): 跨分頁/來源信息整合障礙",
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE': "DI 基礎掌握: 應用不穩定 (Special Focus Error)",
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': "DI 基礎掌握: 應用不穩定 (Special Focus Error)",
+    'DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION': "DI 行為: 粗心 - 細節忽略/看錯",
+    'DI_BEHAVIOR_CARELESSNESS_ISSUE': "DI 行為: 粗心 - 整體快錯率偏高",
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "DI 行為: 測驗前期作答過快風險",
+    # DI Diagnostic Parameters - Difficulty Types (Slow & Wrong / Slow & Correct)
+    'DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION': "DI 閱讀理解障礙: 跨分頁/來源信息整合困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY': "DI 閱讀理解障礙: 詞彙理解困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX': "DI 閱讀理解障礙: 句式理解困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC': "DI 閱讀理解障礙: 邏輯理解困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN': "DI 閱讀理解障礙: 領域理解困難",
+    'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH': "DI 圖表解讀障礙: 圖形信息解讀困難",
+    'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE': "DI 圖表解讀障礙: 表格信息解讀困難",
+    'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH': "DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難",
+    'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH': "DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難",
+    'DI_CALCULATION_DIFFICULTY__MATH': "DI 計算 (數學) 障礙: 數學計算困難",
+    'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED': "DI 閱讀理解障礙: 心態失常讀不進去",
+     # DI Content Domains and Categories
+    'Math Related': "數學相關",
+    'Non-Math Related': "非數學相關",
+    'Unknown Domain': "未知領域",
+    
+    # DI Question Types
+    'Data Sufficiency': 'Data Sufficiency 充分性題',
+    'Two-part analysis': 'Two-part analysis 雙部分分析題',
+    'Multi-source reasoning': 'Multi-source reasoning 多源推理題',
+    'Graph and Table': 'Graph and Table 圖表題',
+    'Unknown Type': '未知類型',
+        # DI Parameter Categories
+    'SFE': '基礎掌握',
+    'Reading/Interpretation': '閱讀/解讀',
+    'Concept/Application': '概念/應用',
+    'Data/Calculation': '數據/計算',
+    'Logic/Reasoning': '邏輯/推理',
+    'Multi-Source': '多源整合',
+    'Efficiency': '效率問題',
+    'Carelessness': '粗心問題',
+    'Behavioral': '行為模式',
+       # DI Time Pressure Status
+    'High': "高",
+    'Low': "低",
+    'True': "有時間壓力",
+    'False': "無時間壓力",
+       # DI Report Structure - Main Sections
+    'di_report_title': "DI 科診斷報告詳情",
+    'di_report_subtitle': "（基於用戶數據與模擬難度分析）",
+    'di_report_overview_feedback': "**一、 報告總覽與即時反饋**",
+    'di_time_strategy_assessment': "* **A. 作答時間與策略評估**",
+    'di_important_notes': "* **B. 重要註記**",
+    'di_core_performance_analysis': "**二、 核心表現分析**",
+    'di_content_domain_overview': "* **A. 內容領域表現概覽**",
+    'di_high_frequency_issues': "* **B. 高頻潛在問題點**",
+    'di_special_behavioral_patterns': "* **C. 特殊行為模式觀察**",
+    'di_macro_practice_suggestions': "**三、 宏觀練習建議 (按題型)**",
+       # DI Report - Time and Strategy Assessment
+    'di_total_test_time': "**整體作答時間：** {:.2f} 分鐘 (允許 {:.1f} 分鐘，剩餘 {:.2f} 分鐘)",
+    'di_time_pressure_perception': "**時間壓力感知：** {}",
+    'di_manual_invalid_count': "您手動標記了 {} 題為無效，這些題目已從部分細化分析中排除。",
+    'di_no_manual_invalid': "無手動標記為無效的題目。",
+       # DI Report - Domain Performance
+    'di_math_related_poor_error': "{} 領域的錯誤率明顯更高。",
+    'di_non_math_related_poor_error': "{} 領域的錯誤率明顯更高。",
+    'di_math_related_poor_overtime': "{} 領域的超時率明顯更高。",
+    'di_non_math_related_poor_overtime': "{} 領域的超時率明顯更高。",
+    'di_no_significant_domain_difference': "{}與{}領域的表現在錯誤率和超時率上無顯著差異。",
+    'di_refer_detailed_analysis': "請參考詳細數據分析各領域表現。",
+       # DI Report - Potential Issues
+    'di_sfe_note': "(註：SFE 指在已掌握難度範圍內題目失誤)",
+    'di_no_obvious_core_issues': "未識別出明顯的核心問題模式。",
+    
+    # DI Report - Behavioral Patterns
+    'di_carelessness_pattern': "：相對快速作答的題目中，錯誤比例偏高（{}），提示可能存在粗心問題。",
+    'di_early_rushing_pattern': "：測驗前期（{} 題）出現作答時間過短（<1分鐘）的情況，可能影響準確率。",
+    'di_no_negative_patterns': "未發現明顯的粗心或前期過快等負面行為模式。",
+    
+    # DI Report - Practice Recommendations
+    'di_no_practice_recommendations': "根據當前分析，暫無特別的練習建議。請保持全面複習。",
+    'di_overall_improvement_space': "整體表現有較大提升空間",
+    'di_comprehensive_foundation_consolidation': "建議全面鞏固基礎",
+    'di_macro_recommendation_prefix': "宏觀建議",
+    'di_due_to_performance': "由於",
+    'di_error_rate_or_overtime_rate': "(錯誤率 {}% 或 超時率 {}%)",
+    'di_recommend_systematic_practice': "，建議進行系統性練習",
+    'di_time_limit_suggestion': "建議時限：{}",
+    'di_specific_recommendation_prefix': "特定建議",
+    'di_focus_on_fundamental_skills': "著重基礎技能：{}",
+    'di_na': "N/A",
+    
+    # DI AI Prompts and Recommendations
+    'di_ai_analysis_available': "AI 深度分析可用",
+    'di_ai_analysis_unavailable': "AI 深度分析暫不可用",
+    'di_ai_recommendation_context': "基於 DI 診斷結果的推薦分析工具：",
+    'di_ai_tool_context': "推薦的 AI 工具基於您的診斷標籤：{}",
+    'di_ai_fallback_message': "若無法訪問 AI 工具，請參考診斷報告進行手動分析。",
+    # DI Utility Functions
+    'di_format_rate_percent': "{}%",
+    'di_unknown_value': "未知",
+    # Additional DI Constants
+    'di_invalid_data_tag': "數據無效：用時過短（DI：受時間壓力影響）",
+    'di_max_allowed_time': "45.0",
+    
+    # DI main module
+    'di_diagnosis_error_message': "DI 診斷過程中發生未預期錯誤",
+    
+    # === End DI Diagnostic Translations ===
+    
+    # AI prompts module translations
     'v_ai_no_data_analysis': "(無數據可供分析)",
     'v_ai_no_diagnostic_tags': "(未找到診斷標籤)",
     'v_ai_tag_count_format': "**{}** (出現{}次):\n",
