@@ -491,4 +491,94 @@ Applied:
 
 Status: DI diagnostic report now fully supports bilingual output with unified i18n system, following same pattern as V/Q modules.
 
+## DI Diagnosis Logic Compliance Issues (2025-01-28)
+
+Mistake: MSR reading time calculation for single-question groups doesn't follow MD document
+Wrong:
+```python
+# In di_preprocessor.py
+if num_other_qs_msr == 0:
+    calculated_msr_reading_time = first_q_time_msr  # Use first question time directly
+```
+Correct:
+MD document states "此計算僅在題組包含至少兩題時有效" - should not calculate reading time for single-question MSR groups
+
+Mistake: Invalid data detection standards use exclusive checking instead of "any one triggers"
+Wrong:
+```python
+# In main.py invalid data logic
+if not abnormally_fast and pd.notna(q_time) and q_time < 1.0:
+    abnormally_fast = True
+```
+Correct:
+Standards should be checked independently as MD document states "滿足其一即可觸發", not exclusive checking
+
+Mistake: MSR overtime logic adds undefined msr_reading_over check
+Wrong:
+```python
+# In main.py overtime calculation
+msr_reading_over = msr_mask & (~msr_group_over) & df_di['is_first_msr_q'] & df_di['msr_reading_time'].notna() & (df_di['msr_reading_time'] > thresholds['MSR_READING'])
+msr_over_mask = msr_group_over | msr_reading_over | msr_adj_first_over | msr_non_first_over
+```
+Correct:
+MD document only defines group_overtime OR individual_overtime, no separate reading time overtime check
+
+Mistake: MSR Z_agg calculation uses msr_group_total_time instead of question_time
+Wrong:
+```python
+# In chapter_logic.py _check_foundation_override
+max_group_time_minutes = triggering_df['msr_group_total_time'].max()
+z_agg = math.floor(max_group_time_minutes * 2) / 2.0
+```
+Correct:
+MD document specifies Z_agg should use max question_time: "找出該題型下所有...題目中的最大 question_time"
+
+## DI Diagnosis Logic Detailed Compliance Issues Found (2025-01-28)
+
+Issue Category: Logic Flow Consistency
+- MSR reading time calculation violates MD document constraints
+- Invalid data detection uses wrong logical operators
+- Overtime calculation adds undefined checks
+- Foundation override uses wrong time metrics for MSR
+
+Impact: These issues may cause incorrect diagnostic results and recommendations that don't align with the standardized MD document framework
+
+Status: Identified, awaiting user decision on which fixes to prioritize
+
+## DI Diagnosis Logic Compliance Issues - FIXED (2025-01-28)
+
+Fixed: MSR reading time calculation for single-question groups now follows MD document
+Applied:
+Modified gmat_diagnosis_app/subject_preprocessing/di_preprocessor.py line 69-80:
+- Removed automatic fallback to first_q_time_msr for single-question groups
+- Added clear comment explaining MD document constraint: "此計算僅在題組包含至少兩題時有效"
+- Single-question MSR groups now keep msr_reading_time = 0.0 as initialized
+
+Fixed: Invalid data detection standards now use independent checking instead of exclusive
+Applied:
+Modified gmat_diagnosis_app/diagnostics/di_modules/main.py lines 127-140:
+- Removed "if not abnormally_fast" conditions from Standards 2, 3-5, and 6
+- Changed to independent checks allowing "滿足其一即可觸發" as per MD document
+- All standards now check independently and any can trigger abnormally_fast = True
+
+Fixed: MD document updated to match code implementation for MSR overtime logic
+Applied:
+Updated analysis-framework/sec-doc-zh/gmat-di-score-logic-dustin-v1.4.md:
+- Changed MSR overtime from "雙重標準" to "四重標準"
+- Added detailed descriptions for msr_group_over, msr_reading_over, msr_adj_first_over, msr_non_first_over
+- Updated final overtime condition to match code: "msr_group_over OR msr_reading_over OR msr_adj_first_over OR msr_non_first_over"
+
+Fixed: MD document updated for MSR Z_agg calculation to match code implementation
+Applied:
+Updated analysis-framework/sec-doc-zh/gmat-di-score-logic-dustin-v1.4.md Chapter 5:
+- Added MSR special handling note: "對於MSR題型，使用 msr_group_total_time 作為時間計算基準"
+- Document now reflects code's actual implementation using different time metrics for different question types
+
+Status: All 5 DI diagnosis logic compliance issues have been resolved according to user decisions:
+1. ✅ Code fixed to match MD document (MSR reading time calculation)
+2. ✅ Code fixed to match MD document (invalid data detection)  
+3. ✅ MD document updated to match code (MSR overtime logic)
+4. ✅ MD document updated to match code (override parameters)
+5. ✅ MD document updated to match code (Z_agg calculation)
+
 --- 

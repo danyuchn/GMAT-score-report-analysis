@@ -67,13 +67,13 @@ def preprocess_di_data(df):
                     first_q_time_msr = group.loc[first_q_idx_msr, 'question_time']
                     other_qs_time_msr = group.loc[group.index != first_q_idx_msr, 'question_time']
                     
-                    calculated_msr_reading_time = first_q_time_msr
+                    # Calculate MSR reading time according to MD document: only for groups with at least 2 questions
                     if not other_qs_time_msr.empty:
                         avg_other_qs_time_msr = other_qs_time_msr.mean()
                         calculated_msr_reading_time = first_q_time_msr - avg_other_qs_time_msr
-                    
-                    df_msr_part.loc[first_q_idx_msr, 'msr_reading_time'] = calculated_msr_reading_time
-            
+                        df_msr_part.loc[first_q_idx_msr, 'msr_reading_time'] = calculated_msr_reading_time
+                    # Note: For single-question MSR groups, msr_reading_time remains 0.0 (MD document: "此計算僅在題組包含至少兩題時有效")
+
             df_msr_part['msr_reading_time'] = pd.to_numeric(df_msr_part['msr_reading_time'], errors='coerce')
             df_msr_part['msr_reading_time'] = df_msr_part['msr_reading_time'].replace({pd.NA: 0, None: 0, np.nan: 0}).infer_objects(copy=False)
 

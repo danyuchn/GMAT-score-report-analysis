@@ -112,19 +112,23 @@
     *   若 `question_type` == `'TPA'` 且 `question_time` > `overtime_threshold_tpa`，標記 `overtime` = `True`。
     *   若 `question_type` == `'GT'` 且 `question_time` > `overtime_threshold_gt`，標記 `overtime` = `True`。
     *   若 `question_type` == `'DS'` 且 `question_time` > `overtime_threshold_ds`，標記 `overtime` = `True`。
-    *   **針對 `MSR` 題目的超時標記 (雙重標準):**
-        *   **a. 題組超時標記 (`msr_group_overtime`):**
-            *   計算每個 MSR 題組的總時間 (`group_total_time`)。
+    *   **針對 `MSR` 題目的超時標記 (四重標準):**
+        *   **a. 題組超時標記 (`msr_group_over`):**
+            *   計算每個 MSR 題組的總時間 (`msr_group_total_time`)。
             *   獲取該題組的目標時間 `msr_group_target_time` (基於 `time_pressure`: True 時 6.0 分鐘, False 時 7.0 分鐘)。
-            *   判斷: 如果 `group_total_time > msr_group_target_time`，則該 MSR 題組內**所有**題目標記 `msr_group_overtime = True`。
-        *   **b. 單題超時標記 (`msr_individual_overtime`):**
-            *   設定固定單題閾值 `msr_individual_q_threshold = 1.5` 分鐘 (不隨 `time_pressure` 變化)。
-            *   計算調整後時間 `adjusted_msr_time`:
-                *   對於題組第一題: `adjusted_msr_time = question_time - msr_reading_time` (使用第零章計算的 `msr_reading_time`)。
-                *   對於題組非第一題: `adjusted_msr_time = question_time`。
-            *   判斷: 如果某 MSR 題目的 `adjusted_msr_time > msr_individual_q_threshold` (1.5 分鐘)，則該題標記 `msr_individual_overtime = True`。
-        *   **c. 最終 `overtime` 標記:**
-            *   一個 MSR 題目最終被標記為 `overtime = True`，當且僅當該題目滿足 `msr_group_overtime == True` **或者** `msr_individual_overtime == True`。
+            *   判斷: 如果 `msr_group_total_time > msr_group_target_time`，則該 MSR 題組內**所有**題目標記 `msr_group_over = True`。
+        *   **b. 閱讀時間超時標記 (`msr_reading_over`):**
+            *   對於**未被 `msr_group_over` 標記**且為**題組第一題**的 MSR 題目。
+            *   如果該題的 `msr_reading_time > MSR_READING_THRESHOLD` (1.5 分鐘)，則標記 `msr_reading_over = True`。
+        *   **c. 調整後第一題超時標記 (`msr_adj_first_over`):**
+            *   對於**未被上述兩種情況標記**且為**題組第一題**的 MSR 題目。
+            *   計算調整後時間: `adjusted_time = question_time - msr_reading_time`。
+            *   如果 `adjusted_time > MSR_SINGLE_Q_THRESHOLD` (1.5 分鐘)，則標記 `msr_adj_first_over = True`。
+        *   **d. 非第一題超時標記 (`msr_non_first_over`):**
+            *   對於**未被 `msr_group_over` 標記**且為**題組非第一題**的 MSR 題目。
+            *   如果 `question_time > MSR_SINGLE_Q_THRESHOLD` (1.5 分鐘)，則標記 `msr_non_first_over = True`。
+        *   **e. 最終 `overtime` 標記:**
+            *   一個 MSR 題目最終被標記為 `overtime = True`，當且僅當該題目滿足以下任一條件: `msr_group_over OR msr_reading_over OR msr_adj_first_over OR msr_non_first_over`。
 2.  **創建過濾數據集：** 從原始題目數據中，移除所有被標記為 `is_invalid` = `True` 的題目。
 3.  **後續分析範圍：** 第二章至第六章的所有計算、分析和建議，僅基於這個過濾後的數據集。
 
@@ -192,7 +196,7 @@
     - **核心概念定義:**
         - **時間表現分類 (`Time Performance`):**
             - 快 (`is_relatively_fast`): `question_time` < `average_time_per_type`[該題 `question_type`] * 0.75。
-            - 慢 (`is_slow`): 該題被標記為 `overtime` = `True` (根據第一章的閾值判斷，對於 MSR 題目，基於 `msr_group_overtime` 或 `msr_individual_overtime` 的新定義)。
+            - 慢 (`is_slow`): 該題被標記為 `overtime` = `True` (根據第一章的閾值判斷，對於 MSR 題目，基於 `msr_group_over` 或 `msr_individual_over` 的新定義)。
             - 正常時間 (`is_normal_time`): 非快也非慢。
         - **特殊關注錯誤 (`special_focus_error`)**:
             - *定義*: 錯誤題目 (`is_correct`==`False`) 的 `question_difficulty` < `max_correct_difficulty_per_combination`[該題 `question_type`, 該題 `content_domain`]。
@@ -433,7 +437,8 @@
 - **宏觀練習難度確定 (若觸發)：** 找出該 `question_type` 下所有 `is_correct` == `False` 或超時題目中的最低 `question_difficulty` 值 (`min_error_or_overtime_difficulty_per_type`)。根據第二章的難度映射規則，將此 `min_error_or_overtime_difficulty_per_type` 轉換為對應的難度標籤 (`Y_agg`)，用於宏觀建議。
 - **設定宏觀限時 (`Z_agg`)：**
     - 找出觸發該題型覆蓋規則的所有題目。
-    - 找到這些題目中最大的 `question_time`，記為 `max_time_triggering`。
+    - **MSR題型特殊處理：** 對於MSR題型，使用 `msr_group_total_time` 作為時間計算基準；對於其他題型，使用 `question_time`。
+    - 找到這些題目中最大的時間值，記為 `max_time_triggering`。
     - 計算 `Z_agg` = `floor(max_time_triggering * 2) / 2` (向下取整到最近的 0.5 分鐘)。
 
 <aside>
@@ -691,7 +696,6 @@
 * `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH`: DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難
 * `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH`: DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難
 * `DI_CALCULATION_DIFFICULTY__MATH`: DI 計算 (數學) 障礙: 數學計算困難
-* `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`: DI 基礎掌握: 應用不穩定 (Special Focus Error)
 
 ### 時間表現: 慢且對 (`Slow & Correct`)
 

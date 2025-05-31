@@ -168,16 +168,16 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
                         
                         abnormally_fast = False
 
-                        # 標準 1 (疑似放棄)
+                        # 標準 1 (疑似放棄) - Independent check
                         if pd.notna(q_time) and q_time < INVALID_TIME_THRESHOLD_MINUTES: # 0.5 minutes
                             abnormally_fast = True
 
-                        # 標準 2 (絕對倉促)
-                        if not abnormally_fast and pd.notna(q_time) and q_time < 1.0: # 1.0 minutes (use EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES)
+                        # 標準 2 (絕對倉促) - Independent check  
+                        if pd.notna(q_time) and q_time < 1.0: # 1.0 minutes (use EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES)
                             abnormally_fast = True
                         
-                        # 標準 3-5 (相對單題倉促 - DS, TPA, GT)
-                        if not abnormally_fast and q_type in ['DS', 'TPA', 'GT', 'Data Sufficiency', 'Two-part analysis', 'Graph and Table']: # Handle variations in q_type names
+                        # 標準 3-5 (相對單題倉促 - DS, TPA, GT) - Independent check
+                        if q_type in ['DS', 'TPA', 'GT', 'Data Sufficiency', 'Two-part analysis', 'Graph and Table']: # Handle variations in q_type names
                             # Map variations to standard names for lookup
                             standard_q_type = q_type
                             if q_type == 'Data Sufficiency': standard_q_type = 'DS'
@@ -188,8 +188,8 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
                             if avg_time is not None and pd.notna(avg_time) and pd.notna(q_time) and q_time < (avg_time * SUSPICIOUS_FAST_MULTIPLIER):
                                 abnormally_fast = True
                         
-                        # 標準 6 (相對題組倉促 - MSR)
-                        if not abnormally_fast and q_type in ['MSR', 'Multi-source reasoning']:
+                        # 標準 6 (相對題組倉促 - MSR) - Independent check
+                        if q_type in ['MSR', 'Multi-source reasoning']:
                             standard_q_type_msr = 'MSR' # Standardize for lookup
                             avg_time_msr = first_third_average_time_per_type.get(standard_q_type_msr)
                             group_total_time = row.get('msr_group_total_time')
