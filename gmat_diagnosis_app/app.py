@@ -1,17 +1,6 @@
 # -*- coding: utf-8 -*- # Ensure UTF-8 encoding for comments/strings
 import streamlit as st
 
-# Import i18n functions early to use in page config
-from gmat_diagnosis_app.i18n import translate as t
-
-# Call set_page_config as the first Streamlit command
-st.set_page_config(
-    page_title=t("page_title"),
-    page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -25,7 +14,7 @@ import openai
 import plotly.graph_objects as go
 import datetime
 
-# --- Project Path Setup ---
+# --- Project Path Setup (MUST BE FIRST) ---
 try:
     app_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(app_dir)
@@ -33,8 +22,18 @@ try:
         sys.path.insert(0, project_root)
 except NameError:
     # Handle cases where __file__ is not defined (e.g., interactive environments)
-    st.warning("Could not automatically determine project root. Assuming modules are available.", icon="⚠️")
     project_root = os.getcwd()  # Fallback
+
+# Import i18n functions after path setup
+from gmat_diagnosis_app.i18n import translate as t
+
+# Call set_page_config as early as possible
+st.set_page_config(
+    page_title=t("page_title"),
+    page_icon="🎯",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # --- Module Imports ---
 try:
@@ -77,7 +76,11 @@ try:
     # from gmat_diagnosis_app.analysis_helpers.diagnosis_manager import run_diagnosis, update_session_state_after_analysis # Removed
     
 except ImportError as e:
-    st.error(t("import_error_message").format(e))
+    # Add fallback for when translation is not available
+    try:
+        st.error(t("import_error_message").format(e))
+    except:
+        st.error(f"導入模組時出錯: {e}. 請確保環境設定正確，且 gmat_diagnosis_app 在 Python 路徑中。")
     st.stop()
 
 # --- Initialize Column Display Configuration ---
@@ -179,9 +182,9 @@ def load_sample_data_callback():
 # --- Main Application ---
 def main():
     """Main application entry point"""
-    # 設置頁面配置
+    # Set page configuration (removed duplicate)
     # st.set_page_config( # This block will be removed
-    #     page_title="GMAT 成績診斷平台",
+    #     page_title="GMAT Score Analysis Platform",
     #     page_icon="📊",
     #     layout="wide",
     #     initial_sidebar_state="expanded"
@@ -190,7 +193,7 @@ def main():
     # Initialize session state
     init_session_state()
     
-    # 額外確保聊天歷史持久化
+    # Ensure chat history persistence
     ensure_chat_history_persistence()
     
     # Apply custom CSS styling
@@ -204,7 +207,7 @@ def main():
     if 'sample_data_pasted_success' not in st.session_state:
         st.session_state.sample_data_pasted_success = False
     
-    # 頁面標題與簡介區
+    # Page title and introduction area
     col1, col2 = st.columns([5, 1])
     with col1:
         st.markdown(f"""
@@ -212,11 +215,11 @@ def main():
         ### {translate('main_subtitle')}
         """)
     
-    # 建立主要導航
+    # Create main navigation
     main_tabs = st.tabs([translate('data_input_tab'), translate('results_view_tab')])
     
-    with main_tabs[0]:  # 數據輸入與分析標籤頁
-        # 簡短使用指引（核心步驟）
+    with main_tabs[0]:  # Data input and analysis tab
+        # Brief usage guide (core steps)
         with st.expander(translate('quick_guide'), expanded=False):
             st.markdown(f"""
             1. {t('preparation_guide_step1')}

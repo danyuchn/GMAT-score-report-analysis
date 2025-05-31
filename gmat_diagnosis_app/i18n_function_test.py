@@ -26,7 +26,7 @@ def test_i18n_function():
     """測試i18n translate函數"""
     print("=== i18n translate() 函數測試 ===\n")
     
-    # 獲取所有翻譯鍵並抽樣
+    # Get all translation keys and sample them
     all_keys = list(zh_trans.keys())
     sample_size = len(all_keys) 
     sampled_keys = random.sample(all_keys, sample_size)
@@ -47,6 +47,8 @@ def test_i18n_function():
     if hasattr(st.session_state, 'language'):
         st.session_state.language = 'zh_TW'
     
+    zh_examples = []  # Collect all Chinese translation examples
+    
     for i, key in enumerate(sampled_keys):
         if i % 100 == 0:
             print(f"  進度: {i}/{sample_size}")
@@ -55,8 +57,8 @@ def test_i18n_function():
             translation = t(key)
             if translation and translation != key:  # 成功翻譯且不是原鍵值
                 stats['zh_success'] += 1
-                if i < 3:  # 顯示前3個示例
-                    print(f"  ✅ {key} -> {translation[:50]}{'...' if len(translation) > 50 else ''}")
+                # Collect all examples, not just first 3
+                zh_examples.append(f"  ✅ {key} -> {translation[:50]}{'...' if len(translation) > 50 else ''}")
             else:
                 stats['zh_errors'] += 1
                 if len(error_details) < 5:
@@ -66,12 +68,18 @@ def test_i18n_function():
             if len(error_details) < 5:
                 error_details.append(f"💥 中文翻譯錯誤: {key} -> {str(e)}")
     
+    # Print all Chinese translation examples
+    print("\n--- 中文翻譯示例 ---")
+    for example in zh_examples:
+        print(example)
     print()
     
     # 測試英文翻譯
     print("🇺🇸 測試英文翻譯 (en)...")
     if hasattr(st.session_state, 'language'):
         st.session_state.language = 'en'
+    
+    en_examples = []  # Collect all English translation examples
     
     for i, key in enumerate(sampled_keys):
         if i % 100 == 0:
@@ -81,8 +89,8 @@ def test_i18n_function():
             translation = t(key)
             if translation and translation != key:  # 成功翻譯且不是原鍵值
                 stats['en_success'] += 1
-                if i < 3:  # 顯示前3個示例
-                    print(f"  ✅ {key} -> {translation[:50]}{'...' if len(translation) > 50 else ''}")
+                # Collect all examples, not just first 3
+                en_examples.append(f"  ✅ {key} -> {translation[:50]}{'...' if len(translation) > 50 else ''}")
             else:
                 stats['en_errors'] += 1
                 if len(error_details) < 10:
@@ -91,6 +99,11 @@ def test_i18n_function():
             stats['en_errors'] += 1
             if len(error_details) < 10:
                 error_details.append(f"💥 英文翻譯錯誤: {key} -> {str(e)}")
+    
+    # Print all English translation examples
+    print("\n--- 英文翻譯示例 ---")
+    for example in en_examples:
+        print(example)
     
     # 顯示結果
     print(f"\n{'='*60}")

@@ -1,6 +1,7 @@
 """
-繪圖服務模組
-提供生成圖表的功能
+Plotting service module
+
+Provides functions for generating charts
 """
 
 import pandas as pd

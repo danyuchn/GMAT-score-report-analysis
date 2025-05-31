@@ -129,7 +129,7 @@ def _debug_show_chat_history(session_state):
                     st.text(t('chat_debug_no_report'))
                 
                 # Display diagnostic table summary
-                if context["dataframe"] and context["dataframe"] != "(無詳細數據表格)":
+                if context["dataframe"] and context["dataframe"] != t('chat_debug_no_detailed_table'):
                     df_preview = context["dataframe"].split("\n")[:5]
                     df_preview = "\n".join(df_preview) + "\n..."
                     st.text(t('chat_debug_diagnostic_table').format(len(context['dataframe'])) + f"\n{df_preview}")
@@ -137,7 +137,7 @@ def _debug_show_chat_history(session_state):
                     st.text(f"{t('chat_debug_diagnostic_table').format(0)}: {context['dataframe']}")
                     
                 # New: Display statistics for wrong and invalid questions
-                if "dataframe" in context and context["dataframe"] != "(無詳細數據表格)":
+                if "dataframe" in context and context["dataframe"] != t('chat_debug_no_detailed_table'):
                     st.markdown("##### " + t('chat_debug_data_statistics'))
                     lines = context["dataframe"].split("\n")
                     

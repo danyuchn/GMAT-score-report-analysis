@@ -741,7 +741,7 @@ def display_results():
                 if "trimmed_tags_suggestion" in st.session_state:
                     tag_trimming_expander.markdown(f"##### {t('tag_trimming_result_title')}")
                     suggestion_to_display = st.session_state.trimmed_tags_suggestion
-                    if suggestion_to_display.startswith("錯誤：") or suggestion_to_display.startswith("AI 未能提供修剪建議"):
+                    if suggestion_to_display.startswith(t('tag_trimming_error_prefix')) or suggestion_to_display.startswith(t('tag_trimming_ai_failed_prefix')):
                         tag_trimming_expander.error(suggestion_to_display)
                     elif suggestion_to_display == t('tag_trimming_no_match'):
                         tag_trimming_expander.info(suggestion_to_display)

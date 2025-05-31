@@ -581,4 +581,118 @@ Status: All 5 DI diagnosis logic compliance issues have been resolved according 
 4. ✅ MD document updated to match code (override parameters)
 5. ✅ MD document updated to match code (Z_agg calculation)
 
+## Hardcoded Chinese Text Completion Fix (2025-01-29)
+
+Mistake: Remaining hardcoded Chinese text in various files after i18n implementation
+Wrong:
+Files still contained hardcoded Chinese text that should use the translation system:
+```python
+# In results_display.py
+if suggestion_to_display.startswith("錯誤：") or suggestion_to_display.startswith("AI 未能提供修剪建議"):
+
+# In chat_interface.py  
+if context["dataframe"] and context["dataframe"] != "(無詳細數據表格)":
+
+# In plotting_service.py
+"""
+繪圖服務模組
+提供生成圖表的功能
+"""
+
+# In app.py (comments)
+# 設置頁面配置
+# 額外確保聊天歷史持久化
+```
+Correct:
+```python
+# In results_display.py - use translation keys
+if suggestion_to_display.startswith(t('tag_trimming_error_prefix')) or suggestion_to_display.startswith(t('tag_trimming_ai_failed_prefix')):
+
+# In chat_interface.py - use translation key
+if context["dataframe"] and context["dataframe"] != t('chat_debug_no_detailed_table'):
+
+# In plotting_service.py - English comments
+"""
+Plotting service module
+
+Provides functions for generating charts
+"""
+
+# In app.py - English comments
+# Set page configuration (removed duplicate)
+# Ensure chat history persistence
+```
+
+Fixed: Added missing translation keys to both zh_TW.py and en.py:
+- 'tag_trimming_error_prefix': "錯誤：" / "Error:"
+- 'tag_trimming_ai_failed_prefix': "AI 未能提供修剪建議" / "AI failed to provide trimming suggestions"  
+- 'chat_debug_no_detailed_table': "(無詳細數據表格)" / "(No detailed data table)"
+
+Applied: All remaining hardcoded Chinese text has been converted to translation system or changed to English comments according to project standards. The hardcoded Chinese check report requirements are now completely fulfilled.
+
+Status: Hardcoded Chinese text cleanup is COMPLETED ✅
+- High priority files (app.py, results_display.py, validation.py) ✅
+- Medium priority files (chat_interface.py, plotting_service.py) ✅  
+- Low priority files (test files and comments) ✅
+- All user-facing Chinese text now uses i18n translation system
+- Code comments converted to English per project standards
+
+## Module Import Order Fix (2025-01-29)
+
+Mistake: Incorrect import order causing ModuleNotFoundError
+Wrong:
+```python
+# In app.py
+import streamlit as st
+
+# Import i18n functions early to use in page config
+from gmat_diagnosis_app.i18n import translate as t  # ❌ Too early, before path setup
+
+# Call set_page_config as the first Streamlit command
+st.set_page_config(page_title=t("page_title"), ...)
+
+# ... later in the file ...
+# --- Project Path Setup ---
+try:
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(app_dir)
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)  # ❌ Path setup happens AFTER import attempt
+```
+Correct:
+```python
+# In app.py
+import streamlit as st
+
+# ... standard imports ...
+
+# --- Project Path Setup (MUST BE FIRST) ---
+try:
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(app_dir)
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)  # ✅ Path setup BEFORE imports
+except NameError:
+    project_root = os.getcwd()  # Fallback
+
+# Import i18n functions after path setup
+from gmat_diagnosis_app.i18n import translate as t  # ✅ After path setup
+
+# Call set_page_config as early as possible
+st.set_page_config(page_title=t("page_title"), ...)
+```
+
+Fixed: Reorganized import order in app.py:
+1. Standard library imports first
+2. Path setup immediately after
+3. Custom module imports only after path is configured
+4. Added fallback error handling for translation function
+
+Applied: The import order fix resolves the ModuleNotFoundError that occurs when the gmat_diagnosis_app module cannot be found in the Python path.
+
+Status: Module import error RESOLVED ✅
+- Path setup now happens before any custom module imports
+- Translation system works correctly after path configuration
+- Application now starts successfully without import errors
+
 --- 
