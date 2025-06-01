@@ -562,16 +562,13 @@ TRANSLATIONS = {
     'Invalid/Excluded': "無效/已排除",
     'RC Reading Speed Poor: Group performance poor': "RC 閱讀速度差：整組表現不佳",
     'RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
-    'v_qualitative_analysis_suggestion': "**建議：** 如果您對報告中指出的某些問題仍感困惑，可以嘗試 **提供 2-3 題相關錯題的詳細解題流程跟思路範例** ，供顧問進行更深入的個案分析。",
-
-    # New English translation keys for failing Chinese strings
-    'rc_timing_individual_question_efficiency_severe_issue_full': "RC 時間個別題目效率嚴重問題：個別題目時間效率嚴重問題",
-    'carelessness_issue_high_fast_wrong_ratio': "粗心問題 (快而錯比例高)",
-    'rc_reading_speed_poor_group_performance_poor': "RC 閱讀速度差：整組表現不佳",
-
-    # === End DI Diagnostic Translations ===
+    'v_qualitative_analysis_suggestion': "由於部分診斷結果涉及複雜的語言理解或推理瓶頸，建議進一步進行質化分析，檢視實際做題過程的思路脈絡。",
+    'v_analysis_clear_note': "目前診斷模式相對清晰，可依上述建議進行改進。",
     
-    # DI Diagnostic Parameters - Error Types (Fast & Wrong / Normal Time & Wrong)
+    # V tip prefix for behavioral patterns
+    'v_tip_prefix': "提示：",
+    
+    # DI (Data Insights) Translation Keys
     'DI_READING_COMPREHENSION_ERROR__VOCABULARY': "DI 閱讀理解錯誤: 詞彙理解",
     'DI_READING_COMPREHENSION_ERROR__SYNTAX': "DI 閱讀理解錯誤: 句式理解",
     'DI_READING_COMPREHENSION_ERROR__LOGIC': "DI 閱讀理解錯誤: 邏輯理解",
@@ -685,6 +682,29 @@ TRANSLATIONS = {
     
     # DI main module
     'di_diagnosis_error_message': "DI 診斷過程中發生未預期錯誤",
+    
+    # DI report additional translations
+    'per_question_group': "題組",
+    'per_question': "題",
+    'foundation_instability_note': "*基礎掌握不穩*",
+    'current_challenge': "當前挑戰",
+    'suggested_direction': "建議方向", 
+    'suggested_time_limit': "建議限時",
+    'subsequent_action_and_reflection_guide': "四、 後續行動與深度反思指引",
+    'review_practice_record_secondary_evidence': "檢視練習記錄 (二級證據參考)",
+    'review_focus_core_issues': "題目是否反覆涉及報告第二部分（核心表現分析）指出的核心問題：",
+    'review_focus_general_errors': "根據核心表現分析，留意常見錯誤類型。",
+    'note': "注意",
+    'insufficient_sample_note': "如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。",
+    'guided_reflection_prompts_specific': "引導性反思提示 (針對特定題型與表現)",
+    'no_reflection_patterns_needed': "未發現需要特別反思的問題模式。請繼續保持良好表現。",
+    'seek_advanced_assistance_qualitative': "五、 尋求進階協助 (質化分析)",
+    'suggestion': "建議",
+    'qualitative_analysis_suggestion': "如果您對報告中指出的某些問題仍感困惑，可以嘗試提供 2-3 題相關錯題的詳細解題流程跟思路範例，供顧問進行更深入的個案分析。",
+    'analysis_clear_note': "目前分析結果較為清晰，若仍有疑問可隨時提出。",
+    'appears_times': "出現{}次",
+    'combined_recommendations': "合併建議",
+    'reflection_direction': "檢討方向",
     
     # === End DI Diagnostic Translations ===
     
@@ -810,6 +830,29 @@ TRANSLATIONS = {
     'csv_append_no_data': "沒有可附加到 gmat_performance_data.csv 的資料。",
     'subjective_report_error': "添加 {} 科目的主觀時間壓力報告到 CSV 時發生錯誤。",
     
+    # Analysis orchestrator status messages
+    'analysis_initializing': "初始化分析環境...",
+    'analysis_step_time_pressure': "步驟 {}/{}: 計算各科時間壓力指標與超時情況...",
+    'analysis_step_time_pressure_error': "步驟 {}/{}: 計算時間壓力時出錯。",
+    'analysis_step_data_preparation': "步驟 {}/{}: 處理原始數據並應用題目的答對/答錯調整...",
+    'analysis_step_data_preparation_error': "步驟 {}/{}: 準備模擬數據時出錯。",
+    'analysis_step_irt_simulation': "步驟 {}/{}: 執行 IRT 題目難度與能力值 (Theta) 模擬計算中...",
+    'analysis_step_irt_initialization': "步驟 {}/{}: 初始化 IRT 題庫與題目難度估算...",
+    'analysis_step_theta_generation': "步驟 {}/{}: 生成能力值 (Theta) 走勢圖與最終估計...",
+    'analysis_step_irt_error': "步驟 {}/{}: IRT 模擬過程中出錯。",
+    'analysis_step_diagnosis_preparation': "步驟 {}/{}: 篩選無效題目與準備診斷數據...",
+    'analysis_step_invalid_marking': "步驟 {}/{}: 標記無效題目與計算時間基準值...",
+    'analysis_step_data_splitting': "步驟 {}/{}: 將數據分割為各科目診斷格式...",
+    'analysis_step_diagnosis_preparation_error': "步驟 {}/{}: 科目診斷數據準備失敗。",
+    'analysis_step_diagnosis_execution': "步驟 {}/{}: 執行三科目診斷與報告生成...",
+    'analysis_step_q_diagnosis': "步驟 {}/{}: Q科目診斷中 - 計算時間表現、錯題模式與SFE...",
+    'analysis_step_v_diagnosis': "步驟 {}/{}: V科目診斷中 - 分析閱讀理解與批判性推理表現...",
+    'analysis_step_di_diagnosis': "步驟 {}/{}: DI科目診斷中 - 評估數據分析與圖表解讀能力...",
+    'analysis_step_ai_summary': "步驟 {}/{}: 使用AI整理診斷內容並生成匯總建議...",
+    'analysis_step_diagnosis_error': "步驟 {}/{}: 診斷過程失敗。",
+    'analysis_step_diagnosis_execution_error': "步驟 {}/{}: 執行診斷時出錯。",
+    'analysis_complete': "分析完成！共 {} 步驟全部處理完畢，請查看「結果查看」分頁。",
+    
     # Tutorial section translations
     'tutorial_title': "教學指引 📖",
     'tutorial_welcome_title': "### 歡迎使用 GMAT 成績診斷平台！",
@@ -933,6 +976,7 @@ TRANSLATIONS = {
     # Column display configuration
     'column_question_number': "題號",
     'column_question_number_help': "題目在測驗中的順序",
+    'column_subject': "科目",
     'column_question_type': "題型",
     'column_tested_ability': "考察能力",
     'column_simulated_difficulty': "模擬難度",
@@ -1318,5 +1362,35 @@ TRANSLATIONS = {
     # DI report review practice translations
     'di_review_practice_purpose': "**目的：** 當無法準確回憶具體的錯誤原因、涉及知識點，或需更客觀數據確認問題模式時。",
     'di_review_practice_method': "**方法：** 按照以上指引查看近期練習記錄，整理相關錯題或超時題目。",
+
+    # Regex patterns for report generation
+    'macro_recommendation_pattern': "宏觀建議",
+    'performance_gap_pattern': "由於整體表現有較大提升空間",
+    'consolidation_pattern': "建議全面鞏固",
+    'suggestion_prefix': "建議",
+    'time_limit_pattern': "建議限時",
+    'practice_recommendation_pattern': "建議練習",
+    'increase_practice_pattern': "建議增加.*?比例",
+    'initial_time_limit_pattern': "起始練習限時建議為",
+    'error_rate_pattern': "錯誤率",
+    'timeout_rate_pattern': "超時率", 
+    'or': "或",
+    'question_type_foundation': "題型的基礎",
+    'can_start_from': "可從",
+    'systematic_practice': "開始系統性練習",
+    'master_core_methods': "掌握核心方法",
+
+    # DI behavioral and analysis terms
+    'di_overall_improvement_space': "整體表現有較大提升空間",
+    'di_comprehensive_foundation_consolidation': "建議全面鞏固基礎",
+    'di_unknown_value': "未知",
+    'di_targeted_domain_question': "針對 **{}** 領域的 **{}** 題目 ({})",
+
+    # DI report generation additional translations
+    'unknown_target': "未知目標",
+    'minutes': "分鐘", 
+    'final_target_time': "最終目標時間",
+    'difficulty_level': "難度",
+    'difficulty_questions': "難度題目",
 
 } 

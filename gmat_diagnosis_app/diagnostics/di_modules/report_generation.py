@@ -187,68 +187,60 @@ def _generate_di_summary_report(di_results):
             q_type_eng_for_map = original_q_type_field # Default to original field
 
             if rec_type == 'macro':
-                q_type_match_macro = re.search(r"宏觀建議 \\((.*?)\\):", rec_text)
+                # Extract Q type from macro recommendations using translated patterns
+                q_type_match_macro = re.search(rf"{t('macro_recommendation_pattern')} \\((.*?)\\):", rec_text)
                 if q_type_match_macro:
-                    q_type_eng = q_type_match_macro.group(1).strip()
-                    q_type_zh = t(q_type_eng)
-                    q_type_eng_for_map = q_type_eng # Update for map lookup
-                # else q_type_eng_for_map remains original_q_type_field
-
-                challenge_match_macro = re.search(r"由於(整體表現有較大提升空間 \\(錯誤率 .*?% 或 超時率 .*?%\\))", rec_text)
-                if challenge_match_macro:
-                    challenge_text = challenge_match_macro.group(1).strip()
-
-                direction_match_macro = re.search(r"(建議全面鞏固.*?題型的基礎，可從.*?開始系統性練習，掌握核心方法)", rec_text)
-                if direction_match_macro:
-                    full_direction_text = direction_match_macro.group(1).strip()
-                    direction_text = full_direction_text[len("建議"):].strip() if full_direction_text.startswith("建議") else full_direction_text
+                    q_type_from_macro = q_type_match_macro.group(1)
                 
-                time_limit_match_macro = re.search(r"建議限時 \\*\\*(.*?分鐘)\\*\\*", rec_text)
+                # Extract challenge description from macro recommendations
+                current_challenge = ""
+                challenge_match_macro = re.search(rf"{t('performance_gap_pattern')} \\({t('error_rate_pattern')} .*?% {t('or')} {t('timeout_rate_pattern')} .*?%\\)", rec_text)
+                if challenge_match_macro:
+                    current_challenge = challenge_match_macro.group(1)
+                
+                # Extract direction from macro recommendations  
+                direction_match_macro = re.search(rf"({t('consolidation_pattern')}.*?{t('question_type_foundation')}，{t('can_start_from')}.*?{t('systematic_practice')}，{t('master_core_methods')})", rec_text)
+                if direction_match_macro:
+                    full_direction_text = direction_match_macro.group(1)
+                    direction_text = full_direction_text[len(t('suggestion_prefix')):].strip() if full_direction_text.startswith(t('suggestion_prefix')) else full_direction_text
+                
+                time_limit_match_macro = re.search(rf"{t('time_limit_pattern')} \\*\\*(.*?{t('minutes')})\\*\\*", rec_text)
                 if time_limit_match_macro:
-                    time_limit_text = time_limit_match_macro.group(1).strip()
+                    time_limit_text = time_limit_match_macro.group(1)
 
             elif rec_type == 'case_aggregated':
                 q_type_eng = original_q_type_field # Use type from the recommendation object
 
                 # Construct challenge_text from structured fields or parse rec_text
-                sfe_prefix = "*基礎掌握不穩* " if rec_original.get('is_sfe') else ""
+                sfe_prefix = f"{t('foundation_instability_note')} " if rec_original.get('is_sfe') else ""
                 domain_in_rec = t(rec_original.get('domain', 'Unknown Domain'))
                 # q_type_in_rec_zh = t(rec_original.get('question_type', 'Unknown Type')) # q_type_zh is already this
                 problem_desc_in_rec = t('di_unknown_value')
-                challenge_text = f"{sfe_prefix}針對 **{domain_in_rec}** 領域的 **{q_type_zh}** 題目 ({problem_desc_in_rec})"
+                challenge_text = f"{sfe_prefix}{t('di_targeted_domain_question').format(domain_in_rec, q_type_zh, problem_desc_in_rec)}"
                 
                 # Construct direction_text
                 difficulty_grade_in_rec = rec_original.get('difficulty_grade', '未知難度')
                 # Read the target time directly from the recommendation object
                 target_time_val = rec_original.get('target_time_minutes') # <-- READ FROM rec_original
                 
-                target_time_str = "未知目標" # Default if not found
+                target_time_str = t('unknown_target') # Default if not found
                 if pd.notna(target_time_val):
-                    target_time_str = f"{target_time_val:.1f} 分鐘" # Format the read value
+                    target_time_str = f"{target_time_val:.1f} {t('minutes')}" # Format the read value
                 
                 # Generate direction text using the structured difficulty and the read target time
-                direction_text = f"建議練習 **{difficulty_grade_in_rec}** 難度題目 (最終目標時間: {target_time_str})\"" # <-- USE target_time_str from rec_original
+                direction_text = f"{t('practice_recommendation_pattern')} **{difficulty_grade_in_rec}** {t('difficulty_questions')} ({t('final_target_time')}: {target_time_str})\"" # <-- USE target_time_str from rec_original
 
                 # Append focus note if present in rec_text (usually at the end)
                 # Use a non-capturing group for the space and make the note optional
-                focus_note_match = re.search(r"((?:\s|^)\\*\\*建議增加.*?比例。\\*\\*)$", rec_text)
+                focus_note_match = re.search(rf"((?:\s|^)\\*\\*{t('increase_practice_pattern')}\\*\\*)$", rec_text)
                 if focus_note_match:
                     # Append only the captured note itself
                     direction_text += focus_note_match.group(1) 
 
-
                 # Construct time_limit_text (Initial suggested time)
                 time_val_z = rec_original.get('time_limit_z')
                 if pd.notna(time_val_z):
-                    time_limit_text = f"{time_val_z:.1f} 分鐘"
-                else:
-                    # Fallback regex if field not present, though direct field is better
-                    time_limit_pattern_case = r"起始練習限時建議為 \\*\\*(.*?)\\*\\*"
-                    time_limit_match_case = re.search(time_limit_pattern_case, rec_text)
-                    if time_limit_match_case:
-                        time_limit_text = time_limit_match_case.group(1).strip()
-                    else:
-                        time_limit_text = t('di_na')
+                    time_limit_text = f"{time_val_z:.1f} {t('minutes')}"
             
             elif rec_type == 'exemption_note':
                 # q_type_eng_for_map is already original_q_type_field by default.
@@ -261,9 +253,9 @@ def _generate_di_summary_report(di_results):
             current_q_type_for_suffix = q_type_eng_for_map # Use the determined English q_type for suffix logic
             if time_limit_text and time_limit_text != t('di_na'): # Check if not None and not N/A
                 if current_q_type_for_suffix == "Multi-source reasoning":
-                    time_limit_text += "/題組"
+                    time_limit_text += f"/{t('per_question_group')}"
                 else:
-                    time_limit_text += "/題"
+                    time_limit_text += f"/{t('per_question')}"
             
             # --- New section_letter assignment logic ---
             section_letter = ""
@@ -287,7 +279,7 @@ def _generate_di_summary_report(di_results):
             #             pass # section_letter remains ""
             
             if rec_type == 'case_aggregated' and rec_original.get('is_sfe'):
-                title_line_content_for_type += " (*基礎掌握不穩*)"
+                title_line_content_for_type += f" ({t('foundation_instability_note')})"
 
             title_line = f"* **{section_letter} {title_line_content_for_type}**"
             
@@ -300,11 +292,11 @@ def _generate_di_summary_report(di_results):
             else:
                 # For other types (macro, case_aggregated), print challenge, direction, time limit
                 if challenge_text: 
-                    report_lines.append(f"    * **當前挑戰：** {challenge_text}")
+                    report_lines.append(f"    * **{t('current_challenge')}：** {challenge_text}")
                 if direction_text:
-                    report_lines.append(f"    * **建議方向：** {direction_text}")
+                    report_lines.append(f"    * **{t('suggested_direction')}：** {direction_text}")
                 if time_limit_text:
-                    report_lines.append(f"    * **建議限時：** {time_limit_text}")
+                    report_lines.append(f"    * **{t('suggested_time_limit')}：** {time_limit_text}")
             # --- END MODIFICATION for output ---
             report_lines.append("")
 
@@ -312,11 +304,11 @@ def _generate_di_summary_report(di_results):
 
 
     # --- IV. 後續行動與深度反思指引 ---
-    report_lines.append("**四、 後續行動與深度反思指引**")
+    report_lines.append(f"**{t('subsequent_action_and_reflection_guide')}**")
     report_lines.append("")
 
     # A. 檢視練習記錄 (二級證據參考)
-    report_lines.append("* **A. 檢視練習記錄 (二級證據參考)**")
+    report_lines.append(f"* **A. {t('review_practice_record_secondary_evidence')}**")
     if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
         report_lines.append(f"    * {t('di_review_practice_purpose')}")
         report_lines.append(f"    * {t('di_review_practice_method')}")
@@ -330,20 +322,20 @@ def _generate_di_summary_report(di_results):
         filtered_core_issues_for_review = [issue for issue in core_issue_texts_for_review if issue != t('di_invalid_data_tag')]
 
         if filtered_core_issues_for_review:
-             report_lines.append(f"    * **重點關注：** 題目是否反覆涉及報告第二部分（核心表現分析）指出的核心問題：")
+             report_lines.append(f"    * **{t('key_focus')}：** {t('review_focus_core_issues')}")
              for issue in filtered_core_issues_for_review:
                  report_lines.append(f"        * {issue}")
         else:
-            report_lines.append(f"    * **重點關注：** 根據核心表現分析，留意常見錯誤類型。")
+            report_lines.append(f"    * **{t('key_focus')}：** {t('review_focus_general_errors')}")
 
-        report_lines.append("    * **注意：** 如果樣本不足，請在接下來的做題中注意收集，以便更準確地定位問題。")
+        report_lines.append(f"    * **{t('note')}：** {t('insufficient_sample_note')}")
     else:
-        report_lines.append("    * (本次分析未發現需要二級證據深入探究的問題點，或數據不足)")
+        report_lines.append(f"    * {t('no_secondary_evidence_needed')}")
     report_lines.append("")
 
 
     # B. 引導性反思提示 (針對特定題型與表現)
-    report_lines.append("* **B. 引導性反思提示 (針對特定題型與表現)**")
+    report_lines.append(f"* **B. {t('guided_reflection_prompts_specific')}**")
     reflection_prompts_data = [] # Store tuples of (time_perf, domain, q_type, params_by_category)
 
     if diagnosed_df is not None and not diagnosed_df.empty:
@@ -392,11 +384,11 @@ def _generate_di_summary_report(di_results):
                         })
     
     if not reflection_prompts_data:
-        report_lines.append("    * 未發現需要特別反思的問題模式。請繼續保持良好表現。")
+        report_lines.append(f"    * {t('no_reflection_patterns_needed')}")
     else:
         for idx, prompt_data in enumerate(reflection_prompts_data):
             report_lines.append(f"    * **{idx + 1}. {prompt_data['domain_zh']} {prompt_data['q_type_zh']} ({prompt_data['time_perf_zh']})**")
-            report_lines.append(f"        * **檢討方向：**")
+            report_lines.append(f"        * **{t('reflection_direction')}：**")
             for category_zh, params_zh_list in prompt_data['categories'].items():
                 report_lines.append(f"            * 【{category_zh}】：{', '.join(params_zh_list)}")
             report_lines.append("") # Space after each reflection item block
@@ -404,7 +396,7 @@ def _generate_di_summary_report(di_results):
 
 
     # --- V. 尋求進階協助 (質化分析) ---
-    report_lines.append("**五、 尋求進階協助 (質化分析)**")
+    report_lines.append(f"**{t('seek_advanced_assistance_qualitative')}**")
     report_lines.append("")
     # Condition for showing this suggestion (can be adjusted)
     # Using a simplified condition based on existence of any core issues previously identified
@@ -416,9 +408,9 @@ def _generate_di_summary_report(di_results):
         show_qualitative_suggestion = True
         
     if show_qualitative_suggestion:
-        report_lines.append("* **建議：** 如果您對報告中指出的某些問題仍感困惑，可以嘗試提供 2-3 題相關錯題的詳細解題流程跟思路範例，供顧問進行更深入的個案分析。")
+        report_lines.append(f"* **{t('suggestion')}：** {t('qualitative_analysis_suggestion')}")
     else:
-        report_lines.append("* 目前分析結果較為清晰，若仍有疑問可隨時提出。")
+        report_lines.append(f"* {t('analysis_clear_note')}")
     report_lines.append("")
 
 

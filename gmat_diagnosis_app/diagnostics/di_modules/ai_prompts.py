@@ -90,7 +90,7 @@ def generate_di_ai_tool_recommendations_legacy(df_di: pd.DataFrame) -> str:
     already_recommended = set()  # 用於追踪已經推薦的工具，避免重複
     
     for tag, tools, count in matched_tags:
-        recommendation_text = f"**{tag}** ({t('v_appears_times').format(count)}):\n"
+        recommendation_text = f"**{tag}** ({t('appears_times').format(count)}):\n"
         
         tools_added = False
         for tool in tools:
@@ -133,7 +133,7 @@ def generate_di_ai_tool_recommendations(df_di: pd.DataFrame) -> str:
         if recommendations == f"({t('di_ai_analysis_unavailable')})" or recommendations.startswith(t('di_ai_fallback_message')):
             legacy_recommendations = generate_di_ai_tool_recommendations_legacy(df_di)
             if not legacy_recommendations.startswith(t('di_ai_fallback_message')) and legacy_recommendations != f"({t('di_ai_analysis_unavailable')})":
-                recommendations = f"**{t('di_ai_recommendation_context')}**\n{recommendations}\n\n**{t('v_ai_combined_recommendations')}**\n{legacy_recommendations}"
+                recommendations = f"**{t('di_ai_recommendation_context')}**\n{recommendations}\n\n**{t('combined_recommendations')}**\n{legacy_recommendations}"
         
         return recommendations
         

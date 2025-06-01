@@ -9,10 +9,10 @@ import numpy as np
 import plotly.graph_objects as go
 from gmat_diagnosis_app.utils.styling import apply_styles
 from gmat_diagnosis_app.utils.excel_utils import to_excel
-from gmat_diagnosis_app.constants.config import SUBJECTS, EXCEL_COLUMN_MAP
+from gmat_diagnosis_app.constants.config import SUBJECTS
+from gmat_diagnosis_app.i18n import translate as t
 from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
 from gmat_diagnosis_app.services.openai_service import trim_diagnostic_tags_with_openai
-from gmat_diagnosis_app.i18n import translate as t
 import logging
 import traceback # Added for more detailed error logging in download
 
@@ -62,7 +62,23 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     if df_subject is not None and not df_subject.empty:
         # Data preprocessing before table display
         subject_col_config = col_config.copy()
-        subject_excel_map = excel_map.copy()
+        
+        # Create translated excel_map dynamically
+        subject_excel_map = {
+            "Subject": t("column_subject"),
+            "question_position": t("column_question_number"),
+            "question_type": t("column_question_type"),
+            "question_fundamental_skill": t("column_tested_ability"),
+            "question_difficulty": t("column_simulated_difficulty"),
+            "question_time": t("column_response_time_minutes"),
+            "time_performance_category": t("column_time_performance"),
+            "content_domain": t("column_content_domain"),
+            "diagnostic_params_list": t("column_diagnostic_tags"),
+            "is_correct": t("column_is_correct"),
+            "is_sfe": t("column_is_sfe"),
+            "is_invalid": t("column_is_invalid"),
+            "overtime": "overtime_flag",  # Internal flag for Excel styling, will be hidden by to_excel
+        }
         
         # Copy dataframe to avoid modifying original data
         df_display = df_subject.copy()
@@ -165,7 +181,7 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
 
     # 4. Download Button (same for all subjects)
     try:
-        # Prepare a copy specifically for Excel export using excel_map
+        # Prepare a copy specifically for Excel export using subject_excel_map
         df_for_excel = df_subject.copy() # First copy complete df_subject
 
         # Important: Ensure is_invalid in df_for_excel also follows is_manually_invalid
@@ -180,8 +196,8 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         if 'is_invalid' in df_for_excel.columns:
             df_for_excel['is_invalid'] = df_for_excel['is_invalid'].astype(bool)
             
-        # Filter columns by excel_map (after is_invalid update)
-        df_for_excel = df_for_excel[[k for k in excel_map.keys() if k in df_for_excel.columns]].copy()
+        # Filter columns by subject_excel_map (after is_invalid update)
+        df_for_excel = df_for_excel[[k for k in subject_excel_map.keys() if k in df_for_excel.columns]].copy()
         
         # Ensure sorted by question number
         if 'question_position' in df_for_excel.columns:
@@ -210,7 +226,7 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
             
         invalid_count = (df_for_excel['is_invalid'] == 'True').sum() if 'is_invalid' in df_for_excel.columns else 0
                 
-        excel_bytes = to_excel(df_for_excel, excel_map)
+        excel_bytes = to_excel(df_for_excel, subject_excel_map)
         
         today_str = pd.Timestamp.now().strftime('%Y%m%d')
         tab_container.download_button(
@@ -636,7 +652,7 @@ def display_results():
         try:
             actual_tab_index_for_subject = tab_titles.index(subject_tab_title)
             with tabs[actual_tab_index_for_subject]:
-                display_subject_results(subject, tabs[actual_tab_index_for_subject], report_md, df_subject, COLUMN_DISPLAY_CONFIG, EXCEL_COLUMN_MAP)
+                display_subject_results(subject, tabs[actual_tab_index_for_subject], report_md, df_subject, COLUMN_DISPLAY_CONFIG, {})
         except ValueError:
             st.error(t('display_results_tab_not_found_error').format(subject_tab_title, tab_titles))
 
@@ -979,16 +995,33 @@ def display_results():
                                     logging.info("[Download Edited] Merge not needed or not possible.")
 
                                 # --- Prepare final map and select columns based on internal names AFTER merge ---
+                                # Create translated excel_map dynamically
+                                translated_excel_column_map = {
+                                    "Subject": t("column_subject"),
+                                    "question_position": t("column_question_number"),
+                                    "question_type": t("column_question_type"),
+                                    "question_fundamental_skill": t("column_tested_ability"),
+                                    "question_difficulty": t("column_simulated_difficulty"),
+                                    "question_time": t("column_response_time_minutes"),
+                                    "time_performance_category": t("column_time_performance"),
+                                    "content_domain": t("column_content_domain"),
+                                    "diagnostic_params_list": t("column_diagnostic_tags"),
+                                    "is_correct": t("column_is_correct"),
+                                    "is_sfe": t("column_is_sfe"),
+                                    "is_invalid": t("column_is_invalid"),
+                                    "overtime": "overtime_flag",  # Internal flag for Excel styling, will be hidden by to_excel
+                                }
+                                
                                 final_internal_columns_to_export = [
                                     internal_name
-                                    for internal_name in EXCEL_COLUMN_MAP.keys() # Use defined export order/keys
+                                    for internal_name in translated_excel_column_map.keys() # Use defined export order/keys
                                     if internal_name in df_to_export.columns # Check if column exists after merge
                                 ]
                                 df_to_export_final = df_to_export[final_internal_columns_to_export].copy() # Select final columns with internal names
 
                                 # Create the map only for the selected columns
                                 excel_column_map_for_export_final = {
-                                    internal_name: EXCEL_COLUMN_MAP[internal_name]
+                                    internal_name: translated_excel_column_map[internal_name]
                                     for internal_name in final_internal_columns_to_export
                                 }
                                 logging.info(f"[Download Edited] Final internal columns selected: {final_internal_columns_to_export}")

@@ -46,7 +46,7 @@ def get_client_ip():
         # elif hasattr(session_client, '_forwarded_for_ip'): # example
         #     return session_client._forwarded_for_ip
         else:
-            st.warning("無法從客戶端資訊中直接讀取 IP 位址。將使用開發用預設 IP。")
+            # Removed warning message about not being able to read IP directly
             # Fallback for local development (use with caution, only for trusted local env)
             return "local_development_ip"
 

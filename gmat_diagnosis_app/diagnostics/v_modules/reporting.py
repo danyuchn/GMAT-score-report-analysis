@@ -229,12 +229,12 @@ def generate_v_summary_report(v_diagnosis_results):
     pattern_found = False
     if early_rushing_flag:
          early_rush_param_translated = t('BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
-         report_lines.append(f"    * **提示：** {early_rush_param_translated} - {t('v_early_rush_advice')}。")
+         report_lines.append(f"    * **{t('v_tip_prefix')}** {early_rush_param_translated} - {t('v_early_rush_advice')}。")
          pattern_found = True
     if carelessness_issue:
         careless_param_translated = t('BEHAVIOR_CARELESSNESS_ISSUE')
         fast_wrong_rate_str = format_rate(fast_wrong_rate) if fast_wrong_rate is not None else "N/A"
-        report_lines.append(f"    * **提示：** {careless_param_translated} - {t('v_careless_advice').format(fast_wrong_rate_str)}。")
+        report_lines.append(f"    * **{t('v_tip_prefix')}** {careless_param_translated} - {t('v_careless_advice').format(fast_wrong_rate_str)}。")
         pattern_found = True
     if not pattern_found:
         report_lines.append(f"    * {t('v_no_obvious_behavioral_patterns')}")

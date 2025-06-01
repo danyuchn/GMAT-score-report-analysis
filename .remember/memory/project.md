@@ -249,4 +249,47 @@ The GMAT diagnosis system is now fully internationalized with:
 
 **Task Status: COMPLETE - Hardcoded Chinese text conversion to i18n system successfully finished across all core application modules.**
 
+## 硬編碼中文問題解決狀況 (2025-01-29)
+
+**Status: COMPLETED ✅ - 表格欄位標題國際化已完成**
+
+成功解決了使用者反映的 spreadsheet column title 硬編碼中文問題：
+
+### 問題描述：
+- 表格欄位標題（題號、題型、考察能力、模擬難度、作答時間(分)、時間表現、內容領域、診斷標籤）仍然顯示為硬編碼中文
+- 即使切換到英文介面，表格標題仍然是中文
+
+### 實作內容：
+1. **修改 results_display.py**：
+   - 將 `display_subject_results` 函數中的 `EXCEL_COLUMN_MAP` 替換為動態生成的翻譯映射
+   - 編輯頁面下載功能也改用動態翻譯映射
+   - 移除對硬編碼 `EXCEL_COLUMN_MAP` 的依賴
+
+2. **添加翻譯鍵**：
+   - `zh_TW.py` 和 `en.py` 中添加 `column_subject` 翻譯鍵
+   - 重新添加 `v_tip_prefix` 翻譯鍵（因為 V 診斷模組仍在使用）
+
+3. **動態映射結構**：
+```python
+subject_excel_map = {
+    "Subject": t("column_subject"),
+    "question_position": t("column_question_number"),
+    "question_type": t("column_question_type"),
+    "question_fundamental_skill": t("column_tested_ability"),
+    "question_difficulty": t("column_simulated_difficulty"),
+    "question_time": t("column_response_time_minutes"),
+    "time_performance_category": t("column_time_performance"),
+    "content_domain": t("column_content_domain"),
+    "diagnostic_params_list": t("column_diagnostic_tags"),
+    # ... 其他欄位
+}
+```
+
+### 技術效果：
+- **即時語言切換**：表格欄位標題現在會根據使用者選擇的語言即時更新
+- **完整國際化**：Excel 下載檔案的欄位標題也會使用正確的語言
+- **一致性**：所有表格顯示和下載功能都使用統一的翻譯系統
+
+**結果**：GMAT 診斷系統的表格欄位標題現在完全支援雙語切換，解決了使用者反映的硬編碼中文問題。整個系統的國際化實作已經達到完整狀態。
+
 --- 

@@ -327,7 +327,7 @@ TRANSLATIONS = {
     
     # DI Report - Practice Recommendations
     'di_no_practice_recommendations': "Based on current analysis, no specific practice recommendations. Please maintain comprehensive review.",
-    'di_overall_improvement_space': "Overall performance has significant room for improvement",
+    'di_overall_improvement_space': "Significant room for improvement in overall performance",
     'di_comprehensive_foundation_consolidation': "Recommend comprehensive foundation consolidation",
     'di_macro_recommendation_prefix': "Macro Recommendation",
     'di_due_to_performance': "Due to",
@@ -339,22 +339,22 @@ TRANSLATIONS = {
     'di_na': "N/A",
     
     # DI AI Prompts and Recommendations
-    'di_ai_analysis_available': "AI Deep Analysis Available",
-    'di_ai_analysis_unavailable': "AI Deep Analysis Currently Unavailable",
-    'di_ai_recommendation_context': "Recommended analysis tools based on DI diagnosis results:",
-    'di_ai_tool_context': "Recommended AI tools based on your diagnostic labels: {}",
-    'di_ai_fallback_message': "If AI tools are inaccessible, please refer to the diagnostic report for manual analysis.",
+    'di_ai_analysis_available': "AI In-depth Analysis Available",
+    'di_ai_analysis_unavailable': "AI In-depth Analysis Currently Unavailable",
+    'di_ai_recommendation_context': "Recommended Analysis Tools Based on DI Diagnostic Results:",
+    'di_ai_tool_context': "Recommended AI tools based on your diagnostic tags: {}",
+    'di_ai_fallback_message': "If AI tools are not accessible, please refer to the diagnostic report for manual analysis.",
     
     # DI Utility Functions
     'di_format_rate_percent': "{}%",
     'di_unknown_value': "Unknown",
     
     # Additional DI Constants
-    'di_invalid_data_tag': "Invalid Data: Too Short Response Time (DI: Affected by Time Pressure)",
+    'di_invalid_data_tag': "Invalid Data: Short Response Time (DI: Affected by Time Pressure)",
     'di_max_allowed_time': "45.0",
     
     # DI main module
-    'di_diagnosis_error_message': "An unexpected error occurred during DI diagnosis",
+    'di_diagnosis_error_message': "Unexpected error occurred during DI diagnosis",
     
     # AI prompts module translations
     'no_data_for_analysis': "(No data available for analysis)",
@@ -806,9 +806,9 @@ TRANSLATIONS = {
     'analysis_flow_step4': "4. **View Results**: View results here after analysis completion",
     
     # CSV related translations
-    'csv_append_error': "Error occurred while adding data to CSV",
-    'csv_append_no_data': "No data to add to CSV",
-    'subjective_report_error': "Error occurred while adding {} subject subjective report",
+    'csv_append_error': "Error appending data to gmat_performance_data.csv.",
+    'csv_append_no_data': "No data available to append to gmat_performance_data.csv.",
+    'subjective_report_error': "Error adding {} subject subjective time pressure report to CSV.",
     
     # Data source label
     'data_source_label': "Sample Data",
@@ -825,6 +825,7 @@ TRANSLATIONS = {
     # Column display configuration
     'column_question_number': "Question #",
     'column_question_number_help': "Question sequence in the test",
+    'column_subject': "Subject",
     'column_question_type': "Question Type",
     'column_tested_ability': "Tested Ability",
     'column_simulated_difficulty': "Simulated Difficulty",
@@ -1203,6 +1204,84 @@ including updated content from the "Edit Diagnostic Labels" tab (if you have edi
 
     # DI report review practice translations
     'di_review_practice_purpose': "**Purpose:** When you cannot accurately recall specific error causes, involved knowledge points, or need more objective data to confirm problem patterns.",
-    'di_review_practice_method': "**Method:** Follow the above guidance to review recent practice records and organize related incorrect or overtime questions.",
+    'di_review_practice_method': "**Method:** Review recent practice records as guided above, and organize related incorrect or overtime questions.",
 
+    # V tip prefix for behavioral patterns
+    'v_tip_prefix': "Tip:",
+
+    # Additional error messages and status messages for app.py
+    'analysis_initializing': "Initializing analysis environment...",
+    'analysis_step_time_pressure': "Step {}/{}: Calculating time pressure indicators and overtime situations for each subject...",
+    'analysis_step_time_pressure_error': "Step {}/{}: Error occurred while calculating time pressure.",
+    'analysis_step_data_preparation': "Step {}/{}: Processing raw data and applying correct/incorrect adjustments...",
+    'analysis_step_data_preparation_error': "Step {}/{}: Error occurred while preparing simulation data.",
+    'analysis_step_irt_simulation': "Step {}/{}: Executing IRT question difficulty and ability (Theta) simulation calculations...",
+    'analysis_step_irt_initialization': "Step {}/{}: Initializing IRT question bank and difficulty estimation...",
+    'analysis_step_theta_generation': "Step {}/{}: Generating ability (Theta) trend charts and final estimates...",
+    'analysis_step_irt_error': "Step {}/{}: Error occurred during IRT simulation process.",
+    'analysis_step_diagnosis_preparation': "Step {}/{}: Filtering invalid questions and preparing diagnostic data...",
+    'analysis_step_invalid_marking': "Step {}/{}: Marking invalid questions and calculating time baselines...",
+    'analysis_step_data_splitting': "Step {}/{}: Splitting data into subject-specific diagnostic formats...",
+    'analysis_step_diagnosis_preparation_error': "Step {}/{}: Subject diagnostic data preparation failed.",
+    'analysis_step_diagnosis_execution': "Step {}/{}: Executing three-subject diagnosis and report generation...",
+    'analysis_step_q_diagnosis': "Step {}/{}: Q subject diagnosis in progress - calculating time performance, error patterns, and SFE...",
+    'analysis_step_v_diagnosis': "Step {}/{}: V subject diagnosis in progress - analyzing reading comprehension and critical reasoning performance...",
+    'analysis_step_di_diagnosis': "Step {}/{}: DI subject diagnosis in progress - evaluating data analysis and chart interpretation abilities...",
+    'analysis_step_ai_summary': "Step {}/{}: Using AI to organize diagnostic content and generate summary recommendations...",
+    'analysis_step_diagnosis_error': "Step {}/{}: Diagnosis process failed.",
+    'analysis_step_diagnosis_execution_error': "Step {}/{}: Error occurred while executing diagnosis.",
+    'analysis_complete': "Analysis complete! All {} steps have been processed. Please check the 'Results View' tab.",
+
+    # DI report additional translations
+    'per_question_group': "per question group",
+    'per_question': "per question",
+    'foundation_instability_note': "*Foundation Mastery Instability*",
+    'current_challenge': "Current Challenge",
+    'suggested_direction': "Suggested Direction", 
+    'suggested_time_limit': "Suggested Time Limit",
+    'subsequent_action_and_reflection_guide': "IV. Subsequent Actions and Deep Reflection Guidelines",
+    'review_practice_record_secondary_evidence': "Review Practice Records (Secondary Evidence Reference)",
+    'review_focus_core_issues': "Whether questions repeatedly involve core issues identified in Section II (Core Performance Analysis):",
+    'review_focus_general_errors': "Based on core performance analysis, pay attention to common error types.",
+    'note': "Note",
+    'insufficient_sample_note': "If the sample is insufficient, please pay attention to collecting data in future practice for more accurate problem identification.",
+    'guided_reflection_prompts_specific': "Guided Reflection Prompts (Specific to Question Types and Performance)",
+    'no_reflection_patterns_needed': "No specific problem patterns requiring reflection found. Continue maintaining good performance.",
+    'seek_advanced_assistance_qualitative': "V. Seek Advanced Assistance (Qualitative Analysis)",
+    'suggestion': "Suggestion",
+    'qualitative_analysis_suggestion': "If you are still confused about some problems identified in the report, you can try providing 2-3 related wrong questions with detailed problem-solving processes and thinking examples for consultants to conduct more in-depth case analysis.",
+    'analysis_clear_note': "Current analysis results are relatively clear. Feel free to ask if you have any questions.",
+    'appears_times': "appears {} times",
+    'combined_recommendations': "Combined Recommendations",
+    'reflection_direction': "Reflection Direction",
+
+    # Regex patterns for report generation
+    'macro_recommendation_pattern': "Macro Recommendation",
+    'performance_gap_pattern': "Due to significant room for improvement in overall performance",
+    'consolidation_pattern': "Recommend comprehensive consolidation",
+    'suggestion_prefix': "Recommend",
+    'time_limit_pattern': "Suggested time limit",
+    'practice_recommendation_pattern': "Recommend practicing",
+    'increase_practice_pattern': "Recommend increasing.*?proportion",
+    'initial_time_limit_pattern': "Initial practice time limit recommended",
+    'error_rate_pattern': "error rate",
+    'timeout_rate_pattern': "timeout rate",
+    'or': "or",
+    'question_type_foundation': "question type foundation", 
+    'can_start_from': "can start from",
+    'systematic_practice': "systematic practice",
+    'master_core_methods': "master core methods",
+
+    # DI report generation additional translations
+    'unknown_target': "Unknown Target",
+    'minutes': "minutes", 
+    'final_target_time': "Final Target Time",
+    'difficulty_level': "difficulty",
+    'difficulty_questions': "difficulty questions",
+
+    # DI behavioral and analysis terms
+    'di_overall_improvement_space': "Significant room for improvement in overall performance",
+    'di_comprehensive_foundation_consolidation': "Recommend comprehensive foundation consolidation",
+    'di_unknown_value': "Unknown",
+    'di_targeted_domain_question': "For **{}** domain **{}** questions ({})",
 }
