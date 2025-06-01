@@ -453,3 +453,85 @@ df_diagnosed.loc[q_type_mask, 'time_performance_category'] = processed_df['time_
 2. ✅ 保持了診斷邏輯的完整性
 3. ✅ 避免了索引對齊問題
 4. ✅ 確保了只更新必要的欄位
+
+## DI科診斷標籤映射邏輯與標準文件一致性修復 (2025-01-30)
+
+**Status: COMPLETED ✅**
+
+Successfully aligned DI module diagnostic tag mapping logic with `diagnostic_tags_summary.md` standard.
+
+### 問題描述:
+用戶要求確保DI科的診斷標籤映射邏輯與 `diagnostic_tags_summary.md` 文檔中的標準完全一致，特別是基於 `(時間表現類別, 題型, 內容領域)` 的精確標籤分配。
+
+### 修復過程:
+
+**1. 建立完整的DI_PARAM_ASSIGNMENT_RULES字典:**
+- 實現基於 `(time_category, question_type, content_domain)` 的精確標籤映射
+- 覆蓋所有時間表現類別: Fast & Wrong, Normal Time & Wrong, Slow & Wrong, Slow & Correct
+- 支援所有DI題型: Data Sufficiency, Two-part analysis, Graph and Table, Multi-source reasoning
+- 區分內容領域: Math Related, Non-Math Related
+
+**2. 修正行為標籤檢測邏輯:**
+
+Mistake: 行為標籤檢測邏輯不符合標準文件規定
+Wrong:
+```python
+# 粗心檢測使用錯誤的計算基準
+fast_wrong_rate = fast_wrong_count / total_valid  # 使用全部有效題目作分母
+
+# 早期衝刺檢測邏輯過於簡化
+if q_time < avg_time * 0.5:  # 使用平均時間50%作標準
+```
+
+Correct:
+```python
+# 粗心檢測使用正確的計算基準 - 符合標準文件
+total_fast_questions = fast_wrong_mask.sum() + fast_correct_mask.sum()
+fast_wrong_rate = fast_wrong_count / total_fast_questions  # 使用快速作答題目作分母
+
+# 早期衝刺檢測基於前1/3題目且用時<1分鐘
+first_third_count = max(1, total_questions // 3)
+if q_time < 1.0:  # 用時 < 1分鐘
+```
+
+**3. 確保標籤名稱完全符合標準:**
+- SFE標籤: `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`
+- 行為標籤: `DI_BEHAVIOR_CARELESSNESS_ISSUE`, `DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK`
+- 具體題目粗心標籤: `DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION`
+
+**4. 實現MSR題型特殊處理:**
+- MSR題型在 Normal Time & Wrong 和 Slow & Wrong 類別中添加 `DI_MULTI_SOURCE_INTEGRATION_ERROR`
+- MSR題型在困難類標籤中添加 `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION`
+
+### 關鍵改進:
+
+**精確的時間表現分類映射:**
+```python
+DI_PARAM_ASSIGNMENT_RULES = {
+    ('Fast & Wrong', 'Data Sufficiency', 'Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        # ... 完整標籤列表
+    ],
+    # ... 覆蓋所有 (時間類別, 題型, 領域) 組合
+}
+```
+
+**改進的行為模式檢測:**
+- 粗心問題觸發閾值: 快錯率 > 25% (基於快速作答題目)
+- 早期衝刺檢測: 前1/3題目中存在用時<1分鐘的題目
+- 具體題目標籤: Fast & Wrong 題目自動添加細節忽略標籤
+
+**標準化的標籤分配邏輯:**
+- 基於標準化的題型和領域名稱映射
+- 精確的時間表現類別計算
+- 符合MD文檔的完整標籤集合
+
+### 修復效果:
+1. ✅ DI科診斷標籤映射邏輯完全符合 `diagnostic_tags_summary.md` 標準
+2. ✅ 所有標籤名稱與文檔完全一致
+3. ✅ 行為標籤檢測邏輯精確實現標準要求
+4. ✅ MSR題型特殊標籤正確處理
+5. ✅ SFE檢測邏輯與V科、Q科保持一致
+
+**Result**: DI科診斷模組現在完全符合診斷標籤摘要文件的標準，提供精確且一致的診斷標籤分配。

@@ -8,6 +8,7 @@ import numpy as np
 import math # Keep math for _check_foundation_override if it moves here later
 import logging
 from collections import defaultdict
+from typing import Dict, List, Tuple, Optional, Any
 
 # # Basic logging configuration to ensure INFO messages are displayed within this module # Removed by AI
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(module)s - %(funcName)s - %(lineno)d - %(message)s') # Removed by AI
@@ -25,6 +26,378 @@ from .utils import grade_difficulty_di, format_rate
 # Define threshold for hasty guessing
 HASTY_GUESSING_THRESHOLD_MINUTES = 0.5
 
+# DI 診斷標籤分配規則 - 基於 diagnostic_tags_summary.md 標準
+DI_PARAM_ASSIGNMENT_RULES = {
+    # Fast & Wrong - 錯誤類標籤
+    ('Fast & Wrong', 'Data Sufficiency', 'Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX', 
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Fast & Wrong', 'Data Sufficiency', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC', 
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    ('Fast & Wrong', 'Two-part analysis', 'Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN', 
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Fast & Wrong', 'Two-part analysis', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    ('Fast & Wrong', 'Graph and Table', 'Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Fast & Wrong', 'Graph and Table', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY', 
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    ('Fast & Wrong', 'Multi-source reasoning', 'Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE', 
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Fast & Wrong', 'Multi-source reasoning', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    
+    # Normal Time & Wrong - 錯誤類標籤 + MSR特殊標籤
+    ('Normal Time & Wrong', 'Data Sufficiency', 'Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH', 
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Normal Time & Wrong', 'Data Sufficiency', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    ('Normal Time & Wrong', 'Two-part analysis', 'Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Normal Time & Wrong', 'Two-part analysis', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    ('Normal Time & Wrong', 'Graph and Table', 'Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Normal Time & Wrong', 'Graph and Table', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    ('Normal Time & Wrong', 'Multi-source reasoning', 'Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH',
+        'DI_MULTI_SOURCE_INTEGRATION_ERROR'  # MSR 特殊標籤
+    ],
+    ('Normal Time & Wrong', 'Multi-source reasoning', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH',
+        'DI_MULTI_SOURCE_INTEGRATION_ERROR'  # MSR 特殊標籤
+    ],
+    
+    # Slow & Wrong - 困難類標籤 + 錯誤類標籤
+    ('Slow & Wrong', 'Data Sufficiency', 'Math Related'): [
+        # 困難類標籤
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH',
+        'DI_CALCULATION_DIFFICULTY__MATH',
+        # 錯誤類標籤
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Slow & Wrong', 'Data Sufficiency', 'Non-Math Related'): [
+        # 困難類標籤
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH',
+        # 錯誤類標籤
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    ('Slow & Wrong', 'Two-part analysis', 'Math Related'): [
+        # 困難類標籤
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH',
+        'DI_CALCULATION_DIFFICULTY__MATH',
+        # 錯誤類標籤
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Slow & Wrong', 'Two-part analysis', 'Non-Math Related'): [
+        # 困難類標籤
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH',
+        # 錯誤類標籤
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    ('Slow & Wrong', 'Graph and Table', 'Math Related'): [
+        # 困難類標籤
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+        'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH',
+        'DI_CALCULATION_DIFFICULTY__MATH',
+        # 錯誤類標籤
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Slow & Wrong', 'Graph and Table', 'Non-Math Related'): [
+        # 困難類標籤
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+        'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH',
+        # 錯誤類標籤
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    ('Slow & Wrong', 'Multi-source reasoning', 'Math Related'): [
+        # 困難類標籤 (包含MSR特殊標籤)
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION',  # MSR特殊困難標籤
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+        'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH',
+        'DI_CALCULATION_DIFFICULTY__MATH',
+        # 錯誤類標籤
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_CONCEPT_APPLICATION_ERROR__MATH',
+        'DI_CALCULATION_ERROR__MATH'
+    ],
+    ('Slow & Wrong', 'Multi-source reasoning', 'Non-Math Related'): [
+        # 困難類標籤 (包含MSR特殊標籤)
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION',  # MSR特殊困難標籤
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+        'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH',
+        # 錯誤類標籤
+        'DI_READING_COMPREHENSION_ERROR__VOCABULARY',
+        'DI_READING_COMPREHENSION_ERROR__SYNTAX',
+        'DI_READING_COMPREHENSION_ERROR__LOGIC',
+        'DI_READING_COMPREHENSION_ERROR__DOMAIN',
+        'DI_GRAPH_INTERPRETATION_ERROR__GRAPH',
+        'DI_GRAPH_INTERPRETATION_ERROR__TABLE',
+        'DI_LOGICAL_REASONING_ERROR__NON_MATH'
+    ],
+    
+    # Slow & Correct - 僅困難類標籤
+    ('Slow & Correct', 'Data Sufficiency', 'Math Related'): [
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH',
+        'DI_CALCULATION_DIFFICULTY__MATH'
+    ],
+    ('Slow & Correct', 'Data Sufficiency', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'
+    ],
+    ('Slow & Correct', 'Two-part analysis', 'Math Related'): [
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH',
+        'DI_CALCULATION_DIFFICULTY__MATH'
+    ],
+    ('Slow & Correct', 'Two-part analysis', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'
+    ],
+    ('Slow & Correct', 'Graph and Table', 'Math Related'): [
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+        'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH',
+        'DI_CALCULATION_DIFFICULTY__MATH'
+    ],
+    ('Slow & Correct', 'Graph and Table', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+        'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'
+    ],
+    ('Slow & Correct', 'Multi-source reasoning', 'Math Related'): [
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION',  # MSR特殊困難標籤
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+        'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH',
+        'DI_CALCULATION_DIFFICULTY__MATH'
+    ],
+    ('Slow & Correct', 'Multi-source reasoning', 'Non-Math Related'): [
+        'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY',
+        'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX',
+        'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC',
+        'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED',
+        'DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION',  # MSR特殊困難標籤
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH',
+        'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE',
+        'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH'
+    ]
+}
 
 def diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
     """
@@ -91,7 +464,7 @@ def diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
 def process_question_type(q_type_df, q_type, avg_times, max_diffs, ch1_thresholds):
     """
     Process diagnostic logic for a specific question type.
-    Implementation of DI Chapter 3 diagnostic rules.
+    Implementation of DI Chapter 3 diagnostic rules following diagnostic_tags_summary.md standard.
     """
     # Make a copy to avoid modifying input data
     processed_df = q_type_df.copy()
@@ -148,34 +521,32 @@ def process_question_type(q_type_df, q_type, avg_times, max_diffs, ch1_threshold
                 
                 if pd.notna(max_correct_diff) and q_difficulty < max_correct_diff:
                     processed_df.at[idx, 'is_sfe'] = True
-                    if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE' not in current_params:
-                        current_params.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE')
+                    sfe_tag = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE'
+                    if sfe_tag not in current_params:
+                        current_params.insert(0, sfe_tag)
             
-            # 2. Add time-based diagnostic parameters
+            # 2. Add basic time-based diagnostic parameters (hasty guessing, etc.)
             if pd.notna(q_time):
-                # Hasty guessing detection
+                # Hasty guessing detection - 使用正確的標籤名稱
                 if q_time < HASTY_GUESSING_THRESHOLD_MINUTES:
-                    if 'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK' not in current_params:
-                        current_params.append('DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
-                
-                # Add specific diagnostic parameters based on time category and question type
-                time_specific_params = get_time_specific_parameters(
-                    q_type, time_category, content_domain, is_correct, is_overtime
-                )
-                
-                for param in time_specific_params:
-                    if param not in current_params:
-                        current_params.append(param)
+                    rushing_tag = 'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK'
+                    if rushing_tag not in current_params:
+                        current_params.append(rushing_tag)
             
-            # 3. Add difficulty-based parameters
-            if pd.notna(q_difficulty):
-                difficulty_params = get_difficulty_specific_parameters(
-                    q_type, q_difficulty, is_correct, content_domain
-                )
-                
-                for param in difficulty_params:
-                    if param not in current_params:
-                        current_params.append(param)
+            # 3. Add precise diagnostic parameters based on (time_category, question_type, content_domain)
+            # This follows the exact rules defined in diagnostic_tags_summary.md
+            normalized_q_type = normalize_question_type(q_type)
+            normalized_domain = normalize_content_domain(content_domain)
+            
+            lookup_key = (time_category, normalized_q_type, normalized_domain)
+            
+            # Get parameters from the rules dictionary
+            time_specific_params = DI_PARAM_ASSIGNMENT_RULES.get(lookup_key, [])
+            
+            # Add each parameter if not already present
+            for param in time_specific_params:
+                if param not in current_params:
+                    current_params.append(param)
         
         else:
             # For invalid rows, ensure they have the invalid tag
@@ -190,6 +561,49 @@ def process_question_type(q_type_df, q_type, avg_times, max_diffs, ch1_threshold
     override_info = calculate_override_conditions(processed_df, q_type)
     
     return processed_df, override_info
+
+
+def normalize_question_type(q_type: str) -> str:
+    """Normalize question type to match the rules dictionary."""
+    if pd.isna(q_type):
+        return 'Unknown'
+    
+    # Map various forms to standard names
+    q_type_mapping = {
+        'Data Sufficiency': 'Data Sufficiency',
+        'Two-part analysis': 'Two-part analysis', 
+        'Graph and Table': 'Graph and Table',
+        'Multi-source reasoning': 'Multi-source reasoning',
+        'DS': 'Data Sufficiency',
+        'TPA': 'Two-part analysis',
+        'GT': 'Graph and Table',
+        'G&T': 'Graph and Table',
+        'MSR': 'Multi-source reasoning'
+    }
+    
+    return q_type_mapping.get(str(q_type).strip(), str(q_type).strip())
+
+
+def normalize_content_domain(content_domain: str) -> str:
+    """Normalize content domain to match the rules dictionary."""
+    if pd.isna(content_domain):
+        return 'Unknown'
+    
+    # Map various forms to standard names
+    domain_mapping = {
+        'Math Related': 'Math Related',
+        'Math related': 'Math Related',
+        'Math-related': 'Math Related',
+        'Mathematical': 'Math Related',
+        'Non-Math Related': 'Non-Math Related',
+        'Non-Math related': 'Non-Math Related',
+        'Non-mathematical': 'Non-Math Related',
+        'Textual': 'Non-Math Related',
+        'Logical': 'Non-Math Related'
+    }
+    
+    domain_str = str(content_domain).strip()
+    return domain_mapping.get(domain_str, domain_str)
 
 
 def calculate_time_performance_category(q_time, is_correct, is_overtime, avg_time):
@@ -383,6 +797,7 @@ def calculate_override_conditions(processed_df, q_type):
 def observe_di_patterns(df, avg_times):
     """
     Chapter 4 logic: Observe behavioral patterns in DI data.
+    Implementation following diagnostic_tags_summary.md behavioral pattern standards.
     
     Args:
         df: The diagnosed DataFrame
@@ -405,35 +820,55 @@ def observe_di_patterns(df, avg_times):
     if valid_df.empty:
         return patterns
     
-    # Carelessness detection
-    fast_wrong_mask = (valid_df['is_correct'] == False) & (valid_df['overtime'] == False)
-    fast_wrong_count = fast_wrong_mask.sum()
-    total_valid = len(valid_df)
+    # 1. 粗心問題檢測 - 基於 diagnostic_tags_summary.md 標準
+    # 檢測 Fast & Wrong 快錯率是否超過 25% 閾值
+    fast_wrong_mask = (valid_df['is_correct'] == False) & (valid_df['time_performance_category'] == 'Fast & Wrong')
+    fast_correct_mask = (valid_df['is_correct'] == True) & (valid_df['time_performance_category'] == 'Fast & Correct')
     
-    if total_valid > 0:
-        fast_wrong_rate = fast_wrong_count / total_valid
+    # 總體快速作答題目 (Fast & Wrong + Fast & Correct)
+    total_fast_questions = fast_wrong_mask.sum() + fast_correct_mask.sum()
+    fast_wrong_count = fast_wrong_mask.sum()
+    
+    if total_fast_questions > 0:
+        fast_wrong_rate = fast_wrong_count / total_fast_questions
         patterns['fast_wrong_rate'] = fast_wrong_rate
         
-        # Trigger carelessness if fast-wrong rate exceeds threshold
-        if fast_wrong_rate >= 0.3:  # 30% threshold
+        # 觸發粗心問題檢測：快錯率 > 25%
+        if fast_wrong_rate > 0.25:
             patterns['carelessness_issue_triggered'] = True
             patterns['triggered_behavioral_params'].append('DI_BEHAVIOR_CARELESSNESS_ISSUE')
     
-    # Early rushing detection
+    # 2. 早期衝刺風險檢測 - 基於 diagnostic_tags_summary.md 標準
+    # 檢測前1/3題目中是否存在用時 < 1分鐘的題目
+    total_questions = len(valid_df)
+    first_third_count = max(1, total_questions // 3)  # 至少檢查1題
+    
+    # 假設DataFrame已按題目順序排列，取前1/3題目
+    first_third_df = valid_df.head(first_third_count)
+    
     rushing_questions = []
-    for idx, row in valid_df.iterrows():
-        q_type = row.get('question_type')
+    for idx, row in first_third_df.iterrows():
         q_time = row.get('question_time', 0)
-        avg_time = avg_times.get(q_type, 2.0)
-        
-        # Consider rushing if time < 50% of average time
-        if q_time < avg_time * 0.5:
+        if pd.notna(q_time) and q_time < 1.0:  # 用時 < 1分鐘
             rushing_questions.append(idx)
     
-    if len(rushing_questions) >= 2:  # At least 2 rushing instances
+    if len(rushing_questions) > 0:
         patterns['early_rushing_risk_triggered'] = True
         patterns['early_rushing_questions'] = rushing_questions
         patterns['triggered_behavioral_params'].append('DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
+    
+    # 3. 為具體題目添加粗心標籤 - DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION
+    # 根據標準，這個標籤應該在 Fast & Wrong 條件下為具體題目觸發
+    for idx, row in valid_df.iterrows():
+        if row.get('time_performance_category') == 'Fast & Wrong':
+            current_params = row.get('diagnostic_params', [])
+            if isinstance(current_params, list):
+                # 添加具體題目的粗心標籤
+                detail_omission_tag = 'DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION'
+                if detail_omission_tag not in current_params:
+                    current_params.append(detail_omission_tag)
+                    # 更新原DataFrame
+                    df.at[idx, 'diagnostic_params'] = current_params
     
     return patterns
 
