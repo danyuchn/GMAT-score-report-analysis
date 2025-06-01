@@ -14,18 +14,18 @@ from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMME
 
 def generate_report_section3(triggered_params_translated, sfe_triggered, sfe_skills_involved):
     """Generates Section 3: Core Issue Diagnosis."""
-    lines = [t('core_issues_diagnosis')]
-    lines.append("")
-    lines.append(t('high_frequency_potential_issues'))
+    lines = []
+    lines.append("**B. 高頻潛在問題**")
     sfe_param_translated = t('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
 
     if sfe_triggered:
-        sfe_note = f"{t('sfe_attention_note')} (**{sfe_param_translated}**)"
+        sfe_note = f"特別值得注意的是，在已掌握技能領域的基礎或中等難度題目上出現錯誤（**{sfe_param_translated}**），"
         if sfe_skills_involved:
-            sfe_note += f"{t('sfe_skills_involved')} {', '.join(sorted(list(sfe_skills_involved)))}"
+            sfe_note += f"涉及技能：{', '.join(sorted(list(sfe_skills_involved)))}，顯示這些知識點應用存在穩定性問題。"
         else:
-            sfe_note += ")"
-        lines.append(f"    * {sfe_note}{t('sfe_stability_problem')}")
+            sfe_note += "顯示基礎掌握存在穩定性問題。"
+        lines.append(sfe_note)
+        lines.append("")
 
     core_issue_summary = []
     param_careless_detail = t('Q_CARELESSNESS_DETAIL_OMISSION')
@@ -38,95 +38,118 @@ def generate_report_section3(triggered_params_translated, sfe_triggered, sfe_ski
     param_eff_calc = t('Q_EFFICIENCY_BOTTLENECK_CALCULATION')
 
     if param_careless_detail in triggered_params_translated:
-        core_issue_summary.append(f"{t('careless_tendency')}**{param_careless_detail}**。")
+        core_issue_summary.append(f"粗心傾向是失分原因（**{param_careless_detail}**）。")
     if (param_concept_app in triggered_params_translated or param_problem_under in triggered_params_translated) and not sfe_triggered:
          related_issues = []
          if param_concept_app in triggered_params_translated: related_issues.append(f"**{param_concept_app}**")
          if param_problem_under in triggered_params_translated: related_issues.append(f"**{param_problem_under}**")
-         core_issue_summary.append(f"{t('concept_understanding_issue')}{t('or').join(related_issues)}。")
+         core_issue_summary.append(f"概念理解存在問題：{'或'.join(related_issues)}。")
     if param_calculation in triggered_params_translated:
-        core_issue_summary.append(f"{t('calculation_error_cause')} (**{param_calculation}**)。")
+        core_issue_summary.append(f"計算錯誤也是失分原因之一（**{param_calculation}**）。")
     if param_reading_comp in triggered_params_translated:
-        core_issue_summary.append(f"{t('reading_comprehension_barrier')} (**{param_reading_comp}**)。")
+        core_issue_summary.append(f"Real題目的文字信息理解可能存在障礙（**{param_reading_comp}**）。")
 
     efficiency_params_triggered = {p for p in triggered_params_translated if p in [param_eff_reading, param_eff_concept, param_eff_calc]}
     if efficiency_params_triggered:
         efficiency_contexts = []
-        if param_eff_reading in efficiency_params_triggered: efficiency_contexts.append(t('reading_real_questions'))
-        if param_eff_concept in efficiency_params_triggered: efficiency_contexts.append(t('concept_thinking'))
-        if param_eff_calc in efficiency_params_triggered: efficiency_contexts.append(t('calculation_process'))
-        core_issue_summary.append(t('efficiency_time_consumption').format(
-            "、".join(efficiency_contexts), ", ".join([f"**{p}**" for p in sorted(list(efficiency_params_triggered))])))
+        if param_eff_reading in efficiency_params_triggered: efficiency_contexts.append("閱讀Real題目")
+        if param_eff_concept in efficiency_params_triggered: efficiency_contexts.append("概念思考")
+        if param_eff_calc in efficiency_params_triggered: efficiency_contexts.append("計算過程")
+        core_issue_summary.append(f"在{'、'.join(efficiency_contexts)}環節耗時較多（{', '.join([f'**{p}**' for p in sorted(list(efficiency_params_triggered))])}）。")
 
     if core_issue_summary:
-        lines.extend([f"    * {line}" for line in core_issue_summary])
+        for line in core_issue_summary:
+            lines.append(line)
+            lines.append("")
     elif not sfe_triggered:
-        lines.append(f"    * {t('no_core_issues_identified')}")
+        lines.append("未識別出明顯的核心問題模式。")
+        lines.append("")
     return lines
 
 
 def generate_report_section4(ch5_patterns):
     """Generates Section 4: Pattern Observation."""
     lines = []
-    lines.append(t('special_behavioral_patterns'))
+    lines.append("**C. 特殊行為模式觀察**")
     pattern_found = False
     param_early_rush = t('Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
     param_careless_issue = t('Q_BEHAVIOR_CARELESSNESS_ISSUE')
 
     if ch5_patterns.get('early_rushing_flag', False):
-        lines.append(f"    * {t('early_rushing_warning')} (**{param_early_rush}**)")
+        lines.append(f"考試初期部分題目答題節奏偏快，建議保持穩定的答題節奏以避免潛在的\"標記復查\"風險。（**{param_early_rush}**）")
         pattern_found = True
     if ch5_patterns.get('carelessness_issue_flag', False):
-        lines.append(f"    * {t('carelessness_analysis').format(ch5_patterns.get('fast_wrong_rate', 0))} (**{param_careless_issue}**)")
+        lines.append(f"快速答錯比例較高（{ch5_patterns.get('fast_wrong_rate', 0):.1%}），存在粗心傾向。（**{param_careless_issue}**）")
         pattern_found = True
     if not pattern_found:
-        lines.append(f"    * {t('no_special_patterns')}")
+        lines.append("未發現特殊行為模式。")
+    lines.append("")
     return lines
 
 
 def generate_report_section5(ch6_override):
     """Generates Section 5: Foundational Consolidation Hint."""
     lines = []
-    lines.append(t('practice_consolidation'))
-    lines.append("")
-    lines.append(t('priority_consolidation_skills'))
+    lines.append("**A. 優先鞏固技能**")
     override_skills_list = [skill for skill, data in ch6_override.items() if data.get('triggered', False)]
     if override_skills_list:
-        lines.append(f"    * {t('core_skills_consolidation').format(', '.join(sorted(override_skills_list)))}")
+        skill_text = ', '.join(sorted(override_skills_list))
+        lines.append(f"對於 {skill_text} 這些核心技能，由於整體表現顯示有明顯提升空間，建議優先進行系統性基礎鞏固，而非僅針對個別錯題。")
     else:
-        lines.append(f"    * {t('no_skill_override_triggered')}")
+        lines.append("當前未發現需要優先全面基礎鞏固的技能領域。")
+    lines.append("")
     return lines
 
 
 def generate_report_section6(q_recommendations, sfe_triggered):
     """Generates Section 6: Practice Plan Presentation."""
     lines = []
-    lines.append(t('overall_practice_direction'))
-    lines.append("")
+    lines.append("**B. 整體練習方向**")
+    if sfe_triggered:
+        lines.append("（註：涉及\"Foundation Mastery Instability\"的建議以優先級列出）")
+        lines.append("")
+    
     if q_recommendations:
-        if sfe_triggered:
-            lines.append(f"    * {t('sfe_priority_note')}")
-            lines.append("")
         for rec in q_recommendations: # Assumes q_recommendations is already formatted list of strings
-            lines.append(f"    {rec}")
+            lines.append(rec)
     else:
-        lines.append(f"    * {t('no_specific_practice_recommendations')}")
+        lines.append("暫無具體練習建議。")
+    lines.append("")
     return lines
 
 
 def generate_report_section7(triggered_params_translated, sfe_skills_involved, df_diagnosed):
     """Generates Section 7: Follow-up Action Guidance."""
     lines = []
-    lines.append(t('follow_up_action_guidance'))
-    lines.append("")
-
-    # --- Reflection Prompts ---
-    lines.append(t('guided_reflection_prompts'))
-    
-    # 從診斷數據中提取基本信息，用於生成反思提示
-    reflection_prompts = []
+    lines.append("**A. 練習記錄回顧（次要證據參考）**")
     
     # 確保有可用的數據
+    if df_diagnosed is not None and not df_diagnosed.empty:
+        lines.append("目的：當您無法準確回憶具體錯誤原因、涉及知識點，或需要更客觀數據確認問題模式時。")
+        lines.append("")
+        lines.append("方法：建議按照以下指導反思回顧近期練習記錄，整理相關錯題或超時題目。")
+        lines.append("")
+        
+        # 重點關注核心問題
+        lines.append("重點關注：題目是否重複涉及報告第III部分指出的核心問題：")
+        core_issues = ["Q Carelessness Issue: Detail Omission", "Q Concept Application Error: Mathematical Concept/Formula Application", "Q Calculation Error: Mathematical Calculation", "Q Reading Comprehension Error: Text Understanding"]
+        if sfe_skills_involved:
+            core_issues.append("Q Foundation Mastery: Application Instability (Special Focus Error)")
+        
+        for issue in core_issues:
+            lines.append(f"- {issue}")
+        lines.append("")
+        lines.append("**注意**：如果樣本不足，請注意在接下來的練習中收集，以便更準確地識別問題。")
+    else:
+        lines.append("目前缺乏足夠的診斷數據進行次要證據分析。")
+    
+    lines.append("")
+    
+    # --- Reflection Prompts ---
+    lines.append("**B. 引導反思提示（針對具體技能與表現）**")
+    lines.append("")
+    
+    # 從診斷數據中提取基本信息，用於生成反思提示
     if df_diagnosed is not None and not df_diagnosed.empty:
         # 只對有問題且有效的題目(錯誤或超時)進行分析以生成反思建議
         if 'is_manually_invalid' in df_diagnosed.columns:
@@ -154,14 +177,12 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
                 
                 # 翻譯時間表現、技能和題型
                 time_perf_map = {
-                    'Fast & Wrong': t('fast_wrong'),
-                    'Slow & Wrong': t('slow_wrong'),
-                    'Normal Time & Wrong': t('normal_time_wrong')
+                    'Fast & Wrong': 'Fast & Wrong',
+                    'Slow & Wrong': 'Slow & Wrong', 
+                    'Normal Time & Wrong': 'Normal Time & Wrong'
                 }
                 
                 time_perf_zh = time_perf_map.get(time_perf, time_perf)
-                q_type_zh = q_type  # 假設REAL/PURE不需要翻譯
-                skill_zh = skill  # 技能名稱可能已經是中文或不需要翻譯
                 
                 # 獲取該組的所有診斷參數
                 all_diagnostic_params = []
@@ -173,91 +194,23 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
                     # 去除重複的診斷參數並過濾無效參數
                     unique_params = list(set([p for p in all_diagnostic_params if isinstance(p, str) and p.strip()]))
                     
-                    # 按類別分組
-                    params_by_category = {}
-                    for param in unique_params:
-                        # 根據參數前綴或特定關鍵字進行分類
-                        category = t('problem_types')  # 默認類別
-                        
-                        # 簡單分類邏輯
-                        if "CARELESSNESS" in param:
-                            category = t('carelessness_problems')
-                        elif "READING" in param or "COMPREHENSION" in param:
-                            category = t('reading_comprehension_problems')
-                        elif "CALCULATION" in param:
-                            category = t('calculation_problems')
-                        elif "CONCEPT" in param or "APPLICATION" in param:
-                            category = t('concept_application_problems')
-                        elif "EFFICIENCY" in param:
-                            category = t('efficiency_problems')
-                        
-                        if category not in params_by_category:
-                            params_by_category[category] = []
-                        params_by_category[category].append(param)
-                    
-                    # 生成引導反思提示
-                    current_prompt_lines = []
-                    current_prompt_lines.append(f"    * {t('reflection_instruction').format(skill_zh, q_type_zh, time_perf_zh)}")
-                    
-                    for cat_name, cat_params in params_by_category.items():
-                        # 翻譯參數
-                        params_zh = []
-                        for p_code in cat_params:
-                            try:
-                                translated = t(p_code)
-                                params_zh.append(translated)
-                            except:
-                                params_zh.append(p_code)
-                        current_prompt_lines.append(f"        - {cat_name}：{', '.join(params_zh)}")
-                    
-                    current_prompt_lines.append(f"        {t('problems_category')}")
-                    reflection_prompts.append(current_prompt_lines)
+                    if unique_params:
+                        # 生成引導反思提示
+                        lines.append(f"**{skill} {q_type} 練習記錄反思**")
+                        lines.append(f"尋找考前練習記錄中的{time_perf_zh}題目，回顧並反思是否存在以下問題類型：")
+                        params_display = ', '.join(unique_params[:3])  # 限制顯示數量避免過長
+                        if len(unique_params) > 3:
+                            params_display += " 等問題。"
+                        else:
+                            params_display += " 等問題。"
+                        lines.append(params_display)
+                        lines.append("")
     
     # 如果沒有生成任何反思提示，添加默認提示
-    if not reflection_prompts:
-        reflection_prompts.append([f"    * {t('default_reflection_prompt')}"])
-    
-    # 添加反思提示到報告中
-    for prompt_line_list in reflection_prompts:
-        for line_content in prompt_line_list:
-            lines.append(line_content)
-        lines.append("")  # Add a blank line between different reflection prompt blocks
+    if not any("練習記錄反思" in line for line in lines[-10:]):
+        lines.append("建議回顧近期練習記錄，特別關注錯題的共同特徵和問題類型。")
+        lines.append("")
 
-    # --- Second Evidence ---
-    lines.append(t('practice_record_review'))
-    
-    # 直接檢查是否有足夠診斷數據，作為二級證據參考建議的條件
-    if df_diagnosed is not None and not df_diagnosed.empty:
-        lines.append(f"    * {t('review_purpose')}")
-        lines.append(f"    * {t('review_method')}")
-        
-        # 再次強調核心問題
-        core_issue_text = []
-        param_to_emphasize = ["Q_CARELESSNESS_DETAIL_OMISSION", "Q_CONCEPT_APPLICATION_ERROR", "Q_CALCULATION_ERROR", "Q_READING_COMPREHENSION_ERROR"]
-        for param in param_to_emphasize:
-            if t(param):
-                core_issue_text.append(t(param))
-        
-        if sfe_skills_involved:
-            core_issue_text.append(t("Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE"))
-        
-        if core_issue_text:
-            lines.append(f"    * {t('key_focus')}")
-            for issue in core_issue_text:
-                lines.append(f"        - {issue}")
-        else:
-            lines.append(f"    * {t('key_focus_general')}")
-        
-        lines.append(f"    * {t('sample_insufficient_note')}")
-    else:
-        lines.append(f"    * {t('no_secondary_evidence_needed')}")
-
-    # --- Qualitative Analysis Suggestion ---
-    lines.append("")
-    lines.append(t('advanced_assistance'))
-    lines.append("")
-    lines.append(f"    * {t('qualitative_analysis_suggestion')}")
-    lines.append("")
     return lines
 
 
@@ -266,8 +219,9 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     Generates the summary report for Q section, based on Chapter 8 guidelines.
     Combines all the diagnostics into a comprehensive yet readable report.
     """
-    report_lines = [t('q_report_title')]
-    report_lines.append(t('q_report_subtitle'))
+    report_lines = []
+    report_lines.append("# Q Section Diagnostic Report Details")
+    report_lines.append("## Q部分診斷報告詳情（基於用戶數據與模擬難度分析）")
     report_lines.append("")
     
     # 獲取各章節的診斷結果
@@ -306,52 +260,44 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     valid_score_rate = round((correct_valid_q / manual_valid_q * 100) if manual_valid_q > 0 else 0, 1)
     
     # 1. 報告總覽與即時反饋
-    report_lines.append(t('report_overview_feedback'))
+    report_lines.append("### I. 報告概覽與即時反饋")
     report_lines.append("")
     
     # A. 作答時間與策略評估
-    report_lines.append(t('time_strategy_assessment'))
+    report_lines.append("**A. 答題時間與策略評估**")
     time_pressure = ch1_results.get('time_pressure_status', False)
-    time_pressure_text = t('yes') if time_pressure else t('no')
+    time_pressure_text = "是" if time_pressure else "否"
     overtime_threshold = ch1_results.get('overtime_threshold_used', 2.5)
-    report_lines.append(f"    * {t('time_pressure_status_label')}{time_pressure_text}")
-    report_lines.append(f"    * {t('overtime_threshold_used')}{overtime_threshold} {t('minutes')}")
+    report_lines.append(f"- 時間壓力狀態：{time_pressure_text}")
+    report_lines.append(f"- 使用超時閾值：{overtime_threshold}分鐘")
+    report_lines.append("")
     
     # B. 重要註記
-    report_lines.append(t('important_notes'))
+    report_lines.append("**B. 重要提醒**")
     if manual_invalid_q > 0:
-        report_lines.append(f"    * {t('manual_invalid_data_count')}{manual_invalid_q} ({'{:.1f}'.format(manual_invalid_q / total_q * 100 if total_q > 0 else 0)}%)")
-    report_lines.append(f"    * {t('valid_score_rate')}{valid_score_rate}% ({correct_valid_q}/{manual_valid_q})")
+        report_lines.append(f"- 手動標記無效數據數量：{manual_invalid_q} ({'{:.1f}'.format(manual_invalid_q / total_q * 100 if total_q > 0 else 0)}%)")
+    report_lines.append(f"- 有效答題正確率（基於手動無效排除）：{valid_score_rate}% ({correct_valid_q}/{manual_valid_q})")
     report_lines.append("")
     
     # 2. 核心表現分析
-    report_lines.append(t('core_performance_analysis'))
+    report_lines.append("### II. 核心表現分析")
     report_lines.append("")
     
     # A. 內容領域表現概覽
-    report_lines.append(t('content_domain_overview'))
-    report_lines.append(f"    {t('by_question_type')}")
+    report_lines.append("**A. 內容領域表現概覽**")
+    report_lines.append("按題目類型（Real vs Pure）分析：", end="")
+    
     if ch2_flags.get('poor_real', False):
-        report_lines.append(f"        * {t('real_performance_poor')}")
-    if ch2_flags.get('poor_pure', False):
-        report_lines.append(f"        * {t('pure_performance_poor')}")
-    if ch2_flags.get('slow_real', False):
-        report_lines.append(f"        * {t('real_slower')}")
-    if ch2_flags.get('slow_pure', False):
-        report_lines.append(f"        * {t('pure_slower')}")
+        report_lines.append("Real題型表現較差")
+    elif ch2_flags.get('poor_pure', False):
+        report_lines.append("Pure題型表現較差")
+    elif ch2_flags.get('slow_real', False):
+        report_lines.append("Real題型速度較慢")
+    elif ch2_flags.get('slow_pure', False):
+        report_lines.append("Pure題型速度較慢")
+    else:
+        report_lines.append("Real題型與Pure題型表現無顯著差異")
     
-    if not any(ch2_flags.values()):
-        report_lines.append(f"        * {t('no_significant_difference')}")
-    
-    # 獲取錯誤分佈信息（如果有）
-    if ch3_errors:
-        error_difficulties = [err.get('Difficulty') for err in ch3_errors if err.get('Difficulty') is not None and not pd.isna(err.get('Difficulty'))]
-        if error_difficulties:
-            difficulty_labels = [map_difficulty_to_label(d) for d in error_difficulties]
-            label_counts = pd.Series(difficulty_labels).value_counts().sort_index()
-            if not label_counts.empty:
-                distribution_str = ", ".join([f"{label} ({count}{t('questions_count')})" for label, count in label_counts.items()])
-                report_lines.append(f"    {t('error_difficulty_distribution')} {distribution_str}")
     report_lines.append("")
     
     # B. 高頻潛在問題點
@@ -377,36 +323,38 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
                     sfe_skills_involved.add(skill)
     
     core_issue_lines = generate_report_section3(triggered_params_translated, sfe_triggered, sfe_skills_involved)
-    report_lines.extend(core_issue_lines[1:]) # Skip the title
+    report_lines.extend(core_issue_lines)
     
     # C. 特殊行為模式觀察
     pattern_lines = generate_report_section4(ch5_results)
     report_lines.extend(pattern_lines)
-    report_lines.append("")
     
     # 3. 練習建議與基礎鞏固
+    report_lines.append("### III. 練習建議與基礎鞏固")
+    report_lines.append("")
+    
     consolidation_lines = generate_report_section5(ch6_override)
     report_lines.extend(consolidation_lines)
     
     # B. 整體練習方向
     practice_lines = generate_report_section6(recommendations, sfe_triggered)
     report_lines.extend(practice_lines)
+    
+    # 4. 後續行動與深度反思指引
+    report_lines.append("### IV. 後續行動與深度反思指導")
     report_lines.append("")
     
-    # 4 & 5. 後續行動與深度反思指引 & 尋求進階協助
     action_lines = generate_report_section7(triggered_params_translated, sfe_skills_involved, df_final)
     report_lines.extend(action_lines)
-    report_lines.append("")
     
-    # AI Tool Recommendation Section (Chapter 9)
-    # Placeholder - this should be generated by a new function if needed
-    # For now, let's assume it might come from 'recommendations' or be a static text.
-    # Example: ai_tool_recs = generate_q_ai_tool_recommendations(df_final) # You'd need to create this
-    # report_lines.extend(ai_tool_recs)
+    # 5. 尋求高級協助
+    report_lines.append("### V. 尋求高級協助（定性分析）")
+    report_lines.append("")
+    report_lines.append("如果您對報告中識別的某些問題仍感困惑，可嘗試提供2-3道相關錯題，並附上詳細解題過程和思考實例，供顧問進行更深入的案例分析。")
+    report_lines.append("")
     
     # --- Final cleanup and assembly ---
     # Ensure no leading/trailing empty lines in the final report sections
-    # (This is a basic example, more sophisticated cleanup might be needed)
     final_report_lines = []
     for line in report_lines:
         if final_report_lines or line.strip(): # Add line if it's not a leading empty line

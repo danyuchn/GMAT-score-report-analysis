@@ -11,6 +11,76 @@ Correct:
 [Insert corrected code or logic]
 ```
 
+## Q診斷報告Key Focus區域縮排層級修正 (2025-01-29)
+
+Mistake: Q診斷報告中「重點關注」或「Key Focus」下的列表項目缺少適當的縮排層級
+Wrong:
+格式化函數過度移除縮排，導致「重點關注」標題下的項目點沒有層級區分：
+```
+重點關注：題目是否重複涉及報告第III部分指出的核心問題：
+- Q Carelessness Issue: Detail Omission
+- Q Concept Application Error: Mathematical Concept/Formula Application
+- Q Calculation Error: Mathematical Calculation
+```
+顯示為同一層級，缺少視覺層次
+
+Correct:
+改進格式化邏輯，為Key Focus區域下的列表項目添加適當縮排：
+```python
+# 檢測Key Focus區域並為其下的列表項目添加縮排
+if in_key_focus_section:
+    if line.startswith('- '):
+        # 為Key Focus下的列表項目添加2個空格縮排
+        processed_lines.append('  ' + line)
+    elif line.startswith('**注意**'):
+        # 注意事項保持原樣
+        processed_lines.append(line)
+    else:
+        processed_lines.append(line)
+```
+
+Applied:
+1. 改進Key Focus區域檢測邏輯，更準確地識別「重點關注」和「Key Focus」區域
+2. 為該區域下的列表項目（- 開頭）自動添加2個空格縮排
+3. 改進區域結束檢測，通過標題標記或內容分析判斷何時離開Key Focus區域
+4. 保留注意事項和說明文字的原始格式
+
+Fixed: Q診斷報告中「重點關注」標題下的核心問題列表現在顯示為適當的第二層級縮排，提供清晰的視覺層次
+
+## Q Diagnostic Report Format Update (2025-01-29)
+
+Mistake: Q diagnostic reporting format not matching q_section_diagnostic_report_formatted.md structure
+Wrong:
+Using old bullet point heavy format with multiple nested levels and translation keys:
+```python
+# In reporting.py generate_report_section3
+lines = [t('core_issues_diagnosis')]
+lines.append("")
+lines.append(t('high_frequency_potential_issues'))
+# Multiple nested bullet points like:
+lines.extend([f"    * {line}" for line in core_issue_summary])
+```
+Correct:
+Updated to use cleaner heading structure with reduced bullet point nesting:
+```python
+# Updated format following q_section_diagnostic_report_formatted.md
+lines = []
+lines.append("**B. 高頻潛在問題**")
+# Direct text without excessive nesting:
+for line in core_issue_summary:
+    lines.append(line)
+    lines.append("")
+```
+
+Applied:
+1. Updated reporting.py to use ### for main sections, ** for subsections
+2. Reduced bullet point nesting - only use for specific data items
+3. Direct paragraph text for explanatory content
+4. Updated styling.py format_diagnostic_report function to handle new structure
+5. Maintained all diagnostic logic while improving readability
+
+Fixed: Q diagnostic reports now follow the cleaner format structure specified in q_section_diagnostic_report_formatted.md with proper heading hierarchy and minimal bullet point usage
+
 ## Translation System Fix for Failing Chinese Strings (2025-01-28)
 
 Mistake: Chinese strings used as translation keys causing lookup failures
