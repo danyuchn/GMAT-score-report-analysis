@@ -285,7 +285,7 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     
     # A. 內容領域表現概覽
     report_lines.append("**A. 內容領域表現概覽**")
-    report_lines.append("按題目類型（Real vs Pure）分析：", end="")
+    report_lines.append("按題目類型（Real vs Pure）分析：")
     
     if ch2_flags.get('poor_real', False):
         report_lines.append("Real題型表現較差")

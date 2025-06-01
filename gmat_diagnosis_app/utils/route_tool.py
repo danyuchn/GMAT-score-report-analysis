@@ -560,6 +560,28 @@ class DiagnosisRouterTool:
         Returns:
             str: 對應的英文代碼，如果找不到則返回原標籤
         """
+        # 首先檢查特殊映射（優先級最高）
+        special_mappings = {
+            "Mathematical Concept/Formula Application Difficulty": "Q_CONCEPT_APPLICATION_DIFFICULTY",
+            "Mathematical Calculation Difficulty": "Q_CALCULATION_DIFFICULTY",
+            "CR Stem Understanding Error: Question Requirement Grasp": "CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP",
+            "DI Reading Comprehension Difficulty: Mental Block Unable to Read": "DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED",
+            "Q Concept Application Error: Mathematical Concept/Formula Application": "Q_CONCEPT_APPLICATION_ERROR",
+            "Q Calculation Error: Mathematical Calculation": "Q_CALCULATION_ERROR",
+            "數據無效：用時過短（受時間壓力影響）": "DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED",
+            "Q 概念應用障礙：數學觀念/公式應用困難": "Q_CONCEPT_APPLICATION_DIFFICULTY",
+            "Q 計算障礙：數學計算困難": "Q_CALCULATION_DIFFICULTY",
+            "CR 題幹理解錯誤：提問要求把握": "CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP",
+            "CR 題幹理解錯誤：詞彙": "CR_STEM_UNDERSTANDING_ERROR_VOCAB",
+            "CR 題幹理解錯誤：句式": "CR_STEM_UNDERSTANDING_ERROR_SYNTAX",
+            "DI 閱讀理解障礙: 心態失常讀不進去": "DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED",
+            "DI 閱讀理解錯誤: 詞彙理解": "DI_READING_COMPREHENSION_ERROR__VOCABULARY",
+            "DI 閱讀理解錯誤: 句式理解": "DI_READING_COMPREHENSION_ERROR__SYNTAX"
+        }
+        
+        if zh_tag in special_mappings:
+            return special_mappings[zh_tag]
+        
         # 完全匹配
         if zh_tag in self.zh_to_en_mapping:
             return self.zh_to_en_mapping[zh_tag]
@@ -574,39 +596,29 @@ class DiagnosisRouterTool:
                     if len(zh_desc) >= len(zh_tag) * 0.6:  # 描述長度至少是標籤的60%
                         return en_code
         
-        # 中文字符模糊匹配（防止編輯時刪除部分字詞）
-        best_match = None
-        best_score = 0.0
+        # 中文字符模糊匹配（僅對包含中文字符的文本進行）
+        import re
+        has_chinese = bool(re.search(r'[\u4e00-\u9fa5]', zh_tag))
         
-        for zh_desc, en_code in self.zh_to_en_mapping.items():
-            ratio = self._calculate_chinese_similarity(zh_tag, zh_desc)
-            if ratio >= 0.75:  # 75%匹配率閾值
-                # 計算綜合分數：相似度 + 長度獎勵（優先選擇更長、更具體的匹配）
-                length_bonus = min(len(zh_desc) / len(zh_tag), 2.0) * 0.1  # 最多0.2的長度獎勵
-                score = ratio + length_bonus
-                
-                if score > best_score:
-                    best_score = score
-                    best_match = en_code
-        
-        if best_match:
-            return best_match
-        
-        # 處理一些常見的特殊情況
-        special_mappings = {
-            "數據無效：用時過短（受時間壓力影響）": "DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED",
-            "Q 概念應用障礙：數學觀念/公式應用困難": "Q_CONCEPT_APPLICATION_DIFFICULTY",
-            "Q 計算障礙：數學計算困難": "Q_CALCULATION_DIFFICULTY",
-            "CR 題幹理解錯誤：提問要求把握": "CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP",
-            "CR 題幹理解錯誤：詞彙": "CR_STEM_UNDERSTANDING_ERROR_VOCAB",
-            "CR 題幹理解錯誤：句式": "CR_STEM_UNDERSTANDING_ERROR_SYNTAX",
-            "DI 閱讀理解障礙: 心態失常讀不進去": "DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED",
-            "DI 閱讀理解錯誤: 詞彙理解": "DI_READING_COMPREHENSION_ERROR__VOCABULARY",
-            "DI 閱讀理解錯誤: 句式理解": "DI_READING_COMPREHENSION_ERROR__SYNTAX"
-        }
-        
-        if zh_tag in special_mappings:
-            return special_mappings[zh_tag]
+        if has_chinese:
+            best_match = None
+            best_score = 0.0
+            
+            for zh_desc, en_code in self.zh_to_en_mapping.items():
+                # 只對包含中文字符的描述進行模糊匹配
+                if re.search(r'[\u4e00-\u9fa5]', zh_desc):
+                    ratio = self._calculate_chinese_similarity(zh_tag, zh_desc)
+                    if ratio >= 0.75:  # 75%匹配率閾值
+                        # 計算綜合分數：相似度 + 長度獎勵（優先選擇更長、更具體的匹配）
+                        length_bonus = min(len(zh_desc) / len(zh_tag), 2.0) * 0.1  # 最多0.2的長度獎勵
+                        score = ratio + length_bonus
+                        
+                        if score > best_score:
+                            best_score = score
+                            best_match = en_code
+            
+            if best_match:
+                return best_match
         
         # 如果沒有匹配到，返回原始標籤
         return zh_tag

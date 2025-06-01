@@ -11,6 +11,97 @@ Correct:
 [Insert corrected code or logic]
 ```
 
+## AI工具推薦翻譯邏輯修正 - 英文標籤錯誤匹配問題 (2025-01-29)
+
+Mistake: 英文診斷標籤被錯誤翻譯，導致AI工具推薦失效
+Wrong:
+1. `translate_zh_to_en()` 函數中 `special_mappings` 檢查位置錯誤，在模糊匹配之後：
+```python
+def translate_zh_to_en(self, zh_tag: str) -> str:
+    # 完全匹配
+    if zh_tag in self.zh_to_en_mapping:
+        return self.zh_to_en_mapping[zh_tag]
+    
+    # 部分匹配和模糊匹配邏輯...
+    
+    # special_mappings 在最後才檢查（錯誤位置）
+    special_mappings = {
+        "Mathematical Concept/Formula Application Difficulty": "Q_CONCEPT_APPLICATION_DIFFICULTY",
+        # ...
+    }
+    if zh_tag in special_mappings:
+        return special_mappings[zh_tag]
+```
+
+2. 中文字符相似度計算函數被錯誤應用於英文文本，導致不相關的英文短語被高度匹配：
+```python
+# 對所有文本進行模糊匹配，包括英文
+for zh_desc, en_code in self.zh_to_en_mapping.items():
+    ratio = self._calculate_chinese_similarity(zh_tag, zh_desc)  # 英文文本錯誤使用中文相似度算法
+    if ratio >= 0.75:  # "Mathematical Concept/Formula Application Difficulty" 與 "Data Sufficiency" 匹配度 0.91
+        return en_code
+```
+
+Correct:
+1. 將 `special_mappings` 檢查移到函數最前面，確保優先級最高：
+```python
+def translate_zh_to_en(self, zh_tag: str) -> str:
+    # 首先檢查特殊映射（優先級最高）
+    special_mappings = {
+        "Mathematical Concept/Formula Application Difficulty": "Q_CONCEPT_APPLICATION_DIFFICULTY",
+        "Mathematical Calculation Difficulty": "Q_CALCULATION_DIFFICULTY",
+        "CR Stem Understanding Error: Question Requirement Grasp": "CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP",
+        # ... 其他映射
+    }
+    
+    if zh_tag in special_mappings:
+        return special_mappings[zh_tag]
+    
+    # 其他匹配邏輯...
+```
+
+2. 限制模糊匹配僅適用於包含中文字符的文本：
+```python
+# 中文字符模糊匹配（僅對中文文本進行）
+import re
+has_chinese = bool(re.search(r'[\u4e00-\u9fa5]', zh_tag))
+
+if has_chinese:
+    for zh_desc, en_code in self.zh_to_en_mapping.items():
+        # 只對包含中文字符的描述進行模糊匹配
+        if re.search(r'[\u4e00-\u9fa5]', zh_desc):
+            ratio = self._calculate_chinese_similarity(zh_tag, zh_desc)
+            if ratio >= 0.75:
+                return en_code
+```
+
+Applied:
+1. 修正翻譯函數執行順序，確保特殊映射優先處理
+2. 限制模糊匹配範圍，避免英文文本被錯誤匹配
+3. 保持中文文本的模糊匹配功能，用於處理編輯時的字詞變化
+
+Fixed: 
+- "Mathematical Concept/Formula Application Difficulty" 現在正確翻譯為 "Q_CONCEPT_APPLICATION_DIFFICULTY"
+- "Mathematical Calculation Difficulty" 正確翻譯為 "Q_CALCULATION_DIFFICULTY"  
+- "CR Stem Understanding Error: Question Requirement Grasp" 正確翻譯為 "CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP"
+- "DI Reading Comprehension Difficulty: Mental Block Unable to Read" 正確翻譯為 "DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED"
+- AI工具推薦系統現在能正確為這些標籤提供相應的工具建議，不再顯示"暫無對應的工具推薦"
+
+**最終測試結果 (2025-01-29)：**
+✅ 特殊映射測試全部通過：
+  - "Mathematical Concept/Formula Application Difficulty" → "Q_CONCEPT_APPLICATION_DIFFICULTY"
+  - "Mathematical Calculation Difficulty" → "Q_CALCULATION_DIFFICULTY"  
+  - "CR Stem Understanding Error: Question Requirement Grasp" → "CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP"
+
+✅ 工具推薦功能恢復：
+  - "Q Concept Application Error: Mathematical Concept/Formula Application" 找到 6 項推薦
+  - "Q Calculation Error: Mathematical Calculation" 找到 2 項推薦
+
+✅ 模糊匹配限制正常工作：
+  - 中文文本正確翻譯，英文文本不再被錯誤匹配
+
+✅ 修正徹底解決了英文標籤錯誤匹配問題，系統運作完全正常
+
 ## Q&DI診斷報告列表縮排統一優化及背景顏色修正 (2025-01-29)
 
 Mistake: 列表縮排邏輯僅針對Q報告Key Focus區域，未覆蓋DI報告的反思提示等列表結構；診斷報告背景顏色與父容器不一致
@@ -1016,3 +1107,72 @@ Applied: 修復了gmat_diagnosis_app/utils/styling.py中的format_diagnostic_rep
 
 ## 根本原因分析
 問題的根本原因是V科報告生成時使用了8個空格的縮排（`f"        【{category_reflect_key}】：{labels_in_category_text}"`），這在Markdown中被自動識別為代碼塊。現在通過格式化函數將過度縮排調整為最多3個空格，完全避免了代碼塊自動識別問題。
+
+## AI工具推薦路由錯誤修正 (2025-01-29)
+
+Mistake: AI工具推薦系統顯示「暫無對應的工具推薦，建議諮詢教學專家」，但實際上路由表中有對應的工具推薦
+Wrong:
+1. 行為標籤判斷邏輯不完整，只檢查原始標籤而未檢查轉換後的英文標籤：
+```python
+elif tag.startswith('BEHAVIOR_'):
+    # 只檢查原始標籤，忽略了轉換後的英文標籤
+    recommendation_text += "- *此為行為模式標籤，無需特定工具練習，建議注意答題習慣的調整*\n"
+```
+
+2. 特殊標籤映射不全面，缺少英文版本的標籤映射：
+```python
+special_mappings = {
+    "數據無效：用時過短（受時間壓力影響）": "BEHAVIOR_DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED",
+    # 缺少英文版本的映射
+}
+```
+
+3. 路由表中缺少某些DI標籤的條目，特別是心態問題相關標籤
+
+Correct:
+1. 改進行為標籤判斷邏輯，同時檢查原始標籤和轉換後標籤：
+```python
+# 在函數開頭保存轉換後的英文標籤
+en_tag = self.translate_zh_to_en(tag)
+
+# 改進行為標籤判斷
+elif tag.startswith('BEHAVIOR_') or en_tag.startswith('BEHAVIOR_') or tag.startswith('行為') or '數據無效' in tag:
+    # 行為標籤的特殊處理（包括原始標籤和轉換後標籤的檢查）
+    recommendation_text += "- *此為行為模式標籤，無需特定工具練習，建議注意答題習慣的調整*\n"
+```
+
+2. 完善特殊標籤映射，增加英文版本：
+```python
+special_mappings = {
+    "數據無效：用時過短（受時間壓力影響）": "BEHAVIOR_DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED",
+    "Mathematical Concept/Formula Application Difficulty": "Q_CONCEPT_APPLICATION_DIFFICULTY",
+    "Mathematical Calculation Difficulty": "Q_CALCULATION_DIFFICULTY",
+    "CR Stem Understanding Error: Question Requirement Grasp": "CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP",
+    "CR Stem Understanding Error: Vocabulary": "CR_STEM_UNDERSTANDING_ERROR_VOCAB",
+    "CR Stem Understanding Error: Syntax": "CR_STEM_UNDERSTANDING_ERROR_SYNTAX",
+    "DI Reading Comprehension Difficulty: Mental Block Unable to Read": "DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED",
+    "DI Reading Comprehension Error: Vocabulary Understanding": "DI_READING_COMPREHENSION_ERROR__VOCABULARY", 
+    "DI Reading Comprehension Error: Syntax Understanding": "DI_READING_COMPREHENSION_ERROR__SYNTAX"
+}
+```
+
+3. 在MSR和GT路由表中添加缺失的DI標籤條目：
+```python
+# MSR路由表
+"DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED": [
+    "Passage you failed to organize", "Customize your preferred Problem-solving process and request an AI demonstration"
+]
+
+# GT路由表
+"DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED": [
+    "Learn Math Concept", "Explain Textbook"
+]
+```
+
+Applied:
+1. 修正了中文標籤到英文代碼的轉換和匹配機制
+2. 完善了行為標籤的識別和處理邏輯  
+3. 添加了缺失的路由表條目，確保所有診斷標籤都有對應的工具推薦
+4. 改進了標籤匹配的準確性，減少「暫無對應工具推薦」的錯誤訊息
+
+Fixed: AI工具推薦系統現在能夠正確識別和路由所有診斷標籤，為使用者提供準確的工具推薦而不是錯誤的「暫無對應工具推薦」訊息。

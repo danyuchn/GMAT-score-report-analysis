@@ -17,7 +17,7 @@ class Tools:
         
         # Command descriptions from prompt-to-label.md
         self.command_descriptions: Dict[str, str] = {
-            "Questions you did wrong": "使用者提供做錯的題目，我將用高中生易懂的方式解釋解題步驟與答案，幫助你理解問題。",
+            "Questions you did wrong": "使用者提供做錯的題目，我將用高中生易懂的方式解釋解題步驟與答案，幫助你理解問題。最適合觀念真正不懂的題目",
             "You did right but slowly": "使用者提供雖然做對但耗時過長的題目 (CR或TPA非數學相關)，我將提供 N分鐘內快速解題的捷徑。我會引導你先閱讀問題，識別解鎖問題的關鍵要素，然後判斷文本中哪些部分是相關信息，哪些不是，最後指出使用預寫策略還是排除策略來回答問題。每個步驟都包含清晰的提示，引導至下一步，並遵循線性的單向思維過程。",
             "Passages you fail to organize": "使用者提供一篇難以組織的文章，我將為其創建一個心智圖（markdown格式，輸出在代碼塊中），幫助你視覺化資訊間的關係，從而更好地理解文章結構和 logic。",
             "Examine your thoughts": "使用者提供口頭解題過程的錄音轉文字稿和題目文本，我將分析你的解題思路，找出其中的錯誤和可以改進的地方，幫助你提升解題效率和準確性。",
