@@ -9,12 +9,12 @@ import pandas as pd
 from gmat_diagnosis_app.utils.route_tool import DiagnosisRouterTool
 from gmat_diagnosis_app.diagnostics.di_modules.constants import DI_TOOL_AI_RECOMMENDATIONS
 from gmat_diagnosis_app.i18n import translate as t
-from gmat_diagnosis_app.diagnostics.di_modules.translation import APPENDIX_A_TRANSLATION_DI
 
 
 def translate_zh_to_en(zh_tag: str) -> str:
     """
-    將中文標籤轉換為英文標籤 (保留作為模糊匹配的備選方案)
+    將中文標籤轉換為英文標籤
+    現在使用i18n系統進行翻譯，不再依賴硬編碼的翻譯字典
     
     Args:
         zh_tag (str): 中文標籤
@@ -22,19 +22,39 @@ def translate_zh_to_en(zh_tag: str) -> str:
     Returns:
         str: 對應的英文標籤，如果找不到則返回原標籤
     """
-    # 構建反向映射字典 (中文 -> 英文)
-    reverse_translation = {v: k for k, v in APPENDIX_A_TRANSLATION_DI.items()}
+    # 由於已轉為i18n系統，這個函數主要用於處理特殊的標籤映射
+    # 對於大部分情況，可以直接使用原始標籤進行匹配
     
-    # 嘗試查找完全匹配的中文標籤
-    if zh_tag in reverse_translation:
-        return reverse_translation[zh_tag]
+    # 處理一些特殊的映射案例
+    special_mappings = {
+        # 數學相關
+        "數學相關": "Math Related",
+        "非數學相關": "Non-Math Related",
+        # 時間壓力狀態
+        "有時間壓力": "True",
+        "無時間壓力": "False",
+        # 時間表現分類
+        "快錯": "Fast & Wrong",
+        "慢錯": "Slow & Wrong", 
+        "正常時間 & 錯": "Normal Time & Wrong",
+        "慢對": "Slow & Correct",
+        "快對": "Fast & Correct",
+        "正常時間 & 對": "Normal Time & Correct",
+        # 其他常見翻譯
+        "高": "High",
+        "低": "Low",
+        "未知": "Unknown",
+        "未知領域": "Unknown Domain",
+        "未知類型": "Unknown Type",
+        "已排除/無效": "Invalid/Excluded"
+    }
     
-    # 嘗試部分匹配 (中文標籤可能只是完整翻譯的一部分)
-    for zh, en in reverse_translation.items():
-        if isinstance(zh, str) and isinstance(zh_tag, str) and zh_tag in zh:
-            return en
+    # 首先檢查特殊映射
+    if zh_tag in special_mappings:
+        return special_mappings[zh_tag]
     
-    # 如果沒有匹配到，返回原始標籤
+    # 對於診斷參數，嘗試直接使用原標籤
+    # 因為DI_TOOL_AI_RECOMMENDATIONS中的鍵通常是英文參數名
     return zh_tag
 
 

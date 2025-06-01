@@ -21,10 +21,11 @@ from .utils import (
 # from .translation import (
 #     _translate_di # Only translation function needed directly in main logic?
 # )
-from .chapter_logic import (
-    _diagnose_root_causes, _observe_di_patterns, _check_foundation_override, _generate_di_recommendations
+from .analysis import (
+    _diagnose_root_causes, _observe_di_patterns, _check_foundation_override
 )
-from .report_generation import _generate_di_summary_report
+from .recommendations import _generate_di_recommendations
+from .reporting import _generate_di_summary_report
 from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
 from gmat_diagnosis_app.analysis_helpers.time_analyzer import calculate_first_third_average_time_per_type
 # Add unified i18n system import

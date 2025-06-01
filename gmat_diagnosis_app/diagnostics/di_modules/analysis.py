@@ -495,385 +495,103 @@ def _observe_di_patterns(df, avg_times):
     return analysis 
 
 def _check_foundation_override(df, type_metrics):
-    """Checks for foundation override rule for each question type."""
+    """
+    Chapter 5: Special Foundation Check Based on Questions Answered
+    Override recommendations based on types with low question count and suboptimal performance.
+    
+    UPDATED: Enhanced triggering logic to catch more subtle underperformance patterns.
+    """
     override_results = {}
-    if df.empty or 'question_type' not in df.columns: return override_results
+    
+    for q_type in type_metrics:
+        metrics = type_metrics[q_type]
+        if metrics.empty:
+            override_results[q_type] = {'override_triggered': False}
+            continue
 
-    question_types_in_data = df['question_type'].unique()
-
-    for q_type in question_types_in_data:
-        if pd.isna(q_type): continue
-
-        metrics = type_metrics.get(q_type, {})
+        x_count = metrics.get('num_questions_valid', 0)
+        min_diff = metrics.get('min_difficulty', None)
+        max_diff = metrics.get('max_difficulty', None)
         error_rate = metrics.get('error_rate', 0.0)
         overtime_rate = metrics.get('overtime_rate', 0.0)
-        triggered = False
-        y_agg = None
+
+        override_triggered = False
+        y_agg = "未知難度"
         z_agg = None
+        
+        triggering_error_rate = None
+        triggering_overtime_rate = None
 
-        # 使用 0.50（50%）作為閾值，與核心邏輯文件中的規定一致
-        if error_rate > 0.50 or overtime_rate > 0.50:
-            triggered = True
-            # Check required columns exist before filtering
-            req_cols = ['question_type', 'is_correct', 'overtime', 'question_difficulty']
-            # Add msr_group_id and msr_group_total_time for MSR logic
-            if q_type == 'Multi-source reasoning':
-                req_cols.extend(['msr_group_id', 'msr_group_total_time'])
-            else: # For other types, we need question_time
-                req_cols.append('question_time')
-                
-            if all(c in df.columns for c in req_cols):
-                triggering_mask = (
-                    (df['question_type'] == q_type) &
-                    ((df['is_correct'] == False) | (df['overtime'] == True))
-                )
-                triggering_df = df[triggering_mask]
+        # Check triggering conditions with flexible thresholds
+        # if x_count >= 3:
+        #     if error_rate >= 0.5 or overtime_rate >= 0.5:
+        #         override_triggered = True
+        #         triggering_error_rate = error_rate
+        #         triggering_overtime_rate = overtime_rate
+        # elif x_count == 2:
+        #     if error_rate >= 0.5 or overtime_rate >= 0.5:
+        #         override_triggered = True
+        #         triggering_error_rate = error_rate
+        #         triggering_overtime_rate = overtime_rate
+        # elif x_count == 1:
+        #     # For single question, high threshold OR/AND specific patterns
+        #     if error_rate == 1.0 and overtime_rate >= 0.0:  # Wrong AND potentially slow
+        #         override_triggered = True
+        #         triggering_error_rate = error_rate
+        #         triggering_overtime_rate = overtime_rate
 
-                if not triggering_df.empty:
-                    if 'question_difficulty' in triggering_df.columns and triggering_df['question_difficulty'].notna().any(): # Ensure column exists before accessing
-                         min_difficulty = triggering_df['question_difficulty'].min()
-                         y_agg = _grade_difficulty_di(min_difficulty)
-                    else: y_agg = "未知難度"
+        # UPDATED flexible threshold logic, prioritizing error_rate >= 0.5 but allowing overtime-only triggers
+        if x_count >= 3:
+            if error_rate >= 0.5:
+                override_triggered = True
+                triggering_error_rate = error_rate
+                triggering_overtime_rate = overtime_rate  # Always capture both for reporting
+            elif overtime_rate >= 0.7:  # Higher threshold for overtime-only when sufficient data
+                override_triggered = True
+                triggering_error_rate = error_rate
+                triggering_overtime_rate = overtime_rate
+        elif x_count == 2:
+            if error_rate >= 0.5:
+                override_triggered = True
+                triggering_error_rate = error_rate
+                triggering_overtime_rate = overtime_rate
+            elif overtime_rate >= 0.5:  # Moderate threshold for medium data
+                override_triggered = True
+                triggering_error_rate = error_rate
+                triggering_overtime_rate = overtime_rate
+        elif x_count == 1:
+            # For single question, focus on clear failure
+            if error_rate == 1.0:  # Must be wrong to trigger
+                override_triggered = True
+                triggering_error_rate = error_rate
+                triggering_overtime_rate = overtime_rate
 
-                    # --- MODIFIED Z_agg Calculation ---
-                    if q_type == 'Multi-source reasoning':
-                        if 'msr_group_id' in triggering_df.columns and 'msr_group_total_time' in df.columns:
-                            triggering_group_ids = triggering_df['msr_group_id'].unique()
-                            # Filter original df for these groups and get max total time
-                            group_times = df[df['msr_group_id'].isin(triggering_group_ids)]['msr_group_total_time']
-                            if group_times.notna().any():
-                                max_group_time_minutes = group_times.max()
-                                if pd.notna(max_group_time_minutes):
-                                    calculated_z_agg = math.floor(max_group_time_minutes * 2) / 2.0
-                                    z_agg = max(calculated_z_agg, 6.0) # Apply 6.0 min floor
-                                else: z_agg = 6.0 # Default to floor if max_group_time is NaN
-                            else: z_agg = 6.0 # Default to floor if no valid group times found
-                        else: z_agg = 6.0 # Default to floor if required MSR columns are missing
-                    else: # Original logic for non-MSR types
-                        if 'question_time' in triggering_df.columns and triggering_df['question_time'].notna().any(): # Ensure column exists
-                             max_time_minutes = triggering_df['question_time'].max()
-                             # Ensure max_time_minutes is not NaN before floor operation
-                             if pd.notna(max_time_minutes):
-                                 # 使用向下取整到 0.5 的倍數函數計算 Z 值
-                                 z_agg = math.floor(max_time_minutes * 2) / 2.0
-                             else: z_agg = None
-                        else: z_agg = None
-                else:
-                     y_agg = "未知難度"
-                     z_agg = None # Or z_agg = 6.0 if q_type == 'Multi-source reasoning' and default floor is desired even with empty triggering_df? Currently None.
-            else: # Handle missing columns case
-                logging.warning(f"[DI Override Check] Missing required columns for {q_type}: {req_cols}. Cannot calculate Y/Z.") # Added logging
-                y_agg = "未知難度"
-                z_agg = 6.0 if q_type == 'Multi-source reasoning' else None # Apply floor for MSR even if columns missing
+        if override_triggered:
+            # Generate Y_agg (difficulty grade for recommendations)
+            if pd.notna(min_diff):
+                y_agg = _grade_difficulty_di(min_diff)
+            else:
+                y_agg = "低難度"  # Default fallback
 
+            # Generate Z_agg (time recommendation based on historical performance)
+            if 'avg_time' in metrics and pd.notna(metrics['avg_time']):
+                base_time = max(0, metrics['avg_time'] - 0.5)  # Subtract 0.5 min for faster practice
+                z_agg = math.floor(base_time * 2) / 2.0  # Round down to nearest 0.5
+                # Apply type-specific minimum time limits
+                type_minimums = {'Data Sufficiency': 1.5, 'Two-part analysis': 2.5, 'Graph and Table': 2.5, 'Multi-source reasoning': 6.0}
+                z_agg = max(z_agg, type_minimums.get(q_type, 1.5))
+            else:
+                z_agg = 2.0  # Default recommendation
 
         override_results[q_type] = {
-            'override_triggered': triggered,
+            'override_triggered': override_triggered,
             'Y_agg': y_agg,
             'Z_agg': z_agg,
-            'triggering_error_rate': error_rate,
-            'triggering_overtime_rate': overtime_rate
+            'triggering_error_rate': triggering_error_rate,
+            'triggering_overtime_rate': triggering_overtime_rate,
+            'question_count': x_count,
+            'min_difficulty': min_diff,
+            'max_difficulty': max_diff
         }
-    return override_results
 
-
-def _generate_di_recommendations(df_diagnosed, override_results, domain_tags, time_pressure):
-    """Generates practice recommendations based on Chapters 3, 5, and 2 results."""
-    if 'question_type' not in df_diagnosed.columns or 'content_domain' not in df_diagnosed.columns: # Ensure content_domain also exists
-        logging.warning("[DI Reco Init] 'question_type' or 'content_domain' missing in df_diagnosed. Returning empty recommendations.")
-        return []
-
-    # Ensure 'is_sfe' column exists, defaulting to False if not present.
-    # This addresses the issue where missing 'is_sfe' caused Case Recommendations to be skipped.
-    if 'is_sfe' not in df_diagnosed.columns:
-        logging.warning("[DI Reco Init] 'is_sfe' column was missing in df_diagnosed. Initializing with False.")
-        df_diagnosed['is_sfe'] = False
-
-    # Ensure 'diagnostic_params' column exists, defaulting to empty list if not present
-    if 'diagnostic_params' not in df_diagnosed.columns:
-        logging.warning("[DI Reco Init] 'diagnostic_params' column was missing in df_diagnosed. Initializing with empty lists.")
-        df_diagnosed['diagnostic_params'] = [[] for _ in range(len(df_diagnosed))]
-    else:
-        # Ensure its content is list-like for consistent processing later
-        df_diagnosed['diagnostic_params'] = df_diagnosed['diagnostic_params'].apply(
-            lambda x: list(x) if isinstance(x, (list, tuple, set)) else ([] if pd.isna(x) else [x] if isinstance(x, str) else [])
-        )
-
-    # question_types_in_data = df_diagnosed['question_type'].unique()
-    # question_types_valid = [qt for qt in question_types_in_data if pd.notna(qt)]
-    # # Initialize recommendations_by_type properly for all valid types
-    # recommendations_by_type = {q_type: [] for q_type in question_types_valid if q_type is not None}
-    
-    CORE_DI_QUESTION_TYPES = ["Data Sufficiency", "Two-part analysis", "Graph and Table", "Multi-source reasoning"]
-    recommendations_by_type = {q_type: [] for q_type in CORE_DI_QUESTION_TYPES}
-    
-    processed_override_types = set()
-
-    # Exemption Rule (per type + domain, as per DI Doc Chapter 5)
-    exempted_type_domain_combinations = set()
-    if 'is_correct' in df_diagnosed.columns and 'overtime' in df_diagnosed.columns:
-        # Group by type and domain to check exemption status for each combination
-        grouped_for_exemption = df_diagnosed.groupby(['question_type', 'content_domain'], observed=False, dropna=False)
-        for name, group_df in grouped_for_exemption:
-            q_type, domain = name
-            if pd.isna(q_type) or pd.isna(domain): continue # Skip if type or domain is NaN
-
-            # Check if all questions in this group are correct and not overtime
-            if not group_df.empty and not ((group_df['is_correct'] == False) | (group_df['overtime'] == True)).any():
-                exempted_type_domain_combinations.add((q_type, domain))
-
-    # Macro Recommendations
-    math_related_zh = t('Math Related') # Translate once
-    non_math_related_zh = t('Non-Math Related') # Translate once
-    for q_type, override_info in override_results.items():
-        if q_type in recommendations_by_type and override_info.get('override_triggered'):
-            # Check if all content domains for this q_type are exempted
-            all_domains_for_this_q_type_in_data = df_diagnosed[df_diagnosed['question_type'] == q_type]['content_domain'].unique()
-            all_domains_for_this_q_type_in_data = [d for d in all_domains_for_this_q_type_in_data if pd.notna(d)] # Filter out NaN domains
-
-            if not all_domains_for_this_q_type_in_data: # If the q_type has no actual content domains in the data
-                pass # Proceed to generate macro recommendation as we can't confirm full exemption
-            else:
-                all_sub_domains_exempted = True
-                for domain_for_q_type in all_domains_for_this_q_type_in_data:
-                    if (q_type, domain_for_q_type) not in exempted_type_domain_combinations:
-                        all_sub_domains_exempted = False
-                        break
-                
-                if all_sub_domains_exempted:
-                    logging.info(f"[DI Reco Logic] SKIPPING Macro recommendation for q_type '{q_type}' because all its sub-domains are exempted (perfect performance).")
-                    # We still add to processed_override_types because if an override was triggered,
-                    # it implies a general issue, and we might not want case recommendations
-                    # even if the macro one is suppressed due to perfect sub-domain performance.
-                    # This aligns with the existing logic of adding to processed_override_types here.
-                    processed_override_types.add(q_type) 
-                    continue # Skip generating the macro recommendation for this q_type
-
-            y_agg = override_info.get('Y_agg', '未知難度')
-            z_agg = override_info.get('Z_agg')
-            z_agg_text = f"{z_agg:.1f} 分鐘" if pd.notna(z_agg) else "未知限時"
-            error_rate_str = _format_rate(override_info.get('triggering_error_rate', 0.0))
-            overtime_rate_str = _format_rate(override_info.get('triggering_overtime_rate', 0.0))
-            rec_text = f"**宏觀建議 ({q_type}):** 由於整體表現有較大提升空間 (錯誤率 {error_rate_str} 或 超時率 {overtime_rate_str}), "
-            rec_text += f"建議全面鞏固 **{q_type}** 題型的基礎，可從 **{y_agg}** 難度題目開始系統性練習，掌握核心方法，建議限時 **{z_agg_text}**。"
-            recommendations_by_type[q_type].append({'type': 'macro', 'text': rec_text, 'question_type': q_type})
-            processed_override_types.add(q_type)
-
-    # Case Recommendations
-    target_times_minutes = {'Data Sufficiency': 2.0, 'Two-part analysis': 3.0, 'Graph and Table': 3.0, 'Multi-source reasoning': 1.5}
-    required_cols = ['is_correct', 'overtime', 'question_type', 'content_domain', 'question_difficulty', 'question_time', 'is_sfe', 'diagnostic_params']
-    
-    # Logging to check columns in df_diagnosed and the condition for case recommendations - REMOVED by AI
-    # logging.info(f"[DI Reco Pre-Check] df_diagnosed columns: {list(df_diagnosed.columns)}")
-    missing_cols = [col for col in required_cols if col not in df_diagnosed.columns]
-    if missing_cols:
-        logging.warning(f"[DI Reco Pre-Check] Missing required columns in df_diagnosed for Case Recommendations: {missing_cols}") # Keep warning
-    condition_met = all(col in df_diagnosed.columns for col in required_cols)
-    # logging.info(f"[DI Reco Pre-Check] Condition 'all(col in df_diagnosed.columns for col in required_cols)' is {condition_met}.") # REMOVED by AI
-
-    if condition_met:
-        df_trigger = df_diagnosed[((df_diagnosed['is_correct'] == False) | (df_diagnosed['overtime'] == True))]
-        # --- Added Log after creating df_trigger --- REMOVED by AI
-        # logging.info(f"[DI Reco Logic] df_trigger created. Is empty: {df_trigger.empty}")
-        # if not df_trigger.empty:
-        #     logging.info(f"[DI Reco Logic] df_trigger head:\n{df_trigger.head().to_string()}")
-        # --- End of Added Log --- REMOVED by AI
-        
-        if not df_trigger.empty:
-            # logging.info(f"[DI Reco Logic] df_trigger is not empty. Row count: {len(df_trigger)}. Unique q_types in trigger: {df_trigger['question_type'].unique()}") # Existing Log - REMOVED by AI
-            try:
-                grouped_triggers = df_trigger.groupby(['question_type', 'content_domain'], observed=False, dropna=False) # Handle potential NaNs in grouping keys
-                for name, group_df in grouped_triggers:
-                    q_type, domain = name
-                    # logging.info(f"[DI Reco Logic] Processing group: q_type='{q_type}', domain='{domain}'") # Existing Log - REMOVED by AI
-
-                    if pd.isna(q_type) or pd.isna(domain):
-                        # logging.info(f"[DI Reco Logic] SKIPPING group ('{q_type}', '{domain}') because q_type or domain is NaN.") # Existing Log - REMOVED by AI
-                        continue
-
-                    # --- Added Logging for Skip Conditions --- REMOVED by AI
-                    
-                    # Original skip logic (kept for completeness)
-                    if q_type in processed_override_types:
-                        # logging.info(f"[DI Reco Logic] SKIPPING group ('{q_type}', '{domain}') because q_type '{q_type}' is in processed_override_types: {processed_override_types}." ) # MODIFIED Log - REMOVED by AI
-                        continue
-                    if (q_type, domain) in exempted_type_domain_combinations:
-                        # logging.info(f"[DI Reco Logic] SKIPPING group ('{q_type}', '{domain}') because it is in exempted_type_domain_combinations: {exempted_type_domain_combinations}." ) # MODIFIED Log - REMOVED by AI
-                        continue
-                    
-                    # logging.info(f"[DI Reco Logic] PROCEEDING to generate case recommendation for group ('{q_type}', '{domain}'). Row count in group: {len(group_df)}.") # Existing Log - REMOVED by AI
-
-                    min_difficulty_score = group_df['question_difficulty'].min()
-                    y_grade = _grade_difficulty_di(min_difficulty_score)
-
-                    # --- Calculate Target Time (MODIFIED FOR MSR) & Max Z ---
-                    max_z_minutes = None # Initialize
-                    target_time_minutes = None # Initialize
-                    if q_type == 'Multi-source reasoning':
-                        target_time_minutes = 6.0 if time_pressure else 7.0 # Use group target time based on pressure
-                        # Calculate max_z_minutes for MSR using group logic
-                        if 'msr_group_id' in group_df.columns and 'msr_group_total_time' in df_diagnosed.columns:
-                            triggering_group_ids = group_df['msr_group_id'].unique()
-                            group_times = df_diagnosed[df_diagnosed['msr_group_id'].isin(triggering_group_ids)]['msr_group_total_time']
-                            if group_times.notna().any():
-                                max_group_time_minutes = group_times.max()
-                                if pd.notna(max_group_time_minutes):
-                                    calculated_z_agg = math.floor(max_group_time_minutes * 2) / 2.0
-                                    max_z_minutes = max(calculated_z_agg, 6.0) # Apply 6.0 min floor
-                                else: max_z_minutes = 6.0
-                            else: max_z_minutes = 6.0
-                        else: 
-                            logging.warning(f"[DI Case Reco MSR] Missing msr_group_id or msr_group_total_time for MSR ({q_type}, {domain}). Defaulting Z to 6.0 min.")
-                            max_z_minutes = 6.0
-                    else: # Original logic for non-MSR types
-                        target_time_minutes = target_times_minutes.get(q_type, 2.0) # Use dict lookup for non-MSR target
-                        # Calculate max_z_minutes for non-MSR using single-question logic
-                        z_minutes_list = []
-                        for _, row in group_df.iterrows():
-                            q_time_minutes = row['question_time']
-                            is_overtime = row['overtime']
-                            if pd.notna(q_time_minutes):
-                                base_time_minutes = max(0, q_time_minutes - 0.5 if is_overtime else q_time_minutes)
-                                z_raw_minutes = math.floor(base_time_minutes * 2) / 2.0
-                                z = max(z_raw_minutes, target_time_minutes) # Apply non-MSR target time floor
-                                z_minutes_list.append(z)
-                        max_z_minutes = max(z_minutes_list) if z_minutes_list else target_time_minutes
-                    
-                    # Ensure max_z_minutes has a value (fallback to target time)
-                    if max_z_minutes is None:
-                         max_z_minutes = target_time_minutes # Use the determined target time (MSR or other)
-                         logging.warning(f"[DI Case Reco] max_z_minutes calculation resulted in None for ({q_type}, {domain}). Falling back to target_time: {target_time_minutes}")
-                    
-                    # Ensure target_time_minutes is defined before logging/text generation
-                    if target_time_minutes is None: # Fallback if somehow target_time wasn't set
-                         target_time_minutes = target_times_minutes.get(q_type, 2.0) # Default lookup
-                         logging.warning(f"[DI Case Reco] target_time_minutes was None for ({q_type}, {domain}) before text generation. Falling back to default: {target_time_minutes}")
-                    
-                    # Log the calculated values just before text generation - REMOVED by AI
-
-                    # --- Generate Recommendation Text ---                    
-                    z_text = f"{max_z_minutes:.1f} 分鐘" # Initial suggested time text
-                    target_time_text = f"{target_time_minutes:.1f} 分鐘" # Final target time text
-                    group_sfe = group_df['is_sfe'].any()
-                    diag_params_codes = set().union(*[s for s in group_df['diagnostic_params'] if isinstance(s, list)]) # More concise set union
-                    # Note: diag_params_codes collected but not currently used in recommendation text
-
-                    problem_desc = "錯誤或超時"
-                    sfe_prefix = "*基礎掌握不穩* " if group_sfe else ""
-                    translated_domain = t(domain) # Translate domain
-
-                    rec_text = f"{sfe_prefix}針對 **{translated_domain}** 領域的 **{q_type}** 題目 ({problem_desc})，"
-                    rec_text += f"建議練習 **{y_grade}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。"
-                    if max_z_minutes - target_time_minutes > 2.0:
-                        rec_text += " **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效。**"
-
-                    if q_type in recommendations_by_type:
-                         recommendations_by_type[q_type].append({
-                             'type': 'case_aggregated', 
-                             'is_sfe': group_sfe, 
-                             'domain': domain, 
-                             'difficulty_grade': y_grade, 
-                             'time_limit_z': max_z_minutes, # Starting suggested time
-                             'target_time_minutes': target_time_minutes, # <-- ADDED Final target time
-                             'text': rec_text, 
-                             'question_type': q_type
-                             })
-            except Exception as e: # Catch exceptions during the loop
-                 logging.error(f"Error generating case recommendation for group: ('{q_type if 'q_type' in locals() else 'unknown'}', '{domain if 'domain' in locals() else 'unknown'}'): {e}", exc_info=True) # Ensure q_type/domain exist
-        else: # df_trigger is empty
-            # logging.info(f"[DI Reco Logic] df_trigger is EMPTY. No incorrect or overtime questions found in df_diagnosed to generate case recommendations.") # REMOVED by AI
-            pass # No action needed if trigger df is empty
-
-    # Final Assembly
-    final_recommendations = []
-    # 先定義題型排序順序
-    type_order_final = ['Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
-    
-    # Add exemption notes based on type-domain combinations
-    all_type_domain_combos_in_data = set(df_diagnosed.groupby(['question_type', 'content_domain'], observed=False, dropna=False).groups.keys())
-    sorted_exemptions = sorted(list(exempted_type_domain_combinations), key=lambda x: (type_order_final.index(x[0]) if x[0] in type_order_final else 99, x[1]))
-
-    for q_type, domain in sorted_exemptions:
-        if pd.isna(q_type) or pd.isna(domain): continue
-        exempt_type_zh = t(q_type)
-        exempt_domain_zh = t(domain)
-        final_recommendations.append({
-            'type': 'exemption_note',
-            'text': f"**{exempt_domain_zh}** 領域的 **{exempt_type_zh}** 題目表現完美，已豁免練習建議。",
-            'question_type': q_type,
-            'domain': domain
-        })
-
-    for q_type in CORE_DI_QUESTION_TYPES: # Iterate through valid types found in data
-        # Check if all domain combinations for this q_type are exempted
-        all_domains_for_type_exempted = True
-        # Get all domains present in the data for this specific q_type
-        domains_for_this_q_type = df_diagnosed[df_diagnosed['question_type'] == q_type]['content_domain'].unique()
-        domains_for_this_q_type = [d for d in domains_for_this_q_type if pd.notna(d)]
-
-        if not domains_for_this_q_type: # If no domains for this type (e.g. type only had NaN domains)
-             all_domains_for_type_exempted = False # Treat as not fully exempted
-        else:
-            for domain_for_type in domains_for_this_q_type:
-                if (q_type, domain_for_type) not in exempted_type_domain_combinations:
-                    all_domains_for_type_exempted = False
-                    break
-        
-        if all_domains_for_type_exempted and q_type not in processed_override_types: # If all type+domain are exempt, and no override, skip this type's case recs
-            continue
-            
-        type_recs = recommendations_by_type.get(q_type, [])
-        if not type_recs: continue
-        type_recs.sort(key=lambda rec: 0 if rec['type'] == 'macro' else 1)
-
-        focus_note = ""
-        has_math_case_agg = any(r.get('domain') == 'Math Related' for r in type_recs if r['type'] == 'case_aggregated')
-        has_non_math_case_agg = any(r.get('domain') == 'Non-Math Related' for r in type_recs if r['type'] == 'case_aggregated')
-
-        # Use pre-translated domain names
-        if (domain_tags.get('poor_math_related') or domain_tags.get('slow_math_related')) and has_math_case_agg:
-            focus_note += f" **建議增加 {q_type} 題型下 {math_related_zh} 題目的練習比例。**"
-        if (domain_tags.get('poor_non_math_related') or domain_tags.get('slow_non_math_related')) and has_non_math_case_agg:
-            focus_note += f" **建議增加 {q_type} 題型下 {non_math_related_zh} 題目的練習比例。**"
-
-        if focus_note and type_recs:
-            # Find last non-macro index safely
-            last_agg_rec_index = -1
-            for i in range(len(type_recs) - 1, -1, -1):
-                 if type_recs[i]['type'] != 'macro': # Attach to last non-macro/exemption
-                     last_agg_rec_index = i
-                     break
-            if last_agg_rec_index != -1:
-                 type_recs[last_agg_rec_index]['text'] += focus_note
-            else: # Attach to the only rec (must be macro if list not empty)
-                 type_recs[-1]['text'] += focus_note
-
-
-        final_recommendations.extend(type_recs)
-
-    # 多級排序：
-    # 1. SFE 聚合建議 (is_sfe=True) 優先級最高 (0)
-    # 2. 宏觀建議 (type='macro') 次之 (1)
-    # 3. 非SFE聚合建議 (is_sfe=False) 再次之 (2)
-    # 4. 豁免說明 (type='exemption_note') 最後 (3)
-    # 在相同優先級內部，再按題型順序 (type_order_final) 排序
-    def sort_key(rec):
-        rec_type = rec.get('type')
-        is_sfe = rec.get('is_sfe', False) # 聚合建議才有 is_sfe
-        q_type = rec.get('question_type', 'zzzzz') # 給予一個較後的默認排序值
-        type_priority = type_order_final.index(q_type) if q_type in type_order_final else 99
-
-        if rec_type == 'case_aggregated' and is_sfe:
-            return (0, type_priority)
-        elif rec_type == 'macro':
-            return (1, type_priority)
-        elif rec_type == 'case_aggregated' and not is_sfe:
-            return (2, type_priority)
-        elif rec_type == 'exemption_note':
-            # 豁免說明通常按題型排在前面或特定位置，這裡也按題型排
-            return (3, type_priority) 
-        return (4, type_priority) # 其他類型（如果有）
-
-    final_recommendations.sort(key=sort_key)
-
-    return final_recommendations 
+    return override_results 

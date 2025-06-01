@@ -158,3 +158,40 @@ DI_TOOL_AI_RECOMMENDATIONS = {
         "AI Prompt: Verbal-related/05_evaluate_explanation.md"
     ]
 }
+
+# Parameter categories for report grouping (DI)
+DI_PARAM_CATEGORY_ORDER = [
+    'SFE', 'Reading/Interpretation', 'Concept/Application', 'Data/Calculation',
+    'Logic/Reasoning', 'Multi-Source', 'Efficiency', 'Carelessness', 'Behavioral', 'Unknown'
+]
+
+DI_PARAM_TO_CATEGORY = {
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE': 'SFE',
+    'DI_READING_COMPREHENSION_ERROR__VOCABULARY': 'Reading/Interpretation',
+    'DI_READING_COMPREHENSION_ERROR__SYNTAX': 'Reading/Interpretation',
+    'DI_READING_COMPREHENSION_ERROR__LOGIC': 'Reading/Interpretation',
+    'DI_READING_COMPREHENSION_ERROR__DOMAIN': 'Reading/Interpretation',
+    'DI_GRAPH_INTERPRETATION_ERROR__GRAPH': 'Reading/Interpretation',
+    'DI_GRAPH_INTERPRETATION_ERROR__TABLE': 'Reading/Interpretation',
+    'DI_CONCEPT_APPLICATION_ERROR__MATH': 'Concept/Application',
+    'DI_LOGICAL_REASONING_ERROR__NON_MATH': 'Logic/Reasoning',
+    'DI_CALCULATION_ERROR__MATH': 'Data/Calculation',
+    'DI_MULTI_SOURCE_INTEGRATION_ERROR': 'Multi-Source',
+    'DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION': 'Multi-Source',
+    'DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY': 'Multi-Source',
+    'DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX': 'Multi-Source',
+    'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC': 'Multi-Source',
+    'DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN': 'Multi-Source',
+    'DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH': 'Multi-Source',
+    'DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE': 'Multi-Source',
+    'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH': 'Concept/Application',
+    'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH': 'Logic/Reasoning',
+    'DI_CALCULATION_DIFFICULTY__MATH': 'Data/Calculation',
+    'DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION': 'Carelessness',
+    'DI_BEHAVIOR_CARELESSNESS_ISSUE': 'Behavioral',
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': 'Behavioral'
+}
+
+# NOTE: The previous APPENDIX_A_TRANSLATION_DI dictionary and _translate_di function 
+# have been removed as they are now replaced by the unified i18n translation system.
+# All parameter translations are now handled via the i18n system using translation keys.

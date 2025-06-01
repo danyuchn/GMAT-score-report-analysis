@@ -9,8 +9,8 @@ from .utils import _format_rate
 from .constants import (
     MAX_ALLOWED_TIME_DI
 )
-# Import needed constants from translation.py for parameter categorization
-from .translation import DI_PARAM_CATEGORY_ORDER, DI_PARAM_TO_CATEGORY
+# Import needed constants from constants.py for parameter categorization
+from .constants import DI_PARAM_CATEGORY_ORDER, DI_PARAM_TO_CATEGORY
 
 def _generate_di_summary_report(di_results):
     """Generates the summary report string for the Data Insights section based on the new structure."""

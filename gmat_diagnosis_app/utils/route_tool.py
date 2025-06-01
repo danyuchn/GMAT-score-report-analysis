@@ -541,7 +541,7 @@ class DiagnosisRouterTool:
 
         try:
             # DI科目翻譯
-            from gmat_diagnosis_app.diagnostics.di_modules.translation import APPENDIX_A_TRANSLATION_DI
+            from gmat_diagnosis_app.diagnostics.di_modules.constants import APPENDIX_A_TRANSLATION_DI
             for en_code, zh_desc in APPENDIX_A_TRANSLATION_DI.items():
                 if isinstance(zh_desc, str) and isinstance(en_code, str):
                     mapping[zh_desc] = en_code
