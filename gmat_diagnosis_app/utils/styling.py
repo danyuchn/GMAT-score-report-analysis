@@ -119,43 +119,68 @@ def format_diagnostic_report(report_text):
     report_text = re.sub(r'^    \* ', '  - ', report_text, flags=re.MULTILINE)
     
     # 5. 修正過度縮排問題（防止被識別為代碼塊）但保留層級結構
-    # 特別處理「Key Focus」和「重點關注」相關的內容，保持其下層項目的縮排
+    # 特別處理列表結構，包括Key Focus、反思提示等需要縮排層級的內容
     lines = report_text.split('\n')
     processed_lines = []
-    in_key_focus_section = False
+    in_list_section = False
+    list_section_patterns = [
+        r'^\s*.*Key Focus:|^\s*.*重點關注',  # Q報告Key Focus
+        r'^\s*.*引導性反思提示',  # DI報告反思提示
+        r'^\s*.*引導反思提示',   # V報告反思提示
+        r'^\s*.*\*\*.*\*\*：.*題目.*反思',  # 具體反思標題
+        r'^\s*.*【.*】：',  # 分類標題（如【概念應用錯誤】：）
+    ]
     
     for i, line in enumerate(lines):
-        # 檢查是否進入Key Focus區域
-        if re.match(r'^\s*.*Key Focus:|^\s*.*重點關注', line, re.IGNORECASE):
-            in_key_focus_section = True
-            processed_lines.append(line)
-            continue
+        # 檢查是否進入需要處理縮排的列表區域
+        if not in_list_section:
+            for pattern in list_section_patterns:
+                if re.match(pattern, line, re.IGNORECASE):
+                    in_list_section = True
+                    break
         
-        # 檢查是否離開Key Focus區域
-        # 如果遇到新的標題（**開頭或###開頭）則離開
-        if in_key_focus_section and line.strip():
-            if (line.startswith('**') and line.endswith('**')) or line.startswith('###') or line.startswith('##'):
-                in_key_focus_section = False
-            # 如果遇到非列表項目且非空白的行，也可能離開（但要排除說明文字）
-            elif not line.startswith('-') and not line.startswith(' ') and not line.startswith('**注意**'):
-                # 檢查是否是另一個主要段落
-                if not any(keyword in line for keyword in ['題目', '問題', '注意', '如果', '建議']):
-                    in_key_focus_section = False
+        # 檢查是否離開列表區域
+        if in_list_section and line.strip():
+            # 如果遇到新的主要標題則離開
+            if ((line.startswith('**') and line.endswith('**') and '：' not in line) or 
+                line.startswith('###') or line.startswith('##')):
+                in_list_section = False
+            # 如果遇到段落文字（非列表項目且非空白）也離開
+            elif (not line.startswith('-') and not line.startswith(' ') and 
+                  not line.startswith('**') and not line.startswith('【') and
+                  not any(keyword in line for keyword in ['題目', '問題', '注意', '如果', '建議', '方向', '反思'])):
+                in_list_section = False
         
         # 處理縮排
-        if in_key_focus_section:
-            # 在Key Focus區域，為列表項目添加適當縮排
+        if in_list_section:
+            # 為不同類型的列表項目添加適當縮排
             if line.startswith('- '):
-                # 為Key Focus下的列表項目添加2個空格縮排
+                # 第一層列表項目添加2個空格縮排
                 processed_lines.append('  ' + line)
-            elif line.startswith('**注意**'):
-                # 注意事項保持原樣
+            elif line.startswith('            * 【'):
+                # DI報告中的分類項目（原本12個空格），調整為8個空格
+                processed_lines.append('        ' + line.lstrip())
+            elif line.startswith('        * '):
+                # DI報告中的第二層項目（原本8個空格），調整為4個空格
+                processed_lines.append('    ' + line.lstrip())
+            elif line.startswith('    * '):
+                # 保持4個空格的項目不變
+                processed_lines.append(line)
+            elif re.match(r'^\s*\*\s', line):
+                # 其他星號開頭的項目，添加基本縮排
+                processed_lines.append('  ' + line.lstrip())
+            elif line.startswith('**注意**') or line.startswith('**建議**'):
+                # 注意事項和建議保持原樣
                 processed_lines.append(line)
             else:
-                # 其他內容保持原樣
-                processed_lines.append(line)
+                # 避免過度縮排成為代碼塊，但保留層級
+                leading_spaces = len(line) - len(line.lstrip())
+                if leading_spaces > 8:
+                    processed_lines.append('    ' + line.lstrip())
+                else:
+                    processed_lines.append(line)
         else:
-            # 非Key Focus區域，按原邏輯處理過度縮排
+            # 非列表區域，按原邏輯處理過度縮排
             if re.match(r'^[ ]{4,}[^\s]', line):
                 processed_lines.append('  ' + line.lstrip())
             else:
@@ -298,7 +323,7 @@ def apply_custom_css():
     
     /* 診斷報告區域樣式 */
     .diagnostic-report {
-        background-color: #ffffff;
+        background-color: transparent;
         border: 1px solid #e2e8f0;
         border-radius: 0.5rem;
         padding: 1.5rem;
