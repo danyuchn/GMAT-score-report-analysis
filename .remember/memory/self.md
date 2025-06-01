@@ -729,6 +729,23 @@ Status Check: Based on project memory files, DI diagnostic modules have already 
 2. ✅ V text reports "提示：": Fixed with translation key 'v_tip_prefix'
 3. ✅ Section Detailed Data column headers: Already using translation system via 'subject_detailed_data' key
 
+## DI Diagnosis Translation Error Fix (2025-06-01)
+
+Mistake: Passing list to translation function instead of individual strings
+Wrong:
+```python
+diag_params_codes = set().union(*[s for s in group_df['diagnostic_params'] if isinstance(s, list)])
+translated_params_list = t(list(diag_params_codes)) # Error: unhashable type: 'list'
+```
+Correct:
+```python
+diag_params_codes = set().union(*[s for s in group_df['diagnostic_params'] if isinstance(s, list)])
+translated_params_list = [t(param_code) for param_code in diag_params_codes] # Translate each parameter code separately
+```
+
+Fixed: Translation function only accepts strings as keys, not lists. Each parameter code must be translated individually.
+Applied: Fixed in gmat_diagnosis_app/diagnostics/di_modules/chapter_logic.py line 758
+
 # GMAT診斷平台開發經驗與錯誤修正記錄
 
 ## 硬編碼中文國際化修正 (2025-01-16) - 已完成

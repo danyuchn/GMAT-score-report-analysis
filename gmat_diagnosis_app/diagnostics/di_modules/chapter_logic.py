@@ -756,7 +756,7 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags, ti
                     target_time_text = f"{target_time_minutes:.1f} 分鐘" # Final target time text
                     group_sfe = group_df['is_sfe'].any()
                     diag_params_codes = set().union(*[s for s in group_df['diagnostic_params'] if isinstance(s, list)]) # More concise set union
-                    translated_params_list = t(list(diag_params_codes)) # Translate here if needed for text, else done later
+                    # Note: diag_params_codes collected but not currently used in recommendation text
 
                     problem_desc = "錯誤或超時"
                     sfe_prefix = "*基礎掌握不穩* " if group_sfe else ""
