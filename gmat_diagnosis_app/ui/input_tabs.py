@@ -12,11 +12,12 @@ from gmat_diagnosis_app.constants.config import (
     MAX_FILE_SIZE_BYTES, 
     REQUIRED_ORIGINAL_COLS
 )
+from gmat_diagnosis_app.i18n import translate as t
 
 def setup_input_tabs(preprocess_helpers_module):
     """設置輸入標籤頁，處理數據輸入和驗證"""
-    st.header("1. 上傳或貼上各科成績單")
-    st.info(f"提示：上傳的 CSV 檔案大小請勿超過 {MAX_FILE_SIZE_BYTES // (1024*1024)}MB。貼上的資料沒有此限制。")
+    st.header(t('input_tabs_upload_header'))
+    st.info(t('input_tabs_upload_info').format(MAX_FILE_SIZE_BYTES // (1024*1024)))
 
     tab_q, tab_v, tab_di, tab_total = st.tabs(["Quantitative (Q)", "Verbal (V)", "Data Insights (DI)", "Total"])
     tabs = {'Q': tab_q, 'V': tab_v, 'DI': tab_di, 'Total': tab_total}
@@ -33,15 +34,15 @@ def setup_input_tabs(preprocess_helpers_module):
     
     # 設置Total標籤頁
     with tab_total:
-        st.subheader("使用滑竿選擇總分和各科級分")
-        st.markdown("本功能可根據選擇的分數生成相應的百分位數和曲線圖")
+        st.subheader(t('input_tabs_total_subheader'))
+        st.markdown(t('input_tabs_total_description'))
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("### 總分設定")
+            st.markdown(t('input_tabs_total_score_header'))
             total_score = st.slider(
-                "GMAT總分 (205-805)",
+                t('input_tabs_total_score_slider'),
                 min_value=205,
                 max_value=805,
                 value=505,
@@ -54,9 +55,9 @@ def setup_input_tabs(preprocess_helpers_module):
                 st.session_state.total_score = total_score
         
         with col2:
-            st.markdown("### 各科級分設定")
+            st.markdown(t('input_tabs_section_scores_header'))
             q_score = st.slider(
-                "Q科級分 (60-90)",
+                t('input_tabs_q_score_slider'),
                 min_value=60,
                 max_value=90,
                 value=75,
@@ -65,7 +66,7 @@ def setup_input_tabs(preprocess_helpers_module):
             )
             
             v_score = st.slider(
-                "V科級分 (60-90)",
+                t('input_tabs_v_score_slider'),
                 min_value=60,
                 max_value=90,
                 value=75,
@@ -74,7 +75,7 @@ def setup_input_tabs(preprocess_helpers_module):
             )
             
             di_score = st.slider(
-                "DI科級分 (60-90)",
+                t('input_tabs_di_score_slider'),
                 min_value=60,
                 max_value=90,
                 value=75,
@@ -91,11 +92,11 @@ def setup_input_tabs(preprocess_helpers_module):
                 st.session_state.di_score = di_score
         
         # 創建一個示例DataFrame以供顯示
-        if st.button("確認分數設定", key="confirm_total_scores"):
+        if st.button(t('input_tabs_confirm_scores_button'), key="confirm_total_scores"):
             # 創建一個包含選定分數的DataFrame
             data = {
-                'Score_Type': ['Total Score', 'Q Scaled Score', 'V Scaled Score', 'DI Scaled Score'],
-                'Score': [total_score, q_score, v_score, di_score]
+                t('input_tabs_score_type'): [t('input_tabs_total_score'), t('input_tabs_q_scaled_score'), t('input_tabs_v_scaled_score'), t('input_tabs_di_scaled_score')],
+                t('input_tabs_score'): [total_score, q_score, v_score, di_score]
             }
             score_df = pd.DataFrame(data)
             
@@ -106,7 +107,7 @@ def setup_input_tabs(preprocess_helpers_module):
             st.session_state.total_scores_confirmed = True
             
             # 顯示所選分數
-            st.write("已選擇的分數:")
+            st.write(t('input_tabs_selected_scores'))
             st.dataframe(score_df, hide_index=True)
             
             # 存入input_dfs以供後續處理
@@ -123,7 +124,7 @@ def setup_input_tabs(preprocess_helpers_module):
             
             input_dfs['Total'] = total_df
             validation_errors['Total'] = []
-            data_source_types['Total'] = "滑竿設定"
+            data_source_types['Total'] = t('input_tabs_slider_setting')
         
         # 如果之前已經確認過分數，重新創建Total的DataFrame
         elif st.session_state.get('total_scores_confirmed', False):
@@ -139,12 +140,12 @@ def setup_input_tabs(preprocess_helpers_module):
             
             input_dfs['Total'] = total_df
             validation_errors['Total'] = []
-            data_source_types['Total'] = "滑竿設定"
+            data_source_types['Total'] = t('input_tabs_slider_setting')
             
             # 顯示確認狀態
-            st.success("✅ 分數設定已確認")
+            st.success(t('input_tabs_scores_confirmed'))
             if 'score_df' in st.session_state:
-                st.write("已選擇的分數:")
+                st.write(t('input_tabs_selected_scores'))
                 st.dataframe(st.session_state.score_df, hide_index=True)
     
     # 處理其他主題標籤頁
@@ -303,25 +304,25 @@ def display_analysis_button(df_combined_input, any_validation_errors, input_dfs,
     if all_subjects_loaded_and_valid and time_pressure_keys_filled and total_scores_confirmed:
         button_disabled = False  # Enable button
     elif not total_scores_confirmed:
-        button_message = "請先在「Total (總分與百分位)」頁籤中點擊「確認分數設定」按鈕。"
+        button_message = t('input_tabs_confirm_total_scores_required')
         st.warning(button_message, icon="⚠️")
     elif not time_pressure_keys_filled:
-        button_message = f"請為 {'、'.join(missing_time_pressure_subjects)} 科目填寫時間壓力評估（必填）。"
+        button_message = t('input_tabs_time_pressure_required').format('、'.join(missing_time_pressure_subjects))
         st.warning(button_message, icon="⚠️")
     elif any_validation_errors:
-        button_message = "部分科目數據驗證失敗，請修正上方標示的錯誤後再試。"
+        button_message = t('input_tabs_validation_errors')
         st.error(button_message)
     else:  # Not all subjects loaded or combined DF failed
         subjects_actually_loaded = [subj for subj, df in input_dfs.items() if df is not None and subj in SUBJECTS]
         missing_subjects = [subj for subj in SUBJECTS if subj not in subjects_actually_loaded]
         if missing_subjects:
-            button_message = f"請確保已為 {'、'.join(missing_subjects)} 科目提供有效數據。"
+            button_message = t('input_tabs_missing_subjects').format('、'.join(missing_subjects))
             st.warning(button_message, icon="⚠️")
         elif not input_dfs:  # No data attempted at all
-            button_message = "請在上方分頁中為 Q, V, DI 三個科目上傳或貼上資料。"
+            button_message = t('input_tabs_no_data')
             st.info(button_message)
         else:  # All attempted, but maybe combination failed or validation error cleared?
-            button_message = "請檢查所有科目的數據是否已成功加載且無誤。"
+            button_message = t('input_tabs_check_data')
             st.warning(button_message, icon="⚠️")
     
-    return st.button("開始分析", type="primary", disabled=button_disabled, key="analyze_button"), button_disabled, button_message 
+    return st.button(t('input_tabs_start_analysis'), type="primary", disabled=button_disabled, key="analyze_button"), button_disabled, button_message 

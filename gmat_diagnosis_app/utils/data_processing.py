@@ -9,6 +9,7 @@ import numpy as np
 import streamlit as st
 from thefuzz import process as fuzz_process # Renamed to avoid conflict
 from thefuzz import fuzz
+from gmat_diagnosis_app.i18n import translate as t
 
 def normalize_and_rename_headers(df, subject_key, required_cols_map, tab_container_for_warnings):
     # Ensure all column names are strings before processing
@@ -57,7 +58,7 @@ def normalize_and_rename_headers(df, subject_key, required_cols_map, tab_contain
         elif expected_col_lower in available_actual_cols_lower_map:
             matched_actual_col = available_actual_cols_lower_map[expected_col_lower]
             if matched_actual_col != expected_col:
-                 warnings.append(f"欄位自動匹配：輸入欄位 '{matched_actual_col}' 已通過忽略大小寫匹配至標準欄位 '{expected_col}'。")
+                 warnings.append(t('data_processing_auto_case_match').format(matched_actual_col, expected_col))
         
         # 3. Fuzzy match if no direct or case-insensitive match among available columns
         else:
@@ -67,7 +68,7 @@ def normalize_and_rename_headers(df, subject_key, required_cols_map, tab_contain
                     # Check if this best_match_tuple[0] (an actual user column) has already been used for another expected_col
                     # This check is implicitly handled by `available_actual_cols` being up-to-date.
                     matched_actual_col = best_match_tuple[0]
-                    warnings.append(f"欄位模糊匹配：輸入欄位 '{matched_actual_col}' 已通過模糊匹配（相似度 {best_match_tuple[1]}%）至標準欄位 '{expected_col}'。")
+                    warnings.append(t('data_processing_fuzzy_match').format(matched_actual_col, best_match_tuple[1], expected_col))
 
         if matched_actual_col:
             # If the matched_actual_col is different from the canonical expected_col, add to rename_map.
@@ -86,29 +87,32 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
     subject_key = subject.lower()
 
     uploaded_file = tab_container.file_uploader(
-        f"上傳 {subject} 科目 CSV 檔案",
+        t('data_processing_upload_file').format(subject),
         type="csv",
         key=f"{subject_key}_uploader",
-        help=f"檔案大小限制為 {max_file_size_bytes // (1024*1024)}MB。"
+        help=t('data_processing_file_size_limit').format(max_file_size_bytes // (1024*1024))
     )
     pasted_data = tab_container.text_area(
-        f"或將 {subject} 科目 Excel 資料貼在此處：",
+        t('data_processing_paste_data').format(subject),
         height=150,
         key=f"{subject_key}_paster"
     )
     
     # 添加時間壓力選擇欄位
     tab_container.divider()
-    time_pressure_options = {"0": "否，未感覺到時間壓力", "1": "是，感覺到顯著的時間壓力"}
+    time_pressure_options = {
+        "0": t('data_processing_no_time_pressure'), 
+        "1": t('data_processing_yes_time_pressure')
+    }
     time_pressure_key = f"{subject_key}_time_pressure"
     
-    tab_container.subheader("時間壓力評估（必填）")
+    tab_container.subheader(t('data_processing_time_pressure_header'))
     time_pressure = tab_container.radio(
-        f"在 {subject} 科目中，您是否感受到顯著的時間壓力？",
+        t('data_processing_time_pressure_question').format(subject),
         options=list(time_pressure_options.keys()),
         format_func=lambda x: time_pressure_options[x],
         key=time_pressure_key,
-        help="此為必填項目。您的回答將有助於更準確的分析結果。"
+        help=t('data_processing_time_pressure_help')
     )
     
     # 保存到 session_state
@@ -121,7 +125,7 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
     req_cols_list = required_original_cols.get(subject, [])
     req_cols_str = ", ".join(f"'{c}'" for c in req_cols_list)
     tab_container.caption(
-        f"系統將嘗試自動匹配欄位標頭（忽略大小寫和輕微差異）。建議的標準欄位為: {req_cols_str}。若自動匹配失敗，請確保欄位與建議一致。"
+        t('data_processing_header_match_info').format(req_cols_str)
     )
 
     temp_df = None
@@ -132,7 +136,7 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
     # Determine data source
     if uploaded_file is not None:
         if uploaded_file.size > max_file_size_bytes:
-            tab_container.error(f"檔案大小 ({uploaded_file.size / (1024*1024):.2f} MB) 超過 {max_file_size_bytes // (1024*1024)}MB 限制。")
+            tab_container.error(t('data_processing_file_too_large').format(uploaded_file.size / (1024*1024), max_file_size_bytes // (1024*1024)))
             return None, 'File Upload', [] # Return error state
         else:
             source = uploaded_file
@@ -147,7 +151,7 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
             temp_df = pd.read_csv(source, sep=None, engine='python', skip_blank_lines=True)
 
             if temp_df.empty: # Check if df is empty immediately after read
-                tab_container.warning("讀取的資料為空或格式不正確。")
+                tab_container.warning(t('data_processing_empty_data'))
                 return None, data_source_type, ["Empty or invalid data format after read."]
 
             # ---> 新增：標準化欄位標頭 <---
@@ -170,10 +174,10 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
             temp_df.reset_index(drop=True, inplace=True)
             cleaned_rows, cleaned_cols = temp_df.shape
             if initial_rows > cleaned_rows or initial_cols > cleaned_cols:
-                 tab_container.caption(f"已自動移除 {initial_rows - cleaned_rows} 個空行和 {initial_cols - cleaned_cols} 個空列。")
+                 tab_container.caption(t('data_processing_auto_cleaned').format(initial_rows - cleaned_rows, initial_cols - cleaned_cols))
 
             if temp_df.empty:
-                 tab_container.warning("讀取的資料在清理空行/空列後為空。")
+                 tab_container.warning(t('data_processing_empty_after_cleaning'))
                  return None, data_source_type, []
 
             # Add manual invalid column *before* editor
@@ -223,14 +227,14 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
                         # 使用替代方法處理NaN值，避免FutureWarning
                         temp_df['is_manually_invalid'] = processed_suggest_df['is_auto_suggested_invalid'].reindex(temp_df.index).replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
                 else:
-                     tab_container.caption("無法自動建議無效題目，缺少必要欄位(時間, 題號, 正確性)。請手動勾選。")
+                     tab_container.caption(t('data_processing_cannot_suggest_invalid'))
 
 
             except Exception as suggest_err:
-                tab_container.warning(f"自動檢測無效題目時出錯，請手動檢查: {suggest_err}", icon="⚠️")
+                tab_container.warning(t('data_processing_suggest_invalid_error').format(suggest_err), icon="⚠️")
 
             # --- Editable Preview ---
-            tab_container.write("預覽與編輯資料 (修改後請確保欄位符合要求)：")
+            tab_container.write(t('data_processing_preview_edit'))
             column_order = ['is_manually_invalid'] + [col for col in temp_df.columns if col != 'is_manually_invalid']
 
             # Ensure the checkbox column uses boolean type before editor
@@ -244,8 +248,8 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
                 column_order=column_order,
                 column_config={
                     "is_manually_invalid": st.column_config.CheckboxColumn(
-                        "是否草率做題？ (手動標記)",
-                        help="勾選此框表示您手動判斷此題為無效（例如因倉促/慌亂）。此標記將優先於系統自動建議。",
+                        t('data_processing_manual_invalid_checkbox'),
+                        help=t('data_processing_manual_invalid_help'),
                         default=False,
                     )
                     # Add other specific configs here if needed (e.g., number formats)
@@ -258,7 +262,7 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
             validation_errors, warnings = validate_dataframe(df_to_validate, subject) # validate_dataframe now modifies df_to_validate in place for corrections
 
             if validation_errors:
-                tab_container.error(f"{subject} 科目: 發現以下輸入錯誤，請修正：")
+                tab_container.error(t('data_processing_validation_errors').format(subject))
                 for error in validation_errors:
                     tab_container.error(f"- {error}")
                 return None, data_source_type, validation_errors # Indicate validation failure
@@ -288,12 +292,12 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
                  final_df['is_correct'] = final_df['is_correct'].apply(lambda x: True if str(x).strip().lower() == 'correct' else False)
             else:
                  # This case should be caught by validation, but as a safeguard:
-                 tab_container.error(f"{subject}: 編輯/驗證後仍缺少 'Performance'/'is_correct' 欄位。", icon="🚨")
+                 tab_container.error(t('data_processing_missing_performance').format(subject), icon="🚨")
                  return None, data_source_type, ["Missing 'Performance' column after edits."]
 
             # Ensure question_position is numeric and sequential if missing/invalid
             if 'question_position' not in final_df.columns or pd.to_numeric(final_df['question_position'], errors='coerce').isnull().any():
-                tab_container.warning(f"{subject}: 'Question'/'question_position' 缺失或無效，將根據當前順序重新生成題號。", icon="⚠️")
+                tab_container.warning(t('data_processing_regenerate_question_numbers').format(subject), icon="⚠️")
                 final_df = final_df.reset_index(drop=True) # Ensure index is clean before assigning
                 final_df['question_position'] = final_df.index + 1
             else:
@@ -312,14 +316,14 @@ def process_subject_tab(subject, tab_container, base_rename_map, max_file_size_b
             # 添加主觀時間壓力值到數據框中
             final_df['subjective_time_pressure'] = int(time_pressure)
 
-            tab_container.success(f"{subject} 科目資料讀取與驗證成功 ({data_source_type})！")
+            tab_container.success(t('data_processing_success').format(subject, data_source_type))
             return final_df, data_source_type, warnings
 
         except pd.errors.ParserError as pe:
-             tab_container.error(f"無法解析 {subject} 資料。請檢查是否為有效的 CSV 或 Tab 分隔格式，且標頭正確。錯誤: {pe}")
+             tab_container.error(t('data_processing_parse_error').format(subject, pe))
              return None, data_source_type, [f"ParserError: {pe}"]
         except Exception as e:
-            tab_container.error(f"處理 {subject} 科目資料時發生未預期錯誤：{e}")
+            tab_container.error(t('data_processing_unexpected_error').format(subject, e))
             # tab_container.code(traceback.format_exc()) # Optional: show full traceback for debugging
             return None, data_source_type, [f"Unexpected error: {e}"]
 

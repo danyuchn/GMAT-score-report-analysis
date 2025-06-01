@@ -318,8 +318,8 @@ def _generate_di_summary_report(di_results):
     # A. 檢視練習記錄 (二級證據參考)
     report_lines.append("* **A. 檢視練習記錄 (二級證據參考)**")
     if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
-        report_lines.append("    * **目的：** 當無法準確回憶具體的錯誤原因、涉及知識點，或需更客觀數據確認問題模式時。")
-        report_lines.append("    * **方法：** 按照以上指引查看近期練習記錄，整理相關錯題或超時題目。")
+        report_lines.append(f"    * {t('di_review_practice_purpose')}")
+        report_lines.append(f"    * {t('di_review_practice_method')}")
 
         core_issue_texts_for_review = []
         if sfe_triggered: core_issue_texts_for_review.append(t(sfe_code))
