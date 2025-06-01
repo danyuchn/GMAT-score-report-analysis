@@ -1284,4 +1284,12 @@ including updated content from the "Edit Diagnostic Labels" tab (if you have edi
     'di_comprehensive_foundation_consolidation': "Recommend comprehensive foundation consolidation",
     'di_unknown_value': "Unknown",
     'di_targeted_domain_question': "For **{}** domain **{}** questions ({})",
+    'DI_DATA_EXTRACTION_ERROR': "DI Data Extraction (GT): Data extraction error from charts",
+    'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR': "DI Information Extraction/Inference (GT/MSR Non-Math): Information location/inference error",
+    'DI_QUESTION_TYPE_SPECIFIC_ERROR': "DI Question Type Specific Error (e.g., MSR Non-Math subtypes)",
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE': "DI Foundation Mastery: Application Instability (Special Focus Error)",
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "DI Behavior: Early Test Phase Too Fast Risk",
+    'DI_EFFICIENCY_BOTTLENECK_LOGIC': "DI Efficiency Bottleneck: Logic Reasoning Speed",
+    'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE': "DI Efficiency Bottleneck: Graph/Table Reading Speed",
+    'DI_EFFICIENCY_BOTTLENECK_INTEGRATION': "DI Efficiency Bottleneck: Multi-Source Integration Speed",
 }

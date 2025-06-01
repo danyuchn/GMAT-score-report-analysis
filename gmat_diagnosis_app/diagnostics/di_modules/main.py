@@ -94,22 +94,16 @@ def run_di_diagnosis(
         else: # Ensure it handles empty strings if already present
             df_di['time_performance_category'] = df_di['time_performance_category'].replace({'': t('Unknown'), pd.NA: t('Unknown'), None: t('Unknown'), np.nan: t('Unknown')})
 
-        # 添加調試日誌：記錄原始數據
+        # Debug logging: Record original data status
         total_questions = len(df_di)
-        # logging.info(f"[DI數據追蹤] 原始數據總題數: {total_questions}")
         if 'is_correct' in df_di.columns:
             correct_count = df_di['is_correct'].sum()
             wrong_count = total_questions - correct_count
-            # logging.info(f"[DI數據追蹤] 原始數據答對題數: {correct_count}, 答錯題數: {wrong_count}")
         if 'is_invalid' in df_di.columns:
             invalid_count = df_di['is_invalid'].sum()
             valid_count = total_questions - invalid_count
-            # logging.info(f"[DI數據追蹤] 原始數據有效題數: {valid_count}, 無效題數: {invalid_count}")
-            
-        # logging.debug(f"[run_di_diagnosis_logic] Starting diagnosis. Input df shape: {df_di.shape}")
 
         # --- Chapter 0: Derivative Data Calculation & Basic Prep ---
-        # logging.debug("[run_di_diagnosis_logic] Chapter 0: Basic Prep")
         df_di['question_time'] = pd.to_numeric(df_di['question_time'], errors='coerce')
         if 'question_position' not in df_di.columns: df_di['question_position'] = range(len(df_di))
         else: df_di['question_position'] = pd.to_numeric(df_di['question_position'], errors='coerce')
@@ -122,49 +116,36 @@ def run_di_diagnosis(
         if 'is_invalid' not in df_di.columns:
             df_di['is_invalid'] = False
             
-        # 添加調試日誌：數據類型轉換後的狀態
-        # logging.info(f"[DI數據追蹤] 數據類型轉換後 - 總題數: {len(df_di)}, 答對題數: {df_di['is_correct'].sum()}, 答錯題數: {(~df_di['is_correct']).sum()}, 無效題數: {df_di['is_invalid'].sum()}")
-
-        # df_di = _calculate_msr_metrics(df_di) # Removed call, MSR metrics are now expected from preprocessor
-        # logging.debug(f"[run_di_diagnosis_logic] After _calculate_msr_metrics, df shape: {df_di.shape}") # Updated name
+        # Debug logging: Data status after type conversion
 
         # --- Chapter 1: Time Strategy & Validity ---
-        # logging.debug("[run_di_diagnosis_logic] Chapter 1: Time Strategy & Validity")
         total_test_time_di = df_di['question_time'].sum(skipna=True) # Ensure NaNs are skipped
         time_diff = MAX_ALLOWED_TIME_DI - total_test_time_di
 
-        # --- 添加識別異常快速作答的邏輯（核心邏輯文件第一章）---
-        # 初始化 suspiciously_fast 列
+        # --- Add logic for identifying abnormally fast responses (Core Logic Document Chapter 1) ---
+        # Initialize suspiciously_fast column
         df_di['suspiciously_fast'] = False # This column might be redundant after full invalid logic
         
-        # 計算考試前三分之一各題型平均時間 (first_third_average_time_per_type)
+        # Calculate first third average time per question type
         first_third_average_time_per_type = calculate_first_third_average_time_per_type(
             df_di, ['DS', 'TPA', 'MSR', 'GT', 'Data Sufficiency', 'Two-part analysis', 'Multi-source reasoning', 'Graph and Table']
         )
 
-        # 舊的 suspiciously_fast 邏輯 (基於全局平均) 可以被新的 is_invalid 邏輯覆蓋或移除
+        # Old suspiciously_fast logic (based on global average) can be overridden or removed by new is_invalid logic
         # For now, we comment it out as the new invalid logic is more comprehensive
-        # if 'question_position' in df_di.columns and 'question_time' in df_di.columns:
-        #     positions = df_di['question_position'].sort_values().unique()
-        #     first_third_positions = positions[:max(1, len(positions) // 3)]
-        #     first_third_mask = df_di['question_position'].isin(first_third_positions)
-        #     first_third_avg_time = df_di.loc[first_third_mask, 'question_time'].mean()
-        #     suspicious_fast_threshold = first_third_avg_time * SUSPICIOUS_FAST_MULTIPLIER
-        #     suspiciously_fast_mask = df_di['question_time'].notna() & (df_di['question_time'] < suspicious_fast_threshold)
-        #     df_di.loc[suspiciously_fast_mask, 'suspiciously_fast'] = True
             
-        # 核心邏輯：標記無效數據 (is_invalid)
-        if time_pressure_status: # 文檔標準：僅在 time_pressure == True 時執行
-            # 獲取所有題目位置
+        # Core logic: Mark invalid data (is_invalid)
+        if time_pressure_status: # Document standard: Only execute when time_pressure == True
+            # Get all question positions
             all_positions_sorted = sorted(df_di['question_position'].unique())
             if len(all_positions_sorted) > 0: # Ensure all_positions_sorted is not empty
-                # 確定題目總數的後三分之一起始位置
+                # Determine starting position for last third of total questions
                 num_total_questions = len(all_positions_sorted)
                 last_third_start_index = num_total_questions - (num_total_questions // 3)
-                # 獲取後三分之一的題目位置列表 (0-indexed for iloc, but positions themselves are values)
+                # Get last third question position list (0-indexed for iloc, but positions themselves are values)
                 last_third_positions_values = all_positions_sorted[last_third_start_index:]
 
-                # 篩選出位於後三分之一的題目
+                # Filter questions in last third
                 last_third_questions_df = df_di[df_di['question_position'].isin(last_third_positions_values)].copy() # Use .copy()
 
                 if not last_third_questions_df.empty:
@@ -177,15 +158,15 @@ def run_di_diagnosis(
                         
                         abnormally_fast = False
 
-                        # 標準 1 (疑似放棄) - Independent check
+                        # Standard 1 (suspected abandonment) - Independent check
                         if pd.notna(q_time) and q_time < INVALID_TIME_THRESHOLD_MINUTES: # 0.5 minutes
                             abnormally_fast = True
 
-                        # 標準 2 (絕對倉促) - Independent check  
+                        # Standard 2 (absolute haste) - Independent check  
                         if pd.notna(q_time) and q_time < 1.0: # 1.0 minutes (use EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES)
                             abnormally_fast = True
                         
-                        # 標準 3-5 (相對單題倉促 - DS, TPA, GT) - Independent check
+                        # Standards 3-5 (relative single-question haste - DS, TPA, GT) - Independent check
                         if q_type in ['DS', 'TPA', 'GT', 'Data Sufficiency', 'Two-part analysis', 'Graph and Table']: # Handle variations in q_type names
                             # Map variations to standard names for lookup
                             standard_q_type = q_type
@@ -197,7 +178,7 @@ def run_di_diagnosis(
                             if avg_time is not None and pd.notna(avg_time) and pd.notna(q_time) and q_time < (avg_time * SUSPICIOUS_FAST_MULTIPLIER):
                                 abnormally_fast = True
                         
-                        # 標準 6 (相對題組倉促 - MSR) - Independent check
+                        # Standard 6 (relative group haste - MSR) - Independent check
                         if q_type in ['MSR', 'Multi-source reasoning']:
                             standard_q_type_msr = 'MSR' # Standardize for lookup
                             avg_time_msr = first_third_average_time_per_type.get(standard_q_type_msr)
@@ -211,7 +192,6 @@ def run_di_diagnosis(
 
                         if abnormally_fast:
                             df_di.loc[index, 'is_invalid'] = True
-                            # logging.debug(f"Marked question pos {row['question_position']} as invalid due to abnormal fast response.")
         
         num_invalid_questions_total = df_di['is_invalid'].sum()
         di_diagnosis_results['invalid_count'] = num_invalid_questions_total
@@ -219,14 +199,12 @@ def run_di_diagnosis(
         # Initialize diagnostic_params if needed
         if 'diagnostic_params' not in df_di.columns:
             try:
-                # logging.debug(f"[run_di_diagnosis_logic] Initializing 'diagnostic_params'. df_di shape: {df_di.shape}, length of list: {len(df_di)}")
                 df_di['diagnostic_params'] = [[] for _ in range(len(df_di))]
             except Exception as e:
                 logging.error(f"Error initializing 'diagnostic_params': {e}", exc_info=True)
                 raise e
         else:
             try:
-                # logging.debug(f"[run_di_diagnosis_logic] Ensuring 'diagnostic_params' is list. df_di shape: {df_di.shape}")
                 df_di['diagnostic_params'] = df_di['diagnostic_params'].apply(lambda x: list(x) if isinstance(x, (list, set, tuple)) else [])
             except Exception as e:
                 logging.error(f"Error ensuring 'diagnostic_params' is list: {e}", exc_info=True)
@@ -235,7 +213,6 @@ def run_di_diagnosis(
         # Add invalid tag
         final_invalid_mask_di = df_di['is_invalid']
         if final_invalid_mask_di.any():
-            # logging.debug(f"[run_di_diagnosis_logic] Updating 'diagnostic_params' for invalid rows in df_di. df_di shape: {df_di.shape}, number invalid: {final_invalid_mask_di.sum()}")
             for idx in df_di.index[final_invalid_mask_di]:
                 try:
                     current_list = df_di.loc[idx, 'diagnostic_params']
@@ -247,7 +224,6 @@ def run_di_diagnosis(
 
         # --- Mark Overtime (Vectorized Approach) on df_di ---
         try:
-            # logging.debug(f"[run_di_diagnosis_logic] Initializing 'overtime' column in df_di. df_di shape: {df_di.shape}")
             df_di['overtime'] = False
         except Exception as e:
             logging.error(f"Error initializing 'overtime': {e}", exc_info=True)

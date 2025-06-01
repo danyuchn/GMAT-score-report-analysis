@@ -42,6 +42,23 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     """Displays the diagnosis report, styled DataFrame, and download button for a subject."""
     tab_container.subheader(t("subject_diagnostic_report").format(subject))
     
+    # Create translated excel_map dynamically at function start to ensure it's always available
+    subject_excel_map = {
+        "Subject": t("column_subject"),
+        "question_position": t("column_question_number"),
+        "question_type": t("column_question_type"),
+        "question_fundamental_skill": t("column_tested_ability"),
+        "question_difficulty": t("column_simulated_difficulty"),
+        "question_time": t("column_response_time_minutes"),
+        "time_performance_category": t("column_time_performance"),
+        "content_domain": t("column_content_domain"),
+        "diagnostic_params_list": t("column_diagnostic_tags"),
+        "is_correct": t("column_is_correct"),
+        "is_sfe": t("column_is_sfe"),
+        "is_invalid": t("column_is_invalid"),
+        "overtime": "overtime_flag",  # Internal flag for Excel styling, will be hidden by to_excel
+    }
+    
     try:
         if df_subject is not None and not df_subject.empty and 'diagnostic_params_list' in df_subject.columns and 'question_type' in df_subject.columns:
             rc_data_session = df_subject[df_subject['question_type'] == 'Reading Comprehension'][['question_position', 'diagnostic_params_list']]
@@ -65,22 +82,12 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         # Data preprocessing before table display
         subject_col_config = col_config.copy()
         
-        # Create translated excel_map dynamically
-        subject_excel_map = {
-            "Subject": t("column_subject"),
-            "question_position": t("column_question_number"),
-            "question_type": t("column_question_type"),
-            "question_fundamental_skill": t("column_tested_ability"),
-            "question_difficulty": t("column_simulated_difficulty"),
-            "question_time": t("column_response_time_minutes"),
-            "time_performance_category": t("column_time_performance"),
-            "content_domain": t("column_content_domain"),
-            "diagnostic_params_list": t("column_diagnostic_tags"),
-            "is_correct": t("column_is_correct"),
-            "is_sfe": t("column_is_sfe"),
-            "is_invalid": t("column_is_invalid"),
-            "overtime": "overtime_flag",  # Internal flag for Excel styling, will be hidden by to_excel
-        }
+        # Subject-specific processing for excel map
+        if subject == 'DI':
+            # Remove 'Tested Ability' field for DI section
+            if 'question_fundamental_skill' in subject_excel_map:
+                subject_excel_map = subject_excel_map.copy()  # Make a copy to avoid modifying the original
+                del subject_excel_map['question_fundamental_skill']
         
         # Copy dataframe to avoid modifying original data
         df_display = df_subject.copy()
@@ -89,13 +96,11 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         if 'question_position' in df_display.columns:
             df_display = df_display.sort_values(by='question_position').reset_index(drop=True)
         
-        # Subject-specific processing
+        # Subject-specific processing for column config
         if subject == 'DI':
             # Remove 'Tested Ability' field for DI section
             if 'question_fundamental_skill' in subject_col_config:
                 del subject_col_config['question_fundamental_skill']
-            if 'question_fundamental_skill' in subject_excel_map:
-                del subject_excel_map['question_fundamental_skill']
         
         # Check invalid data type and values
         if 'is_invalid' in df_display.columns:

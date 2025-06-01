@@ -234,7 +234,7 @@
             - **正常時間做錯 (`is_normal_time` & `is_correct`==`False`) / 快而錯 (`is_relatively_fast` & `is_correct`==`False`):**
                 - *可能原因 (診斷參數)*: 
                     - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math - 考點不熟或應用錯誤)
-                    - `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (主要針對快而錯)
                     - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 遵循通用邏輯。需學生**識別數學相關考點 (參考本章開頭列表)**。
             - **快而對 (`is_relatively_fast` & `is_correct`==`True`):** 提醒避免粗心/被標記；若在後段則詢問是否倉促。
@@ -255,7 +255,7 @@
                 - *可能原因 (診斷參數)*: 
                     - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (文字理解疏漏/錯誤)
                     - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math - 題目內在邏輯應用錯誤)
-                    - `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (主要針對快而錯)
                     - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 遵循通用邏輯，此處**強烈建議觸發二級證據 + 質化分析**。
             - **快而對 (`is_relatively_fast` & `is_correct`==`True`):** 同 A.1 快而對。
@@ -268,7 +268,7 @@
                 - *診斷行動*: 應用通用邏輯，根據情況要求識別考點 **(參考本章開頭列表)** 或分析效率瓶頸。
         - **B.2. `Non-Math Related**
             - **慢而錯 / 慢而對 / 正常時間做錯 / 快而錯 / 快而對 / 正常時間做對**
-                - *可能原因/效率瓶頸 (診斷參數)*: 參考 ``DS Non-Math Related`` (`` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``, `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math), `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` ``, `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math), `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (快錯時))。
+                - *可能原因/效率瓶頸 (診斷參數)*: 參考 ``DS Non-Math Related`` (`` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``, `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math), `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` ``, `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math), `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (快錯時))。
                 - *診斷行動*: 應用通用邏輯，強調在正常/快錯時進行質化分析。
 
     - **C. Graph & Table (`GT`)** (結構同 `DS`/`TPA`，應用通用診斷行動邏輯)
@@ -283,7 +283,7 @@
                     - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                     - `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` `` (慢而對時主要考慮)
                     - `` `DI_CALCULATION_DIFFICULTY__MATH` `` (慢而對時主要考慮)
-                    - `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (快錯時主要考慮)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (快錯時主要考慮)
                 - *診斷行動*: 應用通用邏輯，要求識別數學考點 **(參考本章開頭列表)** 或圖表類型。
         - **C.2. `Non-Math Related**
             - **慢而錯 / 慢而對 / 正常時間做錯 / 快而錯 / 快而對 / 正常時間做對**
@@ -295,7 +295,7 @@
                     - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                     - `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` `` (慢而對時主要考慮)
                     - `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math) (慢而對時主要考慮)
-                    - `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (快錯時主要考慮)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (快錯時主要考慮)
                 - *診斷行動*: 應用通用邏輯，強調在正常/快錯時進行質化分析。
 
     - **D. Multi-Source Reasoning (`MSR`)** (結構同上，應用通用診斷行動邏輯)
@@ -327,7 +327,7 @@
             - **正常時間做錯 (`is_normal_time` & `is_correct`==`False`) / 快而錯 (`is_relatively_fast` & `is_correct`==`False`):**
                 - *可能原因 (診斷參數)*: 
                     - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (主要針對快而錯)
                     - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 應用通用邏輯，需學生**識別數學相關考點 (參考本章開頭列表)**。
             - **快而對 (`is_relatively_fast` & `is_correct`==`True`):** 同 A.1 快而對。
@@ -353,7 +353,7 @@
                 - *可能原因 (診斷參數)*: 
                     - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``
                     - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math)
-                    - `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` (主要針對快而錯)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (主要針對快而錯)
                     - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 SFE 觸發)
                 - *診斷行動*: 應用通用邏輯，此處**強烈建議觸發二級證據 + 質化分析**，分析是否與 `main idea`, `supporting idea`, `inference` 相關。
             - **快而對 (`is_relatively_fast` & `is_correct`==`True`):** 同 A.1 快而對。
@@ -625,8 +625,6 @@
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
             * `` `DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK` `` →
                 * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
-            * `` `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION` `` →
-                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
 
         * **通用 DI 複習/練習:**
             * **Tool:** `GMAT_Terminator_DI_Review.md`
@@ -657,7 +655,6 @@
 * `DI_LOGICAL_REASONING_ERROR__NON_MATH`: DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷
 * `DI_CALCULATION_ERROR__MATH`: DI 計算錯誤 (數學): 數學計算
 * `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`: DI 基礎掌握: 應用不穩定 (Special Focus Error)
-* `DI_BEHAVIOR__CARELESSNESS_DETAIL_OMISSION`: DI 行為: 粗心 - 細節忽略/看錯
 * `DI_BEHAVIOR__CARELESSNESS_ISSUE`: DI 行為: 粗心 - 整體快錯率偏高
 * `DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK`: DI 行為: 測驗前期作答過快風險
 
@@ -741,10 +738,8 @@
 | `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE`     | DI 效率瓶頸: 圖表解讀耗時                          |
 | `DI_EFFICIENCY_BOTTLENECK_INTEGRATION`     | DI 效率瓶頸: 多源信息整合耗時 (MSR)              |
 | **DI - Behavior**                          |                                                    |
-| `DI_CARELESSNESS_DETAIL_OMISSION`          | DI 行為: 粗心 - 細節忽略/看錯 (快錯時隱含)         |
-| **行為模式 (Behavioral Patterns)**       |                                                    |
-| `BEHAVIOR_CARELESSNESS_ISSUE`         | 行為模式: 粗心 - 整體快錯率偏高 (fast_wrong_rate > 25%) |
-| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`    | 行為模式: 測驗前期作答過快風險 (< 1.0 min, 注意 flag for review) |
+| `DI_BEHAVIOR__CARELESSNESS_ISSUE`          | DI 行為: 粗心 - 整體快錯率偏高 (fast_wrong_rate > 25%) |
+| `DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK`     | DI 行為: 測驗前期作答過快風險 (< 1.0 min, 注意 flag for review) |
 
 
 

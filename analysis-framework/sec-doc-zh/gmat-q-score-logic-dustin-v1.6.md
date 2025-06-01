@@ -147,7 +147,10 @@
 
 **本章目標：**深入探究學生答錯的題目（使用過濾數據）。
 **主要關注：**根據學生在錯題上花費的時間長短，以及題目相對於該生能力的難易程度，對錯誤進行分類，並生成標準化**英文診斷標籤參數**。
-**為何重要：**旨在理解錯誤的*性質*。是粗心大意（快而錯）？是花了時間但仍無法掌握（慢而錯）？還是在相對簡單的題目上意外失誤（觸發 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``）？
+**為何重要：**旨在理解錯誤的*性質*。是粗心大意（快而錯）？是花了時間但仍無法掌握（慢而錯）？還是在相對簡單的題目上意外失誤（觸發 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``）？
+
+    - **SFE 判斷:** 如果該題目的 `question_difficulty` ≤ **25百分位數** (例如 ≤ 31分) 且答錯，則設置 `special_focus_error` = `True`，並關聯診斷參數 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``。
+    - **`special_focus_error` / `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` 優先處理方式**: 在第七章生成練習建議和第八章輸出診斷總結時，應將標記為 `special_focus_error` = `True` 的題目及其對應的診斷參數 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` 和建議**優先列出或特別標註** (例如，在列表中置頂並加註「*基礎掌握不穩*」)。
 
 </aside>
 
@@ -156,8 +159,8 @@
     - `max_correct_difficulty_per_skill`[`skill`] (每個 `question_fundamental_skill` 下 `is_correct` == `True` 的題目中的最高 `question_difficulty`)
 2. **分析錯誤題 (遍歷過濾數據中 `is_correct` == `False` 的題目)：**
     - 對每道錯誤題：
-        - **檢查是否特殊關注錯誤 (`special_focus_error`)**: 判斷該錯誤題目的 `question_difficulty` 是否低於其對應 `question_fundamental_skill` 的 `max_correct_difficulty_per_skill`[`skill`]。若是，則標記 `special_focus_error` = `True`，並關聯診斷參數 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``。
-        - **`special_focus_error` / `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 優先處理方式**: 在第七章生成練習建議和第八章輸出診斷總結時，應將標記為 `special_focus_error` = `True` 的題目及其對應的診斷參數 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 和建議**優先列出或特別標註** (例如，在列表中置頂並加註「*基礎掌握不穩*」)。
+        - **檢查是否特殊關注錯誤 (`special_focus_error`)**: 判斷該錯誤題目的 `question_difficulty` 是否低於其對應 `question_fundamental_skill` 的 `max_correct_difficulty_per_skill`[`skill`]。若是，則標記 `special_focus_error` = `True`，並關聯診斷參數 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``。
+        - **`special_focus_error` / `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` 優先處理方式**: 在第七章生成練習建議和第八章輸出診斷總結時，應將標記為 `special_focus_error` = `True` 的題目及其對應的診斷參數 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` 和建議**優先列出或特別標註** (例如，在列表中置頂並加註「*基礎掌握不穩*」)。
         - **分類錯誤類型並記錄可能原因：**
             - **時間表現分類 (`Time Performance`):**
                 - 快 (`is_relatively_fast`): `question_time` < `average_time_per_type`[該題 `question_type`] * 0.75。
@@ -178,7 +181,7 @@
                         - `` `Q_READING_COMPREHENSION_ERROR` `` (若 `question_type` == 'Real')
                         - `` `Q_CONCEPT_APPLICATION_ERROR` ``
                         - `` `Q_CALCULATION_ERROR` ``
-                        - `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 `special_focus_error` == `True`)
+                        - `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 `special_focus_error` == `True`)
                     - *主要診斷行動*: 
                         1. *回憶*: 請學生回憶卡關點，哪個環節耗時最長？
                         2. *觸發二級證據*: 若無法清晰回憶，建議查看近期在該 `question_fundamental_skill` 及相關題型下的慢錯題目記錄，歸納障礙類型。
@@ -189,7 +192,7 @@
                         - `` `Q_CONCEPT_APPLICATION_ERROR` ``
                         - `` `Q_PROBLEM_UNDERSTANDING_ERROR` ``
                         - `` `Q_CALCULATION_ERROR` `` (若涉及複雜計算)
-                        - `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (若 `special_focus_error` == `True`)
+                        - `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (若 `special_focus_error` == `True`)
                     - *主要診斷行動*: 
                         1. *回憶*: 請學生回憶錯誤原因。
                         2. *觸發二級證據*: 若無法清晰回憶，建議查看近期在該 `question_fundamental_skill` 及相關題型下的正常時間做錯題目記錄，歸納錯誤模式。
@@ -197,9 +200,9 @@
 
 <aside>
 
-**本章總結：** 我們分析了所有錯誤題目，根據其作答時間（快/慢/正常）進行分類。引入了診斷參數 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 對應 `special_focus_error` 並明確了其優先處理方式。針對不同錯誤類型，列出了可能的**英文診斷參數**（如 `` `BEHAVIOR_CARELESSNESS_ISSUE` ``, `` `Q_CONCEPT_APPLICATION_ERROR` `` 等）。同時，為無法清晰回憶錯誤原因的情況，提供了二級證據和質化分析的建議路徑。
+**本章總結：** 我們分析了所有錯誤題目，根據其作答時間（快/慢/正常）進行分類。引入了診斷參數 `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` 對應 `special_focus_error` 並明確了其優先處理方式。針對不同錯誤類型，列出了可能的**英文診斷參數**（如 `` `BEHAVIOR_CARELESSNESS_ISSUE` ``, `` `Q_CONCEPT_APPLICATION_ERROR` `` 等）。同時，為無法清晰回憶錯誤原因的情況，提供了二級證據和質化分析的建議路徑。
 
-**結果去向：** 這些錯誤分類、診斷參數以及 `special_focus_error` / `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` 標記是後續生成具體練習建議（第七章）的關鍵依據。二級證據和質化分析的建議旨在幫助學生更深入地理解問題根源。第八章的總結報告將引用這些參數（並通過附錄翻譯）。
+**結果去向：** 這些錯誤分類、診斷參數以及 `special_focus_error` / `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` 標記是後續生成具體練習建議（第七章）的關鍵依據。二級證據和質化分析的建議旨在幫助學生更深入地理解問題根源。第八章的總結報告將引用這些參數（並通過附錄翻譯）。
 
 </aside>
 
@@ -435,7 +438,7 @@
     * **若診斷涉及計算錯誤或基礎掌握問題:**
         * `` `Q_CALCULATION_ERROR` `` →
             * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/02_quick_math_tricks.md` ``
-        * `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` →
+        * `` `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` →
             * **Tool:** `Dustin_GMAT_Textbook_Explainer.md`
             * AI Prompt: **優先** `` `Quant-related/01_basic_explanation.md` ``；輔助 `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/05_variant_questions.md` ``。
 
@@ -473,7 +476,7 @@
 * `Q_READING_COMPREHENSION_ERROR`: Q 閱讀理解錯誤：題目文字理解
 * `Q_CONCEPT_APPLICATION_ERROR`: Q 概念應用錯誤：數學觀念/公式應用
 * `Q_CALCULATION_ERROR`: Q 計算錯誤：數學計算
-* `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`: Q 基礎掌握：應用不穩定（Special Focus Error）
+* `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`: Q 基礎掌握：應用不穩定（Special Focus Error）
 * `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`: 行為模式：前期作答過快（Flag risk）
 * `BEHAVIOR_CARELESSNESS_ISSUE`: 行為模式：整體粗心問題（快而錯比例高）
 
@@ -482,7 +485,7 @@
 * `Q_READING_COMPREHENSION_ERROR`: Q 閱讀理解錯誤：題目文字理解
 * `Q_CONCEPT_APPLICATION_ERROR`: Q 概念應用錯誤：數學觀念/公式應用
 * `Q_CALCULATION_ERROR`: Q 計算錯誤：數學計算
-* `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`: Q 基礎掌握：應用不穩定（Special Focus Error）
+* `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`: Q 基礎掌握：應用不穩定（Special Focus Error）
 * `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`: 行為模式：前期作答過快（Flag risk）
 * `BEHAVIOR_CARELESSNESS_ISSUE`: 行為模式：整體粗心問題（快而錯比例高）
 
@@ -494,7 +497,7 @@
 * `Q_READING_COMPREHENSION_DIFFICULTY`: Q 閱讀理解障礙：題目文字理解困難
 * `Q_CONCEPT_APPLICATION_DIFFICULTY`: Q 概念應用障礙：數學觀念/公式應用困難
 * `Q_CALCULATION_DIFFICULTY`: Q 計算障礙：數學計算困難
-* `Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`: Q 基礎掌握：應用不穩定（Special Focus Error）
+* `Q_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`: Q 基礎掌握：應用不穩定（Special Focus Error）
 
 ### 時間表現: 慢且對 (`Slow & Correct`)
 

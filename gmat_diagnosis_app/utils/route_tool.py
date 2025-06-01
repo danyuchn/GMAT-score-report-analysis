@@ -531,7 +531,7 @@ class DiagnosisRouterTool:
             logging.warning("無法匯入Q科目翻譯字典")
 
         try:
-            # V科目翻譯
+            # V科目翻譯 - 修正匯入路徑
             from gmat_diagnosis_app.diagnostics.v_modules.translations import APPENDIX_A_TRANSLATION_V
             for en_code, zh_desc in APPENDIX_A_TRANSLATION_V.items():
                 if isinstance(zh_desc, str) and isinstance(en_code, str):
@@ -539,14 +539,9 @@ class DiagnosisRouterTool:
         except ImportError:
             logging.warning("無法匯入V科目翻譯字典")
 
-        try:
-            # DI科目翻譯
-            from gmat_diagnosis_app.diagnostics.di_modules.constants import APPENDIX_A_TRANSLATION_DI
-            for en_code, zh_desc in APPENDIX_A_TRANSLATION_DI.items():
-                if isinstance(zh_desc, str) and isinstance(en_code, str):
-                    mapping[zh_desc] = en_code
-        except ImportError:
-            logging.warning("無法匯入DI科目翻譯字典")
+        # Note: DI modules have migrated to unified i18n system and no longer use APPENDIX_A_TRANSLATION_DI
+        # The translation mappings are now handled through the central i18n system
+        # This eliminates the need for separate DI translation dictionary imports
 
         return mapping
 

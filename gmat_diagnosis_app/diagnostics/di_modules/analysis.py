@@ -16,9 +16,14 @@ from .constants import (
     CARELESSNESS_THRESHOLD,
     TOTAL_QUESTIONS_DI, # Import TOTAL_QUESTIONS_DI
     EARLY_RUSHING_ABSOLUTE_THRESHOLD_MINUTES, # Import new constant
+    RELATIVELY_FAST_MULTIPLIER
 )
+from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
 from gmat_diagnosis_app.i18n import translate as t # Use unified i18n system
 from .utils import grade_difficulty_di, format_rate
+
+# Define threshold for hasty guessing
+HASTY_GUESSING_THRESHOLD_MINUTES = 0.5
 
 
 def diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
@@ -38,10 +43,16 @@ def diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
     df_diagnosed = df.copy()
     
     # Initialize diagnostic parameters column
-    df_diagnosed['diagnostic_params'] = [[] for _ in range(len(df_diagnosed))]
+    if 'diagnostic_params' not in df_diagnosed.columns:
+        df_diagnosed['diagnostic_params'] = [[] for _ in range(len(df_diagnosed))]
     
     # Initialize is_sfe column (to be set later in the process)
-    df_diagnosed['is_sfe'] = False
+    if 'is_sfe' not in df_diagnosed.columns:
+        df_diagnosed['is_sfe'] = False
+    
+    # Initialize time_performance_category if not present
+    if 'time_performance_category' not in df_diagnosed.columns:
+        df_diagnosed['time_performance_category'] = t('Unknown')
     
     # Override results tracking
     override_results = {}
@@ -66,7 +77,9 @@ def diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
         )
         
         # Update the main dataframe with processed results
-        df_diagnosed.loc[q_type_mask, :] = processed_df
+        df_diagnosed.loc[q_type_mask, 'diagnostic_params'] = processed_df['diagnostic_params'].values
+        df_diagnosed.loc[q_type_mask, 'is_sfe'] = processed_df['is_sfe'].values
+        df_diagnosed.loc[q_type_mask, 'time_performance_category'] = processed_df['time_performance_category'].values
         
         # Store override information
         if type_override_info:
@@ -76,10 +89,25 @@ def diagnose_root_causes(df, avg_times, max_diffs, ch1_thresholds):
 
 
 def process_question_type(q_type_df, q_type, avg_times, max_diffs, ch1_thresholds):
-    """Process diagnostic logic for a specific question type."""
-    # Implementation details...
-    # (This is a simplified version - the actual implementation would be more complex)
+    """
+    Process diagnostic logic for a specific question type.
+    Implementation of DI Chapter 3 diagnostic rules.
+    """
+    # Make a copy to avoid modifying input data
+    processed_df = q_type_df.copy()
     
+    # Initialize columns if they don't exist
+    if 'diagnostic_params' not in processed_df.columns:
+        processed_df['diagnostic_params'] = [[] for _ in range(len(processed_df))]
+    if 'is_sfe' not in processed_df.columns:
+        processed_df['is_sfe'] = False
+    if 'time_performance_category' not in processed_df.columns:
+        processed_df['time_performance_category'] = t('Unknown')
+    
+    # Get average time for this question type
+    avg_time = avg_times.get(q_type, 2.0)  # Default 2 minutes if not found
+    
+    # Initialize override tracking
     override_info = {
         'override_triggered': False,
         'Y_agg': None,
@@ -88,7 +116,268 @@ def process_question_type(q_type_df, q_type, avg_times, max_diffs, ch1_threshold
         'triggering_overtime_rate': 0.0
     }
     
-    return q_type_df, override_info
+    # Process each question in this type
+    for idx, row in processed_df.iterrows():
+        q_time = row.get('question_time', 0)
+        is_correct = row.get('is_correct', True)
+        is_overtime = row.get('overtime', False) 
+        is_invalid = row.get('is_invalid', False)
+        q_difficulty = row.get('question_difficulty', 0)
+        content_domain = row.get('content_domain', 'Unknown')
+        
+        # Initialize diagnostic params for this row
+        current_params = row.get('diagnostic_params', [])
+        if not isinstance(current_params, list):
+            current_params = []
+        current_params = current_params.copy()  # Avoid modifying original
+        
+        # Calculate time performance category for ALL rows (valid and invalid)
+        time_category = calculate_time_performance_category(
+            q_time, is_correct, is_overtime, avg_time
+        )
+        processed_df.at[idx, 'time_performance_category'] = time_category
+        
+        # Only process diagnostic logic for VALID rows
+        if not is_invalid:
+            # 1. Check for Systematic Foundational Error (SFE)
+            if not is_correct and pd.notna(q_difficulty):
+                # Get max correct difficulty for this question type and content domain
+                max_correct_diff = get_max_correct_difficulty(
+                    max_diffs, q_type, content_domain
+                )
+                
+                if pd.notna(max_correct_diff) and q_difficulty < max_correct_diff:
+                    processed_df.at[idx, 'is_sfe'] = True
+                    if 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE' not in current_params:
+                        current_params.insert(0, 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE')
+            
+            # 2. Add time-based diagnostic parameters
+            if pd.notna(q_time):
+                # Hasty guessing detection
+                if q_time < HASTY_GUESSING_THRESHOLD_MINUTES:
+                    if 'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK' not in current_params:
+                        current_params.append('DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
+                
+                # Add specific diagnostic parameters based on time category and question type
+                time_specific_params = get_time_specific_parameters(
+                    q_type, time_category, content_domain, is_correct, is_overtime
+                )
+                
+                for param in time_specific_params:
+                    if param not in current_params:
+                        current_params.append(param)
+            
+            # 3. Add difficulty-based parameters
+            if pd.notna(q_difficulty):
+                difficulty_params = get_difficulty_specific_parameters(
+                    q_type, q_difficulty, is_correct, content_domain
+                )
+                
+                for param in difficulty_params:
+                    if param not in current_params:
+                        current_params.append(param)
+        
+        else:
+            # For invalid rows, ensure they have the invalid tag
+            invalid_tag = t('di_invalid_data_tag')
+            if invalid_tag not in current_params:
+                current_params = [invalid_tag]
+        
+        # Update diagnostic params for this row
+        processed_df.at[idx, 'diagnostic_params'] = current_params
+    
+    # Calculate override conditions for this question type
+    override_info = calculate_override_conditions(processed_df, q_type)
+    
+    return processed_df, override_info
+
+
+def calculate_time_performance_category(q_time, is_correct, is_overtime, avg_time):
+    """Calculate time performance category based on time, correctness, and overtime status."""
+    
+    # Determine if relatively fast
+    is_relatively_fast = False
+    if pd.notna(q_time) and pd.notna(avg_time) and avg_time > 0:
+        is_relatively_fast = q_time < (avg_time * RELATIVELY_FAST_MULTIPLIER)
+    
+    # Assign time performance category
+    if is_correct:
+        if is_relatively_fast:
+            return 'Fast & Correct'
+        elif is_overtime:
+            return 'Slow & Correct'
+        else:
+            return 'Normal Time & Correct'
+    else:  # Incorrect
+        if is_relatively_fast:
+            return 'Fast & Wrong'
+        elif is_overtime:
+            return 'Slow & Wrong'
+        else:
+            return 'Normal Time & Wrong'
+
+
+def get_max_correct_difficulty(max_diffs, q_type, content_domain):
+    """Get maximum correct difficulty for SFE detection."""
+    if isinstance(max_diffs, dict):
+        # Try to get from the max_diffs dictionary
+        if q_type in max_diffs and content_domain in max_diffs[q_type]:
+            return max_diffs[q_type][content_domain]
+        elif q_type in max_diffs:
+            # If specific domain not found, use any available domain for this question type
+            domain_diffs = max_diffs[q_type]
+            if isinstance(domain_diffs, dict) and domain_diffs:
+                return max(domain_diffs.values())
+    return -np.inf  # Default if not found
+
+
+def get_time_specific_parameters(q_type, time_category, content_domain, is_correct, is_overtime):
+    """Get diagnostic parameters based on time performance."""
+    params = []
+    
+    # Map question type to standardized names
+    q_type_map = {
+        'Data Sufficiency': 'DS',
+        'Two-part analysis': 'TPA', 
+        'Graph and Table': 'GT',
+        'Multi-source reasoning': 'MSR'
+    }
+    
+    std_q_type = q_type_map.get(q_type, q_type)
+    
+    # Add time-specific parameters based on performance category
+    if time_category in ['Fast & Wrong', 'Normal Time & Wrong']:
+        # Error-related parameters
+        if content_domain in ['Math Related', 'Math related']:
+            params.extend([
+                'DI_CONCEPT_APPLICATION_ERROR__MATH',
+                'DI_CALCULATION_ERROR__MATH'
+            ])
+        else:
+            params.extend([
+                'DI_LOGICAL_REASONING_ERROR__NON_MATH',
+                'DI_READING_COMPREHENSION_ERROR__LOGIC'
+            ])
+        
+        # Add question type specific error parameters
+        if std_q_type in ['TPA', 'GT']:
+            params.append('DI_GRAPH_INTERPRETATION_ERROR__TABLE')
+        elif std_q_type == 'MSR':
+            params.append('DI_MULTI_SOURCE_INTEGRATION_ERROR')
+    
+    elif time_category in ['Slow & Wrong', 'Slow & Correct']:
+        # Difficulty/efficiency parameters
+        if content_domain in ['Math Related', 'Math related']:
+            params.extend([
+                'DI_CONCEPT_APPLICATION_DIFFICULTY__MATH',
+                'DI_CALCULATION_DIFFICULTY__MATH'
+            ])
+        else:
+            params.extend([
+                'DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH',
+                'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC'
+            ])
+        
+        # Add efficiency bottleneck parameters
+        if std_q_type == 'DS':
+            params.append('DI_EFFICIENCY_BOTTLENECK_LOGIC')
+        elif std_q_type in ['TPA', 'GT']:
+            params.append('DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE')
+        elif std_q_type == 'MSR':
+            params.append('DI_EFFICIENCY_BOTTLENECK_INTEGRATION')
+    
+    return params
+
+
+def get_difficulty_specific_parameters(q_type, q_difficulty, is_correct, content_domain):
+    """Get diagnostic parameters based on question difficulty."""
+    params = []
+    
+    # Only add difficulty parameters for incorrect answers
+    if not is_correct and pd.notna(q_difficulty):
+        difficulty_level = grade_difficulty_di(q_difficulty)
+        
+        # Add difficulty-specific parameters based on content domain
+        if content_domain in ['Math Related', 'Math related']:
+            if q_difficulty <= 0:  # Low to mid difficulty
+                params.append('DI_CALCULATION_ERROR__MATH')
+            else:  # Higher difficulty
+                params.append('DI_CONCEPT_APPLICATION_ERROR__MATH')
+        else:
+            if q_difficulty <= 0:  # Low to mid difficulty
+                params.append('DI_READING_COMPREHENSION_ERROR__DOMAIN')
+            else:  # Higher difficulty
+                params.append('DI_LOGICAL_REASONING_ERROR__NON_MATH')
+    
+    return params
+
+
+def calculate_override_conditions(processed_df, q_type):
+    """Calculate override conditions for macro recommendations."""
+    override_info = {
+        'override_triggered': False,
+        'Y_agg': None,
+        'Z_agg': None,
+        'triggering_error_rate': 0.0,
+        'triggering_overtime_rate': 0.0
+    }
+    
+    # Filter to valid questions only
+    valid_df = processed_df[~processed_df.get('is_invalid', False)]
+    
+    if valid_df.empty:
+        return override_info
+    
+    # Calculate performance metrics
+    total_valid = len(valid_df)
+    errors = (valid_df['is_correct'] == False).sum()
+    overtime_count = valid_df['overtime'].sum()
+    
+    error_rate = errors / total_valid if total_valid > 0 else 0.0
+    overtime_rate = overtime_count / total_valid if total_valid > 0 else 0.0
+    
+    # Check override thresholds
+    error_threshold = 0.4  # 40%
+    overtime_threshold = 0.3  # 30%
+    
+    if error_rate >= error_threshold or overtime_rate >= overtime_threshold:
+        override_info['override_triggered'] = True
+        override_info['triggering_error_rate'] = error_rate
+        override_info['triggering_overtime_rate'] = overtime_rate
+        
+        # Set difficulty grade for recommendations
+        if 'question_difficulty' in valid_df.columns:
+            min_difficulty = valid_df['question_difficulty'].min()
+            if pd.notna(min_difficulty):
+                override_info['Y_agg'] = grade_difficulty_di(min_difficulty)
+            else:
+                override_info['Y_agg'] = t('low_difficulty')
+        else:
+            override_info['Y_agg'] = t('low_difficulty')
+        
+        # Set time recommendation
+        if 'question_time' in valid_df.columns:
+            avg_time = valid_df['question_time'].mean()
+            if pd.notna(avg_time):
+                # Subtract 0.5 minutes for practice recommendation
+                base_time = max(0, avg_time - 0.5)
+                override_info['Z_agg'] = math.floor(base_time * 2) / 2.0
+                
+                # Apply minimum time limits by question type
+                type_minimums = {
+                    'Data Sufficiency': 1.5,
+                    'Two-part analysis': 2.5, 
+                    'Graph and Table': 2.5,
+                    'Multi-source reasoning': 6.0
+                }
+                min_time = type_minimums.get(q_type, 1.5)
+                override_info['Z_agg'] = max(override_info['Z_agg'], min_time)
+            else:
+                override_info['Z_agg'] = 2.0
+        else:
+            override_info['Z_agg'] = 2.0
+    
+    return override_info
 
 
 def observe_di_patterns(df, avg_times):

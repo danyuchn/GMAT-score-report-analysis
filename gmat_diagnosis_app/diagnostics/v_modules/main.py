@@ -14,6 +14,8 @@ from typing import Dict, Optional, Tuple
 from gmat_diagnosis_app.diagnostics.v_modules.constants import INVALID_DATA_TAG_V, V_SUSPICIOUS_FAST_MULTIPLIER, RC_READING_TIME_THRESHOLD_3Q, RC_READING_TIME_THRESHOLD_4Q
 # Use i18n system instead of the old translation function
 from gmat_diagnosis_app.i18n import translate as t
+# Add debug context manager import
+from gmat_diagnosis_app.utils.debug_utils import DebugContext
 # 添加統一的時間分析函數
 from gmat_diagnosis_app.analysis_helpers.time_analyzer import calculate_first_third_average_time_per_type
 from gmat_diagnosis_app.diagnostics.v_modules.utils import (
@@ -53,56 +55,52 @@ def run_v_diagnosis(
     include_summary_report: bool = True
 ) -> Tuple[Dict, str, pd.DataFrame]:
     """
-    Main entry point for V diagnostics.
+    Main V diagnosis function that analyzes Verbal section performance.
     
     Args:
-        df_processed (pd.DataFrame): Preprocessed V dataframe with question data
-        time_pressure_status (bool): Time pressure status for V section
-        avg_time_per_type (Optional[Dict[str, float]]): Average time per question type, optional
-        include_summaries (bool): Whether to include detailed summary data
-        include_individual_errors (bool): Whether to include individual error details
-        include_summary_report (bool): Whether to generate the text summary report
+        df_processed: DataFrame with V data
+        time_pressure_status: Whether student felt time pressure
+        avg_time_per_type: Average time per question type
+        include_summaries: Whether to include summary reports
+        include_individual_errors: Whether to include individual error details
+        include_summary_report: Whether to include final summary report
         
     Returns:
-        Tuple[Dict, str, pd.DataFrame]: (diagnostic results, summary report, diagnosed dataframe)
+        Tuple of (diagnosis_results_dict, diagnosis_report_string, processed_dataframe)
     """
-    try:
+    with DebugContext("V Diagnosis"):
         # Use the provided parameters instead of the old parameter names
         df_v_processed = df_processed.copy()
         v_time_pressure_status = time_pressure_status
         v_avg_time_per_type = avg_time_per_type or {}
         
-        # 添加調試日誌
-        # import streamlit as st # Removed unused import from function scope
+        # Add debug logging
         import logging
         
-        # 調試檢查手動標記的無效項
+        # Debug check for manually marked invalid items
         if 'is_manually_invalid' in df_v_processed.columns:
             manual_invalid_count = df_v_processed['is_manually_invalid'].sum()
             if manual_invalid_count > 0:
-                # logging.info(f"V科診斷: 檢測到 {manual_invalid_count} 個手動標記的無效項") # REMOVED by AI
-                # logging.info(f"手動標記無效的題號: {manually_invalid_positions}") # REMOVED by AI
                 pass # End of manually_invalid check
         
-        # 重要修改：完全以手動標記為準，不合併自動標記的結果
-        # 先檢查是否存在手動標記列
+        # Important modification: Use only manual markings as the source of truth
+        # First check if manual marking column exists
         if 'is_manually_invalid' in df_v_processed.columns:
-            # 不管之前is_invalid的值如何，完全重設為False
+            # Reset is_invalid to False regardless of previous values
             if 'is_invalid' in df_v_processed.columns:
                 df_v_processed['is_invalid'] = False
             else:
-                df_v_processed['is_invalid'] = False  # 如果不存在，創建一個全為False的列
+                df_v_processed['is_invalid'] = False  # Create column if doesn't exist
             
-            # 只將手動標記的項目設為無效
+            # Only mark items as invalid if they are manually marked
             df_v_processed.loc[df_v_processed['is_manually_invalid'] == True, 'is_invalid'] = True
             
-            # 重新計算無效項數量 (僅記錄到日誌，不顯示在UI中)
+            # Recalculate invalid count (logged only, not displayed in UI)
             invalid_count = df_v_processed['is_invalid'].sum()
-            # logging.info(f"V科診斷: 僅使用手動標記，無效項數量為 {invalid_count}") # REMOVED by AI
             
-            # 調試信息：確認是否只有手動標記的項目被設為無效 (僅記錄到日誌)
+            # Debug info: Confirm only manually marked items are set as invalid (logged only)
             if invalid_count != manual_invalid_count:
-                logging.warning(f"警告：無效項數量 ({invalid_count}) 與手動標記數量 ({manual_invalid_count}) 不一致！")
+                logging.warning(f"Warning: Invalid count ({invalid_count}) doesn't match manual marking count ({manual_invalid_count})!")
         
         # --- Chapter 0: Initial Setup and Basic Metrics ---
         logging.debug("[V Diag - Entry] Received data. Overtime count: %s", df_v_processed['overtime'].sum() if 'overtime' in df_v_processed.columns else 'N/A')
@@ -133,8 +131,8 @@ def run_v_diagnosis(
             if col not in df_v_processed.columns: df_v_processed[col] = False
         if 'time_performance_category' not in df_v_processed.columns: df_v_processed['time_performance_category'] = ''
 
-        # --- 計算前三分之一各題型平均時間 (first_third_average_time_per_type) ---
-        # MD 文檔第一章無效數據檢測標準 3 和 4 所需要的計算
+        # Calculate first third average time per question type (MD document Chapter 1)
+        # Required for invalid data detection standards 3 and 4
         first_third_average_time_per_type = calculate_first_third_average_time_per_type(
             df_v_processed, ['Critical Reasoning', 'Reading Comprehension']
         )
@@ -143,8 +141,6 @@ def run_v_diagnosis(
         final_invalid_mask_v = df_v_processed['is_invalid']
         if final_invalid_mask_v.any():
             invalid_count = final_invalid_mask_v.sum()
-            # 減少UI輸出
-            # logging.info(f"V科診斷: 將為 {invalid_count} 個標記為無效的項目添加無效數據標籤") # REMOVED by AI
             
             for idx in df_v_processed.index[final_invalid_mask_v]:
                 current_list = df_v_processed.loc[idx, 'diagnostic_params']
@@ -157,9 +153,6 @@ def run_v_diagnosis(
         v_diagnosis_results = {}
         v_diagnosis_results['invalid_count'] = num_invalid_v_total
         
-        # 僅在日誌中記錄
-        # logging.info(f"V科診斷: 總共有 {num_invalid_v_total} 個項目被標記為無效") # REMOVED by AI
-
         # --- Create df_v_valid_for_analysis_only for specific analyses that ONLY need valid data ---
         # This df is for reading/analysis, not for modifying rows that go back to the main df_v_processed
         df_v_valid_for_analysis_only = df_v_processed[~df_v_processed['is_invalid']].copy()
@@ -410,7 +403,4 @@ def run_v_diagnosis(
             pass # Keep count check but remove excessive logging
 
         # Return the final df AFTER dropping the English params col
-        return v_diagnosis_results, v_report_content, df_v_final
-    except Exception as e:
-        logging.error(f"Error in run_v_diagnosis_processed: {e}", exc_info=True)
-        return {}, t('v_diagnosis_error_message'), pd.DataFrame() 
+        return v_diagnosis_results, v_report_content, df_v_final 
