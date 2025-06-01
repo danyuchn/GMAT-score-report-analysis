@@ -11,6 +11,62 @@ Correct:
 [Insert corrected code or logic]
 ```
 
+## GMAT Route Tool JSON-Python命令名稱統一修正 (2025-01-30)
+
+Mistake: Python檔案中的命令名稱與JSON檔案中的模型名稱存在大小寫差異和命名格式不一致，導致系統功能性衝突
+Wrong:
+Python檔案中使用小寫或不一致的命名格式：
+```python
+"Questions you did wrong": { ... }
+"You did right but slowly": { ... }
+"Passages you fail to organize": { ... }
+"Examine your thoughts": { ... }
+"Understand Logical terms": { ... }
+"Review distractor": { ... }
+"Learn math concepts": { ... }
+"Convert to real context": { ... }
+"Enhanced Reading Speed": { ... }
+"Predictive and Active Reading": { ... }
+```
+
+Correct:
+統一命令名稱為JSON檔案中的標準格式（Title Case）：
+```python
+"Questions You Did Wrong": { ... }
+"You Did Right But Slowly": { ... }
+"Passages You Failed to Organize": { ... }
+"Examine your Thoughts": { ... }
+"Understand Logical Terms": { ... }
+"Review Distractor (Trap Choices)": { ... }
+"Learn Math Concepts": { ... }
+"Convert to Real-Context": { ... }
+"Enhance Reading Speed": { ... }
+"Train Predictive & Active Reading": { ... }
+```
+
+Applied:
+1. 修正了command_details字典中所有25個命令的命名格式
+2. 更新了route_table中所有科目（CR/DS/GT/MSR/PS/RC/TPA）的命令引用
+3. 確保Python程式碼與JSON模型檔案之間的命名一致性
+4. 保持了所有功能描述和使用場合說明不變
+
+Fixed: 
+- 大小寫差異問題：22個命令名稱已統一為Title Case格式
+- 命名格式差異：特殊命令如"Review Distractor (Trap Choices)"已包含完整描述
+- 系統一致性：Python路由工具現在與JSON模型檔案完全匹配
+- 避免了因命名不一致導致的功能調用失敗
+
+**統一後的主要命令對照表**:
+- Questions you did wrong → Questions You Did Wrong ✅
+- You did right but slowly → You Did Right But Slowly ✅
+- Review distractor → Review Distractor (Trap Choices) ✅
+- Learn math concepts → Learn Math Concepts ✅
+- Convert to real context → Convert to Real-Context ✅
+- Enhanced Reading Speed → Enhance Reading Speed ✅
+- Predictive and Active Reading → Train Predictive & Active Reading ✅
+
+**結果**: GMAT診斷工具的命令路由系統現在與AI模型檔案保持完全一致的命名標準，確保了系統間的無縫整合和功能正確性。
+
 ## AI工具推薦翻譯邏輯修正 - 英文標籤錯誤匹配問題 (2025-01-29)
 
 Mistake: 英文診斷標籤被錯誤翻譯，導致AI工具推薦失效

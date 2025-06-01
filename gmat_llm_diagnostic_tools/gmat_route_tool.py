@@ -26,142 +26,131 @@ class Tools:
         
         # 修改 command_descriptions 結構，每個指令包含 description 和 usage_occasion
         self.command_details: Dict[str, CommandDetail] = {
-            "Questions you did wrong": {
-                "description": "使用者提供做錯的題目，我將用高中生易懂的方式解釋解題步驟與答案，幫助你理解問題。最適合觀念真正不懂的題目",
-                "usage_occasion": "當你做錯題目，需要理解正確解法與考點時。"
+            "Questions You Did Wrong": {
+                "description": "使用者提供做錯的題目，我將用高中生易懂的方式解釋解題步驟與答案，幫助你理解問題。最適合觀念真正不懂的各類題目。",
+                "usage_occasion": "當你做錯題目，需要在事後檢討時確實理解正確解法、考點、選項的正確與錯誤原因時。"
             },
-            "You did right but slowly": {
-                "description": "使用者提供雖然做對但耗時過長的題目 (CR或TPA非數學相關)，我將提供 N分鐘內快速解題的捷徑。我會引導你先閱讀問題，識別解鎖問題的關鍵要素，然後判斷文本中哪些部分是相關信息，哪些不是，最後指出使用預寫策略還是排除策略來回答問題。每個步驟都包含清晰的提示，引導至下一步，並遵循線性的單向思維過程。",
-                "usage_occasion": "當你題目雖然做對，但解題速度過慢，希望找到更快捷徑時。"
+            "You Did Right But Slowly": {
+                "description": "使用者提供雖然做對但耗時過長的題目，我將提供2-3分鐘內快速解題的捷徑。我會引導你先閱讀問題，識別解鎖問題的關鍵要素，然後判斷文本中哪些部分是相關信息，哪些不是，最後指出使用預寫策略還是排除策略來回答問題。每個步驟都包含清晰的提示，引導至下一步，並遵循線性的單向思維過程。",
+                "usage_occasion": "當你題目雖然做對但解題速度過慢，希望在事後事後檢討時找到更快捷徑，且這個捷徑是實戰上具體可操作、非AI思維而是貼近人類單線思維。"
             },
-            "Passages you fail to organize": {
-                "description": "使用者提供一篇難以組織的文章，我將為其創建一個心智圖（markdown格式，輸出在代碼塊中），幫助你視覺化資訊間的關係，從而更好地理解文章結構和 logic。",
-                "usage_occasion": "當你閱讀文章後，對整體結構、段落關係或論點脈絡感到困惑時。"
+            "Passages You Failed to Organize": {
+                "description": "使用者提供一篇難以組織的文章，我將為其創建邏輯簡圖，幫助你視覺化資訊間的關係，從而更好地理解文章結構和邏輯。",
+                "usage_occasion": "當你閱讀題目的文本，感到資訊難以組織在一起，對段落或論點之間的關係感到困惑，希望在事後檢討時徹底理清文本邏輯時。"
             },
-            "Examine your thoughts": {
-                "description": "使用者提供口頭解題過程的錄音轉文字稿和題目文本，我將分析你的解題思路，找出其中的錯誤和可以改進的地方，幫助你提升解題效率和準確性。",
-                "usage_occasion": "當你想深入了解自己解題過程中的盲點或低效環節時。"
+            "Examine your Thoughts": {
+                "description": "使用者提供口頭解題過程的錄音轉文字稿和題目文本，我將分析你的解題思路，找出其中的錯誤和可以改進的地方，幫助你事後檢討時可以針對思維盲點進行改進。",
+                "usage_occasion": "當你學會了新的解題方法，且在解題過程中有錄音紀錄下思考過程，就可以在檢討中深入了解自己解題過程中的盲點或低效環節。"
             },
-            "CR-BF Demo Thoughts": {
-                "description": "使用者提供Boldface題目，我將扮演AI助教，專門解決邏輯推理問題（例如BF題型）。我會遵循五大原則，逐步分析和回答問題，採用循環迭代的方法，每次專注於一個核心差異，並在每個循環中進行單一推斷，以排除選項，直到剩下一個為止。如果需要更多信息，我會請求澄清，而不是假設或跳過步驟。",
-                "usage_occasion": "當你需要學習如何有條理地分析CR Boldface題目的論證結構時。"
+            "CR-BF: Demo Thoughts": {
+                "description": "使用者提供Boldface題目，我將扮演AI助教，使用比較選項差異的特殊思路解決Boldface題型。",
+                "usage_occasion": "當你Boldface題目做錯或做題速度過慢，需要學習如何用「比較差異法」解決Boldface題型時。"
             },
-            "Understand Logical terms": {
-                "description": "使用者提供五個答案選項，我將解釋其中每個 logic 術語的含義，幫助你理解選項的確切意思。",
-                "usage_occasion": "當你對CR或TPA題目選項中出現的邏輯術語（如前提、結論、假設、削弱等）感到困惑時。"
+            "Understand Logical Terms": {
+                "description": "使用者提供五個答案選項，我將解釋其中每個邏輯抽象術語的含義，幫助你理解選項的確切意思。",
+                "usage_occasion": "當你對V/DI題目的選項中出現的邏輯抽象術語感到困惑而導致有理解障礙，希望在事後檢討時徹底理清其邏輯含義時。"
             },
-            "Rewrite passage into complex sentences": {
-                "description": "使用者提供一篇文章，我將保留其確切的核心含義，不任意增刪觀點、含義或細節，將其改寫成用詞艱深、風格抽象的版本。改寫後的文章長度不超過原文1.5倍，每段至少包含2-3個體現這些風格的句子。我將提供改寫後的英文文章、一個簡單易懂的白話文版本，並簡要說明改寫如何運用抽象 logic詞彙、複雜句型和客觀語氣，同時確認未增刪意義且符合長度限制。",
-                "usage_occasion": "當你想提升對複雜長句的理解能力，或想了解學術文章的常見表達方式時。"
+            "Rewrite Passage into Complex Sentences": {
+                "description": "使用者給我一篇文章，我會保留原意，把它改寫成用詞較難、句子較長、語氣較正式的英文版本，並另外一個簡單易懂的白話文版本。簡單說明改寫用了哪些抽象詞和複雜句型。",
+                "usage_occasion": "當你的閱讀障礙是來自「句構複雜」，希望在平常練習題目或閱讀文章時一併提升對複雜長句的理解能力時。"
             },
-            "Review distractor": {
-                "description": "使用者提供一個GMAT問題以及一個正確選項和一個錯誤選項。我會用繁體中文，以像對10歲小孩說話的語氣和風格，詳細解釋為什麼正確選項符合題目要求，以及為什麼錯誤選項不符合。我會為正確和錯誤選項各提供兩個不同的類比情境（新故事），幫助你理解。然後，我會問你想要更多類比例子還是設計一個變體問題。如果選擇設計變體問題，我會根據你提供的英文問題和兩個選項，更改故事的領域和內容，但保留文章和選項的logic，並創建一個語法結構盡可能相似的英文變體問題和兩個選項。",
-                "usage_occasion": "當你對某個題目的選項特別糾結，尤其是搞不清楚為什麼自己選的錯誤選項不對，或者正確選項為什麼對時。"
+            "Review Distractor (Trap Choices)": {
+                "description": "使用者提供一個GMAT題目和最後二選一的選項組（正確/混淆選項），我會使用類比舉例協助你理解背後隱藏的陷阱邏輯，以及創造類似邏輯的題目供你練習。",
+                "usage_occasion": "當你對某個題目的選項特別糾結，尤其是搞不清楚為什麼自己選的錯誤選項不對或正確選項為什麼對，或者是害怕下次考試又會出現類似陷阱時。"
             },
-            "Classify this question": { # CR/TPA/MSR/RC/PS/DS 皆可能
-                "description": "使用者提供CR或TPA非數學相關問題，我將判斷其屬於分析、建構、評論或計畫四大子類型中的哪一種，並進行兩次獨立判斷以確保一致性。若不一致則進行第三次最終判斷。最後，我會提供一個表格整理各子類型的出現次數，助你找出弱點題型。 (對於RC/MSR，則判斷主旨、支持、推論、評估、應用等類型；對於PS/DS，則判斷涉及的數學概念領域)",
-                "usage_occasion": "當你想了解自己在哪類特定問題上較弱，以便進行針對性練習時。"
+            "Classify This Question": { # CR/TPA/MSR/RC/PS/DS 皆可能
+                "description": "使用者提供一串問題紀錄，如果是CR或TPA問題，我將判斷其題型類別。CR/TPA分為分析、建構、評論、計畫四類；RC/MSR分為主旨、支持、推論、評估、應用等類；PS/DS則依數學概念分類。我會進行兩次判斷確保準確性，並提供統計表格幫助你找出弱點題型。",
+                "usage_occasion": "當你手上有了過去做題的錯題或者障礙題紀錄，想進一步了解自己在哪類特定分類題型上較弱，以便進行針對性練習時。"
             },
-            "Create variant question": { # CR/DS/PS/RC/TPA 皆可能
-                "description": "使用者提供一個原始問題，我將設計一個變體問題，讓你可以練習使用相同的解題方法。這個變體問題會有新的故事情境，但解題 logic與原問題相似。",
-                "usage_occasion": "當你理解了一個題目的解法後，想透過相似題目鞏固理解並練習應用時。"
+            "Create Variant Question": { # CR/DS/PS/RC/TPA 皆可能
+                "description": "使用者提供一個原始問題，我將設計一個變體問題，讓你可以練習使用相同的解題方法。這個變體問題會有新的故事情境，但解題邏輯跟考點與原問題高度相似。",
+                "usage_occasion": "當你剛檢討完一道題目，不確定自己會了沒有，想透過相似題目鞏固理解應用，以避免未來再犯同樣錯誤時。"
             },
             "Boldface Interactive Tutor": {
-                "description": "使用者提供CR boldface問題及其官方答案和用[]標記的粗體部分。我將扮演GMAT Boldface互動導師，透過『你問 -> 使用者回答 -> 評估使用者回答並問下一個問題』的互動形式，逐步引導你分析問題。首先，我會逐句引導你解釋文章中每個句子的作用，並在你理解有誤時提供糾正。完成所有句子的討論後，我會再次展示你對所有句子作用的回答（已修正），並標明文章中的第一和第二粗體部分。接著，我會逐個引導你分析每個答案選項（初期不透露官方答案）：詢問保留或排除該選項，若排除則詢問理由並評估其正確性。如果你排除了官方答案，我會指出你推理的錯誤並引導你，直到你選擇官方答案為止。",
-                "usage_occasion": "當你需要針對CR Boldface題目進行深入的互動式學習和分析訓練時。"
+                "description": "使用者提供CR boldface問題及其官方答案和用[]標記的粗體部分。我將扮演GMAT Boldface互動導師，透過『你問 -> 使用者回答 -> 評估使用者回答並問下一個問題』的互動形式，逐步引導你分析問題。",
+                "usage_occasion": "當你CR Boldface題目跟句子邏輯關係分析是弱項，需要一步一步進行深入的互動式學習和分析訓練時。"
             },
             "Logical Chain Builder": {
-                "description": "使用者提供CR論證評估型文章，並指定邏輯鏈的起點和終點。我將以繁體中文構建一個簡化的邏輯鏈，直接關聯起點和終點，並包含必要的隱藏假設。邏輯鏈將使用 -> 表示因果關係，+ 表示並列關係，() 表示隱藏假設。我會重新檢查邏輯鏈，確保沒有遺漏影響結論有效性的重要隱藏假設或前提，並以學術、精確和簡潔的方式引導你理解論證的 logic結構，如果文章不清晰，我會請求更多信息。",
-                "usage_occasion": "當你需要理清CR題目中的論證脈絡，找出前提、結論及隱含假設時。"
+                "description": "使用者給我一段CR文章和邏輯鏈的起點終點，我幫你畫出簡化邏輯鏈，包含隱藏假設。用 -> (因果), + (並列), () (假設) 標示。",
+                "usage_occasion": "當你做CR Assumption, Strengthen, Weaken, Evaluate等題型時，感覺文章論證繞來繞去，想快速看清楚從A到B是怎麼推的，中間藏了哪些沒明說的假設；或者是自己在做邏輯鏈推導時總是推導錯誤，無法預測正確答案時。"
             },
-            "Identify core issue": {
-                "description": "使用者提供一篇GMAT CR文章，我會將其核心問題轉化為'是否'的形式，並創建具有相同邏輯結構但在不同情境下的類比場景。我不會立即揭示新場景的核心問題，而是提示你自行識別。在你回答後，我會揭示場景的實際核心問題，並評估你答案的準確性，提供糾正和指導以增強你的理解。",
-                "usage_occasion": "當你難以準確判斷CR題目論證的核心爭議點或問題焦點時。"
+            "Identify Core Issue": {
+                "description": "使用者給我一段CR的題幹文章，我把它核心問題變成「是不是這樣？」的問句，再給你一個不同故事但邏輯一樣的類比題讓你練習判斷核心。最後我會給你回饋。",
+                "usage_occasion": "當你做CR題時，常常抓不準題目到底在吵什麼，預想思考的切入點是什麼，以及第一輪篩選常常把正確答案視作無關選項排除時。這個工具能幫你練習快速識別文章的真正辯論焦點。"
             },
             "Role-Immersion Trainer": {
-                "description": "使用者提供GMAT CR文章，我將首先確定文章中信息最直接影響的角色。接著，我會詢問你希望進行「推斷」還是「解釋」。若選擇「解釋」，我將從該角色角度解釋文章中的不一致或矛盾事實，避免超出文本的假設；若選擇「推斷」，我將從該角色角度，嚴格基於文章數據或觀察結果得出結論，避免猜測。結論或解釋將以項目符號列表形式呈現，並使用第一人稱。最後，我會請你提供文章的官方答案，並詳細解釋我之前得出的哪個結論或解釋與官方答案最一致。",
-                "usage_occasion": "當你想練習從特定視角理解CR文章信息並進行推斷或解釋時。"
+                "description": "使用者給我一段CR題幹文章，我找出影響題目主題的最關鍵角色，然後讓你選這是「推論題」還是「解釋題」。接著我會代入該角色的立場，教使用者怎麼用「人設法」找破題切入點跟預想。",
+                "usage_occasion": "當你做CR的Argument Constrcution題目時，如果使用「人設法」預想總是有困難，或者是第一輪篩選常常把正確答案視作「推不出」排除時。這個工具可以幫助你練習「人設法」的直觀思維。"
             },
             "Explain Textbook": { # CR/DS/GT/MSR/PS/RC/TPA 皆可能
-                "description": "使用者提供教材的文字或截圖，我會用繁體中文並以中學生易懂的方式解釋概念，並提供三個例子。接著詢問你是否需要測驗。若同意，我會呈現三個新情境（部分正確應用概念，部分否），請你指出適用情境。我會自我檢查評估邏輯後，再評估你的答案並提供回饋。",
-                "usage_occasion": "當你對GMAT教材中的特定概念或知識點感到不理解時。"
+                "description": "使用者給我來自教科書的內容（貼上文字或上傳圖片），我會用相對簡單的方式解釋，另外舉個例子協助你理解，還會幫你設計隨堂測驗以加深記憶。",
+                "usage_occasion": "當你看GMAT教材（例如OG解釋、曼哈頓講義、GWD解析）時，遇到看不懂的專有名詞、解題策略或某個觀念，這個工具能淺顯易懂地解釋給你聽，並透過例子和測驗確保你真的懂了，而不只是死記硬背。"
             },
-            "Train your close reading skill": { # CR/MSR/RC/TPA 皆可能
-                "description": "使用者提供短文（80-120字），我將扮演精讀教練，一次只呈現第一句話，請你理解。收到你的詮釋後，僅在對句子主旨或核心邏輯有根本性誤解，或中文語序怪異不自然時才介入修正，忽略用詞、術語不精確或措辭差異（若大致意思相同）。修正後（或無需修正時）呈現下一句，依此類推。所有句子單獨檢視完畢後，展示你所有的詮釋，並請你將其修改成連貫的段落。",
-                "usage_occasion": "當你想提升對句子層面細節和邏輯的精準理解能力時。"
+            "Train Your Close Reading Skill": { # CR/MSR/RC/TPA 皆可能
+                "description": "使用者給我一小段文章（CR/TPA篇幅，80-120字），我一句一句請你說出你的理解，並且透過逐句拆解和詮釋，引導你修正誤讀的地方，確保你理解每句話的核心意思，最後再把你的理解串成通順的段落。",
+                "usage_occasion": "當你閱讀GMAT文章，常常覺得句子看過去了但意思沒進腦子，或者對句子的意思常常理解零碎或誤讀時。"
             },
             "Train Reading for Specific Domain": { # CR/MSR/RC/TPA 皆可能
-                "description": "使用者指定一個特定領域，我將提供該領域內三個非常具體、狹窄但高度爭議性的主題，請你選擇其一。接著，我会根據你選擇的主題創建一篇200-350字的GMAT風格英文文章，呈現多種立場、論點或理論，並進行分析、批判或擴展，同時納入具體範例或實證數據支持論點。文章會使用正式學術詞彙和複雜句型。收到文章後，請你提供摘要。然後我會提供該文章的簡明繁體中文摘要（掌上型便利貼大小），並評估你的摘要準確性，提供具體回饋及1-10分評分。最後，我會根據文章出三道英文選擇題（主旨、細節、推論各一），每題五個選項，各選項至少25字長。",
-                "usage_occasion": "當你發現在特定學科領域（如科技、社科、人文）的文章閱讀上有困難時。"
+                "description": "使用者選一個你害怕的文章故事領域（如生物學、考古學），我給你一篇該領域的GMAT風格文章讓你讀和摘要，然後我會給你詳細的回饋與三道練習題。",
+                "usage_occasion": "當你發現自己特別害怕或不擅長閱讀某一類GMAT文章，希望加強對特定領域文本的閱讀理解能力時。"
             },
             "Memorizing Vocabularies": { # CR/MSR/RC/TPA 皆可能
-                "description": "使用者提供需要記憶的單字，我將為每個單字創建一個包含英文單字、中文意思、詞性和至少25字長（含至少兩子句及複雜結構如插入語、倒裝或省略）的例句的試算表。接著，我會詢問你是否有仍不熟悉的單字，並用繁體中文和英文以十年級學生能理解的方式解釋，提供三個相關概念，然後詢問是否進入下一步。然後，我會用所有提供的單字寫一篇200-350字GMAT學術風格的英文文章，每句至少25字長且含複雜結構，並顯示字數。之後，我會提供該文章的簡明繁體中文摘要（掌上型便利貼大小），請你提供自己的摘要，我會評估其準確性並評分(1-10)。最後，我會根據文章出三道英文選擇題（主旨、細節、推論各一），每題五個選項，各選項至少25字長。",
-                "usage_occasion": "當你需要系統性地學習和記憶GMAT核心詞彙時。"
+                "description": "使用者給我單詞字，我做成帶長難例句的單詞表，詳細解釋你不熟的詞，再用這些詞寫成GMAT風格文章讓你練習閱讀和摘要，最後出題考你。",
+                "usage_occasion": "當你的閱讀障礙原因主要來自單字儲備量缺乏，需要補充單字，但是傳統的背單字方法對你來說卻枯燥乏味，或者背了就忘，不知道怎麼養成長久記憶時。"
             },
             # DS Commands
-            "Learn math concepts": {
-                "description": "使用者提供一個數學問題，我將從出題者的角度思考，指出這個問題想要測試哪些具體的數學概念，幫助你理解題目背後的考點。",
-                "usage_occasion": "當你對DS或PS題目涉及的數學概念不熟悉或理解不透徹時。"
+            "Learn Math Concepts": {
+                "description": "你給我一道（DS/PS/TPA/GT）數學題，我告訴你這題想考你哪些數學觀念。",
+                "usage_occasion": "當你做DS或PS題目時，常常不知道題目到底在考哪個數學知識點，或者雖然知道考點但理解不夠深入，導致無法正確解題時。"
             },
-            "Identify features for applying a specific solution": { # DS/GT/MSR/PS/TPA 皆可能
-                "description": "使用者提供一個特定的解題方法，我將總結哪些題目陳述的特徵出現時，可以應用此解題方法，幫助你識別模式並有效應用方法。",
-                "usage_occasion": "當你學會了一種解題方法，但不知道在何種題型或條件下應用它時。"
+            "Identify Features for Applying a Specific Solution": { # DS/GT/MSR/PS/TPA 皆可能
+                "description": "你給我一個解題方法，我告訴你未來看到哪些題目有特定特徵時可以使用同一個方法解題。",
+                "usage_occasion": "當數學同樣的觀念反覆做錯，感覺好像在某一道題目的檢討並沒有讓能力完整傳遞到同類型的下一道題時。"
             },
             "Finding Similar Questions in Set": { # DS/PS 皆可能
-                "description": "使用者提供一個題庫和一個之前做錯的樣本問題，我將從題庫中找出與樣本問題使用相似數學概念的題目，幫助你針對性練習。",
-                "usage_occasion": "當你想針對特定數學概念或錯題類型進行集中練習時。"
+                "description": "你給我一個題庫和一個你曾經做錯過的題，我幫你從題庫裡找出考類似觀念的題目，讓你針對性地練習。",
+                "usage_occasion": "當你訂正完一個數學錯題，理解了考點和解法後，想馬上找些類似的題目來鞏固練習。或者是當你手上有大量題目卻怕自己寫不完、練習不集中時。"
             },
-            "Convert to real context": { # DS/PS 皆可能
-                "description": "使用者提供GMAT數學選擇題（文字或圖片形式），我會將其轉換成一個包含真實情境和故事情節的英文應用題（30-50字），且不更改任何數值。如果原題已是應用題，則僅翻譯成英文。",
-                "usage_occasion": "當你覺得抽象的數學題目難以理解，希望透過實際情境幫助思考時。"
+            "Convert to Real-Context": { # DS/PS 皆可能
+                "description": "你給我GMAT數學題，我把它變成一個有生活情境的英文應用題，數字不變。",
+                "usage_occasion": "當你的成績單中顯示顯示數學REAL題表現較弱，或者是數學相關的題目有文字理解錯誤或障礙，需要多加練習應用題時。"
             },
             # GT Commands  
-            "Sentence cracker": { # GT/MSR 皆可能
-                "description": "使用者提供一個難以理解的句子，我會先將其簡化到九年級學生能懂的程度。然後詢問你的困難點是領域特定詞彙、一般詞彙、複雜句型，還是綜合性的。若為詞彙問題，請指出不清楚的單字。領域詞彙我會解釋並提供三個相關概念；一般詞彙則提供三個同義詞和反義詞，各附一個至少25字且含複雜結構的例句。若為句型問題，我會拆解句子結構，逐一說明各成分含義，再解釋如何組織這些含義以理解原句，最後保持原句 estructura，改寫成五個不同領域但句型相似的版本。",
-                "usage_occasion": "當你在閱讀圖表題或多源推理的文字說明時，遇到難以理解的長句或複雜表達時。"
+            "Sentence Cracker": { # GT/MSR 皆可能
+                "description": "你給我一個難句，我先簡化它，再根據你的困難點（單字、領域或句型）詳細解釋，拓展相關單詞、解析句型、提供類似句練習。",
+                "usage_occasion": "當你的閱讀障礙是來自「單詞」「領域」「句型」，且在平常練習題目時遇到看不懂的句子時。"
             },
             # MSR Commands
-            "Customize your preferred Problem-solving process and request an AI demonstration": {
-                "description": "使用者告訴我你偏好的解題順序 (SOP)，我將依此判斷最短、最有效率的閱讀路徑，並遵循人類單向思維模式進行演示。",
-                "usage_occasion": "當你想優化多源推理題目的解題流程，或驗證自己SOP的有效性時。"
+            "Customize Your Preferred Problem-Solving Process": {
+                "description": "你告訴我你習慣的MSR解題步驟以及一組指定的題目，我按你的步驟演示一遍如何使用指定步驟解題，並指出如何才能讓解題更有效率。",
+                "usage_occasion": "當你在做MSR時，面對多個信息來源（文字、圖表、表格），會有手忙腳亂、整合混亂的障礙時。"
             },
-            "Enhanced Reading Speed": { # MSR/RC/TPA 皆可能
-                "description": "使用者提供句子，我將自動將其劃分成邏輯上有意義的區塊，每個區塊代表一個獨立的意義單元（如主語、時間範圍、因果關係、主要論點等），以助你更好地理解句子結構。我會保持原始句子結構，並使用粗體 || 分隔區塊。",
-                "usage_occasion": "當你需要提高閱讀速度，並快速抓住句子核心意義單元時。"
+            "Enhance Reading Speed": { # MSR/RC/TPA 皆可能
+                "description": "你給我句子，我幫你把它切成一塊塊有意義的部分，讓你更快看懂句子結構。",
+                "usage_occasion": "當你苦於閱讀速度無法提升，希望能夠讓自己不是一個一個字看，而是一組一組字看，進而培養閱讀節奏感時。"
             },
             # PS Commands
             "Rewrite passage into compressed sentences": {
-                "description": "將題目中複雜的句子進行複雜化、壓縮或拆解，以幫助理解句子結構，克服閱讀障礙。",
-                "usage_occasion": "當PS題目的文字描述過於冗長或複雜，影響你理解題意時。"
+                "description": "你給我PS題目裡難懂的句子，我幫你把它改寫得更簡潔或拆解分析，讓你更容易理解題意。",
+                "usage_occasion": "當你做REAL類型的數學題有文字閱讀理解錯誤或障礙時。明明題目本身不難，但文字描述特別繞口、句子特別長，或者用了一些不常見的表達方式，導致你看不懂題目在問什麼時。"
             },
             # RC Commands
-            "Diagnostic Label List": {
-                "description": "針對RC題目常見的錯誤類型進行分類與標註，協助釐清學生在閱讀理解過程中遇到的具體困難。",
-                "usage_occasion": "當你想系統性地分析自己在RC題目上的錯誤模式和原因時。"
+            "Rewrite Passage into GMAT Style": {
+                "description": "你給我一篇學術文章，我把它改寫成GMAT RC那種風格的文章。",
+                "usage_occasion": "當你的閱讀基礎能力有障礙，希望在閱讀訓練時所使用的文章素材具有GMAT等級的寫作水平，以及加強練習真實度時。"
             },
-            "Rewrite Passage into GMAT style": {
-                "description": "使用者提供一篇學術文章，我將其改寫成250-400字的GMAT風格文章，適合受過教育的非專業讀者閱讀。我會運用詞彙、句法和結構上的簡化策略，保留原文的核心假設、發現和含義，並確保文章 logic連貫、內容豐富且引人入勝。",
-                "usage_occasion": "當你想了解GMAT RC文章的典型風格和寫作特點，或想將其他學術內容轉換為GMAT閱讀材料時。"
+            "Preparatory Answer Training": {
+                "description": "你給我題目和答案，先說說你看了題目後的初步想法。我會比較你的想法和正確答案，給你打分和改進建議。",
+                "usage_occasion": "當你常常第一輪就排除掉RC的正確選項，或者擬答出現障礙，無法推理時。"
             },
-            "Preparatory answer training": {
-                "description": "使用者提供文章、問題和答案，我會先請你提供自己版本的答案或在閱讀選項前的思路。接著，我會分析你的初步答案與正確答案的一致性，並評分(1-10分)。如果分數低於8分，我會直接指出如何改進以更接近官方答案，並提供詳細具體的建議。我會用正式、學術的語氣提供回饋，並用學術例子和類比闡明複雜概念，專注提升你的GMAT分析和推理能力，而非直接給出答案。",
-                "usage_occasion": "當你想訓練自己在看選項前主動思考答案的能力，並獲得針對性的思路修正建議時。"
+            "Interactively Understand a Passage": {
+                "description": "你給我RC文章，我會問你一系列問題，一步步帶你分析文章的主旨、論點和結構，並給你回饋和總結。",
+                "usage_occasion": "當你讀完一篇GMAT RC文章後，感覺似懂非懂，對文章的整體架構、各段落功能、主要論點和支持細節的掌握不夠清晰時。"
             },
-            "Interactive Understanding Passage": {
-                "description": "使用者提供一篇GMAT RC文章，我將扮演 Dustin 的 GMAT RC 文章分析器，透過5-6個有組織的邏輯順序問題來引導你理解文章。從理解主旨開始，然後分析關鍵論點和證據，最後總結。每個問題都會基於前一個問題，循序漸進地提升你的理解和分析能力。我會對你的每個回答提供回饋，直接糾正錯誤，然後繼續下一個問題。在所有問題回答完畢後，我會指出每個句子的功能、句子間的關係、標示出過渡關鍵詞，並搜尋相關背景知識以助未來理解相似文章。",
-                "usage_occasion": "當你需要逐層深入地理解RC文章的結構、論點和細節時。"
-            },
-            "Predictive and Active Reading": {
-                "description": "使用者提供一篇文章，我將扮演預測文本導師。我會引用第一句話，請你猜測下一句會是什麼。收到你的回答後，我會評估並提供改進建議，然後創建三個可能的後續發展，接著引用下一句話，解釋它與哪個可能發展一致，並請你猜測再下一句。此過程將逐句重複，直到文章結束。",
-                "usage_occasion": "當你想訓練主動閱讀和預測文章發展的能力，以提高閱讀專注度和理解深度時。"
+            "Train Predictive & Active Reading": {
+                "description": "你給我文章，我一句一句念，每念一句就讓你猜下一句會說什麼，訓練你主動預測文章走向。",
+                "usage_occasion": "當你閱讀GMAT文章時，常常是被動接收信息，讀到哪算哪，缺乏對文章後續發展的預期，導致閱讀效率不高、容易讀到後面忘了前面，對文章整體篇章架構掌握不清時。"
             }
-            # TPA Commands - 部分已在CR/MSR/DS中定義，此處可按需補充TPA特有的
-            # "Understand logical terms" - 已有
-            # "Passage you fail to organize" - 已有
-            # "Identify features for applying specific solution" - 已有
-            # "Create Variant Question" - 已有
-            # "Memorizing Vocabulary" - 已有 (注意 TPA 可能會有特定術語，但通用指令已覆蓋)
-            # "Enhanced reading speed" - 已有
         }
         # (route_table 和 error_codes_mapping 保持不變)
         self.route_table: Dict[str, Dict[str, List[str]]] = {
@@ -169,406 +158,406 @@ class Tools:
             # ------------------------  CR  ------------------------
             "CR": {
                 "CR_STEM_UNDERSTANDING_ERROR_VOCAB": [
-                    "Questions you did wrong", "Understand Logical terms", "Memorizing Vocabularies"
+                    "Questions You Did Wrong", "Understand Logical Terms", "Memorizing Vocabularies"
                 ],
                 "CR_STEM_UNDERSTANDING_ERROR_SYNTAX": [
-                    "Questions you did wrong", "Rewrite passage into complex sentences", "Train your close reading skill"
+                    "Questions You Did Wrong", "Rewrite Passage into Complex Sentences", "Train Your Close Reading Skill"
                 ],
                 "CR_STEM_UNDERSTANDING_ERROR_LOGIC": [
-                    "Questions you did wrong", "Passages you fail to organize", "Logical Chain Builder", "Train your close reading skill"
+                    "Questions You Did Wrong", "Passages You Failed to Organize", "Logical Chain Builder", "Train Your Close Reading Skill"
                 ],
                 "CR_STEM_UNDERSTANDING_ERROR_DOMAIN": [
-                    "Questions you did wrong", "Train Reading for Specific Domain"
+                    "Questions You Did Wrong", "Train Reading for Specific Domain"
                 ],
                 "CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP": [
-                    "Questions you did wrong", "Role-Immersion Trainer"
+                    "Questions You Did Wrong", "Role-Immersion Trainer"
                 ],
                 "CR_CHOICE_UNDERSTANDING_ERROR_VOCAB": [
-                    "Questions you did wrong", "Understand Logical terms", "Memorizing Vocabularies"
+                    "Questions You Did Wrong", "Understand Logical Terms", "Memorizing Vocabularies"
                 ],
                 "CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX": [
-                    "Questions you did wrong", "Rewrite passage into complex sentences", "Train your close reading skill"
+                    "Questions You Did Wrong", "Rewrite Passage into Complex Sentences", "Train Your Close Reading Skill"
                 ],
                 "CR_CHOICE_UNDERSTANDING_ERROR_LOGIC": [
-                    "Questions you did wrong", "Create variant question", "Train your close reading skill"
+                    "Questions You Did Wrong", "Create Variant Question", "Train Your Close Reading Skill"
                 ],
                 "CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP": [
-                    "Questions you did wrong", "Passages you fail to organize", "Examine your thoughts",
-                    "Create variant question", "Logical Chain Builder"
+                    "Questions You Did Wrong", "Passages You Failed to Organize", "Examine your Thoughts",
+                    "Create Variant Question", "Logical Chain Builder"
                 ],
                 "CR_REASONING_ERROR_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING": [
-                    "Questions you did wrong", "Examine your thoughts", "Understand Logical terms", "Create variant question"
+                    "Questions You Did Wrong", "Examine your Thoughts", "Understand Logical Terms", "Create Variant Question"
                 ],
                 "CR_REASONING_ERROR_PREDICTION_DIRECTION": [
-                    "Questions you did wrong", "Examine your thoughts", "Create variant question",
+                    "Questions You Did Wrong", "Examine your Thoughts", "Create Variant Question",
                     "Logical Chain Builder", "Role-Immersion Trainer"
                 ],
                 "CR_REASONING_ERROR_CORE_ISSUE_IDENTIFICATION": [
-                    "Questions you did wrong", "Examine your thoughts", "Create variant question",
-                    "Identify core issue", "Role-Immersion Trainer"
+                    "Questions You Did Wrong", "Examine your Thoughts", "Create Variant Question",
+                    "Identify Core Issue", "Role-Immersion Trainer"
                 ],
                 "CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT": [
-                    "Questions you did wrong", "Examine your thoughts", "Create variant question",
-                    "Identify core issue", "Role-Immersion Trainer"
+                    "Questions You Did Wrong", "Examine your Thoughts", "Create Variant Question",
+                    "Identify Core Issue", "Role-Immersion Trainer"
                 ],
                 "CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE": [
-                    "Questions you did wrong", "CR-BF Demo Thoughts", "Classify this question", "Create variant question",
+                    "Questions You Did Wrong", "CR-BF: Demo Thoughts", "Classify This Question", "Create Variant Question",
                     "Boldface Interactive Tutor", "Logical Chain Builder", "Role-Immersion Trainer", "Explain Textbook"
                 ],
                 "CR_STEM_UNDERSTANDING_DIFFICULTY_LOGIC": [
-                    "You did right but slowly", "Logical Chain Builder", "Train your close reading skill"
+                    "You Did Right But Slowly", "Logical Chain Builder", "Train Your Close Reading Skill"
                 ],
                 "CR_CHOICE_UNDERSTANDING_DIFFICULTY_LOGIC": [
-                    "You did right but slowly", "Train your close reading skill"
+                    "You Did Right But Slowly", "Train Your Close Reading Skill"
                 ],
                 "CR_REASONING_DIFFICULTY_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING": [
-                    "You did right but slowly", "Understand Logical terms"
+                    "You Did Right But Slowly", "Understand Logical Terms"
                 ],
                 "CR_REASONING_DIFFICULTY_PREDICTION_DIRECTION_MISSING": [
-                    "You did right but slowly", "Create variant question", "Logical Chain Builder",
-                    "Role-Immersion Trainer", "Identify core issue"
+                    "You Did Right But Slowly", "Create Variant Question", "Logical Chain Builder",
+                    "Role-Immersion Trainer", "Identify Core Issue"
                 ],
                 "CR_REASONING_DIFFICULTY_CORE_ISSUE_IDENTIFICATION": [
-                    "You did right but slowly", "Create variant question", "Identify core issue", "Role-Immersion Trainer"
+                    "You Did Right But Slowly", "Create Variant Question", "Identify Core Issue", "Role-Immersion Trainer"
                 ],
                 "CR_REASONING_DIFFICULTY_CHOICE_RELEVANCE_JUDGEMENT": [
-                    "You did right but slowly", "Create variant question", "Identify core issue", "Role-Immersion Trainer"
+                    "You Did Right But Slowly", "Create Variant Question", "Identify Core Issue", "Role-Immersion Trainer"
                 ],
                 "CR_REASONING_DIFFICULTY_STRONG_DISTRACTOR_CHOICE_ANALYSIS": [
-                    "You did right but slowly", "Review distractor", "Create variant question"
+                    "You Did Right But Slowly", "Review Distractor (Trap Choices)", "Create Variant Question"
                 ],
                 "CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION": [
-                    "Examine your thoughts", "Review distractor", "Create variant question"
+                    "Examine your Thoughts", "Review Distractor (Trap Choices)", "Create Variant Question"
                 ],
                 "CR_STEM_UNDERSTANDING_DIFFICULTY_VOCAB": [
-                    "You did right but slowly","Understand Logical terms", "Memorizing Vocabularies" # Added You did right but slowly as per example, assuming vocab can also be a speed issue
+                    "You Did Right But Slowly","Understand Logical Terms", "Memorizing Vocabularies" # Added You did right but slowly as per example, assuming vocab can also be a speed issue
                 ],
                 "CR_CHOICE_UNDERSTANDING_DIFFICULTY_VOCAB": [
-                    "You did right but slowly","Understand Logical terms", "Memorizing Vocabularies" # Added You did right but slowly
+                    "You Did Right But Slowly","Understand Logical Terms", "Memorizing Vocabularies" # Added You did right but slowly
                 ],
                 "CR_STEM_UNDERSTANDING_DIFFICULTY_SYNTAX": [
-                    "You did right but slowly","Rewrite passage into complex sentences", "Train your close reading skill" # Added You did right but slowly
+                    "You Did Right But Slowly","Rewrite Passage into Complex Sentences", "Train Your Close Reading Skill" # Added You did right but slowly
                 ],
                 "CR_CHOICE_UNDERSTANDING_DIFFICULTY_SYNTAX": [
-                    "You did right but slowly","Rewrite passage into complex sentences", "Train your close reading skill" # Added You did right but slowly
+                    "You Did Right But Slowly","Rewrite Passage into Complex Sentences", "Train Your Close Reading Skill" # Added You did right but slowly
                 ],
                 "CR_STEM_UNDERSTANDING_DIFFICULTY_DOMAIN": [
-                    "You did right but slowly","Train Reading for Specific Domain" # Added You did right but slowly
+                    "You Did Right But Slowly","Train Reading for Specific Domain" # Added You did right but slowly
                 ],
                 "CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN": [ # This is an ERROR, not DIFFICULTY, so "You did right but slowly" might not fit unless specified. Kept original.
-                    "Questions you did wrong","Train Reading for Specific Domain"
+                    "Questions You Did Wrong","Train Reading for Specific Domain"
                 ],
                 "CR_CHOICE_UNDERSTANDING_DIFFICULTY_DOMAIN": [
-                    "You did right but slowly","Train Reading for Specific Domain" # Added You did right but slowly
+                    "You Did Right But Slowly","Train Reading for Specific Domain" # Added You did right but slowly
                 ],
             },
             "DS": {
-                "DI_READING_COMPREHENSION_ERROR__VOCABULARY": ["Question you did wrong"],
+                "DI_READING_COMPREHENSION_ERROR__VOCABULARY": ["Questions You Did Wrong"],
                 "DI_READING_COMPREHENSION_ERROR__SYNTAX": [
-                    "Question you did wrong", "Rewrite passage into complex sentences", "Convert to real context"
+                    "Questions You Did Wrong", "Rewrite Passage into Complex Sentences", "Convert to Real-Context"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__LOGIC": [
-                    "Question you did wrong", "Convert to real context"
+                    "Questions You Did Wrong", "Convert to Real-Context"
                 ],
-                "DI_READING_COMPREHENSION_ERROR__DOMAIN": ["Question you did wrong"],
+                "DI_READING_COMPREHENSION_ERROR__DOMAIN": ["Questions You Did Wrong"],
                 "DI_CONCEPT_APPLICATION_ERROR__MATH": [
-                    "Question you did wrong", "Learn math concepts", "Identify features for applying a specific solution",
-                    "Create variant question", "Finding Similar Questions in Set", "Classify this question", "Explain Textbook" # Changed Create Various Questions to Create variant question for consistency
+                    "Questions You Did Wrong", "Learn Math Concepts", "Identify Features for Applying a Specific Solution",
+                    "Create Variant Question", "Finding Similar Questions in Set", "Classify This Question", "Explain Textbook" # Changed Create Various Questions to Create variant question for consistency
                 ],
                 "DI_CALCULATION_ERROR__MATH": [
-                    "Question you did wrong", "Create variant question", "Finding Similar Questions in Set" # Changed Create Various Questions to Create variant question
+                    "Questions You Did Wrong", "Create Variant Question", "Finding Similar Questions in Set" # Changed Create Various Questions to Create variant question
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX": [
-                    "You did right but slowly","Rewrite passage into complex sentences", "Convert to real context" # Added You did right but slowly
+                    "You Did Right But Slowly","Rewrite Passage into Complex Sentences", "Convert to Real-Context" # Added You did right but slowly
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__LOGIC": [
-                    "You did right but slowly", "Convert to real context"
+                    "You Did Right But Slowly", "Convert to Real-Context"
                 ],
                 "DI_CONCEPT_APPLICATION_DIFFICULTY__MATH": [
-                    "You did right but slowly", "Learn math concepts", "Identify features for applying a specific solution",
-                    "Create variant question", "Finding Similar Questions in Set", "Classify this question", "Explain Textbook" # Changed Create Various Questions to Create variant question
+                    "You Did Right But Slowly", "Learn Math Concepts", "Identify Features for Applying a Specific Solution",
+                    "Create Variant Question", "Finding Similar Questions in Set", "Classify This Question", "Explain Textbook" # Changed Create Various Questions to Create variant question
                 ],
                 "DI_CALCULATION_DIFFICULTY__MATH": [
-                    "You did right but slowly", "Create variant question", "Finding Similar Questions in Set" # Changed Create Various Questions to Create variant question
+                    "You Did Right But Slowly", "Create Variant Question", "Finding Similar Questions in Set" # Changed Create Various Questions to Create variant question
                 ],
             },
             "GT": {
                 "DI_READING_COMPREHENSION_ERROR__VOCABULARY": [
-                    "Questions you did wrong", "Sentence cracker"
+                    "Questions You Did Wrong", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__SYNTAX": [
-                    "Questions you did wrong", "Sentence cracker"
+                    "Questions You Did Wrong", "Sentence Cracker"
                 ],
-                "DI_READING_COMPREHENSION_ERROR__LOGIC": ["Questions you did wrong"],
-                "DI_READING_COMPREHENSION_ERROR__DOMAIN": ["Questions you did wrong"],
+                "DI_READING_COMPREHENSION_ERROR__LOGIC": ["Questions You Did Wrong"],
+                "DI_READING_COMPREHENSION_ERROR__DOMAIN": ["Questions You Did Wrong"],
                 "DI_GRAPH_INTERPRETATION_ERROR__GRAPH": [
-                    "Questions you did wrong", "Learn math concepts", # Changed Learn Math Concept to Learn math concepts
-                    "Identify features for applying a specific solution", "Explain Textbook"
+                    "Questions You Did Wrong", "Learn Math Concepts", # Changed Learn Math Concept to Learn math concepts
+                    "Identify Features for Applying a Specific Solution", "Explain Textbook"
                 ],
                 "DI_GRAPH_INTERPRETATION_ERROR__TABLE": [
-                    "Questions you did wrong", "Learn math concepts", # Changed Learn Math Concept to Learn math concepts
-                    "Identify features for applying a specific solution", "Explain Textbook"
+                    "Questions You Did Wrong", "Learn Math Concepts", # Changed Learn Math Concept to Learn math concepts
+                    "Identify Features for Applying a Specific Solution", "Explain Textbook"
                 ],
                 "DI_CONCEPT_APPLICATION_ERROR__MATH": [
-                    "Questions you did wrong", "Learn math concepts", # Changed Learn Math Concept to Learn math concepts
-                    "Identify features for applying a specific solution", "Explain Textbook"
+                    "Questions You Did Wrong", "Learn Math Concepts", # Changed Learn Math Concept to Learn math concepts
+                    "Identify Features for Applying a Specific Solution", "Explain Textbook"
                 ],
-                "DI_CALCULATION_ERROR__MATH": ["Questions you did wrong"],
+                "DI_CALCULATION_ERROR__MATH": ["Questions You Did Wrong"],
                 "DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH": [
-                    "You did right but slowly","Learn math concepts", "Identify features for applying a specific solution", "Explain Textbook" # Added You did right but slowly
+                    "You Did Right But Slowly","Learn Math Concepts", "Identify Features for Applying a Specific Solution", "Explain Textbook" # Added You did right but slowly
                 ],
                 "DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE": [
-                    "You did right but slowly","Learn math concepts", "Identify features for applying a specific solution", "Explain Textbook" # Added You did right but slowly
+                    "You Did Right But Slowly","Learn Math Concepts", "Identify Features for Applying a Specific Solution", "Explain Textbook" # Added You did right but slowly
                 ],
                 "DI_CONCEPT_APPLICATION_DIFFICULTY__MATH": [
-                    "You did right but slowly","Learn math concepts", "Identify features for applying a specific solution", "Explain Textbook" # Added You did right but slowly
+                    "You Did Right But Slowly","Learn Math Concepts", "Identify Features for Applying a Specific Solution", "Explain Textbook" # Added You did right but slowly
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY": [
-                    "You did right but slowly","Sentence cracker" # Added You did right but slowly
+                    "You Did Right But Slowly","Sentence Cracker" # Added You did right but slowly
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX": [
-                    "You did right but slowly","Sentence cracker" # Added You did right but slowly
+                    "You Did Right But Slowly","Sentence Cracker" # Added You did right but slowly
                 ],
             },
             "MSR": {
                 "DI_READING_COMPREHENSION_ERROR__VOCABULARY": [
-                    "Questions you did wrong", "Memorizing Vocabularies", "Sentence Cracker"
+                    "Questions You Did Wrong", "Memorizing Vocabularies", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__SYNTAX": [
-                    "Questions you did wrong", "Rewrite Passage into Complex Sentences", "Train your Close Reading Skill", "Sentence Cracker"
+                    "Questions You Did Wrong", "Rewrite Passage into Complex Sentences", "Train Your Close Reading Skill", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__LOGIC": [
-                    "Questions you did wrong", "Train your Close Reading Skill"
+                    "Questions You Did Wrong", "Train Your Close Reading Skill"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__DOMAIN": [
-                    "Questions you did wrong", "Train Reading for Specific Domain"
+                    "Questions You Did Wrong", "Train Reading for Specific Domain"
                 ],
                 "DI_GRAPH_INTERPRETATION_ERROR__GRAPH": [
-                    "Questions you did wrong", "Learn math concepts", "Identify Features for applying a specific solution", # Corrected casing
-                    "Classify this question", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "Questions You Did Wrong", "Learn Math Concepts", "Identify Features for Applying a Specific Solution", # Corrected casing
+                    "Classify This Question", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
                 "DI_GRAPH_INTERPRETATION_ERROR__TABLE": [
-                    "Questions you did wrong", "Learn math concepts", "Identify Features for applying a specific solution", # Corrected casing
-                    "Classify this question", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "Questions You Did Wrong", "Learn Math Concepts", "Identify Features for Applying a Specific Solution", # Corrected casing
+                    "Classify This Question", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
                 "DI_CONCEPT_APPLICATION_ERROR__MATH": [
-                    "Questions you did wrong", "Learn math concepts", "Identify Features for applying a specific solution", # Corrected casing
-                    "Classify this question", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "Questions You Did Wrong", "Learn Math Concepts", "Identify Features for Applying a Specific Solution", # Corrected casing
+                    "Classify This Question", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
                 "DI_LOGICAL_REASONING_ERROR__NON_MATH": [
-                    "Questions you did wrong", "Classify this question", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "Questions You Did Wrong", "Classify This Question", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
-                "DI_CALCULATION_ERROR__MATH": ["Questions you did wrong"],
+                "DI_CALCULATION_ERROR__MATH": ["Questions You Did Wrong"],
                 "DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION": [
-                    "You did right but slowly","Passage you fail to organize", "Customize your preferred Problem-solving process and request an AI demonstration" # Added You did right but slowly
+                    "You Did Right But Slowly","Passages You Failed to Organize", "Customize Your Preferred Problem-Solving Process" # Added You did right but slowly
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX": [
-                    "You did right but slowly","Rewrite Passage into Complex Sentences", "Train your Close Reading Skill", "Enhanced Reading Speed", "Sentence Cracker" # Added You did right but slowly
+                    "You Did Right But Slowly","Rewrite Passage into Complex Sentences", "Train Your Close Reading Skill", "Enhance Reading Speed", "Sentence Cracker" # Added You did right but slowly
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__LOGIC": [
-                    "You did right but slowly","Customize your preferred Problem-solving process and request an AI demonstration",
-                    "Train your Close Reading Skill", "Enhanced Reading Speed" # Added You did right but slowly
+                    "You Did Right But Slowly","Customize Your Preferred Problem-Solving Process",
+                    "Train Your Close Reading Skill", "Enhance Reading Speed" # Added You did right but slowly
                 ],
                 "DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH": [
-                    "You did right but slowly","Learn math concepts", "Identify Features for applying a specific solution", # Corrected casing
-                    "Customize your preferred Problem-solving process and request an AI demonstration" # Added You did right but slowly
+                    "You Did Right But Slowly","Learn Math Concepts", "Identify Features for Applying a Specific Solution", # Corrected casing
+                    "Customize Your Preferred Problem-Solving Process" # Added You did right but slowly
                 ],
                 "DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE": [
-                    "You did right but slowly","Learn math concepts", "Identify Features for applying a specific solution", # Corrected casing
-                    "Customize your preferred Problem-solving process and request an AI demonstration" # Added You did right but slowly
+                    "You Did Right But Slowly","Learn Math Concepts", "Identify Features for Applying a Specific Solution", # Corrected casing
+                    "Customize Your Preferred Problem-Solving Process" # Added You did right but slowly
                 ],
                 "DI_CONCEPT_APPLICATION_DIFFICULTY__MATH": [
-                    "You did right but slowly","Learn math concepts", "Identify Features for applying a specific solution", # Corrected casing
-                    "Customize your preferred Problem-solving process and request an AI demonstration" # Added You did right but slowly
+                    "You Did Right But Slowly","Learn Math Concepts", "Identify Features for Applying a Specific Solution", # Corrected casing
+                    "Customize Your Preferred Problem-Solving Process" # Added You did right but slowly
                 ],
                 "DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH": [
-                    "You did right but slowly","Customize your preferred Problem-solving process and request an AI demonstration" # Added You did right but slowly
+                    "You Did Right But Slowly","Customize Your Preferred Problem-Solving Process" # Added You did right but slowly
                 ],
                 "DI_CALCULATION_DIFFICULTY__MATH": [
-                    "You did right but slowly","Customize your preferred Problem-solving process and request an AI demonstration" # Added You did right but slowly
+                    "You Did Right But Slowly","Customize Your Preferred Problem-Solving Process" # Added You did right but slowly
                 ],
-                "DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE": ["Classify this question"], # Assuming "You did right but slowly" isn't always implied by SFE
-                "DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN": ["You did right but slowly","Train Reading for Specific Domain"], # Added You did right but slowly
+                "DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE": ["Classify This Question"], # Assuming "You did right but slowly" isn't always implied by SFE
+                "DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN": ["You Did Right But Slowly","Train Reading for Specific Domain"], # Added You did right but slowly
                 "DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY": [
-                    "You did right but slowly","Memorizing Vocabularies", "Sentence Cracker" # Added You did right but slowly
+                    "You Did Right But Slowly","Memorizing Vocabularies", "Sentence Cracker" # Added You did right but slowly
                 ],
             },
              "PS": {
                 "Q_READING_COMPREHENSION_ERROR": [
-                    "Questions you did wrong", "Rewrite passage into compressed sentences", "Convert to real context", "Sentence Cracker"
+                    "Questions You Did Wrong", "Rewrite passage into compressed sentences", "Convert to Real-Context", "Sentence Cracker"
                 ],
                 "Q_CONCEPT_APPLICATION_ERROR": [
-                    "Questions you did wrong", "Learn math concepts", "Identify features for applying a specific solution",
-                    "Create variant question", "Finding similar questions in set", "Classify this question", "Explain Textbook"
+                    "Questions You Did Wrong", "Learn Math Concepts", "Identify Features for Applying a Specific Solution",
+                    "Create Variant Question", "Finding Similar Questions in Set", "Classify This Question", "Explain Textbook"
                 ],
                 "Q_CALCULATION_ERROR": [
-                    "Questions you did wrong", "Create variant question", "Finding similar questions in set"
+                    "Questions You Did Wrong", "Create Variant Question", "Finding Similar Questions in Set"
                 ],
                 "Q_READING_COMPREHENSION_DIFFICULTY": [
-                    "You did right but slowly","Rewrite passage into compressed sentences", "Convert to real context", "Sentence Cracker" # Added You did right but slowly
+                    "You Did Right But Slowly","Rewrite passage into compressed sentences", "Convert to Real-Context", "Sentence Cracker" # Added You did right but slowly
                 ],
                 "Q_CONCEPT_APPLICATION_DIFFICULTY": [
-                    "You did right but slowly", "Learn math concepts", "Identify features for applying a specific solution",
-                    "Create variant question", "Finding similar questions in set", "Classify this question", "Explain Textbook"
+                    "You Did Right But Slowly", "Learn Math Concepts", "Identify Features for Applying a Specific Solution",
+                    "Create Variant Question", "Finding Similar Questions in Set", "Classify This Question", "Explain Textbook"
                 ],
                 "Q_CALCULATION_DIFFICULTY": [
-                    "You did right but slowly", "Create variant question", "Finding similar questions in set"
+                    "You Did Right But Slowly", "Create Variant Question", "Finding Similar Questions in Set"
                 ],
                 "Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE": [
-                    "You did right but slowly", "Classify this question"
+                    "You Did Right But Slowly", "Classify This Question"
                 ],
             },
             "RC": {
                 "RC_READING_COMPREHENSION_ERROR_VOCAB": [
-                    "Questions you did wrong", "Diagnostic Label List", "Memorizing Vocabularies"
+                    "Questions You Did Wrong",  "Memorizing Vocabularies"
                 ],
                 "RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS": [
-                    "Questions you did wrong", "Diagnostic Label List", "Rewrite passage into complex sentences", "Train your Close Reading Skill"
+                    "Questions You Did Wrong",  "Rewrite Passage into Complex Sentences", "Train Your Close Reading Skill"
                 ],
                 "RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE": [
-                    "Questions you did wrong", "Passages you fail to organize", "Diagnostic Label List",
-                    "Create variant question", "Interactive Understanding Passage",
-                    "Predictive and Active Reading", "Explain Textbook"
+                    "Questions You Did Wrong", "Passages You Failed to Organize", 
+                    "Create Variant Question", "Interactively Understand a Passage",
+                    "Train Predictive & Active Reading", "Explain Textbook"
                 ],
                 "RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING": [
-                    "Questions you did wrong", "Passages you fail to organize", "Diagnostic Label List",
-                    "Create variant question", "Explain Textbook", "Train your Close Reading Skill"
+                    "Questions You Did Wrong", "Passages You Failed to Organize", 
+                    "Create Variant Question", "Explain Textbook", "Train Your Close Reading Skill"
                 ],
                 "RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT": [
-                    "Questions you did wrong", "Diagnostic Label List", "Preparatory answer training",
-                    "Create variant question", "Classify this question", "Explain Textbook", "Train your Close Reading Skill" # Changed Classify This Question to Classify this question
+                    "Questions You Did Wrong", "Preparatory Answer Training",
+                    "Create Variant Question", "Classify This Question", "Explain Textbook", "Train Your Close Reading Skill" # Changed Classify This Question to Classify this question
                 ],
                 "RC_LOCATION_SKILL_ERROR_LOCATION": [
-                    "Questions you did wrong", "Diagnostic Label List", "Preparatory answer training",
-                    "Classify this question", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "Questions You Did Wrong", "Preparatory Answer Training",
+                    "Classify This Question", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
                 "RC_REASONING_ERROR_INFERENCE": [
-                    "Questions you did wrong", "Examine your thoughts", "Diagnostic Label List",
-                    "Preparatory answer training", "Create variant question", "Classify this question", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "Questions You Did Wrong", "Examine your Thoughts", 
+                    "Preparatory Answer Training", "Create Variant Question", "Classify This Question", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_VOCAB": [
-                    "Questions you did wrong", "Diagnostic Label List", "Memorizing Vocabularies"
+                    "Questions You Did Wrong", "Memorizing Vocabularies"
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_SYNTAX": [
-                    "Questions you did wrong", "Diagnostic Label List", "Rewrite passage into complex sentences"
+                    "Questions You Did Wrong", "Rewrite Passage into Complex Sentences"
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_LOGIC": [
-                    "Questions you did wrong", "Diagnostic Label List", "Train your Close Reading Skill"
+                    "Questions You Did Wrong", "Train Your Close Reading Skill"
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_DOMAIN": [
-                    "Questions you did wrong", "Diagnostic Label List", "Train Reading for Specific Domain" # Added "Train Reading for Specific Domain" based on difficulty counterpart
+                    "Questions You Did Wrong", "Train Reading for Specific Domain" # Added "Train Reading for Specific Domain" based on difficulty counterpart
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT": [
-                    "Questions you did wrong", "Diagnostic Label List", "Create variant question",
-                    "Classify this question", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "Questions You Did Wrong",  "Create Variant Question",
+                    "Classify This Question", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
                 "RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION": [
-                    "Questions you did wrong", "Diagnostic Label List", "Create variant question",
-                    "Classify this question", "Review distractor", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "Questions You Did Wrong",  "Create Variant Question",
+                    "Classify This Question", "Review Distractor (Trap Choices)", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
                 "RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING": [
-                    "Questions you did wrong", "Create variant question", "Classify this question", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "Questions You Did Wrong", "Create Variant Question", "Classify This Question", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
                 "RC_READING_COMPREHENSION_DIFFICULTY_VOCAB_BOTTLENECK": [
-                    "You did right but slowly", "Memorizing Vocabularies"
+                    "You Did Right But Slowly", "Memorizing Vocabularies"
                 ],
                 "RC_READING_COMPREHENSION_DIFFICULTY_LONG_DIFFICULT_SENTENCE_ANALYSIS": [
-                    "You did right but slowly", "Rewrite passage into complex sentences", "Train your Close Reading Skill", "Enhanced Reading Speed"
+                    "You Did Right But Slowly", "Rewrite Passage into Complex Sentences", "Train Your Close Reading Skill", "Enhance Reading Speed"
                 ],
                 "RC_READING_COMPREHENSION_DIFFICULTY_PASSAGE_STRUCTURE_GRASP_UNCLEAR": [
-                    "You did right but slowly", "Passages you fail to organize", "Interactive Understanding Passage",
-                    "Predictive and Active Reading", "Explain Textbook", "Enhanced Reading Speed"
+                    "You Did Right But Slowly", "Passages You Failed to Organize", "Interactively Understand a Passage",
+                    "Train Predictive & Active Reading", "Explain Textbook", "Enhance Reading Speed"
                 ],
                 "RC_READING_COMPREHENSION_DIFFICULTY_SPECIFIC_DOMAIN_BACKGROUND_KNOWLEDGE_LACK": [
-                    "You did right but slowly", "Rewrite Passage into GMAT style", "Train Reading for Specific Domain"
+                    "You Did Right But Slowly", "Rewrite Passage into GMAT Style", "Train Reading for Specific Domain"
                 ],
                 "RC_READING_COMPREHENSION_DIFFICULTY_MINDSET_BLOCKED": [
-                    "You did right but slowly"
+                    "You Did Right But Slowly"
                 ],
                 "RC_QUESTION_UNDERSTANDING_DIFFICULTY_FOCUS_POINT_GRASP": [
-                    "You did right but slowly", "Preparatory answer training", "Classify this question", # Changed Classify This Question to Classify this question
-                    "Explain Textbook", "Train your Close Reading Skill"
+                    "You Did Right But Slowly", "Preparatory Answer Training", "Classify This Question", # Changed Classify This Question to Classify this question
+                    "Explain Textbook", "Train Your Close Reading Skill"
                 ],
                 "RC_QUESTION_UNDERSTANDING_DIFFICULTY_MINDSET_BLOCKED": [
-                    "You did right but slowly"
+                    "You Did Right But Slowly"
                 ],
                 "RC_LOCATION_SKILL_DIFFICULTY_INEFFICIENCY": [
-                    "You did right but slowly", "Preparatory answer training", "Classify this question", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "You Did Right But Slowly", "Preparatory Answer Training", "Classify This Question", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
                 "RC_REASONING_DIFFICULTY_INFERENCE_SPEED_SLOW": [
-                    "You did right but slowly", "Examine your thoughts", "Preparatory answer training", "Explain Textbook"
+                    "You Did Right But Slowly", "Examine your Thoughts", "Preparatory Answer Training", "Explain Textbook"
                 ],
                 "RC_CHOICE_ANALYSIS_DIFFICULTY_VOCAB": [
-                    "You did right but slowly", "Memorizing Vocabularies"
+                    "You Did Right But Slowly", "Memorizing Vocabularies"
                 ],
                 "RC_CHOICE_ANALYSIS_DIFFICULTY_SYNTAX": [
-                    "You did right but slowly", "Rewrite passage into complex sentences"
+                    "You Did Right But Slowly", "Rewrite Passage into Complex Sentences"
                 ],
                 "RC_CHOICE_ANALYSIS_DIFFICULTY_LOGIC": [
-                    "You did right but slowly", "Train your Close Reading Skill"
+                    "You Did Right But Slowly", "Train Your Close Reading Skill"
                 ],
                 "RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN": [
-                    "You did right but slowly", "Train Reading for Specific Domain"
+                    "You Did Right But Slowly", "Train Reading for Specific Domain"
                 ],
                 "RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT": [ # Provided example JSON used this error code
-                    "You did right but slowly", "Classify this question", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "You Did Right But Slowly", "Classify This Question", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
                 "RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS": [
-                    "You did right but slowly", "Classify this question", "Review distractor", "Explain Textbook" # Changed Classify This Question to Classify this question
+                    "You Did Right But Slowly", "Classify This Question", "Review Distractor (Trap Choices)", "Explain Textbook" # Changed Classify This Question to Classify this question
                 ],
             },
              "TPA": {
                 "DI_READING_COMPREHENSION_ERROR__VOCABULARY": [
-                    "Questions you did wrong", "Examine your thoughts", "Understand logical terms", "Memorizing Vocabularies", "Sentence Cracker" # Changed Memorizing Vocabulary to Memorizing Vocabularies
+                    "Questions You Did Wrong", "Examine your Thoughts", "Understand Logical Terms", "Memorizing Vocabularies", "Sentence Cracker" # Changed Memorizing Vocabulary to Memorizing Vocabularies
                 ],
                 "DI_READING_COMPREHENSION_ERROR__SYNTAX": [
-                    "Questions you did wrong", "Examine your thoughts", "Passages you fail to organize",
-                    "Rewrite passage into complex sentences", "Train your Close Reading Skill", "Sentence Cracker"
+                    "Questions You Did Wrong", "Examine your Thoughts", "Passages You Failed to Organize",
+                    "Rewrite Passage into Complex Sentences", "Train Your Close Reading Skill", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__LOGIC": [
-                    "Questions you did wrong", "Examine your thoughts", "Passages you fail to organize",
-                    "Review distractor", "Classify this question", "Train your Close Reading Skill"
+                    "Questions You Did Wrong", "Examine your Thoughts", "Passages You Failed to Organize",
+                    "Review Distractor (Trap Choices)", "Classify This Question", "Train Your Close Reading Skill"
                 ],
                 "DI_READING_COMPREHENSION_ERROR__DOMAIN": [
-                    "Questions you did wrong", "Examine your thoughts", "Train Reading for Specific Domain"
+                    "Questions You Did Wrong", "Examine your Thoughts", "Train Reading for Specific Domain"
                 ],
                 "DI_CONCEPT_APPLICATION_ERROR__MATH": [
-                    "Questions you did wrong", "Examine your thoughts", "Learn math concepts",
-                    "Identify features for applying a specific solution", "Create variant question",
-                    "Finding similar questions in set", "Classify this question", "Explain Textbook"
+                    "Questions You Did Wrong", "Examine your Thoughts", "Learn Math Concepts",
+                    "Identify Features for Applying a Specific Solution", "Create Variant Question",
+                    "Finding Similar Questions in Set", "Classify This Question", "Explain Textbook"
                 ],
                 "DI_LOGICAL_REASONING_ERROR__NON_MATH": [
-                    "Questions you did wrong", "Examine your thoughts", "Review distractor", "Classify this question", "Explain Textbook"
+                    "Questions You Did Wrong", "Examine your Thoughts", "Review Distractor (Trap Choices)", "Classify This Question", "Explain Textbook"
                 ],
                 "DI_CALCULATION_ERROR__MATH": [
-                    "Questions you did wrong", "Examine your thoughts", "Create variant question", "Finding similar questions in set"
+                    "Questions You Did Wrong", "Examine your Thoughts", "Create Variant Question", "Finding Similar Questions in Set"
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY": [
-                    "You did right but slowly", "Understand logical terms", "Memorizing Vocabularies", "Sentence Cracker" # Changed Memorizing Vocabulary to Memorizing Vocabularies
+                    "You Did Right But Slowly", "Understand Logical Terms", "Memorizing Vocabularies", "Sentence Cracker" # Changed Memorizing Vocabulary to Memorizing Vocabularies
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX": [
-                    "You did right but slowly", "Passages you fail to organize", "Rewrite passage into complex sentences",
-                    "Train your Close Reading Skill", "Enhanced Reading Speed", "Sentence Cracker"
+                    "You Did Right But Slowly", "Passages You Failed to Organize", "Rewrite Passage into Complex Sentences",
+                    "Train Your Close Reading Skill", "Enhance Reading Speed", "Sentence Cracker"
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__LOGIC": [
-                    "You did right but slowly", "Passages you fail to organize", "Review distractor",
-                    "Train your Close Reading Skill", "Enhanced Reading Speed"
+                    "You Did Right But Slowly", "Passages You Failed to Organize", "Review Distractor (Trap Choices)",
+                    "Train Your Close Reading Skill", "Enhance Reading Speed"
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN": [
-                    "You did right but slowly", "Train Reading for Specific Domain"
+                    "You Did Right But Slowly", "Train Reading for Specific Domain"
                 ],
                 "DI_READING_COMPREHENSION_DIFFICULTY__MINDSET_BLOCKED": [
-                    "You did right but slowly"
+                    "You Did Right But Slowly"
                 ],
                 "DI_CONCEPT_APPLICATION_DIFFICULTY__MATH": [
-                    "You did right but slowly", "Learn math concepts", "Identify features for applying a specific solution",
-                    "Create variant question", "Finding similar questions in set", "Explain Textbook"
+                    "You Did Right But Slowly", "Learn Math Concepts", "Identify Features for Applying a Specific Solution",
+                    "Create Variant Question", "Finding Similar Questions in Set", "Explain Textbook"
                 ],
                 "DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH": [
-                    "You did right but slowly", "Review distractor", "Explain Textbook"
+                    "You Did Right But Slowly", "Review Distractor (Trap Choices)", "Explain Textbook"
                 ],
                 "DI_CALCULATION_DIFFICULTY__MATH": [
-                    "You did right but slowly", "Create variant question", "Finding similar questions in set"
+                    "You Did Right But Slowly", "Create Variant Question", "Finding Similar Questions in Set"
                 ],
             },
         }
