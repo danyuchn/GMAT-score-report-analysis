@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import logging
+from typing import Optional, Dict, Tuple
 
 # # Basic logging configuration to ensure INFO messages are displayed # Removed by AI
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(module)s - %(funcName)s - %(lineno)d - %(message)s') # Removed by AI
@@ -15,24 +16,31 @@ from .constants import (
 )
 from .utils import (
     # _calculate_msr_metrics, # Removed import
-    _analyze_dimension, _grade_difficulty_di
+    analyze_dimension, grade_difficulty_di
 )
 # Import only needed items from translation.py, or keep for backward compatibility
 # from .translation import (
 #     _translate_di # Only translation function needed directly in main logic?
 # )
 from .analysis import (
-    _diagnose_root_causes, _observe_di_patterns, _check_foundation_override
+    diagnose_root_causes, observe_di_patterns, check_foundation_override_detailed
 )
-from .recommendations import _generate_di_recommendations
-from .reporting import _generate_di_summary_report
+from .recommendations import generate_di_recommendations
+from .reporting import generate_di_summary_report
 from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
 from gmat_diagnosis_app.analysis_helpers.time_analyzer import calculate_first_third_average_time_per_type
 # Add unified i18n system import
 from gmat_diagnosis_app.i18n import translate as t
 
 # Rename the main processing function for clarity within the module
-def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
+def run_di_diagnosis(
+    df_processed: pd.DataFrame,
+    time_pressure_status: bool,
+    avg_time_per_type: Optional[Dict[str, float]] = None,
+    include_summaries: bool = False,
+    include_individual_errors: bool = False,
+    include_summary_report: bool = True
+) -> Tuple[Dict, str, pd.DataFrame]:
     # --- FORCE LOGGING CHECK --- REMOVED by AI
     # logging.info("!!!!!! [DI Main Entry] Entering run_di_diagnosis_logic !!!!!")
     # try:
@@ -47,18 +55,18 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
     # logging.info(f">>>> [DI Main Entry] run_di_diagnosis_logic called with di_time_pressure_status: {di_time_pressure_status}")
     # --- End FORCE LOGGING CHECK --- REMOVED by AI
     """
-    Core diagnostic logic for Data Insights, moved from di_diagnostic.py.
-    Assumes 'is_invalid' column reflects the final status after user review.
-    MODIFIED: Ensures time_performance_category is calculated for all rows and not overwritten for invalid ones.
-
+    DI診斷主入口函數
+    
     Args:
-        df_di_processed (pd.DataFrame): DataFrame with DI responses, preprocessed with 'is_invalid'.
-        di_time_pressure_status (bool): Time pressure status for DI.
-
+        df_processed: 預處理後的DataFrame，包含is_invalid標記
+        time_pressure_status: 時間壓力狀態布林值
+        avg_time_per_type: 各題型平均時間字典，可選
+        include_summaries: 是否包含詳細摘要數據
+        include_individual_errors: 是否包含個別錯誤詳情
+        include_summary_report: 是否生成文字摘要報告
+        
     Returns:
-        dict: A dictionary containing the results of the DI diagnosis, structured by chapter.
-        str: A string containing the summary report for the DI section.
-        pd.DataFrame: The processed DI DataFrame with added diagnostic columns.
+        tuple: (診斷結果字典, 報告字串, 帶診斷標記的DataFrame)
     """
     di_diagnosis_results = {}
     report_str = t('report_generation_disabled')  # Use translation for error message
@@ -70,7 +78,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
                   'time_performance_category', 'diagnostic_params_list']
 
     try: # --- Start Main Try Block ---
-        if df_di_processed.empty:
+        if df_processed.empty:
             report_str = t('di_ai_analysis_unavailable')  # Use translation for no data message
             df_to_return = pd.DataFrame(columns=empty_cols)
             if 'Subject' not in df_to_return.columns:
@@ -78,7 +86,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             # logging.info("[run_di_diagnosis_logic] Input DataFrame is empty.") # Removed by AI
             return {}, report_str, df_to_return
 
-        df_di = df_di_processed.copy()
+        df_di = df_processed.copy()
         
         # Initialize time_performance_category early on df_di
         if 'time_performance_category' not in df_di.columns:
@@ -146,7 +154,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         #     df_di.loc[suspiciously_fast_mask, 'suspiciously_fast'] = True
             
         # 核心邏輯：標記無效數據 (is_invalid)
-        if di_time_pressure_status: # 文檔標準：僅在 time_pressure == True 時執行
+        if time_pressure_status: # 文檔標準：僅在 time_pressure == True 時執行
             # 獲取所有題目位置
             all_positions_sorted = sorted(df_di['question_position'].unique())
             if len(all_positions_sorted) > 0: # Ensure all_positions_sorted is not empty
@@ -245,7 +253,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             logging.error(f"Error initializing 'overtime': {e}", exc_info=True)
             raise e
 
-        thresholds = OVERTIME_THRESHOLDS[di_time_pressure_status]
+        thresholds = OVERTIME_THRESHOLDS[time_pressure_status]
         valid_mask = ~df_di['is_invalid']
         
         # Non-MSR Overtime
@@ -273,34 +281,45 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         di_diagnosis_results['chapter_1'] = {
             'total_test_time_minutes': total_test_time_di,
             'time_difference_minutes': time_diff,
-            'time_pressure': di_time_pressure_status,
+            'time_pressure': time_pressure_status,
             'invalid_questions_excluded': num_invalid_questions_total,
             'overtime_thresholds_minutes': thresholds
         }
 
-        # Calculate avg_time_per_type and max_correct_difficulty using VALID data (df_di_filtered_for_analysis)
-        avg_time_per_type_for_rules = {}
+        # Use provided avg_time_per_type if available, otherwise calculate from data
+        if avg_time_per_type and isinstance(avg_time_per_type, dict):
+            avg_time_per_type_for_rules = avg_time_per_type.copy()
+        else:
+            # Calculate avg_time_per_type using filtered data as fallback
+            avg_time_per_type_for_rules = {}
+            if not df_di.empty and 'question_type' in df_di.columns:
+                # Use valid data for calculation
+                df_valid_calc = df_di[~df_di['is_invalid']]
+                if not df_valid_calc.empty:
+                    avg_time_per_type_for_rules = df_valid_calc.groupby('question_type')['question_time'].mean().to_dict()
+        
+        # Calculate max_correct_difficulty using VALID data
         max_correct_difficulty_per_combination_for_rules = pd.DataFrame()
         if not df_di.empty:
-            if 'question_type' in df_di.columns:
-                avg_time_per_type_for_rules = df_di.groupby('question_type')['question_time'].mean().to_dict()
             if 'content_domain' in df_di.columns and 'question_difficulty' in df_di.columns:
-                 correct_rows_valid = df_di['is_correct'] == True
-                 if correct_rows_valid.any():
-                     max_correct_difficulty_per_combination_for_rules = df_di[correct_rows_valid].groupby(
-                         ['question_type', 'content_domain']
-                     )['question_difficulty'].max().unstack(fill_value=-np.inf)
+                # Use valid data for calculation
+                df_valid_calc = df_di[~df_di['is_invalid']]
+                correct_rows_valid = df_valid_calc['is_correct'] == True
+                if correct_rows_valid.any():
+                    max_correct_difficulty_per_combination_for_rules = df_valid_calc[correct_rows_valid].groupby(
+                        ['question_type', 'content_domain']
+                    )['question_difficulty'].max().unstack(fill_value=-np.inf)
 
-        # _diagnose_root_causes will be called on the full df_di.
-        # It needs to be refactored to:
-        #   1. Calculate time_performance_category for ALL rows in df_di.
-        #   2. Apply SFE and detailed diagnostic_params only to NON-INVALID rows in df_di.
-        #   Uses avg_time_per_type_for_rules and max_correct_difficulty_per_combination_for_rules for its internal logic.
-        df_di = _diagnose_root_causes(
+        # 添加時間壓力檢測標記（對所有數據進行檢測，不僅限於無效數據）
+        # diagnose_root_causes will be called on the full df_di.
+        # logging.debug("[run_di_diagnosis_logic] Chapter 3: Diagnose Root Causes")
+        # Call the actual Chapter 3 logic first (always diagnose all rows)
+        # df_di = _diagnose_root_causes(
+        df_di, override_results = diagnose_root_causes(
             df_di, 
             avg_time_per_type_for_rules, 
             max_correct_difficulty_per_combination_for_rules, 
-            OVERTIME_THRESHOLDS[di_time_pressure_status]
+            OVERTIME_THRESHOLDS[time_pressure_status]
         )
 
         di_diagnosis_results['chapter_3'] = {
@@ -325,23 +344,25 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         # --- Chapter 4: Special Pattern Observation (uses df_di_filtered_for_analysis or df_di as appropriate) ---
         # logging.debug("[run_di_diagnosis_logic] Chapter 4: Special Patterns")
         # avg_times_ch3_for_ch4 was originally from diagnosed_dataframe.groupby. Now use avg_time_per_type_for_rules
-        pattern_analysis_results = _observe_di_patterns(df_di_filtered_for_analysis, avg_time_per_type_for_rules)
+        pattern_analysis_results = observe_di_patterns(df_di_filtered_for_analysis, avg_time_per_type_for_rules)
         di_diagnosis_results['chapter_4'] = pattern_analysis_results
         # logging.debug("[run_di_diagnosis_logic] Completed Chapter 4.")
 
-        # --- Chapter 5: Foundation Ability Override Rule (uses df_di_filtered_for_analysis) ---
-        # logging.debug("[run_di_diagnosis_logic] Chapter 5: Override Rule")
+        # --- Chapter 5: Special Foundation Override Check ---
+        # logging.debug("[run_di_diagnosis_logic] Chapter 5: Foundation Override Check")
+        # Pass type_analysis to Chapter 5 for override decision
         type_analysis_ch2_for_ch5 = di_diagnosis_results.get('chapter_2', {}).get('by_type', {})
-        override_analysis = _check_foundation_override(df_di_filtered_for_analysis, type_analysis_ch2_for_ch5)
+        override_analysis = check_foundation_override_detailed(df_di_filtered_for_analysis, type_analysis_ch2_for_ch5)
         di_diagnosis_results['chapter_5'] = override_analysis
         # logging.debug("[run_di_diagnosis_logic] Completed Chapter 5.")
 
-        # --- Chapter 6: Practice Planning & Recommendations (uses df_di_filtered_for_analysis or df_di) ---
+        # --- Chapter 6: Recommendations ---
         # logging.debug("[run_di_diagnosis_logic] Chapter 6: Recommendations")
+        # Pass results from Chapters 2, 3, 5 to Chapter 6
         domain_tags_ch2_for_ch6 = di_diagnosis_results.get('chapter_2', {}).get('domain_comparison_tags', {})
         override_analysis_ch5_for_ch6 = di_diagnosis_results.get('chapter_5', {})
 
-        recommendations = _generate_di_recommendations(df_di_filtered_for_analysis, override_analysis_ch5_for_ch6, domain_tags_ch2_for_ch6, time_pressure=di_time_pressure_status)
+        recommendations = generate_di_recommendations(df_di_filtered_for_analysis, override_analysis_ch5_for_ch6, domain_tags_ch2_for_ch6, time_pressure=time_pressure_status)
         di_diagnosis_results['chapter_6'] = {'recommendations_list': recommendations}
         # logging.debug("[run_di_diagnosis_logic] Completed Chapter 6.")
 
@@ -350,7 +371,11 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         # Update chapter 3's dataframe in results for the report generator, ensuring it's the full df_di
         di_diagnosis_results['chapter_3']['diagnosed_dataframe'] = df_di.copy()
 
-        report_str = _generate_di_summary_report(di_diagnosis_results)
+        # Generate summary report based on include_summary_report parameter
+        if include_summary_report:
+            report_str = generate_di_summary_report(di_diagnosis_results)
+        else:
+            report_str = t('report_generation_disabled')  # Use translation for disabled message
         # logging.debug("[run_di_diagnosis_logic] Completed Chapter 7.")
         
         # Logging for final returned data (df_di will be the base for df_to_return)
@@ -368,7 +393,7 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
         # df_to_return starts as a copy of the fully processed df_di
         df_to_return = df_di.copy()
 
-        # No complex merge needed if diagnostic_params, is_sfe, time_performance_category were correctly set on df_di by _diagnose_root_causes
+        # No complex merge needed if diagnostic_params, is_sfe, time_performance_category were correctly set on df_di by diagnose_root_causes
 
         if 'diagnostic_params' in df_to_return.columns:
             df_to_return['diagnostic_params'] = df_to_return['diagnostic_params'].apply(
@@ -386,8 +411,8 @@ def run_di_diagnosis_logic(df_di_processed, di_time_pressure_status):
             df_to_return['time_performance_category'] = t('Unknown')
         
         # Ensure `time_performance_category` for invalid rows is NOT overwritten to 'Invalid/Excluded' here.
-        # It should retain the value calculated by _diagnose_root_causes.
-        # Fill NA or empty strings with 'Unknown' if _diagnose_root_causes didn't assign a category.
+        # It should retain the value calculated by diagnose_root_causes.
+        # Fill NA or empty strings with 'Unknown' if diagnose_root_causes didn't assign a category.
         with pd.option_context('future.no_silent_downcasting', True):
             df_to_return['time_performance_category'] = df_to_return['time_performance_category'].replace({pd.NA: t('Unknown'), None: t('Unknown'), np.nan: t('Unknown'), '': t('Unknown')})
             df_to_return['time_performance_category'] = df_to_return['time_performance_category'].infer_objects(copy=False)

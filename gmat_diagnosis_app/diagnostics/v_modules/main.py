@@ -1,12 +1,14 @@
 """
-V診斷模塊的主要診斷功能
+V診斷模塊的主入口函數
 
-此模塊包含V(Verbal)診斷的主要入口點函數，
-用於組織和執行完整的診斷流程。
+此模塊包含用於V(Verbal)診斷的主入口點函數，
+用於協調整個診斷流程。
 """
 
 import pandas as pd
+import numpy as np
 import logging
+from typing import Dict, Optional, Tuple
 # import streamlit as st # Removed this unused top-level import
 
 from gmat_diagnosis_app.diagnostics.v_modules.constants import INVALID_DATA_TAG_V, V_SUSPICIOUS_FAST_MULTIPLIER, RC_READING_TIME_THRESHOLD_3Q, RC_READING_TIME_THRESHOLD_4Q
@@ -42,8 +44,34 @@ from gmat_diagnosis_app.diagnostics.v_modules.reporting import generate_v_summar
 #     return run_v_diagnosis_processed(df_v_preprocessed, v_time_pressure_status, v_avg_time_per_type)
 
 
-def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time_per_type):
+def run_v_diagnosis(
+    df_processed: pd.DataFrame, 
+    time_pressure_status: bool, 
+    avg_time_per_type: Optional[Dict[str, float]] = None,
+    include_summaries: bool = False,
+    include_individual_errors: bool = False,
+    include_summary_report: bool = True
+) -> Tuple[Dict, str, pd.DataFrame]:
+    """
+    Main entry point for V diagnostics.
+    
+    Args:
+        df_processed (pd.DataFrame): Preprocessed V dataframe with question data
+        time_pressure_status (bool): Time pressure status for V section
+        avg_time_per_type (Optional[Dict[str, float]]): Average time per question type, optional
+        include_summaries (bool): Whether to include detailed summary data
+        include_individual_errors (bool): Whether to include individual error details
+        include_summary_report (bool): Whether to generate the text summary report
+        
+    Returns:
+        Tuple[Dict, str, pd.DataFrame]: (diagnostic results, summary report, diagnosed dataframe)
+    """
     try:
+        # Use the provided parameters instead of the old parameter names
+        df_v_processed = df_processed.copy()
+        v_time_pressure_status = time_pressure_status
+        v_avg_time_per_type = avg_time_per_type or {}
+        
         # 添加調試日誌
         # import streamlit as st # Removed unused import from function scope
         import logging

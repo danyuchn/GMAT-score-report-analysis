@@ -7,6 +7,7 @@ Q診斷模塊的主入口函數
 
 import pandas as pd
 from collections import defaultdict
+from typing import Dict, Optional, Tuple
 
 from gmat_diagnosis_app.diagnostics.q_modules.constants import (
     OVERTIME_THRESHOLDS,
@@ -33,7 +34,14 @@ from gmat_diagnosis_app.diagnostics.q_modules.reporting import (
 )
 
 
-def diagnose_q_main(df, include_summaries=False, include_individual_errors=False, include_summary_report=True):
+def run_q_diagnosis(
+    df_processed: pd.DataFrame, 
+    time_pressure_status: bool,
+    avg_time_per_type: Optional[Dict[str, float]] = None,
+    include_summaries: bool = False, 
+    include_individual_errors: bool = False, 
+    include_summary_report: bool = True
+) -> Tuple[Dict, str, pd.DataFrame]:
     """
     Main entry point for Q diagnostics.
     
@@ -45,21 +53,23 @@ def diagnose_q_main(df, include_summaries=False, include_individual_errors=False
     5. Producing the final report (Ch 8)
     
     Args:
-        df (DataFrame): Input dataframe with question data. Expected to have 'is_manually_invalid' if manual review is done,
+        df_processed (pd.DataFrame): Input dataframe with question data. Expected to have 'is_manually_invalid' if manual review is done,
                         otherwise 'is_invalid' will be used as a fallback for filtering.
+        time_pressure_status (bool): Time pressure status for Q section
+        avg_time_per_type (Optional[Dict[str, float]]): Average time per question type, optional
         include_summaries (bool): Whether to include detailed summary data
         include_individual_errors (bool): Whether to include individual error details
         include_summary_report (bool): Whether to generate the text summary report
         
     Returns:
-        dict: Diagnostic results, recommendations, and report
+        Tuple[Dict, str, pd.DataFrame]: (diagnostic results, summary report, diagnosed dataframe)
     """
     # Avoid modifying the input
-    df_q = df.copy()
+    df_q = df_processed.copy()
     
     # --- Chapter 1: Time Pressure & Data Validity Analysis ---
-    # Time pressure status is expected to be in df_q.attrs.get('time_pressure_q', False)
-    q_time_pressure_status = df_q.attrs.get('time_pressure_q', False)
+    # Use the provided time_pressure_status parameter instead of attrs
+    q_time_pressure_status = time_pressure_status
     current_overtime_threshold = OVERTIME_THRESHOLDS[q_time_pressure_status]
 
     # Calculate 'overtime' column

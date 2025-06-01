@@ -9,12 +9,12 @@ V診斷主模塊
 
 # 從 v_modules 子包導入主要功能
 # 確保 main 模塊中定義了 run_v_diagnosis_processed
-from gmat_diagnosis_app.diagnostics.v_modules.main import run_v_diagnosis_processed as run_v_diag_processed_from_module
+from gmat_diagnosis_app.diagnostics.v_modules.main import run_v_diagnosis
 
 # 主要診斷函數，保留與原始函數相同的簽名
 def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time_per_type):
     """
-    V診斷主函數 - 通過調用 v_modules.main.run_v_diagnosis_processed 實現核心功能
+    V診斷主函數 - 通過調用 v_modules.main.run_v_diagnosis 實現核心功能
     
     Args:
         df_v_processed (pd.DataFrame): 預處理過的Verbal題目數據
@@ -26,11 +26,12 @@ def run_v_diagnosis_processed(df_v_processed, v_time_pressure_status, v_avg_time
         str: 摘要報告。
         pd.DataFrame: 包含診斷標籤的處理後數據框。
     """
-    # 直接委託給模塊化的實現
-    return run_v_diag_processed_from_module(
-        df_v_processed,
-        v_time_pressure_status,
-        v_avg_time_per_type
+    # 直接委託給統一化的實現
+    return run_v_diagnosis(
+        df_processed=df_v_processed,
+        time_pressure_status=v_time_pressure_status,
+        avg_time_per_type=v_avg_time_per_type,
+        include_summary_report=True
     )
 
 # --- 原始文件中的其他代碼已被移除，因為邏輯已移至 v_modules ---

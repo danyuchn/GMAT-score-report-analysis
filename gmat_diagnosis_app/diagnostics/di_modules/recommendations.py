@@ -9,10 +9,10 @@ import math
 import logging
 
 from gmat_diagnosis_app.i18n import translate as t
-from .utils import _grade_difficulty_di, _format_rate
+from .utils import grade_difficulty_di, format_rate
 
 
-def _generate_di_recommendations(df_diagnosed, override_results, domain_tags, time_pressure):
+def generate_di_recommendations(df_diagnosed, override_results, domain_tags, time_pressure):
     """Generates practice recommendations based on Chapters 3, 5, and 2 results."""
     if 'question_type' not in df_diagnosed.columns or 'content_domain' not in df_diagnosed.columns: # Ensure content_domain also exists
         logging.warning("[DI Reco Init] 'question_type' or 'content_domain' missing in df_diagnosed. Returning empty recommendations.")
@@ -87,8 +87,8 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags, ti
             y_agg = override_info.get('Y_agg', '未知難度')
             z_agg = override_info.get('Z_agg')
             z_agg_text = f"{z_agg:.1f} 分鐘" if pd.notna(z_agg) else "未知限時"
-            error_rate_str = _format_rate(override_info.get('triggering_error_rate', 0.0))
-            overtime_rate_str = _format_rate(override_info.get('triggering_overtime_rate', 0.0))
+            error_rate_str = format_rate(override_info.get('triggering_error_rate', 0.0))
+            overtime_rate_str = format_rate(override_info.get('triggering_overtime_rate', 0.0))
             rec_text = f"**宏觀建議 ({q_type}):** 由於整體表現有較大提升空間 (錯誤率 {error_rate_str} 或 超時率 {overtime_rate_str}), "
             rec_text += f"建議全面鞏固 **{q_type}** 題型的基礎，可從 **{y_agg}** 難度題目開始系統性練習，掌握核心方法，建議限時 **{z_agg_text}**。"
             recommendations_by_type[q_type].append({'type': 'macro', 'text': rec_text, 'question_type': q_type})
@@ -125,7 +125,7 @@ def _generate_di_recommendations(df_diagnosed, override_results, domain_tags, ti
                         continue
 
                     min_difficulty_score = group_df['question_difficulty'].min()
-                    y_grade = _grade_difficulty_di(min_difficulty_score)
+                    y_grade = grade_difficulty_di(min_difficulty_score)
 
                     # --- Calculate Target Time (MODIFIED FOR MSR) & Max Z ---
                     max_z_minutes = None # Initialize

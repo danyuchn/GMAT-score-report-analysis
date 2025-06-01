@@ -5,14 +5,14 @@ import os
 
 # Replace old translation system with unified i18n system
 from gmat_diagnosis_app.i18n import translate as t
-from .utils import _format_rate
+from .utils import format_rate
 from .constants import (
     MAX_ALLOWED_TIME_DI
 )
 # Import needed constants from constants.py for parameter categorization
 from .constants import DI_PARAM_CATEGORY_ORDER, DI_PARAM_TO_CATEGORY
 
-def _generate_di_summary_report(di_results):
+def generate_di_summary_report(di_results):
     """Generates the summary report string for the Data Insights section based on the new structure."""
     report_lines = [t('di_report_title'), t('di_report_subtitle'), ""] # Added main title
 
@@ -139,7 +139,7 @@ def _generate_di_summary_report(di_results):
     patterns_found = False
     behavior_pattern_lines = []
     if careless_triggered_ch4:
-        fast_wrong_rate_str = _format_rate(ch4.get('fast_wrong_rate', 0.0))
+        fast_wrong_rate_str = format_rate(ch4.get('fast_wrong_rate', 0.0))
         tag_to_translate_c = 'DI_BEHAVIOR_CARELESSNESS_ISSUE'
         translated_tag_for_c = t(tag_to_translate_c)
         behavior_pattern_lines.append(f"    * {translated_tag_for_c}{t('di_carelessness_pattern').format(fast_wrong_rate_str)}")

@@ -3,14 +3,14 @@ from gmat_diagnosis_app.i18n import translate as t
 
 # --- DI-Specific Helper Functions ---
 
-def _format_rate(rate_value):
+def format_rate(rate_value):
     """Formats a value as percentage if numeric, otherwise returns as string."""
     if isinstance(rate_value, (int, float)):
         return f"{rate_value:.1%}"
     else:
         return str(rate_value) # Ensure it's a string
 
-def _grade_difficulty_di(difficulty):
+def grade_difficulty_di(difficulty):
     """Grades difficulty based on DI-Doc Chapter 2/6 rules."""
     # Ensure input is numeric before comparison
     difficulty_numeric = pd.to_numeric(difficulty, errors='coerce')
@@ -27,7 +27,7 @@ def _grade_difficulty_di(difficulty):
     # 處理超出範圍的情況
     return t('unknown_difficulty')
 
-def _analyze_dimension(df_filtered, dimension_col):
+def analyze_dimension(df_filtered, dimension_col):
     """Analyzes performance metrics grouped by a specific dimension column."""
     if df_filtered.empty or dimension_col not in df_filtered.columns:
         return {}

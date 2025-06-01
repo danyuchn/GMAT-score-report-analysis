@@ -5,7 +5,7 @@ import logging
 from .di_modules.constants import MAX_ALLOWED_TIME_DI, TIME_PRESSURE_THRESHOLD_DI
 
 # Import the main logic function from the sub-module
-from .di_modules.main import run_di_diagnosis_logic
+from .di_modules.main import run_di_diagnosis
 
 # Keep the original signature for external calls
 def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
@@ -21,11 +21,15 @@ def run_di_diagnosis_processed(df_di_processed, di_time_pressure_status):
         str: A string containing the summary report for the DI section.
         pd.DataFrame: The processed DI DataFrame with added diagnostic columns.
     """
-    # Delegate to the actual implementation in main.py
-    return run_di_diagnosis_logic(df_di_processed, di_time_pressure_status)
+    # Delegate to the actual implementation in main.py with unified parameters
+    return run_di_diagnosis(
+        df_processed=df_di_processed,
+        time_pressure_status=di_time_pressure_status,
+        include_summary_report=True
+    )
 
 # --- DI Diagnosis Wrapper (to match expected import signature in diagnosis_module.py) ---
-def run_di_diagnosis(df_di):
+def diagnose_di(df_di):
     """
     Wrapper function that matches the expected signature in diagnosis_module.py.
     Calculates time pressure status and then calls run_di_diagnosis_processed.
@@ -50,7 +54,7 @@ def run_di_diagnosis(df_di):
         
     # Convert question_time to numeric if needed
     if 'question_time' not in df_di.columns:
-        logging.error("[run_di_diagnosis wrapper] Input DataFrame missing 'question_time'.")
+        logging.error("[diagnose_di wrapper] Input DataFrame missing 'question_time'.")
         return {}, "Data Insights (DI) 資料缺少必要欄位：question_time。", pd.DataFrame(columns=['Subject']) # Minimal error return
     
     try:
@@ -63,7 +67,7 @@ def run_di_diagnosis(df_di):
         # Keeping the simple rule from the original wrapper for consistency
         di_time_pressure_status = time_diff < TIME_PRESSURE_THRESHOLD_DI
     except Exception as e:
-        logging.error(f"[run_di_diagnosis wrapper] Error calculating time pressure: {e}", exc_info=True)
+        logging.error(f"[diagnose_di wrapper] Error calculating time pressure: {e}", exc_info=True)
         # Handle error: maybe default pressure to False and proceed, or return error
         return {}, f"DI 診斷前計算時間壓力時出錯: {e}", pd.DataFrame(columns=['Subject'])
     
