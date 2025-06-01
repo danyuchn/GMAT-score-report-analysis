@@ -776,72 +776,114 @@ display_subject_results(subject, tabs[actual_tab_index_for_subject], report_md, 
 Fixed: Dataframe column headers in diagnosis reports now properly respond to language changes. Static configuration caused headers to be fixed at module load time rather than adapting to current language setting.
 Applied: Modified gmat_diagnosis_app/ui/results_display.py to use dynamic configuration function
 
-# GMAT診斷平台開發經驗與錯誤修正記錄
+## Q科診斷報告代碼塊格式錯誤修復 (2025-01-29)
 
-## 硬編碼中文國際化修正 (2025-01-16) - 已完成
+Mistake: Q科診斷報告中診斷參數文字被錯誤包裹在代碼塊中
+Wrong:
+```python
+# 在styling.py中的代碼塊移除規則不夠完全
+# 16. 修正可能的格式化問題
+# 避免不當的代碼塊格式
+report_text = re.sub(r'```([^`]*[\u4e00-\u9fff][^`]*)```', r'\1', report_text)
 
-### 修正總結:
-本次修正完成了用戶指出的4個主要硬編碼中文國際化問題：
+# 這個規則只能移除包含中文的代碼塊，無法處理：
+# 1. 純英文的代碼塊：```Q Concept Application Error```
+# 2. 單行代碼格式：`Q Concept Application Error`
+# 3. 多行代碼塊標記
+# 4. 混合格式代碼塊
+```
+Correct:
+```python
+# 16. 修正可能的格式化問題 - 強化代碼塊移除
+# 移除所有可能的代碼塊格式（包含中文、英文、數字、符號等）
+report_text = re.sub(r'```([^`]*)```', r'\1', report_text)
+report_text = re.sub(r'`([^`]+)`', r'\1', report_text)
 
-1. ✅ **IP位址檢測錯誤功能移除**: 移除了"無法從客戶端資訊中直接讀取 IP 位址。將使用開發用預設 IP。"警告訊息
-2. ✅ **分析流程訊息國際化**: 國際化了"步驟 5/5: Q科目診斷中 - 計算時間表現、錯題模式與SFE..."等分析流程訊息
-3. ✅ **DI模組硬編碼中文修正**: 完成了DI診斷建議模組中所有硬編碼中文的國際化
-4. ✅ **詳細資料欄位標題一致性**: 確認了詳細資料表格已使用翻譯系統，與編輯診斷標籤部分保持一致
+# 特別處理包含診斷參數的代碼塊
+report_text = re.sub(r'```\s*\[Problem Types[^\]]*\].*?```', lambda m: m.group(0).replace('```', ''), report_text, flags=re.DOTALL)
 
-### 詳細修正記錄:
+# 移除單行代碼格式（反引號）
+report_text = re.sub(r'`([^`\n]*)`', r'\1', report_text)
 
-**錯誤**: DI報告生成模組中存在硬編碼中文文字，包括時間限制後綴、基礎掌握不穩標記、建議標籤、報告章節標題等
-**修正**: 
-1. 修正 `gmat_diagnosis_app/diagnostics/di_modules/report_generation.py` 中的硬編碼中文
-2. 將所有硬編碼文字替換為翻譯系統調用 `t()` 函數
-3. 添加全面的翻譯鍵到 `zh_TW.py` 和 `en.py`:
-   - 基礎翻譯: `per_question_group`, `per_question`, `foundation_instability_note`
-   - 報告結構: `current_challenge`, `suggested_direction`, `suggested_time_limit`
-   - 後續行動: `subsequent_action_and_reflection_guide`, `review_practice_record_secondary_evidence`
-   - 反思指引: `guided_reflection_prompts_specific`, `reflection_direction`
-   - 進階協助: `seek_advanced_assistance_qualitative`, `qualitative_analysis_suggestion`
-   - 正則表達式模式: `macro_recommendation_pattern`, `error_rate_pattern`, `timeout_rate_pattern`等
-   - 報告生成輔助: `unknown_target`, `minutes`, `final_target_time`, `di_targeted_domain_question`等
+# 移除多行代碼塊標記
+report_text = re.sub(r'^```[a-zA-Z]*\n', '', report_text, flags=re.MULTILINE)
+report_text = re.sub(r'\n```$', '', report_text, flags=re.MULTILINE)
+report_text = re.sub(r'^```$', '', report_text, flags=re.MULTILINE)
 
-**錯誤**: DI AI提示模組中存在硬編碼中文文字
-**修正**: 
-1. 修正 `gmat_diagnosis_app/diagnostics/di_modules/ai_prompts.py` 中的硬編碼文字
-2. 將翻譯鍵統一化，避免重複定義
+# 17. 特別處理可能被誤認為代碼的診斷參數行
+# 移除可能的內聯代碼格式化
+report_text = re.sub(r'(\s+- [^:]+：)`([^`]+)`', r'\1\2', report_text)
 
-### 系統架構完善:
+# 18. 確保沒有遺留的代碼塊標記
+report_text = re.sub(r'```', '', report_text)
+report_text = re.sub(r'`', '', report_text)
+```
 
-1. 專案已建立完整的國際化系統，支援繁體中文和英文
-2. 翻譯系統位於 `gmat_diagnosis_app/i18n/` 目錄
-3. 所有用戶介面文字都使用 `from gmat_diagnosis_app.i18n import translate as t` 調用 `t('key')`
-4. 翻譯檔案位於 `gmat_diagnosis_app/i18n/translations/zh_TW.py` 和 `en.py`
-5. 正則表達式模式也完全國際化，支援動態語言切換
+Fixed: Q科診斷報告現在能完全移除所有類型的代碼塊格式化
+Applied: 強化了gmat_diagnosis_app/utils/styling.py中的format_diagnostic_report函數，添加了多重代碼塊移除規則
 
-### 重要原則:
-- 程式碼中的註解保持英文 (according to user preferences)
-- 所有使用者介面文字都已國際化
-- 檢查修正後的程式碼，確保沒有語法錯誤
-- 同時更新中英文翻譯檔案保持一致性
-- 正則表達式模式也需要國際化處理
+測試結果：
+- ✅ 移除三重反引號代碼塊：```content```
+- ✅ 移除單一反引號代碼：`content`
+- ✅ 移除多行代碼塊標記
+- ✅ 處理混合格式代碼塊
+- ✅ 保留正常的粗體格式：**content**
+- ✅ 特別處理診斷參數內容
+```
 
-### 品質保證:
-- 所有修正都保持了原有的功能邏輯
-- 翻譯鍵命名遵循一致的命名規範
-- 中英文翻譯內容保持語義一致性
-- 程式碼可讀性和維護性得到提升
+## V科診斷報告方括號格式錯誤修復 (2025-01-29)
 
-## 程式碼品質修正 (2025-01-16)
+Mistake: V科診斷報告中方括號格式被錯誤顯示，且過度縮排被Markdown識別為代碼塊
+Wrong:
+```python
+# 在V科報告生成中使用方括號格式和過度縮排，但styling.py缺少對應處理規則
+# gmat_diagnosis_app/diagnostics/v_modules/reporting.py 第467行：
+category_lines.append(f"        【{category_reflect_key}】：{labels_in_category_text}")
 
-**錯誤**: `analysis_orchestrator.py` 中存在無效的匯入和重複匯入問題
-**問題描述**: 
-1. 嘗試從不存在的 `gmat_diagnosis_app.config` 匯入配置項
-2. `THRESHOLDS` 重複匯入
-3. 未使用的 IRT 配置變數匯入
+# 產生的格式如：
+# 8個空格 + 【Other Issues】：【CR Choice Understanding Error: Logic】
+# 在Markdown中，4個或更多空格會被自動識別為代碼塊
 
-**修正**: 
-1. 移除了不存在的 `gmat_diagnosis_app.config` 匯入
-2. 統一使用 `from gmat_diagnosis_app.constants.thresholds import THRESHOLDS`
-3. 移除了重複的匯入語句
-4. 清理了未使用的配置變數 (`Q_IRT_SIMULATION_CONFIGS`, `V_IRT_SIMULATION_CONFIGS`, `DI_IRT_SIMULATION_CONFIGS`)
-5. 重新添加了正確的 `THRESHOLDS` 匯入以解決 "未定義變數" 錯誤
+# styling.py中缺少對方括號格式和過度縮排的處理規則
+```
+Correct:
+```python
+# 在styling.py中添加V科方括號格式和過度縮排處理規則：
 
-**結果**: 解決了 Pylance 報告的匯入錯誤和未定義變數錯誤，提升了程式碼品質
+# 5. 修正過度縮排問題（防止被識別為代碼塊）
+# 將4個或更多空格開頭的行調整為最多3個空格，避免Markdown代碼塊識別
+# 但保留有意義的層級結構
+report_text = re.sub(r'^([ ]{4})([^\s])', r'  \2', report_text, flags=re.MULTILINE)  # 4空格->2空格
+report_text = re.sub(r'^([ ]{5,8})([^\s])', r'   \2', report_text, flags=re.MULTILINE)  # 5-8空格->3空格
+report_text = re.sub(r'^([ ]{9,})([^\s])', r'   \2', report_text, flags=re.MULTILINE)  # 9+空格->3空格
+
+# 18. 特別處理V科診斷報告中的方括號格式（防止被誤認為代碼塊）
+# 處理類似 [Other Issues] : [CR Choice Understanding Error: Logic] 的格式
+report_text = re.sub(r'\[([^\]]+)\]\s*:\s*\[([^\]]+)\]', r'\1: \2', report_text)
+
+# 處理多個方括號項目的組合，如 [Error: Key Info Location Understanding] , [ Error: Long Diffi]
+report_text = re.sub(r'\[([^\]]+)\]\s*,\s*\[\s*([^\]]+)\]', r'\1, \2', report_text)
+
+# 處理單獨的方括號項目
+report_text = re.sub(r'\[([^\]]+)\](?!\s*:)', r'\1', report_text)
+
+# 20. 處理V科特有的【】格式（保留但優化顯示）
+# 確保【】包圍的內容不會被誤認為代碼或其他格式
+report_text = re.sub(r'【([^】]+)】：【([^】]+)】', r'**\1**: \2', report_text)
+```
+
+Fixed: V科診斷報告格式化現在能正確處理方括號格式和過度縮排問題
+Applied: 修復了gmat_diagnosis_app/utils/styling.py中的format_diagnostic_report函數
+
+測試結果：
+- ✅ 修正過度縮排：8空格 → 3空格（避免代碼塊識別）
+- ✅ 保留層級結構：4空格 → 2空格，5-8空格 → 3空格
+- ✅ 移除方括號格式：[Other Issues] : [CR Choice Understanding Error: Logic] → Other Issues: CR Choice Understanding Error: Logic
+- ✅ 處理多項目組合：[Error: Key] , [ Error: Long] → Error: Key , Error: Long  
+- ✅ 移除代碼塊包圍：```[RC Reading Comprehension]: [Error: Key]``` → RC Reading Comprehension: Error: Key
+- ✅ 移除單一反引號：`CR Choice Understanding Error: Logic` → CR Choice Understanding Error: Logic
+- ✅ 優化【】格式顯示：【CR 推理障礙】：【CR 推理邏輯錯誤】 → **CR 推理障礙**: CR 推理邏輯錯誤
+- ✅ 保持正常文字格式不變
+
+## 根本原因分析
+問題的根本原因是V科報告生成時使用了8個空格的縮排（`f"        【{category_reflect_key}】：{labels_in_category_text}"`），這在Markdown中被自動識別為代碼塊。現在通過格式化函數將過度縮排調整為最多3個空格，完全避免了代碼塊自動識別問題。

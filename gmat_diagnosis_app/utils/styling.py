@@ -101,52 +101,112 @@ def format_diagnostic_report(report_text):
     if not report_text or not isinstance(report_text, str):
         return report_text
     
-    # 1. 統一標題格式
+    # 1. 處理羅馬數字開頭的第一級標題（如 "I. Report Overview and Immediate Feedback"）
+    report_text = re.sub(r'\*\*([IVX]+\.[^*]+)\*\*', r'# \1', report_text)
+    
+    # 2. 處理英文大寫字母開頭的第二級標題（如 "A. Response Time and Strategy Assessment"）
+    report_text = re.sub(r'\* \*\*([A-Z]\.[^*]+)\*\*', r'## \1', report_text)
+    
+    # 3. 統一中文標題格式（保留原有邏輯）
     report_text = re.sub(r'\*\*([一二三四五六七八九十]+、[^*]+)\*\*', r'## \1', report_text)
     
-    # 2. 改善子標題格式
-    report_text = re.sub(r'\* \*\*([A-Z]\..*?)\*\*', r'### \1', report_text)
+    # 4. 改善其他子標題格式（更精確地識別真正的標題）
+    # 只匹配相對簡短的標題（不超過50字符，不包含冒號後的長描述）
+    report_text = re.sub(r'\* \*\*([A-Z][^:(*]{1,48}[^:(*])\*\*(?:\s*$|\s*\n)', r'### \1', report_text, flags=re.MULTILINE)
     
-    # 3. 統一列表項目格式
-    report_text = re.sub(r'^    \* ', '- ', report_text, flags=re.MULTILINE)
-    report_text = re.sub(r'^        \* ', '  - ', report_text, flags=re.MULTILINE)
-    report_text = re.sub(r'^            \* ', '    - ', report_text, flags=re.MULTILINE)
+    # 5. 修正過度縮排問題（防止被識別為代碼塊）
+    # 將4個或更多空格開頭的行調整為最多3個空格，避免Markdown代碼塊識別
+    # 但保留有意義的層級結構
+    report_text = re.sub(r'^([ ]{4})([^\s])', r'  \2', report_text, flags=re.MULTILINE)  # 4空格->2空格
+    report_text = re.sub(r'^([ ]{5,8})([^\s])', r'   \2', report_text, flags=re.MULTILINE)  # 5-8空格->3空格
+    report_text = re.sub(r'^([ ]{9,})([^\s])', r'   \2', report_text, flags=re.MULTILINE)  # 9+空格->3空格
     
-    # 4. 改善重要資訊的強調
+    # 6. 統一列表項目格式 - 修正層級處理
+    # 先處理最深層級，避免重複轉換
+    report_text = re.sub(r'^                \* ', '        - ', report_text, flags=re.MULTILINE)
+    report_text = re.sub(r'^            \* ', '      - ', report_text, flags=re.MULTILINE)
+    report_text = re.sub(r'^        \* ', '    - ', report_text, flags=re.MULTILINE)
+    report_text = re.sub(r'^    \* ', '  - ', report_text, flags=re.MULTILINE)
+    
+    # 7. 改善重要資訊的強調
     report_text = re.sub(r'時間壓力狀態：(.+)', r'**時間壓力狀態：** \1', report_text)
     report_text = re.sub(r'有效評分率.*?：(.+)', r'**有效評分率：** \1', report_text)
     report_text = re.sub(r'使用的超時閾值：(.+)', r'**超時閾值：** \1', report_text)
     
-    # 5. 改善數據呈現
+    # 8. 改善數據呈現
     report_text = re.sub(r'(\d+\.?\d*%)( \([^)]+\))', r'**\1**\2', report_text)
     
-    # 6. 統一表格格式 - 確保表格周圍有適當空行
+    # 9. 統一表格格式 - 確保表格周圍有適當空行
     report_text = re.sub(r'\n(\|[^|]+\|[^|]+\|)\n', r'\n\n\1\n', report_text)
     
-    # 7. 改善特殊標記
+    # 10. 改善特殊標記
     report_text = re.sub(r'Special Focus Error', '**Special Focus Error**', report_text)
     report_text = re.sub(r'SFE', '**SFE**', report_text)
     
-    # 8. 改善分數和百分位
+    # 11. 改善分數和百分位
     report_text = re.sub(r'(\d{3,4})分', r'**\1分**', report_text)
     report_text = re.sub(r'第(\d+)百分位', r'第**\1**百分位', report_text)
     
-    # 9. 改善數據高亮
+    # 12. 改善數據高亮
     report_text = re.sub(r'(錯誤率|超時率|正確率).*?(\d+\.?\d*%)', r'\1：**\2**', report_text)
     
-    # 10. 清理多餘空行
+    # 13. 清理多餘空行
     report_text = re.sub(r'\n{3,}', '\n\n', report_text)
     
-    # 11. 確保段落之間有適當間距
+    # 14. 確保段落之間有適當間距
+    report_text = re.sub(r'(\n#[^\n]+)\n([^\n])', r'\1\n\n\2', report_text)
     report_text = re.sub(r'(\n##[^\n]+)\n([^\n])', r'\1\n\n\2', report_text)
     report_text = re.sub(r'(\n###[^\n]+)\n([^\n])', r'\1\n\n\2', report_text)
     
-    # 12. 改善注意事項格式
+    # 15. 改善注意事項格式
     report_text = re.sub(r'\*\*(重要註記|重要提醒|注意事項)\*\*', r'> **\1**', report_text)
     
-    # 13. 改善數字統計的顯示
+    # 16. 改善數字統計的顯示
     report_text = re.sub(r'(\d+) 題', r'**\1** 題', report_text)
     report_text = re.sub(r'(\d+\.?\d*) 分鐘', r'**\1** 分鐘', report_text)
+    
+    # 17. 修正可能的格式化問題 - 強化代碼塊移除
+    # 移除所有可能的代碼塊格式（包含中文、英文、數字、符號等）
+    report_text = re.sub(r'```([^`]*)```', r'\1', report_text)
+    report_text = re.sub(r'`([^`]+)`', r'\1', report_text)
+    
+    # 特別處理包含診斷參數的代碼塊
+    report_text = re.sub(r'```\s*\[Problem Types[^\]]*\].*?```', lambda m: m.group(0).replace('```', ''), report_text, flags=re.DOTALL)
+    
+    # 移除單行代碼格式（反引號）
+    report_text = re.sub(r'`([^`\n]*)`', r'\1', report_text)
+    
+    # 移除多行代碼塊標記
+    report_text = re.sub(r'^```[a-zA-Z]*\n', '', report_text, flags=re.MULTILINE)
+    report_text = re.sub(r'\n```$', '', report_text, flags=re.MULTILINE)
+    report_text = re.sub(r'^```$', '', report_text, flags=re.MULTILINE)
+    
+    # 18. 特別處理V科診斷報告中的方括號格式（防止被誤認為代碼塊）
+    # 處理類似 [Other Issues] : [CR Choice Understanding Error: Logic] 的格式
+    report_text = re.sub(r'\[([^\]]+)\]\s*:\s*\[([^\]]+)\]', r'\1: \2', report_text)
+    
+    # 處理多個方括號項目的組合，如 [Error: Key Info Location Understanding] , [ Error: Long Diffi]
+    report_text = re.sub(r'\[([^\]]+)\]\s*,\s*\[\s*([^\]]+)\]', r'\1, \2', report_text)
+    
+    # 處理單獨的方括號項目
+    report_text = re.sub(r'\[([^\]]+)\](?!\s*:)', r'\1', report_text)
+    
+    # 確保列表項目的一致性
+    report_text = re.sub(r'^(\s*)-\s+\*\s+', r'\1- ', report_text, flags=re.MULTILINE)
+    report_text = re.sub(r'^(\s*)\*\s+\*\s+', r'\1- ', report_text, flags=re.MULTILINE)
+    
+    # 19. 特別處理可能被誤認為代碼的診斷參數行
+    # 移除可能的內聯代碼格式化
+    report_text = re.sub(r'(\s+- [^:]+：)`([^`]+)`', r'\1\2', report_text)
+    
+    # 20. 處理V科特有的【】格式（保留但優化顯示）
+    # 確保【】包圍的內容不會被誤認為代碼或其他格式
+    # 但保留【】的視覺效果，因為這是V科報告的設計格式
+    report_text = re.sub(r'【([^】]+)】：【([^】]+)】', r'**\1**: \2', report_text)
+    
+    # 21. 確保沒有遺留的代碼塊標記
+    report_text = re.sub(r'```', '', report_text)
+    report_text = re.sub(r'`', '', report_text)
     
     return report_text.strip()
 

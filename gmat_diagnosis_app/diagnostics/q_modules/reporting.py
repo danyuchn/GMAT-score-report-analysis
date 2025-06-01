@@ -173,15 +173,13 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
                     # 去除重複的診斷參數並過濾無效參數
                     unique_params = list(set([p for p in all_diagnostic_params if isinstance(p, str) and p.strip()]))
                     
-                    # 按類別分組 (這裡需要根據Q模塊的分類實際情況進行調整)
-                    # 暫時使用簡單分組，可以根據需要完善
+                    # 按類別分組
                     params_by_category = {}
                     for param in unique_params:
-                        # 這裡可以添加更複雜的分類邏輯
-                        # 例如：根據參數前綴或特定關鍵字進行分類
+                        # 根據參數前綴或特定關鍵字進行分類
                         category = t('problem_types')  # 默認類別
                         
-                        # 簡單分類邏輯示例 (實際應用中應更完善)
+                        # 簡單分類邏輯
                         if "CARELESSNESS" in param:
                             category = t('carelessness_problems')
                         elif "READING" in param or "COMPREHENSION" in param:
@@ -197,11 +195,10 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
                             params_by_category[category] = []
                         params_by_category[category].append(param)
                     
-                    # 生成引導反思提示的各個行
+                    # 生成引導反思提示
                     current_prompt_lines = []
                     current_prompt_lines.append(f"    * {t('reflection_instruction').format(skill_zh, q_type_zh, time_perf_zh)}")
-                    current_prompt_lines.append("") # Blank line
-
+                    
                     for cat_name, cat_params in params_by_category.items():
                         # 翻譯參數
                         params_zh = []
@@ -211,21 +208,20 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
                                 params_zh.append(translated)
                             except:
                                 params_zh.append(p_code)
-                        current_prompt_lines.append(f"        【{cat_name}：{', '.join(params_zh)}】")
+                        current_prompt_lines.append(f"        - {cat_name}：{', '.join(params_zh)}")
                     
-                    current_prompt_lines.append("") # Blank line
                     current_prompt_lines.append(f"        {t('problems_category')}")
-                    reflection_prompts.append(current_prompt_lines) # Add the list of lines
+                    reflection_prompts.append(current_prompt_lines)
     
     # 如果沒有生成任何反思提示，添加默認提示
     if not reflection_prompts:
-        reflection_prompts.append([f"    * {t('default_reflection_prompt')}"]) # Ensure it's a list of lines
+        reflection_prompts.append([f"    * {t('default_reflection_prompt')}"])
     
     # 添加反思提示到報告中
     for prompt_line_list in reflection_prompts:
         for line_content in prompt_line_list:
             lines.append(line_content)
-        lines.append("") # Add a blank line between different reflection prompt blocks
+        lines.append("")  # Add a blank line between different reflection prompt blocks
 
     # --- Second Evidence ---
     lines.append(t('practice_record_review'))
@@ -248,7 +244,7 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
         if core_issue_text:
             lines.append(f"    * {t('key_focus')}")
             for issue in core_issue_text:
-                lines.append(f"        * {issue}")
+                lines.append(f"        - {issue}")
         else:
             lines.append(f"    * {t('key_focus_general')}")
         
@@ -260,7 +256,7 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
     lines.append("")
     lines.append(t('advanced_assistance'))
     lines.append("")
-    lines.append(f"* {t('qualitative_analysis_suggestion')}") # Example of a long line
+    lines.append(f"    * {t('qualitative_analysis_suggestion')}")
     lines.append("")
     return lines
 

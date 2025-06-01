@@ -176,8 +176,10 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     # 3. Finally display diagnostic report
     if report_md:
         tab_container.subheader(t("subject_diagnostic_report_details").format(subject))
-        from gmat_diagnosis_app.utils.styling import create_report_container
-        create_report_container(report_md)
+        from gmat_diagnosis_app.utils.styling import format_diagnostic_report
+        # 應用格式化並在tab容器中顯示
+        formatted_report = format_diagnostic_report(report_md)
+        tab_container.markdown(formatted_report, unsafe_allow_html=True)
     else:
         tab_container.info(t("report_not_found").format(subject))
 
