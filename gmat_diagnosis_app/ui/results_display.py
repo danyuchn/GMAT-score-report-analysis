@@ -20,21 +20,23 @@ import traceback # Added for more detailed error logging in download
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s') # UNCOMMENTED
 
 # --- Column Display Configuration (Moved from app.py) ---
-COLUMN_DISPLAY_CONFIG = {
-    "question_position": st.column_config.NumberColumn(t("column_question_number"), help=t("column_question_number_help")),
-    "question_type": st.column_config.TextColumn(t("column_question_type")),
-    "question_fundamental_skill": st.column_config.TextColumn(t("column_tested_ability")),
-    "question_difficulty": st.column_config.NumberColumn(t("column_simulated_difficulty"), help=t("column_simulated_difficulty_help"), format="%.2f", width="small"),
-    "question_time": st.column_config.NumberColumn(t("column_response_time_minutes"), format="%.2f", width="small"),
-    "time_performance_category": st.column_config.TextColumn(t("column_time_performance")),
-    "content_domain": st.column_config.TextColumn(t("column_content_domain")),
-    "diagnostic_params_list": st.column_config.ListColumn(t("column_diagnostic_tags"), help=t("column_diagnostic_tags_help"), width="medium"),
-    "is_correct": st.column_config.CheckboxColumn(t("column_is_correct"), help=t("column_is_correct_help")),
-    "is_sfe": st.column_config.CheckboxColumn(t("column_is_sfe"), help=t("column_is_sfe_help"), width="small"),
-    "is_invalid": st.column_config.CheckboxColumn(t("column_is_invalid"), help=t("column_is_invalid_help"), width="small"),
-    "overtime": None, # Internal column for styling
-    "is_manually_invalid": None, # Hide the intermediate manual flag
-}
+def get_column_display_config():
+    """Get column display configuration with current language translations"""
+    return {
+        "question_position": st.column_config.NumberColumn(t("column_question_number"), help=t("column_question_number_help")),
+        "question_type": st.column_config.TextColumn(t("column_question_type")),
+        "question_fundamental_skill": st.column_config.TextColumn(t("column_tested_ability")),
+        "question_difficulty": st.column_config.NumberColumn(t("column_simulated_difficulty"), help=t("column_simulated_difficulty_help"), format="%.2f", width="small"),
+        "question_time": st.column_config.NumberColumn(t("column_response_time_minutes"), format="%.2f", width="small"),
+        "time_performance_category": st.column_config.TextColumn(t("column_time_performance")),
+        "content_domain": st.column_config.TextColumn(t("column_content_domain")),
+        "diagnostic_params_list": st.column_config.ListColumn(t("column_diagnostic_tags"), help=t("column_diagnostic_tags_help"), width="medium"),
+        "is_correct": st.column_config.CheckboxColumn(t("column_is_correct"), help=t("column_is_correct_help")),
+        "is_sfe": st.column_config.CheckboxColumn(t("column_is_sfe"), help=t("column_is_sfe_help"), width="small"),
+        "is_invalid": st.column_config.CheckboxColumn(t("column_is_invalid"), help=t("column_is_invalid_help"), width="small"),
+        "overtime": None, # Internal column for styling
+        "is_manually_invalid": None, # Hide the intermediate manual flag
+    }
 
 def display_subject_results(subject, tab_container, report_md, df_subject, col_config, excel_map):
     """Displays the diagnosis report, styled DataFrame, and download button for a subject."""
@@ -652,7 +654,7 @@ def display_results():
         try:
             actual_tab_index_for_subject = tab_titles.index(subject_tab_title)
             with tabs[actual_tab_index_for_subject]:
-                display_subject_results(subject, tabs[actual_tab_index_for_subject], report_md, df_subject, COLUMN_DISPLAY_CONFIG, {})
+                display_subject_results(subject, tabs[actual_tab_index_for_subject], report_md, df_subject, get_column_display_config(), {})
         except ValueError:
             st.error(t('display_results_tab_not_found_error').format(subject_tab_title, tab_titles))
 

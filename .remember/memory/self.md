@@ -746,6 +746,36 @@ translated_params_list = [t(param_code) for param_code in diag_params_codes] # T
 Fixed: Translation function only accepts strings as keys, not lists. Each parameter code must be translated individually.
 Applied: Fixed in gmat_diagnosis_app/diagnostics/di_modules/chapter_logic.py line 758
 
+## Dataframe Column Headers i18n Fix (2025-06-01)
+
+Mistake: Static COLUMN_DISPLAY_CONFIG causing untranslated dataframe headers
+Wrong:
+```python
+# In results_display.py - defined at module load time
+COLUMN_DISPLAY_CONFIG = {
+    "question_position": st.column_config.NumberColumn(t("column_question_number"), help=t("column_question_number_help")),
+    "question_type": st.column_config.TextColumn(t("column_question_type")),
+    # ... other columns
+}
+```
+Correct:
+```python
+# In results_display.py - dynamic function called at runtime
+def get_column_display_config():
+    """Get column display configuration with current language translations"""
+    return {
+        "question_position": st.column_config.NumberColumn(t("column_question_number"), help=t("column_question_number_help")),
+        "question_type": st.column_config.TextColumn(t("column_question_type")),
+        # ... other columns
+    }
+
+# Usage updated:
+display_subject_results(subject, tabs[actual_tab_index_for_subject], report_md, df_subject, get_column_display_config(), {})
+```
+
+Fixed: Dataframe column headers in diagnosis reports now properly respond to language changes. Static configuration caused headers to be fixed at module load time rather than adapting to current language setting.
+Applied: Modified gmat_diagnosis_app/ui/results_display.py to use dynamic configuration function
+
 # GMAT診斷平台開發經驗與錯誤修正記錄
 
 ## 硬編碼中文國際化修正 (2025-01-16) - 已完成
