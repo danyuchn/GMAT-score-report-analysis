@@ -403,6 +403,10 @@ def apply_ch3_diagnostic_rules(df_v, max_correct_difficulty_per_skill, avg_time_
         processed_diagnostic_params = [] 
 
         # 方案四：添加基於RC整組表現的診斷（僅對RC題型）
+        # TODO: Future enhancement - This RC group-based diagnosis implementation could be further subdivided
+        # into more granular categories based on specific passage types, question subtypes, 
+        # and individual reading vs. answering time breakdown for more precise diagnostic insights.
+        # Currently using simplified group performance categories (良好/尚可/不佳) that could be expanded.
         if q_type == 'Reading Comprehension' and not is_invalid:
             # 獲取RC組表現分類
             rc_group_performance = row.get('rc_group_performance', None)

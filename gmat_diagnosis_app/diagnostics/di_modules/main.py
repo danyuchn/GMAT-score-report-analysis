@@ -264,13 +264,27 @@ def run_di_diagnosis(
         ds_mask = valid_mask & ((df_di['question_type'] == 'Data Sufficiency') | (df_di['question_type'] == 'DS'))
         ds_over_mask = ds_mask & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['DS'])
 
-        # MSR Overtime
+        # MSR Overtime - Add safety checks for MSR columns
         msr_mask = valid_mask & ((df_di['question_type'] == 'Multi-source reasoning') | (df_di['question_type'] == 'MSR'))
-        msr_group_over = msr_mask & df_di['msr_group_total_time'].notna() & (df_di['msr_group_total_time'] > thresholds['MSR_GROUP'])
-        msr_reading_over = msr_mask & (~msr_group_over) & df_di['is_first_msr_q'] & df_di['msr_reading_time'].notna() & (df_di['msr_reading_time'] > thresholds['MSR_READING'])
-        adj_time = df_di['question_time'] - df_di['msr_reading_time']
-        msr_adj_first_over = msr_mask & (~msr_group_over) & (~msr_reading_over) & df_di['is_first_msr_q'] & df_di['msr_reading_time'].notna() & df_di['question_time'].notna() & adj_time.notna() & (adj_time > thresholds['MSR_SINGLE_Q'])
-        msr_non_first_over = msr_mask & (~msr_group_over) & (~df_di['is_first_msr_q']) & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['MSR_SINGLE_Q'])
+        
+        # Check if MSR columns exist before using them
+        msr_group_over = pd.Series(False, index=df_di.index)
+        msr_reading_over = pd.Series(False, index=df_di.index)
+        msr_adj_first_over = pd.Series(False, index=df_di.index)
+        msr_non_first_over = pd.Series(False, index=df_di.index)
+        
+        if 'msr_group_total_time' in df_di.columns and msr_mask.any():
+            msr_group_over = msr_mask & df_di['msr_group_total_time'].notna() & (df_di['msr_group_total_time'] > thresholds['MSR_GROUP'])
+        
+        if 'msr_reading_time' in df_di.columns and 'is_first_msr_q' in df_di.columns and msr_mask.any():
+            msr_reading_over = msr_mask & (~msr_group_over) & df_di['is_first_msr_q'] & df_di['msr_reading_time'].notna() & (df_di['msr_reading_time'] > thresholds['MSR_READING'])
+            adj_time = df_di['question_time'] - df_di['msr_reading_time']
+            # Fix the NoneType error by ensuring is_first_msr_q is boolean before using ~
+            is_first_msr_q_bool = df_di['is_first_msr_q'].fillna(False).infer_objects(copy=False).astype(bool)
+            msr_reading_over = msr_mask & (~msr_group_over) & is_first_msr_q_bool & df_di['msr_reading_time'].notna() & (df_di['msr_reading_time'] > thresholds['MSR_READING'])
+            msr_adj_first_over = msr_mask & (~msr_group_over) & (~msr_reading_over) & is_first_msr_q_bool & df_di['msr_reading_time'].notna() & df_di['question_time'].notna() & adj_time.notna() & (adj_time > thresholds['MSR_SINGLE_Q'])
+            msr_non_first_over = msr_mask & (~msr_group_over) & (~is_first_msr_q_bool) & df_di['question_time'].notna() & (df_di['question_time'] > thresholds['MSR_SINGLE_Q'])
+        
         msr_over_mask = msr_group_over | msr_reading_over | msr_adj_first_over | msr_non_first_over
         
         overall_overtime_mask = tpa_over_mask | gt_over_mask | ds_over_mask | msr_over_mask
