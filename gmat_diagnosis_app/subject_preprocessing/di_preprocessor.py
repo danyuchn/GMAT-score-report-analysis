@@ -10,7 +10,11 @@ def _identify_msr_groups(df_di_subset):
     Adds 'msr_group_id' to the DataFrame.
     """
     if 'MSR Set ID' in df_di_subset.columns and df_di_subset['MSR Set ID'].notna().any():
-        df_di_subset['msr_group_id'] = 'MSR-' + df_di_subset['MSR Set ID'].astype(str)
+        # 修復: 先初始化所有行為NaN，然後只為有MSR Set ID的行設置值
+        df_di_subset['msr_group_id'] = pd.Series(index=df_di_subset.index, dtype='object')
+        msr_set_mask = df_di_subset['MSR Set ID'].notna()
+        df_di_subset.loc[msr_set_mask, 'msr_group_id'] = 'MSR-' + df_di_subset.loc[msr_set_mask, 'MSR Set ID'].astype(str)
+        df_di_subset.loc[~msr_set_mask, 'msr_group_id'] = pd.NA
     else:
         logging.debug("'MSR Set ID' column missing or empty for DI. Attempting to group by contiguity.")
         df_di_subset = df_di_subset.sort_values(by='question_position')
@@ -22,7 +26,7 @@ def _identify_msr_groups(df_di_subset):
         
         df_di_subset.loc[is_msr, 'msr_group_id'] = 'MSRG-' + group_markers[is_msr].astype(str)
         
-        df_di_subset.loc[~is_msr, 'msr_group_id'] = np.nan
+        df_di_subset.loc[~is_msr, 'msr_group_id'] = pd.NA
     return df_di_subset
 
 def preprocess_di_data(df):
@@ -38,6 +42,13 @@ def preprocess_di_data(df):
 
     df_di_subset = df_processed[di_mask].copy() 
     df_di_subset['question_time'] = pd.to_numeric(df_di_subset['question_time'], errors='coerce') # Ensure numeric for sum
+    
+    # 初始化MSR相關列
+    df_di_subset['msr_group_total_time'] = 0.0
+    df_di_subset['msr_group_num_questions'] = 0.0  
+    df_di_subset['msr_reading_time'] = 0.0
+    df_di_subset['is_first_msr_q'] = False
+    
     df_di_subset = _identify_msr_groups(df_di_subset)
 
     # Calculate MSR group total time, number of questions, and reading time
@@ -85,41 +96,23 @@ def preprocess_di_data(df):
                 if valid_first_q_indices:
                     df_msr_part.loc[valid_first_q_indices, 'is_first_msr_q'] = True
 
-            # Update the DI subset with new columns
-            df_di_subset.update(df_msr_part)
+            # 修復: 使用更精確的方式更新MSR相關列，避免覆蓋其他數據
+            msr_cols_to_update = ['msr_group_total_time', 'msr_group_num_questions', 'msr_reading_time', 'is_first_msr_q']
+            for col in msr_cols_to_update:
+                if col in df_msr_part.columns:
+                    df_di_subset.loc[msr_rows_mask, col] = df_msr_part[col].values
+
+    # 修復: 先確保主DataFrame中有所有MSR欄位，然後才進行update
+    msr_all_cols = ['msr_group_id', 'msr_group_total_time', 'msr_group_num_questions', 'msr_reading_time', 'is_first_msr_q']
+    for col in msr_all_cols:
+        if col not in df_processed.columns:
+            if col == 'msr_group_id':
+                df_processed[col] = pd.NA
+            elif col == 'is_first_msr_q':
+                df_processed[col] = False
+            else:
+                df_processed[col] = 0.0
 
     df_processed.update(df_di_subset)
 
-    # Ensure standard MSR columns exist in the main df and initialize them correctly.
-    msr_numeric_cols = ['msr_group_total_time', 'msr_group_num_questions', 'msr_reading_time']
-    msr_bool_cols = ['is_first_msr_q']
-    msr_object_cols = ['msr_group_id']
-
-    for col in msr_numeric_cols:
-        if col not in df_processed.columns:
-            df_processed[col] = 0.0  # Initialize with 0.0 for all rows
-        else:
-            # Ensure correct dtype and fill NaNs if column already existed
-            df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce')
-            df_processed[col] = df_processed[col].replace({pd.NA: 0.0, None: 0.0, np.nan: 0.0}).infer_objects(copy=False)
-            
-    for col in msr_bool_cols:
-        if col not in df_processed.columns:
-            df_processed[col] = False  # Initialize with False for all rows
-        else:
-            # Ensure correct dtype and fill NaNs
-            try:
-                df_processed[col] = df_processed[col].astype(bool) # Attempt direct cast
-            except ValueError: # Handle potential mixed types or uncastable values
-                df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').notna() # Example: 0/1 to False/True
-            df_processed[col] = df_processed[col].replace({pd.NA: False, None: False, np.nan: False}).infer_objects(copy=False)
-
-    for col in msr_object_cols: # e.g., msr_group_id
-        if col not in df_processed.columns:
-            df_processed[col] = pd.NA # Or np.nan, or a placeholder string like "N/A"
-        else:
-            # If it exists, just ensure it's not all NaNs if a placeholder is preferred for full NaNs.
-            # df_processed[col] = df_processed[col].fillna(pd.NA) # Default fillna for object is usually fine
-            pass # Allow existing NaNs or values
-            
     return df_processed 

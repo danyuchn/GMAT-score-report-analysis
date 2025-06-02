@@ -165,11 +165,31 @@ def generate_di_recommendations(df_diagnosed, override_results, domain_tags, tim
                                     logging.warning(f"[DI Case Reco MSR] No valid group times found for MSR ({q_type}, {domain}). Defaulting Z to 6.0 min.")
                                     max_z_minutes = 6.0
                             else:
-                                logging.warning(f"[DI Case Reco MSR] No valid group IDs found for MSR ({q_type}, {domain}). Defaulting Z to 6.0 min.")
-                                max_z_minutes = 6.0
+                                logging.warning(f"[DI Case Reco MSR] No valid group IDs found for MSR ({q_type}, {domain}). Using fallback individual question logic.")
+                                # 根據文檔v1.6第六章邏輯：如果沒有group data，回退到individual question邏輯
+                                z_minutes_list = []
+                                for _, row in group_df.iterrows():
+                                    q_time_minutes = row['question_time']
+                                    is_overtime = row['overtime']
+                                    if pd.notna(q_time_minutes):
+                                        base_time_minutes = max(0, q_time_minutes - 0.5 if is_overtime else q_time_minutes)
+                                        z_raw_minutes = math.floor(base_time_minutes * 2) / 2.0
+                                        z = max(z_raw_minutes, 1.5) # MSR individual target time is 1.5 min per doc
+                                        z_minutes_list.append(z)
+                                max_z_minutes = max(z_minutes_list) if z_minutes_list else 6.0 # Default to group target if no valid individual times
                         else: 
-                            logging.warning(f"[DI Case Reco MSR] Missing msr_group_id or msr_group_total_time for MSR ({q_type}, {domain}). Defaulting Z to 6.0 min.")
-                            max_z_minutes = 6.0
+                            logging.warning(f"[DI Case Reco MSR] Missing msr_group_id or msr_group_total_time columns for MSR ({q_type}, {domain}). Using fallback individual question logic.")
+                            # 根據文檔v1.6第六章邏輯：回退到individual question邏輯
+                            z_minutes_list = []
+                            for _, row in group_df.iterrows():
+                                q_time_minutes = row['question_time']
+                                is_overtime = row['overtime']
+                                if pd.notna(q_time_minutes):
+                                    base_time_minutes = max(0, q_time_minutes - 0.5 if is_overtime else q_time_minutes)
+                                    z_raw_minutes = math.floor(base_time_minutes * 2) / 2.0
+                                    z = max(z_raw_minutes, 1.5) # MSR individual target time is 1.5 min per doc
+                                    z_minutes_list.append(z)
+                            max_z_minutes = max(z_minutes_list) if z_minutes_list else 6.0 # Default to group target if no valid individual times
                     else: # Original logic for non-MSR types
                         target_time_minutes = target_times_minutes.get(q_type, 2.0) # Use dict lookup for non-MSR target
                         # Calculate max_z_minutes for non-MSR using single-question logic
