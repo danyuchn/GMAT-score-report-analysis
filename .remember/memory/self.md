@@ -1144,3 +1144,63 @@ for col in msr_cols_to_update:
 - 與recommendations模組整合: 完全消除group ID缺失警告
 
 **結論:** DI預處理器現在完全符合文檔標準，正確實現MSR group ID生成、時間計算和相關標記邏輯，為後續診斷和建議生成提供完整的MSR群組數據支持。
+
+## 國際化缺失修復 (2025-06-01)
+
+**Status: FIXED ✅**
+
+Successfully fixed two internationalization issues identified by the user:
+
+### 問題 1: DI_MSR_READING_COMPREHENSION_BARRIER 標籤未國際化
+
+**根本原因:**
+DI_MSR_READING_COMPREHENSION_BARRIER 診斷標籤在翻譯檔案中缺少對應的翻譯鍵值，導致在繁體中文界面中顯示英文原文。
+
+Mistake: DI MSR 閱讀障礙標籤缺少國際化翻譯
+Wrong:
+```python
+# zh_TW.py 和 en.py 中都缺少 DI_MSR_READING_COMPREHENSION_BARRIER 的翻譯
+# 導致系統無法找到翻譯，顯示原始英文鍵值
+```
+
+Correct:
+```python
+# zh_TW.py 中添加:
+'DI_MSR_READING_COMPREHENSION_BARRIER': "DI MSR 閱讀障礙：題組整體閱讀時間過長",
+
+# en.py 中添加:
+'DI_MSR_READING_COMPREHENSION_BARRIER': "DI MSR Reading Barrier: Excessive Overall Reading Time for the Group",
+```
+
+### 問題 2: Q診斷報告中出現英文鍵值而非翻譯
+
+**根本原因:**
+在 `gmat_diagnosis_app/diagnostics/q_modules/reporting.py` 第134行，核心問題列表使用了硬編碼的英文字符串而非翻譯函數調用。
+
+Mistake: Q診斷報告使用硬編碼英文字符串而非翻譯鍵值
+Wrong:
+```python
+# reporting.py 第134行
+core_issues = ["Q Carelessness Issue: Detail Omission", "Q Concept Application Error: Mathematical Concept/Formula Application", "Q Calculation Error: Mathematical Calculation", "Q Reading Comprehension Error: Text Understanding"]
+if sfe_skills_involved:
+    core_issues.append("Q Foundation Mastery: Application Instability (Special Focus Error)")
+```
+
+Correct:
+```python
+# reporting.py 修正後
+core_issues = [t("Q_CARELESSNESS_DETAIL_OMISSION"), t("Q_CONCEPT_APPLICATION_ERROR"), t("Q_CALCULATION_ERROR"), t("Q_READING_COMPREHENSION_ERROR")]
+if sfe_skills_involved:
+    core_issues.append(t("Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE"))
+```
+
+### 修復結果:
+1. ✅ DI_MSR_READING_COMPREHENSION_BARRIER 標籤現已完全國際化，支持繁體中文和英文雙語顯示
+2. ✅ Q診斷報告中的核心問題列表現已使用翻譯函數，在中文界面中正確顯示中文翻譯
+3. ✅ 所有相關翻譯鍵值在 zh_TW.py 和 en.py 中都已正確配置
+4. ✅ 測試確認翻譯功能正常工作，能正確返回對應語言的翻譯文字
+
+**影響範圍:**
+- DI 診斷模組：MSR 閱讀障礙標籤國際化
+- Q 診斷模組：報告生成中的核心問題列表國際化
+- 用戶界面：繁體中文界面將不再出現英文鍵值，提升用戶體驗

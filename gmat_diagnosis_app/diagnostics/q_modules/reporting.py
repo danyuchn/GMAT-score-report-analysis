@@ -132,9 +132,9 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
         
         # 重點關注核心問題
         lines.append("重點關注：題目是否重複涉及報告第III部分指出的核心問題：")
-        core_issues = ["Q Carelessness Issue: Detail Omission", "Q Concept Application Error: Mathematical Concept/Formula Application", "Q Calculation Error: Mathematical Calculation", "Q Reading Comprehension Error: Text Understanding"]
+        core_issues = [t("Q_CARELESSNESS_DETAIL_OMISSION"), t("Q_CONCEPT_APPLICATION_ERROR"), t("Q_CALCULATION_ERROR"), t("Q_READING_COMPREHENSION_ERROR")]
         if sfe_skills_involved:
-            core_issues.append("Q Foundation Mastery: Application Instability (Special Focus Error)")
+            core_issues.append(t("Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE"))
         
         for issue in core_issues:
             lines.append(f"- {issue}")
