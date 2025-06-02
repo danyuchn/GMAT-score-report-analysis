@@ -236,4 +236,90 @@ def to_excel(df, column_map):
     writer.close()
     output.seek(0)
     
-    return output.getvalue() 
+    return output.getvalue()
+
+
+def create_combined_download_zip(df, column_map, report_dict):
+    """
+    創建包含Excel和綜合文字報告的zip檔案
+    
+    Args:
+        df: 包含數據的DataFrame
+        column_map: 欄位名稱映射字典
+        report_dict: 包含各科目文字報告的字典
+        
+    Returns:
+        bytes: ZIP文件的字節流
+    """
+    import zipfile
+    import io
+    from datetime import datetime
+    
+    # Create zip buffer
+    zip_buffer = io.BytesIO()
+    
+    # Generate timestamp for filenames
+    today_str = datetime.now().strftime('%Y%m%d')
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Add Excel file
+        excel_bytes = to_excel(df, column_map)
+        zip_file.writestr(f"{today_str}_GMAT_edited_diagnostic_data.xlsx", excel_bytes)
+        
+        # Combine all subject reports into one text file
+        combined_report_lines = []
+        combined_report_lines.append("GMAT 診斷報告綜合分析")
+        combined_report_lines.append("=" * 50)
+        combined_report_lines.append(f"生成日期: {datetime.now().strftime('%Y年%m月%d日 %H:%M')}")
+        combined_report_lines.append("")
+        
+        subjects_order = ['Q', 'V', 'DI']
+        subject_names = {
+            'Q': 'Quantitative (數學科)',
+            'V': 'Verbal (語文科)', 
+            'DI': 'Data Insights (數據洞察科)'
+        }
+        
+        for i, subject in enumerate(subjects_order):
+            if subject in report_dict and report_dict[subject]:
+                # Add subject header
+                combined_report_lines.append(f"{i+1}. {subject_names[subject]}")
+                combined_report_lines.append("-" * 30)
+                
+                # Clean the report content (remove HTML tags if any)
+                clean_report = report_dict[subject]
+                
+                # Remove HTML tags and clean up markdown formatting for text file
+                import re
+                # Remove HTML tags
+                clean_report = re.sub(r'<[^>]+>', '', clean_report)
+                # Convert markdown headers to text format
+                clean_report = re.sub(r'^#+\s*', '', clean_report, flags=re.MULTILINE)
+                # Clean up extra whitespace
+                clean_report = re.sub(r'\n\s*\n', '\n\n', clean_report)
+                
+                combined_report_lines.append(clean_report.strip())
+                combined_report_lines.append("")
+                combined_report_lines.append("")
+            else:
+                # Add placeholder for missing reports
+                combined_report_lines.append(f"{i+1}. {subject_names[subject]}")
+                combined_report_lines.append("-" * 30)
+                combined_report_lines.append(f"此科目暫無診斷報告數據")
+                combined_report_lines.append("")
+                combined_report_lines.append("")
+        
+        # Add footer
+        combined_report_lines.append("=" * 50)
+        combined_report_lines.append("報告結束")
+        combined_report_lines.append(f"檔案包含: Excel分析數據 + 三科綜合診斷報告")
+        
+        # Join all lines and add to zip as single txt file
+        combined_report_text = '\n'.join(combined_report_lines)
+        zip_file.writestr(
+            f"{today_str}_GMAT_三科綜合診斷報告.txt", 
+            combined_report_text.encode('utf-8')
+        )
+    
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue() 

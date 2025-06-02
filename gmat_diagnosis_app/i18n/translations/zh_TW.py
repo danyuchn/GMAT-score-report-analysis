@@ -1285,6 +1285,8 @@ TRANSLATIONS = {
     'new_diagnostic_report_title': "新診斷報告（基於修剪標籤與標準分類）",
     'edit_tags_no_data_error': "無法生成新診斷報告，因為沒有可編輯的數據。",
     'edit_tags_download_button': "下載編輯後試算表",
+    'edit_tags_download_button_combined': "下載編輯後試算表與文字報告",
+    'edit_tags_download_button_combined_label': "點擊下載 Excel 檔案與綜合文字報告",
     'edit_tags_unsaved_warning': "您有未儲存的變更。請點擊「✓ 套用變更並更新質化分析輸出」按鈕先儲存變更，再下載試算表。",
     'edit_tags_download_button_label': "點擊下載 Excel 檔案",
     'edit_tags_ai_processing': "根據您的編輯生成 AI 建議中...",

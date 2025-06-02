@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from gmat_diagnosis_app.utils.styling import apply_styles
-from gmat_diagnosis_app.utils.excel_utils import to_excel
+from gmat_diagnosis_app.utils.excel_utils import to_excel, create_combined_download_zip
 from gmat_diagnosis_app.constants.config import SUBJECTS
 from gmat_diagnosis_app.i18n import translate as t
 from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
@@ -188,7 +188,9 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
     else:
         tab_container.info(t("report_not_found").format(subject))
 
-    # 4. Download Button (same for all subjects)
+    # 4. Download Button (removed per user request)
+    # Commenting out the download detailed data button for individual subjects
+    """
     try:
         # Prepare a copy specifically for Excel export using subject_excel_map
         df_for_excel = df_subject.copy() # First copy complete df_subject
@@ -248,6 +250,7 @@ def display_subject_results(subject, tab_container, report_md, df_subject, col_c
         tab_container.error(t("excel_download_error").format(e))
         logging.error(t("detailed_error").format(traceback.format_exc()))
         tab_container.info(t("contact_admin_error"))
+    """
 
 def display_total_results(tab_container):
     """Display Total score percentiles and chart analysis"""
@@ -954,7 +957,7 @@ def display_results():
                                 st.warning(t('edit_tags_no_data_error'))
                 
                 with col3:
-                    if st.button(t('edit_tags_download_button'), key="download_edited_file_trigger_col", use_container_width=True):
+                    if st.button(t('edit_tags_download_button_combined'), key="download_edited_file_trigger_col", use_container_width=True):
                         if st.session_state.get('has_unsaved_changes', False):
                             tabs[edit_tab_index].warning(t('edit_tags_unsaved_warning'), icon="⚠️")
                         elif st.session_state.get('changes_saved', False):
@@ -1051,14 +1054,25 @@ def display_results():
                                 # --- Call to_excel with internal names and the map ---
                                 excel_bytes = to_excel(df_to_export_final, excel_column_map_for_export_final)
 
+                                # Create combined download with Excel and Markdown reports
+                                # Get current report dict from session state
+                                report_dict = st.session_state.get('report_dict', {})
+                                
+                                # Create zip with both Excel and MD files
+                                zip_bytes = create_combined_download_zip(
+                                    df_to_export_final, 
+                                    excel_column_map_for_export_final, 
+                                    report_dict
+                                )
+
                                 # Trigger download
                                 today_str = pd.Timestamp.now().strftime('%Y%m%d')
                                 st.download_button(
-                                    label=t('edit_tags_download_button_label'), # This label appears AFTER the initial button click
-                                    data=excel_bytes,
-                                    file_name=f"{today_str}_GMAT_edited_diagnostic_data.xlsx",
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    key="actual_download_excel_button_col3_rerun", # Use a different key if needed
+                                    label=t('edit_tags_download_button_combined_label'), # Updated label for combined download
+                                    data=zip_bytes,
+                                    file_name=f"{today_str}_GMAT_edited_data_and_reports.zip",
+                                    mime="application/zip",
+                                    key="actual_download_combined_button_col3_rerun", # Use a different key
                                     use_container_width=True
                                 )
                             except Exception as e:

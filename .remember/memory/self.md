@@ -1204,3 +1204,240 @@ if sfe_skills_involved:
 - DI 診斷模組：MSR 閱讀障礙標籤國際化
 - Q 診斷模組：報告生成中的核心問題列表國際化
 - 用戶界面：繁體中文界面將不再出現英文鍵值，提升用戶體驗
+
+## 下載功能優化與檔案組合修復 (2025-06-02)
+
+**Status: COMPLETED ✅**
+
+Successfully implemented user's request to remove individual subject download buttons and enhance the edit diagnostic tags download functionality.
+
+### 問題描述:
+用戶要求：
+1. 把三個科目的「下載..科詳細數據」按鈕拿掉
+2. 在編輯診斷標籤區域，將「下載編輯後試算表」改為「下載編輯後試算表與文字報告」
+3. 讓三科的文字報告變成md檔，讓用戶跟原來編輯後的xlsx檔一起下載
+
+### 修復過程:
+
+**修復1: 移除個別科目的下載詳細數據按鈕**
+
+Mistake: 三個科目頁面都有各自的下載詳細數據按鈕
+Wrong:
+```python
+# 在 display_subject_results 函數中的下載按鈕
+tab_container.download_button(
+    t("download_subject_detailed_data").format(subject),
+    data=excel_bytes,
+    file_name=f"{today_str}_GMAT_{subject}_detailed_data.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+```
+
+Correct:
+```python
+# 將整個下載按鈕區段註釋掉
+# 4. Download Button (removed per user request)
+# Commenting out the download detailed data button for individual subjects
+"""
+try:
+    # ... 原本的下載邏輯 ...
+except Exception as e:
+    # ... 錯誤處理 ...
+"""
+```
+
+**修復2: 創建組合下載功能**
+
+新增了 `create_combined_download_zip` 函數在 `excel_utils.py` 中：
+
+```python
+def create_combined_download_zip(df, column_map, report_dict):
+    """
+    創建包含Excel和Markdown報告的zip檔案
+    
+    Args:
+        df: 包含數據的DataFrame
+        column_map: 欄位名稱映射字典
+        report_dict: 包含各科目文字報告的字典
+        
+    Returns:
+        bytes: ZIP文件的字節流
+    """
+    import zipfile
+    import io
+    from datetime import datetime
+    
+    # Create zip buffer
+    zip_buffer = io.BytesIO()
+    
+    # Generate timestamp for filenames
+    today_str = datetime.now().strftime('%Y%m%d')
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Add Excel file
+        excel_bytes = to_excel(df, column_map)
+        zip_file.writestr(f"{today_str}_GMAT_edited_diagnostic_data.xlsx", excel_bytes)
+        
+        # Add markdown reports for each subject
+        for subject in ['Q', 'V', 'DI']:
+            if subject in report_dict and report_dict[subject]:
+                # Clean the markdown content (remove HTML tags if any)
+                clean_report = report_dict[subject]
+                
+                # Add subject report as markdown file
+                zip_file.writestr(
+                    f"{today_str}_GMAT_{subject}_diagnostic_report.md", 
+                    clean_report.encode('utf-8')
+                )
+    
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue()
+```
+
+**修復3: 更新編輯診斷標籤的下載按鈕**
+
+Mistake: 編輯診斷標籤區域只下載xlsx檔案
+Wrong:
+```python
+# 原本只下載Excel檔案
+st.download_button(
+    label=t('edit_tags_download_button_label'),
+    data=excel_bytes,
+    file_name=f"{today_str}_GMAT_edited_diagnostic_data.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    key="actual_download_excel_button_col3_rerun",
+    use_container_width=True
+)
+```
+
+Correct:
+```python
+# 使用組合下載功能
+# Get current report dict from session state
+report_dict = st.session_state.get('report_dict', {})
+
+# Create zip with both Excel and MD files
+zip_bytes = create_combined_download_zip(
+    df_to_export_final, 
+    excel_column_map_for_export_final, 
+    report_dict
+)
+
+# Trigger download
+st.download_button(
+    label=t('edit_tags_download_button_combined_label'),
+    data=zip_bytes,
+    file_name=f"{today_str}_GMAT_edited_data_and_reports.zip",
+    mime="application/zip",
+    key="actual_download_combined_button_col3_rerun",
+    use_container_width=True
+)
+```
+
+**修復4: 更新翻譯系統**
+
+添加新的翻譯鍵值：
+- 中文: `'edit_tags_download_button_combined': "下載編輯後試算表與文字報告"`
+- 英文: `'edit_tags_download_button_combined': "Download Modified Spreadsheet & Text Reports"`
+
+### 修復效果:
+1. ✅ 移除了三個科目頁面的個別下載按鈕，簡化了界面
+2. ✅ 編輯診斷標籤區域的下載按鈕現在下載zip檔案
+3. ✅ zip檔案包含：
+   - 編輯後的Excel試算表 (YYYYMMDD_GMAT_edited_diagnostic_data.xlsx)
+   - 三個科目的Markdown文字報告 (YYYYMMDD_GMAT_Q/V/DI_diagnostic_report.md)
+4. ✅ 按鈕文字更新為「下載編輯後試算表與文字報告」
+5. ✅ 支援繁體中文和英文雙語界面
+6. ✅ 保持原有的變更檢查邏輯 (未儲存變更時會提示警告)
+
+**技術實現:**
+- 使用Python的zipfile模組創建壓縮檔案
+- 從session_state.report_dict獲取各科目的文字報告
+- 將文字報告以UTF-8編碼儲存為.md檔案
+- 保持原有的Excel檔案生成邏輯
+- 更新了相關的翻譯鍵值以支援雙語
+
+**用戶影響:**
+現在用戶可以一次下載包含編輯後試算表和完整文字報告的組合檔案，更方便進行離線查看和與教師討論。
+
+## 三科診斷報告合併為單一文字檔案修復 (2025-06-02)
+
+**Status: COMPLETED ✅**
+
+Successfully implemented user's request to combine all three subject reports into a single text file instead of separate markdown files.
+
+### 問題描述:
+用戶要求將三個科目的報告放在同一個txt檔裡讓用戶下載，而不是分別的md檔案。
+
+### 修復過程:
+
+**修復: 合併三科報告為單一txt檔案**
+
+Mistake: 三個科目的報告分別存儲為獨立的md檔案
+Wrong:
+```python
+# 原本的分別下載邏輯
+for subject in ['Q', 'V', 'DI']:
+    if subject in report_dict and report_dict[subject]:
+        # Add subject report as markdown file
+        zip_file.writestr(
+            f"{today_str}_GMAT_{subject}_diagnostic_report.md", 
+            clean_report.encode('utf-8')
+        )
+```
+
+Correct:
+```python
+# 合併三科報告為單一txt檔案
+combined_report_lines = []
+combined_report_lines.append("GMAT 診斷報告綜合分析")
+combined_report_lines.append("=" * 50)
+combined_report_lines.append(f"生成日期: {datetime.now().strftime('%Y年%m月%d日 %H:%M')}")
+
+subjects_order = ['Q', 'V', 'DI']
+subject_names = {
+    'Q': 'Quantitative (數學科)',
+    'V': 'Verbal (語文科)', 
+    'DI': 'Data Insights (數據洞察科)'
+}
+
+for i, subject in enumerate(subjects_order):
+    if subject in report_dict and report_dict[subject]:
+        combined_report_lines.append(f"{i+1}. {subject_names[subject]}")
+        combined_report_lines.append("-" * 30)
+        
+        # 清理報告內容，移除HTML標籤，轉換markdown為純文字
+        clean_report = re.sub(r'<[^>]+>', '', report_dict[subject])
+        clean_report = re.sub(r'^#+\s*', '', clean_report, flags=re.MULTILINE)
+        clean_report = re.sub(r'\n\s*\n', '\n\n', clean_report)
+        
+        combined_report_lines.append(clean_report.strip())
+    else:
+        combined_report_lines.append(f"{i+1}. {subject_names[subject]}")
+        combined_report_lines.append("-" * 30)
+        combined_report_lines.append(f"此科目暫無診斷報告數據")
+
+combined_report_text = '\n'.join(combined_report_lines)
+zip_file.writestr(
+    f"{today_str}_GMAT_三科綜合診斷報告.txt", 
+    combined_report_text.encode('utf-8')
+)
+```
+
+### 實現的功能:
+1. ✅ 將Q、V、DI三科的診斷報告合併為單一txt檔案
+2. ✅ 添加完整的報告標題、日期、科目分隔
+3. ✅ 自動移除HTML標籤和markdown格式，轉換為純文字
+4. ✅ 為缺失報告的科目添加占位符說明
+5. ✅ 保持原有的Excel檔案下載功能
+6. ✅ 更新翻譯鍵值以反映新的文字報告格式
+
+### 修復效果:
+1. ✅ 下載的zip檔案現在包含：
+   - Excel試算表檔案：`YYYYMMDD_GMAT_edited_diagnostic_data.xlsx`
+   - 綜合文字報告：`YYYYMMDD_GMAT_三科綜合診斷報告.txt`
+2. ✅ 文字報告格式化美觀，包含完整的標題和分隔
+3. ✅ 支援繁體中文和英文界面
+4. ✅ 提供離線閱讀和分享的便利性
+
+**用戶影響:** 現在用戶可以獲得一個更方便的綜合文字報告，包含所有三科的診斷結果，適合打印、分享或與教師討論使用。
