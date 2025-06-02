@@ -61,6 +61,7 @@ def generate_di_summary_report(di_results):
         all_triggered_params.update(ch4_behavioral_params)
         param_counts_all = param_counts_all.add(pd.Series(ch4_behavioral_params).value_counts(), fill_value=0)
 
+    # Check if any SFE (Special Focus Error) parameters are triggered
     sfe_triggered = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE' in all_triggered_params
     sfe_code = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'
 

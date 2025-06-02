@@ -11,6 +11,132 @@ Correct:
 [Insert corrected code or logic]
 ```
 
+## GMAT V科文檔逐章節比對與統一化修復 (2025-06-01)
+
+**Status: COMPLETED ✅**
+
+Successfully completed comprehensive chapter-by-chapter comparison between Chinese V documentation (v1.6) and English V documentation (v1.3), implementing all necessary modifications to ensure complete consistency.
+
+### 比對發現的主要不一致之處:
+
+**1. 第三章診斷參數系統完全不同:**
+- 中文文檔v1.6使用詳細的分層診斷參數系統
+- 英文文檔v1.3使用簡化的診斷參數系統
+
+**2. 診斷標籤精確性限制說明缺失:**
+- 中文文檔包含重要的診斷限制說明
+- 英文文檔缺少相應說明
+
+**3. 未來改進機制說明缺失:**
+- 中文文檔包含SFE未來改進機制的詳細說明
+- 英文文檔缺少此部分
+
+**4. 附錄A診斷參數對照表不一致:**
+- 中文文檔使用完整的分層參數系統
+- 英文文檔使用舊版簡化參數系統
+
+### 修復實施:
+
+**修復1: 第三章診斷參數完全更新**
+
+Mistake: 英文文檔使用舊版簡化診斷參數系統
+Wrong:
+```markdown
+# 舊版簡化參數如:
+- CR_READING_BASIC_OMISSION
+- CR_METHOD_PROCESS_DEVIATION
+- RC_READING_INFO_LOCATION_ERROR
+```
+
+Correct:
+```markdown
+# 新版詳細分層參數如:
+- CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP
+- CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP
+- RC_READING_COMPREHENSION_ERROR_VOCAB
+- RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION
+```
+
+**修復2: 添加診斷標籤精確性限制說明**
+
+Mistake: 缺少診斷標籤精確性限制的重要說明
+Wrong:
+```markdown
+# 直接進入診斷流程，無精確性限制說明
+3. Diagnostic Flow and Analysis Points
+```
+
+Correct:
+```markdown
+# 添加完整的精確性限制說明
+📋 **Important Note: Diagnostic Label Precision Limitations**
+
+**Note:** The diagnostic parameters listed below represent general possible causes...
+**Recommended Process:**
+1. The system provides diagnostic parameters as **possible ranges**
+2. Combine with student recall of specific difficulties encountered
+3. Refer to secondary evidence or conduct qualitative analysis if necessary
+4. Finally determine the applicable precise diagnostic labels
+```
+
+**修復3: 添加未來改進機制說明**
+
+Mistake: 缺少SFE未來改進機制說明
+Wrong:
+```markdown
+# 僅有基本SFE定義，無未來改進說明
+- Priority Handling: When generating practice recommendations...
+```
+
+Correct:
+```markdown
+🔧 **Future Improvement Mechanism Description**
+
+**Note:** The current SFE judgment mechanism is based on simple difficulty comparison logic...
+
+1. **Weighted SFE Mechanism**: Multi-dimensional weighted calculation...
+2. **Contextual Awareness SFE**: Considering test context, learning phase...
+3. **Dynamic Threshold Adjustment**: Dynamically adjusting SFE trigger conditions...
+4. **Multi-level SFE Classification**: Distinguishing different severity levels...
+```
+
+**修復4: 附錄A診斷參數對照表完全更新**
+
+Mistake: 使用舊版簡化的診斷參數對照表
+Wrong:
+```markdown
+| CR_READING_BASIC_OMISSION | CR 閱讀理解: 基礎理解疏漏 |
+| CR_REASONING_CHAIN_ERROR | CR 推理障礙: 邏輯鏈分析錯誤 |
+```
+
+Correct:
+```markdown
+| CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP | CR 題幹理解錯誤：提問要求把握錯誤 |
+| CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP | CR 推理錯誤: 邏輯鏈分析錯誤 (前提與結論關係) |
+```
+
+**修復5: 參數名稱統一化**
+
+Mistake: FOUNDATIONAL_MASTERY_INSTABILITY_SFE參數名稱不一致
+Wrong:
+```markdown
+FOUNDATIONAL_MASTERY_INSTABILITY_SFE
+```
+
+Correct:
+```markdown
+FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE
+```
+
+### 修復結果:
+1. ✅ 第三章診斷參數系統完全統一 - Fast & Wrong, Normal Time & Wrong, Slow & Wrong, Slow & Correct所有分類的參數列表已更新
+2. ✅ 診斷標籤精確性限制說明已添加 - 包含完整的限制說明和建議流程
+3. ✅ 未來改進機制說明已添加 - 包含四個改進方向的詳細描述
+4. ✅ 附錄A診斷參數對照表完全更新 - 包含所有分層診斷參數的完整映射
+5. ✅ 參數名稱統一化完成 - 所有FOUNDATIONAL_MASTERY相關參數名稱已統一
+
+**最終狀態:** 英文文檔en-gmat-v-v1.3.md現已與中文文檔gmat-v-score-logic-dustin-v1.6.md完全一致，實現了逐章節內容的完整統一。
+
 ## 診斷標籤修剪助手翻譯問題修復 (2025-06-01)
 
 **Status: FIXED ✅**
@@ -535,3 +661,273 @@ DI_PARAM_ASSIGNMENT_RULES = {
 5. ✅ SFE檢測邏輯與V科、Q科保持一致
 
 **Result**: DI科診斷模組現在完全符合診斷標籤摘要文件的標準，提供精確且一致的診斷標籤分配。
+
+## DI 英文文檔診斷標籤對齊修復 (2025-06-01)
+
+**Status: FIXED ✅**
+
+Successfully aligned English DI documentation diagnostic parameters with Chinese version.
+
+### 問題描述:
+用戶要求將英文版本DI文檔 (en-gmat-di-v1.3.md) 的附錄診斷標籤與中文版本 (gmat-di-score-logic-dustin-v1.6.md) 對齊。
+
+### 根本原因:
+英文版本使用簡化的診斷標籤系統，而中文版本使用詳細的細分標籤系統。
+
+### 修復過程:
+
+**主要差異發現:**
+1. **閱讀理解標籤:** 英文版本使用 `DI_READING_COMPREHENSION_ERROR`，中文版本細分為詞彙、語法、邏輯、領域四個子類別
+2. **圖表解讀標籤:** 英文版本使用 `DI_GRAPH_TABLE_INTERPRETATION_ERROR`，中文版本分為圖形和表格兩個子類別
+3. **參數命名:** 中文版本使用雙下劃線格式 (如 `__VOCABULARY`, `__MATH`)
+4. **行為標籤:** 英文版本缺少詳細的行為類別標籤
+
+Mistake: 英文DI文檔使用簡化的診斷標籤系統
+Wrong:
+```markdown
+| `DI_READING_COMPREHENSION_ERROR`           | DI 閱讀理解: 文字/題意理解錯誤/障礙 (Math/Non-Math) |
+| `DI_GRAPH_TABLE_INTERPRETATION_ERROR`      | DI 圖表解讀: 圖形/表格信息解讀錯誤/障礙            |
+| `DI_CONCEPT_APPLICATION_ERROR`             | DI 概念應用 (Math): 數學觀念/公式應用錯誤/障礙      |
+```
+
+Correct:
+```markdown
+| `DI_READING_COMPREHENSION_ERROR__VOCABULARY` | DI 閱讀理解錯誤: 詞彙理解                          |
+| `DI_READING_COMPREHENSION_ERROR__SYNTAX`     | DI 閱讀理解錯誤: 句式理解                          |
+| `DI_READING_COMPREHENSION_ERROR__LOGIC`      | DI 閱讀理解錯誤: 邏輯理解                          |
+| `DI_READING_COMPREHENSION_ERROR__DOMAIN`     | DI 閱讀理解錯誤: 領域理解                          |
+| `DI_GRAPH_INTERPRETATION_ERROR__GRAPH`       | DI 圖表解讀錯誤: 圖形信息解讀                      |
+| `DI_GRAPH_INTERPRETATION_ERROR__TABLE`       | DI 圖表解讀錯誤: 表格信息解讀                      |
+| `DI_CONCEPT_APPLICATION_ERROR__MATH`         | DI 概念應用 (數學) 錯誤: 數學觀念/公式應用         |
+```
+
+### 修復內容:
+
+**1. 完整替換附錄A診斷標籤系統:**
+- 添加按時間表現分類的詳細診斷標籤列表 (Fast & Wrong, Normal Time & Wrong, Slow & Wrong, Slow & Correct)
+- 包含所有閱讀理解細分類別: VOCABULARY, SYNTAX, LOGIC, DOMAIN
+- 包含圖表解讀細分類別: GRAPH, TABLE
+- 包含數學和非數學領域的詳細區分
+- 添加MSR特定參數和行為模式參數
+
+**2. 統一參數命名格式:**
+- 使用雙下劃線格式: `DI_CATEGORY__SUBCATEGORY`
+- 數學相關標籤使用 `__MATH` 後綴
+- 非數學相關標籤使用 `__NON_MATH` 後綴
+- 行為標籤使用 `DI_BEHAVIOR__` 前綴
+
+**3. 添加完整的標籤分類結構:**
+- Reading & Understanding (閱讀與理解)
+- Concept & Application (概念與應用)
+- Logical Reasoning (邏輯推理)
+- Data Handling & Calculation (數據處理與計算)
+- MSR Specific (MSR特定)
+- Question Type Specific (題型特定)
+- Foundational & Efficiency (基礎與效率)
+- Behavior (行為)
+
+### 修復效果:
+1. ✅ 英文版本診斷標籤完全與中文版本一致
+2. ✅ 標籤命名格式統一為詳細的細分系統
+3. ✅ 按時間表現分類的診斷參數體系完整
+4. ✅ 包含所有MSR特定和行為模式標籤
+5. ✅ 保持了中英文對照表的完整性
+
+**結果:** 英文DI文檔附錄現在與中文版本完全一致，使用相同的詳細診斷標籤系統，確保兩個版本的診斷參數體系統一。
+
+## V科文檔 v1.6 版本一致性驗證完成 (2025-06-01)
+
+**Status: VERIFIED CONSISTENT ✅**
+
+Successfully verified V科中英文文檔（v1.6版本）已完全一致，無需修復。
+
+### 驗證範圍：
+
+**全文檔逐章節比對:**
+1. ✅ 第零章：核心輸入數據和配置
+2. ✅ 第一章：整體時間策略與數據有效性評估
+3. ✅ 第二章：多維度表現分析
+4. ✅ 第三章：根本原因診斷與分析
+5. ✅ 第四章：核心技能/題型/領域參考
+6. ✅ 第五章：特殊模式觀察與粗心評估
+7. ✅ 第六章：基礎能力覆蓋規則
+8. ✅ 第七章：練習規劃與建議
+9. ✅ 第八章：診斷總結與後續行動
+10. ✅ 附錄A：診斷標籤參數與中文對照表
+
+### 一致性確認：
+
+**1. 參數系統完全一致：**
+- 英文版本使用詳細的分層診斷參數系統
+- 所有診斷參數完全對應中文版本
+- 參數命名格式統一（如：`CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP`）
+- SFE參數正確命名：`FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE`
+
+**2. 診斷流程邏輯完全一致：**
+- Fast & Wrong, Normal Time & Wrong, Slow & Wrong, Slow & Correct 診斷參數列表完全相同
+- 時間表現分類標準一致
+- SFE檢測邏輯完全相同
+- 行為模式檢測邏輯一致
+
+**3. 附錄A對照表完全一致：**
+- 包含所有分層診斷參數的完整映射
+- 英文參數與中文描述完全對應
+- 參數分類結構完全相同
+
+**4. 章節結構與內容完全一致：**
+- 所有章節目標、重點、邏輯完全相同
+- 診斷標籤精確性限制說明完全相同
+- 未來改進機制說明完全相同
+- 技能豁免規則和覆蓋規則完全相同
+
+### 驗證結果：
+✅ V科中英文文檔v1.6版本已實現完全一致性
+✅ 無需任何修復或調整
+✅ 兩個版本可安全並行使用
+✅ 診斷參數系統完全統一
+
+**結論：** V科文檔中英文版本v1.6已達到完全一致狀態，診斷框架和技術規格完全對齊。之前的修復工作已成功完成，當前版本無需進一步調整。
+
+## DI診斷模塊覆蓋規則閾值修復 (2025-01-30)
+
+**Status: COMPLETED ✅**
+
+Successfully fixed DI module override rule thresholds to match documentation standards.
+
+### 問題描述:
+DI模塊中的覆蓋規則閾值設定與標準文檔不一致，實現中使用了錯誤率40%和超時率30%的閾值，而文檔要求使用50%和50%。
+
+### 根本原因:
+在`gmat_diagnosis_app/diagnostics/di_modules/analysis.py`文件中，兩個函數使用了錯誤的閾值：
+1. `calculate_override_conditions` 函數
+2. `check_foundation_override` 函數
+
+### 修復過程:
+
+Mistake: DI模塊覆蓋規則閾值與文檔不一致
+Wrong:
+```python
+# 在 calculate_override_conditions 函數中
+error_threshold = 0.4  # 40%
+overtime_threshold = 0.3  # 30%
+
+# 在 check_foundation_override 函數中  
+override_threshold_error = 0.4  # 40%
+override_threshold_overtime = 0.3  # 30%
+```
+
+Correct:
+```python
+# 在 calculate_override_conditions 函數中
+error_threshold = 0.5  # 50% - 修正為與文檔一致
+overtime_threshold = 0.5  # 50% - 修正為與文檔一致
+
+# 在 check_foundation_override 函數中
+override_threshold_error = 0.5  # 50% - 修正為與文檔一致  
+override_threshold_overtime = 0.5  # 50% - 修正為與文檔一致
+```
+
+### 修復效果:
+1. ✅ DI模塊覆蓋規則閾值完全符合文檔標準
+2. ✅ 錯誤率和超時率閾值統一為50%/50%
+3. ✅ 與Q/V模塊保持一致的覆蓋規則標準
+4. ✅ 診斷參數觸發條件更加嚴格和準確
+
+### 技術背景:
+根據GMAT診斷文檔第五章標準，當某題型或技能的錯誤率或超時率超過50%時才觸發覆蓋規則，生成特殊的練習建議。此修復確保了DI模塊與文檔規範的完全一致性。
+
+## DI豁免規則文檔符合性優化和MSR錯誤處理改進 (2025-01-30)
+
+**Status: COMPLETED ✅**
+
+Successfully optimized DI exemption rules to fully comply with documentation standards and improved MSR time handling error recovery mechanisms.
+
+### 1. 豁免規則文檔符合性優化
+
+**問題描述:**
+DI豁免規則實現基本正確，但需要更明確地遵循文檔第五章標準，特別是有效題目篩選和條件檢查。
+
+**修復過程:**
+
+Mistake: 豁免規則邏輯可以更明確地遵循文檔標準
+Wrong:
+```python
+# 簡化的豁免條件檢查
+if not group_df.empty and not ((group_df['is_correct'] == False) | (group_df['overtime'] == True)).any():
+    exempted_type_domain_combinations.add((q_type, domain))
+```
+
+Correct:
+```python
+# 按照文檔第五章標準：首先篩選有效題目
+valid_questions = group_df[group_df.get('is_invalid', False) == False]
+if valid_questions.empty:
+    continue  # 如果沒有有效題目，跳過此組合
+
+# 條件一：所有有效題目必須全部正確 
+condition1_all_correct = valid_questions['is_correct'].all()
+
+# 條件二：所有有效題目必須全部無超時
+condition2_no_overtime = ~valid_questions['overtime'].any()
+
+# 同時滿足兩個條件才豁免
+if condition1_all_correct and condition2_no_overtime:
+    exempted_type_domain_combinations.add((q_type, domain))
+```
+
+### 2. MSR時間處理錯誤處理機制改進
+
+**問題描述:**
+MSR時間處理在多個層級存在錯誤處理，但建議生成階段的錯誤處理可以更加詳細和健壯。
+
+**發現的三層錯誤處理架構:**
+1. **數據預處理階段**: 處理MSR組識別、閱讀時間計算的數據缺失問題
+2. **超時計算階段**: 處理群組超時和個別超時計算中的數據缺失
+3. **建議生成階段**: 處理時間限制建議計算中的數據問題
+
+**修復過程:**
+
+Mistake: MSR建議生成階段的錯誤處理不夠詳細
+Wrong:
+```python
+triggering_group_ids = group_df['msr_group_id'].unique()
+group_times = df_diagnosed[df_diagnosed['msr_group_id'].isin(triggering_group_ids)]['msr_group_total_time']
+if group_times.notna().any():
+    max_group_time_minutes = group_times.max()
+    # 簡化的錯誤處理...
+```
+
+Correct:
+```python
+triggering_group_ids = group_df['msr_group_id'].unique()
+# 過濾掉NaN的group_id
+triggering_group_ids = [gid for gid in triggering_group_ids if pd.notna(gid)]
+
+if triggering_group_ids:
+    group_times = df_diagnosed[df_diagnosed['msr_group_id'].isin(triggering_group_ids)]['msr_group_total_time']
+    valid_group_times = group_times.dropna()
+    
+    if len(valid_group_times) > 0:
+        max_group_time_minutes = valid_group_times.max()
+        if pd.notna(max_group_time_minutes) and max_group_time_minutes > 0:
+            # 正常計算邏輯...
+        else: 
+            logging.warning(f"[DI Case Reco MSR] Invalid max_group_time_minutes...")
+            max_z_minutes = 6.0
+    else: 
+        logging.warning(f"[DI Case Reco MSR] No valid group times found...")
+        max_z_minutes = 6.0
+```
+
+### 修復效果:
+1. ✅ DI豁免規則完全符合文檔第五章標準
+2. ✅ 明確區分有效題目篩選和條件檢查
+3. ✅ MSR時間處理錯誤處理更加健壯
+4. ✅ 增加詳細的警告日誌協助調試
+5. ✅ 多層級的錯誤回退機制確保系統穩定性
+
+**技術改進:**
+- 豁免規則按照文檔標準先篩選有效題目，再檢查兩個條件
+- MSR錯誤處理增加NaN過濾、數據有效性檢查、詳細警告
+- 保持6.0分鐘的默認回退值，確保MSR建議生成不會失敗
+</rewritten_file>

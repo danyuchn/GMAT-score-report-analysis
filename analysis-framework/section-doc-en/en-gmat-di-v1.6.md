@@ -107,19 +107,23 @@
     *   If `question_type` == `'TPA'` and `question_time` > `overtime_threshold_tpa`, flag `overtime` = `True`.
     *   If `question_type` == `'GT'` and `question_time` > `overtime_threshold_gt`, flag `overtime` = `True`.
     *   If `question_type` == `'DS'` and `question_time` > `overtime_threshold_ds`, flag `overtime` = `True`.
-    *   **Overtime Flagging for `MSR` Questions (Dual Criteria):**
-        *   **a. Group Overtime Flag (`msr_group_overtime`):**
+    *   **Overtime Flagging for `MSR` Questions (Quadruple Criteria):**
+        *   **a. Group Overtime Flag (`msr_group_over`):**
             *   Calculate the total time for each MSR group (`group_total_time`).
             *   Get the group's target time `msr_group_target_time` (based on `time_pressure`: 6.0 min if True, 7.0 min if False).
-            *   Determine: If `group_total_time > msr_group_target_time`, then flag **all** questions within that MSR group with `msr_group_overtime = True`.
-        *   **b. Individual Question Overtime Flag (`msr_individual_overtime`):**
-            *   Set a fixed individual question threshold `msr_individual_q_threshold = 1.5` minutes (does not change with `time_pressure`).
-            *   Calculate adjusted time `adjusted_msr_time`:
-                *   For the first question in the group: `adjusted_msr_time = question_time - msr_reading_time` (uses `msr_reading_time` calculated in Chapter 0).
-                *   For non-first questions in the group: `adjusted_msr_time = question_time`.
-            *   Determine: If an MSR question's `adjusted_msr_time > msr_individual_q_threshold` (1.5 minutes), then flag that question with `msr_individual_overtime = True`.
-        *   **c. Final `overtime` Flag:**
-            *   An MSR question is finally flagged as `overtime = True` if and only if it satisfies `msr_group_overtime == True` **OR** `msr_individual_overtime == True`.
+            *   Determine: If `group_total_time > msr_group_target_time`, then flag **all** questions within that MSR group with `msr_group_over = True`.
+        *   **b. Reading Time Overtime Flag (`msr_reading_over`):**
+            *   For MSR questions that are **not flagged by `msr_group_over`** and are the **first question of the group**.
+            *   If that question's `msr_reading_time > msr_reading_threshold` (1.5 minutes), then flag `msr_reading_over = True`.
+        *   **c. Adjusted First Question Overtime Flag (`msr_adj_first_over`):**
+            *   For MSR questions that are **not flagged by the above two conditions** and are the **first question of the group**.
+            *   Calculate adjusted time: `adjusted_time = question_time - msr_reading_time`.
+            *   If `adjusted_time > msr_single_q_threshold` (1.5 minutes), then flag `msr_adj_first_over = True`.
+        *   **d. Non-First Question Overtime Flag (`msr_non_first_over`):**
+            *   For MSR questions that are **not flagged by `msr_group_over`** and are **non-first questions of the group**.
+            *   If `question_time > msr_single_q_threshold` (1.5 minutes), then flag `msr_non_first_over = True`.
+        *   **e. Final `overtime` Flag:**
+            *   An MSR question is finally flagged as `overtime = True` if and only if it satisfies any of the following conditions: `msr_group_over OR msr_reading_over OR msr_adj_first_over OR msr_non_first_over`.
 2.  **Create Filtered Dataset:** Remove all questions marked as `is_invalid` = `True` from the original dataset.
 3.  **Scope of Subsequent Analysis:** All calculations, analyses, and recommendations from Chapter 2 through Chapter 6 will be based exclusively on this filtered dataset.
 
@@ -173,7 +177,7 @@
 <aside>
 
 **Objective:** To delve deeper into and diagnose the root causes of errors or inefficiencies by combining time performance (fast, slow, normal), accuracy (correct, incorrect), question type, content domain, and difficulty information, outputting standardized **English diagnostic parameter tags**.
-**Primary Focus:** Applying a systematic analysis method for each `question_type` and `content_domain` combination. Associating potential **English diagnostic parameters** with different time-accuracy classifications (e.g., slow and wrong, normal time but wrong) and setting corresponding diagnostic actions. Paying special attention to and flagging `special_focus_error` (i.e., `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``).
+**Primary Focus:** Applying a systematic analysis method for each `question_type` and `content_domain` combination. Associating potential **English diagnostic parameters** with different time-accuracy classifications (e.g., slow and wrong, normal time but wrong) and setting corresponding diagnostic actions. Paying special attention to and flagging `special_focus_error` (i.e., `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``).
 **Rationale:** Only by finding the root cause of the problem (whether it's textual understanding, mathematical concepts, logical reasoning, chart interpretation, cross-source integration, or calculation, represented by standardized **English parameters**) can the most effective improvement strategies be developed. This chapter aims to elevate the analysis from "where the error occurred" to a standardized representation of "why the error occurred."
 
 </aside>
@@ -185,12 +189,12 @@
     - **Core Concept Definitions:**
         - **Time Performance Classification (`Time Performance`):**
             - Fast (`is_relatively_fast`): `question_time` < `average_time_per_type`[question's `question_type`] * 0.75.
-            - Slow (`is_slow`): Question is flagged `overtime` = `True` (based on Chapter 1 thresholds, including the dual criteria for MSR).
+            - Slow (`is_slow`): Question is flagged `overtime` = `True` (based on Chapter 1 thresholds, with updated MSR criteria defined below).
             - Normal Time (`is_normal_time`): Neither fast nor slow.
         - **Special Focus Error (`special_focus_error`)**: (Definition and handling aligned with original DI logic)
             - *Definition*: An incorrect question (`is_correct`==`False`) whose `question_difficulty` < `max_correct_difficulty_per_combination`[question's `question_type`, question's `content_domain`].
-            - *Flagging*: If the condition is met, flag `special_focus_error` = `True` and associate with parameter `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``.
-            - *Priority Handling*: When generating individual recommendations (Chapter 6) and outputting the diagnostic summary (Chapter 7), questions flagged as `special_focus_error` = `True` (and their corresponding parameter `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``) and related diagnoses/recommendations should be **listed first or specially highlighted**.
+            - *Flagging*: If the condition is met, flag `special_focus_error` = `True` and associate with parameter `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``.
+            - *Priority Handling*: When generating individual recommendations (Chapter 6) and outputting the diagnostic summary (Chapter 7), questions flagged as `special_focus_error` = `True` (and their corresponding parameter `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``) and related diagnoses/recommendations should be **listed first or specially highlighted**.
 - **Diagnostic Process and Analysis Points (for valid data questions)**
     - **Analyze by `question_type` and `content_domain` combination:**
 
@@ -209,43 +213,43 @@
         - **A.1. `Math Related`**
             - **Slow & Wrong (`is_slow` & `is_correct`==`False`):**
                 - *Potential Causes (Diagnostic Parameters)*: 
-                    - `` `DI_READING_COMPREHENSION_ERROR` `` (Sub-classify: Vocabulary / Sentence Structure / Domain-Specific Terminology)
-                    - `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math - Formula derivation barrier)
-                    - `` `DI_CALCULATION_ERROR` ``
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (Sub-classify: Vocabulary / Sentence Structure / Domain-Specific Terminology)
+                    - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math - Formula derivation barrier)
+                    - `` `DI_CALCULATION_ERROR__MATH` ``
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (If SFE triggered)
                 - *Diagnostic Actions*: Follow general logic. If involving formula/calculation barriers and recall fails, prioritize secondary evidence. Requires student to **identify the Math related topic (refer to list at start of chapter)**.
             - **Slow & Correct (`is_slow` & `is_correct`==`True`):**
                 - *Potential Efficiency Bottlenecks (Diagnostic Parameters)*: 
-                    - `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_CONCEPT` `` (Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` ``
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` `` (Math)
+                    - `` `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH` `` (Math)
+                    - `` `DI_CALCULATION_DIFFICULTY__MATH` ``
                 - *Diagnostic Actions*: Follow general logic. Student **does not** need to identify the topic.
             - **Normal Time & Wrong (`is_normal_time` & `is_correct`==`False`) / Fast & Wrong (`is_relatively_fast` & `is_correct`==`False`):**
                 - *Potential Causes (Diagnostic Parameters)*: 
-                    - `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math - Unfamiliar topic or application error)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (Mainly for fast & wrong)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered)
+                    - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math - Unfamiliar topic or application error)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (Mainly for fast & wrong)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (If SFE triggered)
                 - *Diagnostic Actions*: Follow general logic. Requires student to **identify the Math related topic (refer to list at start of chapter)**.
             - **Fast & Correct (`is_relatively_fast` & `is_correct`==`True`):** Remind to avoid carelessness/flagging; if late in section, ask if rushed.
             - **Normal Time & Correct (`is_normal_time` & `is_correct`==`True`):** N/A
         - **A.2. `Non-Math Related`**
             - **Slow & Wrong (`is_slow` & `is_correct`==`False`):**
                 - *Potential Causes (Diagnostic Parameters)*: 
-                    - `` `DI_READING_COMPREHENSION_ERROR` `` (Sub-classify: Vocabulary / Sentence Structure / Meaning)
-                    - `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math - Internal logical reasoning barrier)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (Sub-classify: Vocabulary / Sentence Structure / Meaning)
+                    - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math - Internal logical reasoning barrier)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (If SFE triggered)
                 - *Diagnostic Actions*: Follow general logic. Ask student to recall if it was a text comprehension or logical judgment issue.
             - **Slow & Correct (`is_slow` & `is_correct`==`True`):**
                 - *Potential Efficiency Bottlenecks (Diagnostic Parameters)*: 
-                    - `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Non-Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math)
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` `` (Non-Math)
+                    - `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math)
                 - *Diagnostic Actions*: Follow general logic.
             - **Normal Time & Wrong (`is_normal_time` & `is_correct`==`False`) / Fast & Wrong (`is_relatively_fast` & `is_correct`==`False`):**
                 - *Potential Causes (Diagnostic Parameters)*: 
-                    - `` `DI_READING_COMPREHENSION_ERROR` `` (Text comprehension omission/error)
-                    - `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math - Internal logical application error)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (Mainly for fast & wrong)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (Text comprehension omission/error)
+                    - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math - Internal logical application error)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (Mainly for fast & wrong)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (If SFE triggered)
                 - *Diagnostic Actions*: Follow general logic, **strongly recommend triggering secondary evidence + qualitative analysis** here.
             - **Fast & Correct (`is_relatively_fast` & `is_correct`==`True`):** Same as A.1 Fast & Correct.
             - **Normal Time & Correct (`is_normal_time` & `is_correct`==`True`):** N/A
@@ -253,42 +257,42 @@
     - **B. Two-Part Analysis (`TPA`)** (Structure same as `DS`, apply general diagnostic action logic)
         - **B.1. `Math Related`**
             - **Slow&Wrong / Slow&Correct / NormalTime&Wrong / Fast&Wrong / Fast&Correct / NormalTime&Correct**
-                - *Potential Causes/Bottlenecks (Diagnostic Parameters)*: Refer to ``DS Math Related`` (`` `DI_READING_COMPREHENSION_ERROR` ``, `` `DI_CONCEPT_APPLICATION_ERROR` ``, `` `DI_CALCULATION_ERROR` ``, `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``, `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Math), `` `DI_EFFICIENCY_BOTTLENECK_CONCEPT` `` (Math), `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` ``).
+                - *Potential Causes/Bottlenecks (Diagnostic Parameters)*: Refer to ``DS Math Related`` (`` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``, `` `DI_CONCEPT_APPLICATION_ERROR__MATH` ``, `` `DI_CALCULATION_ERROR__MATH` ``, `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` ``, `` `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH` ``, `` `DI_CALCULATION_DIFFICULTY__MATH` ``).
                 - *Diagnostic Actions*: Apply general logic, require topic identification **(refer to list at start of chapter)** or bottleneck analysis as appropriate.
         - **B.2. `Non-Math Related`**
             - **Slow&Wrong / Slow&Correct / NormalTime&Wrong / Fast&Wrong / Fast&Correct / NormalTime&Correct**
-                - *Potential Causes/Bottlenecks (Diagnostic Parameters)*: Refer to ``DS Non-Math Related`` (`` `DI_READING_COMPREHENSION_ERROR` ``, `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math), `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``, `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Non-Math), `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math), `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (when fast & wrong)).
+                - *Potential Causes/Bottlenecks (Diagnostic Parameters)*: Refer to ``DS Non-Math Related`` (`` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``, `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math), `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` ``, `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math), `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (when fast & wrong)).
                 - *Diagnostic Actions*: Apply general logic, emphasizing qualitative analysis for normal/fast errors.
 
     - **C. Graph & Table (`GT`)** (Structure same as `DS`/`TPA`, apply general diagnostic action logic)
         - **C.1. `Math Related`**
             - **Slow&Wrong / Slow&Correct / NormalTime&Wrong / Fast&Wrong / Fast&Correct / NormalTime&Correct**
                 - *Potential Causes/Bottlenecks (Diagnostic Parameters)*: 
-                    - `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` ``
-                    - `` `DI_READING_COMPREHENSION_ERROR` `` (Question stem text comprehension)
+                    - `` `DI_GRAPH_INTERPRETATION_ERROR__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_ERROR__TABLE` ``
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (Question stem text comprehension)
                     - `` `DI_DATA_EXTRACTION_ERROR` ``
-                    - `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math - Calculation-related concepts/formulas)
-                    - `` `DI_CALCULATION_ERROR` ``
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` `` (Mainly consider for slow & correct)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` `` (Mainly consider for slow & correct)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (Mainly consider for fast & wrong)
+                    - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math - Calculation-related concepts/formulas)
+                    - `` `DI_CALCULATION_ERROR__MATH` ``
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (If SFE triggered)
+                    - `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` `` (Mainly consider for slow & correct)
+                    - `` `DI_CALCULATION_DIFFICULTY__MATH` `` (Mainly consider for slow & correct)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (Mainly consider for fast & wrong)
                 - *Diagnostic Actions*: Apply general logic, require Math topic **(refer to list at start of chapter)** or chart type identification.
         - **C.2. `Non-Math Related`**
             - **Slow&Wrong / Slow&Correct / NormalTime&Wrong / Fast&Wrong / Fast&Correct / NormalTime&Correct**
                 - *Potential Causes/Bottlenecks (Diagnostic Parameters)*: 
-                    - `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` ``
-                    - `` `DI_READING_COMPREHENSION_ERROR` `` (Question stem text comprehension)
+                    - `` `DI_GRAPH_INTERPRETATION_ERROR__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_ERROR__TABLE` ``
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` (Question stem text comprehension)
                     - `` `DI_INFORMATION_EXTRACTION_INFERENCE_ERROR` `` (Information extraction/inference error)
-                    - `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` `` (Mainly consider for slow & correct)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math) (Mainly consider for slow & correct)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (Mainly consider for fast & wrong)
+                    - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (If SFE triggered)
+                    - `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` `` (Mainly consider for slow & correct)
+                    - `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math) (Mainly consider for slow & correct)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (Mainly consider for fast & wrong)
                 - *Diagnostic Actions*: Apply general logic, emphasizing qualitative analysis for normal/fast errors.
 
     - **D. Multi-Source Reasoning (`MSR`)** (Structure same as above, apply general diagnostic action logic)
-        *Note: "Slow" (`is_slow`) for `MSR` means the question is flagged as `overtime` = `True` (based on the updated definition in Chapter 1, i.e., group overtime or adjusted individual question overtime). Diagnosis needs to consider the overall group situation and individual question performance.*
+        *Note: "Slow" (`is_slow`) for `MSR` means the question is flagged as `overtime` = `True` (based on the updated four-level definition in Chapter 1, i.e., group overtime, reading overtime, adjusted first question overtime, or non-first question overtime). Diagnosis needs to consider the overall group situation and individual question performance.*
 
         - **Independent `MSR` Time Checks (Priority over Slow/Fast/Normal classification):**
             - **Reading Time Check (for the first question of the group):** Calculate `msr_reading_time` (defined in Chapter 0). If `msr_reading_time` > `msr_reading_threshold` (1.5 minutes), trigger specific diagnostic parameter `` `DI_MSR_READING_COMPREHENSION_BARRIER` `` and record diagnostic action: "`MSR` group reading time is long. Ask student to recall source material absorption barrier (Vocabulary, Sentence structure, Domain, Chart, Cross-tab information integration)." Recommend secondary evidence if recall fails.
@@ -299,25 +303,25 @@
             - **Slow & Wrong (`is_slow` & `is_correct`==`False`):**
                 - *Potential Causes (Diagnostic Parameters)*: 
                     - `` `DI_MULTI_SOURCE_INTEGRATION_ERROR` ``
-                    - `` `DI_READING_COMPREHENSION_ERROR` ``
-                    - `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` ``
-                    - `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math)
-                    - `` `DI_CALCULATION_ERROR` ``
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``
+                    - `` `DI_GRAPH_INTERPRETATION_ERROR__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_ERROR__TABLE` ``
+                    - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math)
+                    - `` `DI_CALCULATION_ERROR__MATH` ``
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (If SFE triggered)
                 - *Diagnostic Actions*: Apply general logic, require Math topic identification **(refer to list at start of chapter)**.
             - **Slow & Correct (`is_slow` & `is_correct`==`True`):**
                 - *Potential Efficiency Bottlenecks (Diagnostic Parameters)*: 
-                    - `` `DI_EFFICIENCY_BOTTLENECK_INTEGRATION` ``
-                    - `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` ``
-                    - `` `DI_EFFICIENCY_BOTTLENECK_CONCEPT` `` (Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` ``
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION` ``
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` `` (Math)
+                    - `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` ``
+                    - `` `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH` `` (Math)
+                    - `` `DI_CALCULATION_DIFFICULTY__MATH` ``
                 - *Diagnostic Actions*: Apply general logic. Student **does not** need to identify the topic.
             - **Normal Time & Wrong (`is_normal_time` & `is_correct`==`False`) / Fast & Wrong (`is_relatively_fast` & `is_correct`==`False`):**
                 - *Potential Causes (Diagnostic Parameters)*: 
-                    - `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (Mainly for fast & wrong)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered)
+                    - `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (Mainly for fast & wrong)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (If SFE triggered)
                 - *Diagnostic Actions*: Apply general logic. Requires student to **identify the Math related topic (refer to list at start of chapter)**.
             - **Fast & Correct (`is_relatively_fast` & `is_correct`==`True`):** Same as A.1 Fast & Correct.
             - **Normal Time & Correct (`is_normal_time` & `is_correct`==`True`):** N/A
@@ -325,34 +329,34 @@
             - **Slow & Wrong (`is_slow` & `is_correct`==`False`):**
                 - *Potential Causes (Diagnostic Parameters)*: 
                     - `` `DI_MULTI_SOURCE_INTEGRATION_ERROR` ``
-                    - `` `DI_READING_COMPREHENSION_ERROR` ``
-                    - `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` ``
-                    - `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``
+                    - `` `DI_GRAPH_INTERPRETATION_ERROR__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_ERROR__TABLE` ``
+                    - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math)
                     - `` `DI_QUESTION_TYPE_SPECIFIC_ERROR` `` (MSR Non-Math)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (If SFE triggered)
                 - *Diagnostic Actions*: Apply general logic. Ask student to recall if logical reasoning barrier relates to RC sub-type concepts like `main idea`, `supporting idea`, or `inference`, or perform qualitative analysis.
             - **Slow & Correct (`is_slow` & `is_correct`==`True`):**
                 - *Potential Efficiency Bottlenecks (Diagnostic Parameters)*: 
-                    - `` `DI_EFFICIENCY_BOTTLENECK_INTEGRATION` ``
-                    - `` `DI_EFFICIENCY_BOTTLENECK_READING` `` (Non-Math)
-                    - `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` ``
-                    - `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math)
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION` ``
+                    - `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` `` (Non-Math)
+                    - `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` ``
+                    - `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math)
                 - *Diagnostic Actions*: Apply general logic. Student **does not** need to identify sub-type concepts.
             - **Normal Time & Wrong (`is_normal_time` & `is_correct`==`False`) / Fast & Wrong (`is_relatively_fast` & `is_correct`==`False`):**
                 - *Potential Causes (Diagnostic Parameters)*: 
-                    - `` `DI_READING_COMPREHENSION_ERROR` ``
-                    - `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math)
-                    - `` `DI_CARELESSNESS_DETAIL_OMISSION` `` (Mainly for fast & wrong)
-                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered)
+                    - `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` ``
+                    - `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math)
+                    - `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` (Mainly for fast & wrong)
+                    - `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` (If SFE triggered)
                 - *Diagnostic Actions*: Apply general logic, **strongly recommend triggering secondary evidence + qualitative analysis** here, analyze if related to `main idea`, `supporting idea`, `inference`.
             - **Fast & Correct (`is_relatively_fast` & `is_correct`==`True`):** Same as A.1 Fast & Correct.
             - **Normal Time & Correct (`is_normal_time` & `is_correct`==`True`):** N/A
 
 <aside>
 
-**Chapter Summary:** This chapter detailed the analysis of root causes behind different time-accuracy performance combinations across various question types and content domains, mapping these causes to standardized **English diagnostic parameters**. It defined `special_focus_error` (`` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``) and emphasized its priority. For each scenario, trigger actions were designed, guiding students towards recall or leveraging secondary evidence (with sample size suggestions) and qualitative analysis to confirm specific barriers. A specific time check for MSR reading bottlenecks was also included.
+**Chapter Summary:** This chapter detailed the analysis of root causes behind different time-accuracy performance combinations across various question types and content domains, mapping these causes to standardized **English diagnostic parameters**. It defined `special_focus_error` (`` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``) and emphasized its priority. For each scenario, trigger actions were designed, guiding students towards recall or leveraging secondary evidence (with sample size suggestions) and qualitative analysis to confirm specific barriers. A specific time check for MSR reading bottlenecks was also included.
 
-**Results Destination:** The **English diagnostic parameters** and `special_focus_error` flags generated in this chapter are core inputs for creating targeted practice method recommendations in Chapter 6. The triggered actions directly guide subsequent student reflection and information gathering. The diagnostic findings (represented by **English parameters**) will form the core content of the Chapter 7 summary report (**requiring presentation in natural language based on Appendix A**).
+**Results Destination:** The **English diagnostic parameters** and `special_focus_error` flags generated in this chapter are core inputs for creating targeted practice method recommendations in Chapter 6. The triggered actions directly guide subsequent student reflection and information gathering. The diagnostic findings (represented by **English parameters**) will form the core content of the Chapter 7 summary report (**requiring translation to natural language via Appendix A**).
 
 </aside>
 
@@ -523,7 +527,7 @@
 **3. Core Problem Analysis (Based on Chapter 3)**
 
 *   (Based on the **English diagnostic parameters** generated in Chapter 3, distill the 2-3 main problem areas. For example, point out frequent occurrences of `` `DI_CONCEPT_APPLICATION_ERROR` `` in `Math Related` questions, or that `` `DI_LOGICAL_REASONING_ERROR` `` is the main barrier in `Non-Math Related` `DS` questions.)
-*   (Specifically mention the triggering of `special_focus_error` (`` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``), emphasizing the issue of unstable foundational mastery.)
+*   (Specifically mention the triggering of `special_focus_error` (`` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``), emphasizing the issue of unstable foundational mastery.)
 
 **4. Special Pattern Observation (Based on Chapter 4)**
 
@@ -548,7 +552,7 @@
 
 *   **Diagnostic Understanding Confirmation:**
     *   *General Prompt:* "Please read the report carefully, especially the core problem analysis section. Do you agree with the main issues identified (e.g., the issue described by `` `Parameter X` ``)? Does this align with your experience during the test?"
-    *   *Question regarding `special_focus_error` (`` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``):* "The report indicates errors on some relatively basic questions, suggesting foundational mastery might be unstable. Do you think this is mainly carelessness, or are there genuinely unclear areas in certain basic concepts?"
+    *   *Question regarding `special_focus_error` (`` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` ``):* "The report indicates errors on some relatively basic questions, suggesting foundational mastery might be unstable. Do you think this is mainly carelessness, or are there genuinely unclear areas in certain basic concepts?"
     *   *Question regarding efficiency bottlenecks (e.g., `` `DI_EFFICIENCY_BOTTLENECK_...` ``):* "The report notes longer time spent on some correctly answered questions, possibly due to.... Which situation best describes your problem-solving process at the time?"
 *   **Qualitative Analysis Suggestion:**
     *   *Trigger Condition:* When the student is uncertain about an **English diagnostic parameter** generated in Chapter 3, or needs further confirmation of the root cause.
@@ -561,10 +565,10 @@
     *   *Recommendation List (Based on Diagnostic Parameters):*
 
         * **If diagnosis involves errors in reading comprehension, chart, or data interpretation:**
-            * `` `DI_READING_COMPREHENSION_ERROR` `` →
+            * `` `DI_READING_COMPREHENSION_ERROR__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_ERROR__SYNTAX` ``, `` `DI_READING_COMPREHENSION_ERROR__LOGIC` ``, `` `DI_READING_COMPREHENSION_ERROR__DOMAIN` `` →
                 * **Tool:** `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Close_Reading_Coach.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
                 * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/03_quick_rc_tricks.md` `` , `` `Verbal-related/09_complex_sentence_rewrite.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
-            * `` `DI_GRAPH_TABLE_INTERPRETATION_ERROR` `` →
+            * `` `DI_GRAPH_INTERPRETATION_ERROR__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_ERROR__TABLE` `` →
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/04_problem_pattern.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
             * `` `DI_DATA_EXTRACTION_ERROR` `` (GT) →
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
@@ -572,13 +576,13 @@
                 * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `DI-related/03_msr_info_flow.md` `` (MSR)
 
         * **If diagnosis involves errors in math concepts, calculation, or logic:**
-            * `` `DI_CONCEPT_APPLICATION_ERROR` `` (Math) →
+            * `` `DI_CONCEPT_APPLICATION_ERROR__MATH` `` (Math) →
                 * **Tool:** `Dustin_GMAT_Textbook_Explainer.md`, `Dustin_GMAT_Q_Question_Classifier.md`
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/05_variant_questions.md` ``
-            * `` `DI_LOGICAL_REASONING_ERROR` `` (Non-Math) →
+            * `` `DI_LOGICAL_REASONING_ERROR__NON_MATH` `` (Non-Math) →
                 * **Tool:** `Dustin_GMAT_DI_Non-math_DS_Simulator.md` (if DS), `Dustin_GMAT_Textbook_Explainer.md`
                 * AI Prompt: `` `Verbal-related/01_basic_explanation.md` ``, `` `Verbal-related/02_quick_cr_tpa_tricks.md` `` , `` `Verbal-related/05_evaluate_explanation.md` ``, `` `Verbal-related/07_logical_term_explained.md` ``
-            * `` `DI_CALCULATION_ERROR` `` →
+            * `` `DI_CALCULATION_ERROR__MATH` `` →
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Quant-related/02_quick_math_tricks.md` ``
 
         * **If diagnosis involves MSR specific issues:**
@@ -593,34 +597,32 @@
             * `` `DI_QUESTION_TYPE_SPECIFIC_ERROR` `` →
                 * **Tool:** `Dustin_GMAT_DI_Non-math_DS_Simulator.md` (if DS-NonMath)
                 * AI Prompt: Choose based on specific type, e.g., `` `DI-related/02_quick_g&t_tricks.md` `` (GT), `` `DI-related/03_msr_info_flow.md` `` (MSR).
-            * `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` →
+            * `` `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE` `` →
                 * **Tool:** `Dustin_GMAT_Textbook_Explainer.md`
                 * AI Prompt: **Prioritize** `` `Quant-related/01_basic_explanation.md` `` ; supplement with `` `Quant-related/03_test_math_concepts.md` ``, `` `Quant-related/05_variant_questions.md` ``.
 
         * **If diagnosis involves efficiency bottlenecks:**
-            * `` `DI_EFFICIENCY_BOTTLENECK_READING` `` →
+            * `` `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC` ``, `` `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN` `` →
                 * **Tool:** `Dustin_GMAT_Core_Sentence_Cracker.md`, `Dustin_GMAT_Close_Reading_Coach.md`, `Dustin_GMAT_Chunk_Reading_Coach.md`
                 * AI Prompt: `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
-            * `` `DI_EFFICIENCY_BOTTLENECK_CONCEPT` `` (Math) →
+            * `` `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH` `` (Math) →
                 * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Quant-related/04_problem_pattern.md` ``
-            * `` `DI_EFFICIENCY_BOTTLENECK_CALCULATION` `` →
+            * `` `DI_CALCULATION_DIFFICULTY__MATH` `` →
                 * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``
-            * `` `DI_EFFICIENCY_BOTTLENECK_LOGIC` `` (Non-Math) →
+            * `` `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH` `` (Non-Math) →
                 * AI Prompt: `` `Verbal-related/02_quick_cr_tpa_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
-            * `` `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE` `` →
+            * `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH` ``, `` `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE` `` →
                 * **Tool:** `GMAT_Terminator_DI_Review.md` (if course covers GT)
                 * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `DI-related/02_quick_g&t_tricks.md` ``
-            * `` `DI_EFFICIENCY_BOTTLENECK_INTEGRATION` `` (MSR) →
+            * `` `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION` `` (MSR) →
                 * **Tool:** `GMAT_Terminator_DI_Review.md` (if course covers MSR), `Dustin_GMAT_Chunk_Reading_Coach.md` (if due to slow reading)
                 * AI Prompt: `` `Verbal-related/03_quick_rc_tricks.md` ``, `` `Verbal-related/04_mindmap_passage.md` ``, `` `DI-related/03_msr_info_flow.md` ``, `` `DI-related/04_custom_SOP.md` ``
 
         * **If diagnosis involves behavioral patterns:** 
-            * `` `BEHAVIOR_CARELESSNESS_ISSUE` `` →
+            * `` `DI_BEHAVIOR__CARELESSNESS_ISSUE` `` →
                 * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
-            * `` `BEHAVIOR_EARLY_RUSHING_FLAG_RISK` `` →
+            * `` `DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK` `` →
                 * AI Prompt: `` `Quant-related/02_quick_math_tricks.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
-            * `` `DI_CARELESSNESS_DETAIL_OMISSION` `` →
-                * AI Prompt: `` `Quant-related/01_basic_explanation.md` ``, `` `Verbal-related/05_evaluate_explanation.md` ``
 
         * **General DI Review/Practice:**
             * **Tool:** `GMAT_Terminator_DI_Review.md`
@@ -636,36 +638,122 @@
 
 # **Appendix A: Diagnostic Parameter Tags and Chinese Descriptions**
 
+## Data Insights (DI) Diagnostic Parameters
+
+### Time Performance: Fast & Wrong
+
+* `DI_READING_COMPREHENSION_ERROR__VOCABULARY`: DI 閱讀理解錯誤: 詞彙理解
+* `DI_READING_COMPREHENSION_ERROR__SYNTAX`: DI 閱讀理解錯誤: 句式理解
+* `DI_READING_COMPREHENSION_ERROR__LOGIC`: DI 閱讀理解錯誤: 邏輯理解
+* `DI_READING_COMPREHENSION_ERROR__DOMAIN`: DI 閱讀理解錯誤: 領域理解
+* `DI_GRAPH_INTERPRETATION_ERROR__GRAPH`: DI 圖表解讀錯誤: 圖形信息解讀
+* `DI_GRAPH_INTERPRETATION_ERROR__TABLE`: DI 圖表解讀錯誤: 表格信息解讀
+* `DI_CONCEPT_APPLICATION_ERROR__MATH`: DI 概念應用 (數學) 錯誤: 數學觀念/公式應用
+* `DI_LOGICAL_REASONING_ERROR__NON_MATH`: DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷
+* `DI_CALCULATION_ERROR__MATH`: DI 計算錯誤 (數學): 數學計算
+* `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`: DI 基礎掌握: 應用不穩定 (Special Focus Error)
+* `DI_BEHAVIOR__CARELESSNESS_ISSUE`: DI 行為: 粗心 - 整體快錯率偏高
+* `DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK`: DI 行為: 測驗前期作答過快風險
+
+### Time Performance: Normal Time & Wrong
+
+* `DI_READING_COMPREHENSION_ERROR__VOCABULARY`: DI 閱讀理解錯誤: 詞彙理解
+* `DI_READING_COMPREHENSION_ERROR__SYNTAX`: DI 閱讀理解錯誤: 句式理解
+* `DI_READING_COMPREHENSION_ERROR__LOGIC`: DI 閱讀理解錯誤: 邏輯理解
+* `DI_READING_COMPREHENSION_ERROR__DOMAIN`: DI 閱讀理解錯誤: 領域理解
+* `DI_GRAPH_INTERPRETATION_ERROR__GRAPH`: DI 圖表解讀錯誤: 圖形信息解讀
+* `DI_GRAPH_INTERPRETATION_ERROR__TABLE`: DI 圖表解讀錯誤: 表格信息解讀
+* `DI_CONCEPT_APPLICATION_ERROR__MATH`: DI 概念應用 (數學) 錯誤: 數學觀念/公式應用
+* `DI_LOGICAL_REASONING_ERROR__NON_MATH`: DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷
+* `DI_CALCULATION_ERROR__MATH`: DI 計算錯誤 (數學): 數學計算
+* `DI_MULTI_SOURCE_INTEGRATION_ERROR`: DI 多源整合 (MSR): 跨分頁/來源信息整合障礙
+* `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`: DI 基礎掌握: 應用不穩定 (Special Focus Error)
+
+### Time Performance: Slow & Wrong
+
+* `DI_READING_COMPREHENSION_ERROR__VOCABULARY`: DI 閱讀理解錯誤: 詞彙理解
+* `DI_READING_COMPREHENSION_ERROR__SYNTAX`: DI 閱讀理解錯誤: 句式理解
+* `DI_READING_COMPREHENSION_ERROR__LOGIC`: DI 閱讀理解錯誤: 邏輯理解
+* `DI_READING_COMPREHENSION_ERROR__DOMAIN`: DI 閱讀理解錯誤: 領域理解
+* `DI_GRAPH_INTERPRETATION_ERROR__GRAPH`: DI 圖表解讀錯誤: 圖形信息解讀
+* `DI_GRAPH_INTERPRETATION_ERROR__TABLE`: DI 圖表解讀錯誤: 表格信息解讀
+* `DI_CONCEPT_APPLICATION_ERROR__MATH`: DI 概念應用 (數學) 錯誤: 數學觀念/公式應用
+* `DI_LOGICAL_REASONING_ERROR__NON_MATH`: DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷
+* `DI_CALCULATION_ERROR__MATH`: DI 計算錯誤 (數學): 數學計算
+* `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION`: DI 閱讀理解障礙: 跨分頁/來源信息整合困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY`: DI 閱讀理解障礙: 詞彙理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX`: DI 閱讀理解障礙: 句式理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC`: DI 閱讀理解障礙: 邏輯理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN`: DI 閱讀理解障礙: 領域理解困難
+* `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH`: DI 圖表解讀障礙: 圖形信息解讀困難
+* `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE`: DI 圖表解讀障礙: 表格信息解讀困難
+* `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH`: DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難
+* `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH`: DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難
+* `DI_CALCULATION_DIFFICULTY__MATH`: DI 計算 (數學) 障礙: 數學計算困難
+
+### Time Performance: Slow & Correct
+
+* `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION`: DI 閱讀理解障礙: 跨分頁/來源信息整合困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY`: DI 閱讀理解障礙: 詞彙理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX`: DI 閱讀理解障礙: 句式理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC`: DI 閱讀理解障礙: 邏輯理解困難
+* `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN`: DI 閱讀理解障礙: 領域理解困難
+* `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH`: DI 圖表解讀障礙: 圖形信息解讀困難
+* `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE`: DI 圖表解讀障礙: 表格信息解讀困難
+* `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH`: DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難
+* `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH`: DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難
+* `DI_CALCULATION_DIFFICULTY__MATH`: DI 計算 (數學) 障礙: 數學計算困難
+
+---
+
+## Additional MSR-Specific Parameters
+
+* `DI_MULTI_SOURCE_INTEGRATION_ERROR`: DI 多源整合 (MSR): 跨分頁/來源信息整合錯誤/障礙
+* `DI_MSR_READING_COMPREHENSION_BARRIER`: DI MSR 閱讀障礙: 題組整體閱讀時間過長
+* `DI_DATA_EXTRACTION_ERROR`: DI 數據提取 (GT): 從圖表中提取數據錯誤
+* `DI_INFORMATION_EXTRACTION_INFERENCE_ERROR`: DI 信息提取/推斷 (GT/MSR Non-Math): 信息定位/推斷錯誤
+* `DI_QUESTION_TYPE_SPECIFIC_ERROR`: DI 特定題型障礙 (例如 MSR Non-Math 子題型)
+
+---
+
+## Summary Table Format
+
 | English Parameter                          | Chinese Description (中文描述)                                       |
 |--------------------------------------------|----------------------------------------------------------------------|
 | **DI - Reading & Understanding**           |                                                                      |
-| `DI_READING_COMPREHENSION_ERROR`           | DI 閱讀理解: 文字/題意理解錯誤/障礙 (Math/Non-Math)                  |
-| `DI_GRAPH_TABLE_INTERPRETATION_ERROR`      | DI 圖表解讀: 圖形/表格信息解讀錯誤/障礙                               |
+| `DI_READING_COMPREHENSION_ERROR__VOCABULARY` | DI 閱讀理解錯誤: 詞彙理解                          |
+| `DI_READING_COMPREHENSION_ERROR__SYNTAX`     | DI 閱讀理解錯誤: 句式理解                          |
+| `DI_READING_COMPREHENSION_ERROR__LOGIC`      | DI 閱讀理解錯誤: 邏輯理解                          |
+| `DI_READING_COMPREHENSION_ERROR__DOMAIN`     | DI 閱讀理解錯誤: 領域理解                          |
+| `DI_GRAPH_INTERPRETATION_ERROR__GRAPH`       | DI 圖表解讀錯誤: 圖形信息解讀                      |
+| `DI_GRAPH_INTERPRETATION_ERROR__TABLE`       | DI 圖表解讀錯誤: 表格信息解讀                      |
 | **DI - Concept & Application (Math)**      |                                                                      |
-| `DI_CONCEPT_APPLICATION_ERROR`             | DI 概念應用 (Math): 數學觀念/公式應用錯誤/障礙                       |
+| `DI_CONCEPT_APPLICATION_ERROR__MATH`         | DI 概念應用 (數學) 錯誤: 數學觀念/公式應用         |
 | **DI - Logical Reasoning (Non-Math)**      |                                                                      |
-| `DI_LOGICAL_REASONING_ERROR`               | DI 邏輯推理 (Non-Math): 題目內在邏輯推理/判斷錯誤                    |
+| `DI_LOGICAL_REASONING_ERROR__NON_MATH`       | DI 邏輯推理 (非數學) 錯誤: 題目內在邏輯推理/判斷   |
 | **DI - Data Handling & Calculation**       |                                                                      |
-| `DI_DATA_EXTRACTION_ERROR`                 | DI 數據提取 (GT): 從圖表中提取數據錯誤                                 |
-| `DI_INFORMATION_EXTRACTION_INFERENCE_ERROR`| DI 信息提取/推斷 (GT/MSR Non-Math): 信息定位/推斷錯誤                |
-| `DI_CALCULATION_ERROR`                     | DI 計算: 數學計算錯誤/障礙                                           |
+| `DI_DATA_EXTRACTION_ERROR`                   | DI 數據提取 (GT): 從圖表中提取數據錯誤             |
+| `DI_INFORMATION_EXTRACTION_INFERENCE_ERROR`  | DI 信息提取/推斷 (GT/MSR Non-Math): 信息定位/推斷錯誤 |
+| `DI_CALCULATION_ERROR__MATH`                 | DI 計算錯誤 (數學): 數學計算                       |
 | **DI - MSR Specific**                      |                                                                      |
-| `DI_MULTI_SOURCE_INTEGRATION_ERROR`        | DI 多源整合 (MSR): 跨分頁/來源信息整合錯誤/障礙                      |
-| `DI_MSR_READING_COMPREHENSION_BARRIER`     | DI MSR 閱讀障礙: 題組整體閱讀時間過長                                |
+| `DI_MULTI_SOURCE_INTEGRATION_ERROR`          | DI 多源整合 (MSR): 跨分頁/來源信息整合錯誤/障礙    |
+| `DI_MSR_READING_COMPREHENSION_BARRIER`       | DI MSR 閱讀障礙: 題組整體閱讀時間過長              |
 | **DI - Question Type Specific**            |                                                                      |
-| `DI_QUESTION_TYPE_SPECIFIC_ERROR`          | DI 特定題型障礙 (例如 MSR Non-Math 子題型)                           |
+| `DI_QUESTION_TYPE_SPECIFIC_ERROR`            | DI 特定題型障礙 (例如 MSR Non-Math 子題型)         |
 | **DI - Foundational & Efficiency**         |                                                                      |
-| `DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE`  | DI 基礎掌握: 應用不穩定 (Special Focus Error)                        |
-| `DI_EFFICIENCY_BOTTLENECK_READING`         | DI 效率瓶頸: 閱讀理解耗時 (Math/Non-Math)                            |
-| `DI_EFFICIENCY_BOTTLENECK_CONCEPT`         | DI 效率瓶頸: 概念/公式應用耗時 (Math)                                |
-| `DI_EFFICIENCY_BOTTLENECK_CALCULATION`     | DI 效率瓶頸: 計算耗時                                                |
-| `DI_EFFICIENCY_BOTTLENECK_LOGIC`           | DI 效率瓶頸: 邏輯推理耗時 (Non-Math)                               |
-| `DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE`     | DI 效率瓶頸: 圖表解讀耗時                                            |
-| `DI_EFFICIENCY_BOTTLENECK_INTEGRATION`     | DI 效率瓶頸: 多源信息整合耗時 (MSR)                                  |
+| `DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE`   | DI 基礎掌握: 應用不穩定 (Special Focus Error)      |
+| `DI_READING_COMPREHENSION_DIFFICULTY__VOCABULARY` | DI 閱讀理解障礙: 詞彙理解困難                      |
+| `DI_READING_COMPREHENSION_DIFFICULTY__SYNTAX`     | DI 閱讀理解障礙: 句式理解困難                      |
+| `DI_READING_COMPREHENSION_DIFFICULTY__LOGIC`      | DI 閱讀理解障礙: 邏輯理解困難                      |
+| `DI_READING_COMPREHENSION_DIFFICULTY__DOMAIN`     | DI 閱讀理解障礙: 領域理解困難                      |
+| `DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION` | DI 閱讀理解障礙: 跨分頁/來源信息整合困難           |
+| `DI_GRAPH_INTERPRETATION_DIFFICULTY__GRAPH`       | DI 圖表解讀障礙: 圖形信息解讀困難                  |
+| `DI_GRAPH_INTERPRETATION_DIFFICULTY__TABLE`       | DI 圖表解讀障礙: 表格信息解讀困難                  |
+| `DI_CONCEPT_APPLICATION_DIFFICULTY__MATH`         | DI 概念應用 (數學) 障礙: 數學觀念/公式應用困難     |
+| `DI_LOGICAL_REASONING_DIFFICULTY__NON_MATH`       | DI 邏輯推理 (非數學) 障礙: 題目內在邏輯推理/判斷困難 |
+| `DI_CALCULATION_DIFFICULTY__MATH`                 | DI 計算 (數學) 障礙: 數學計算困難                  |
 | **DI - Behavior**                          |                                                                      |
-| `DI_CARELESSNESS_DETAIL_OMISSION`          | DI 行為: 粗心 - 細節忽略/看錯 (快錯時隱含)                           |
-| **行為模式 (Behavioral Patterns)**       |                                                                      |
-| `BEHAVIOR_CARELESSNESS_ISSUE`              | 行為模式: 粗心 - 整體快錯率偏高 (fast_wrong_rate > 25%)              |
-| `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`         | 行為模式: 測驗前期作答過快風險 (< 1.0 min, 注意 flag for review)     |
+| `DI_BEHAVIOR__CARELESSNESS_ISSUE`            | DI 行為: 粗心 - 整體快錯率偏高 (fast_wrong_rate > 25%) |
+| `DI_BEHAVIOR__EARLY_RUSHING_FLAG_RISK`       | DI 行為: 測驗前期作答過快風險 (< 1.0 min, 注意 flag for review) |
 
 \n\n(End of document)\n\

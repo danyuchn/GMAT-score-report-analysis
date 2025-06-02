@@ -187,24 +187,69 @@
     - **Special Focus Error (`special_focus_error`)**: 
         - *Definition*: An incorrect question (`is_correct` == `False`) whose `question_difficulty` is lower than the `max_correct_difficulty_per_skill`[`skill`] for its corresponding `question_fundamental_skill`.
         - *Flagging*: If the condition is met, flag `special_focus_error` = `True`.
-        - *Priority Handling*: When generating practice recommendations in Chapter 7 and the diagnostic summary in Chapter 8, items flagged with `special_focus_error` = `True` and their corresponding diagnostic parameter (`FOUNDATIONAL_MASTERY_INSTABILITY_SFE`) and recommendations should be **listed first or specially annotated**.
+        - *Priority Handling*: When generating practice recommendations in Chapter 7 and the diagnostic summary in Chapter 8, items flagged with `special_focus_error` = `True` and their corresponding diagnostic parameter (`FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE`) and recommendations should be **listed first or specially annotated**.
+
+🔧 **Future Improvement Mechanism Description**
+
+**Note:** The current SFE judgment mechanism is based on simple difficulty comparison logic. **Future versions may use weighted SFE or contextual awareness SFE judgment mechanisms to improve accuracy and application value**, including but not limited to:
+
+1. **Weighted SFE Mechanism**: Multi-dimensional weighted calculation combining time performance, error frequency, question type characteristics, etc.
+2. **Contextual Awareness SFE**: Considering test context, learning phase, personal learning curve, and other factors
+3. **Dynamic Threshold Adjustment**: Dynamically adjusting SFE trigger conditions based on personal performance history
+4. **Multi-level SFE Classification**: Distinguishing different severity levels of foundational mastery instability
+
+These improvements will be gradually implemented in future versions to provide more precise diagnostic results.
 3.  **Diagnostic Flow and Analysis Points (for valid data questions)**
+
+📋 **Important Note: Diagnostic Label Precision Limitations**
+
+**Note:** The diagnostic parameters listed below represent general possible causes based on time performance and question type classification. **Precise diagnostic labels applicable to individual questions require further determination through student recall and secondary evidence**. The system cannot automatically and precisely diagnose the specific error type for each question based solely on response time and correctness (e.g., whether it's a vocabulary comprehension issue or a logical reasoning problem).
+
+**Recommended Process:**
+1. The system provides diagnostic parameters as **possible ranges**
+2. Combine with student recall of specific difficulties encountered
+3. Refer to secondary evidence or conduct qualitative analysis if necessary
+4. Finally determine the applicable precise diagnostic labels
+
     - Classify and diagnose based on the question's time performance (`is_relatively_fast`, `is_slow`, `is_normal_time`) and correctness (`is_correct`):
     - **1. Fast & Wrong**
         - Classification Criteria: `is_correct` == `False` AND `is_relatively_fast` == `True`.
         - Potential Causes (Diagnostic Parameters) (`CR`):
-            - `` `CR_METHOD_PROCESS_DEVIATION` ``
-            - `` `CR_METHOD_TYPE_SPECIFIC_ERROR` `` (Specify question type)
-            - `` `CR_READING_BASIC_OMISSION` ``
-            - `` `BEHAVIOR_GUESSING_HASTY` `` (If time is extremely short)
+            - `` `CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP` ``
+            - `` `CR_REASONING_ERROR_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` ``
+            - `` `CR_REASONING_ERROR_PREDICTION_DIRECTION` ``
+            - `` `CR_REASONING_ERROR_CORE_ISSUE_IDENTIFICATION` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT` ``
+            - `` `CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION` ``
+            - `` `CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE` `` (Specify question type)
+            - `` `BEHAVIOR_PATTERN_FAST_GUESSING_HASTY` `` (If time is extremely short, single question response time < 0.5 minutes)
         - Potential Causes (Diagnostic Parameters) (`RC`):
-            - `` `RC_READING_INFO_LOCATION_ERROR` ``
-            - `` `RC_READING_KEYWORD_LOGIC_OMISSION` ``
-            - `` `RC_METHOD_TYPE_SPECIFIC_ERROR` `` (Specify question type)
-            - `` `BEHAVIOR_GUESSING_HASTY` `` (If time is extremely short)
+            - `` `RC_READING_COMPREHENSION_ERROR_VOCAB` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING` ``
+            - `` `RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT` ``
+            - `` `RC_LOCATION_SKILL_ERROR_LOCATION` ``
+            - `` `RC_REASONING_ERROR_INFERENCE` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_VOCAB` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_SYNTAX` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_LOGIC` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_DOMAIN` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION` ``
+            - `` `RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING` `` (Specify question type)
+            - `` `BEHAVIOR_PATTERN_FAST_GUESSING_HASTY` `` (If time is extremely short, single question response time < 0.5 minutes)
         - Primary Diagnostic Actions:
             - First, ask the student to recall their thought process or the specific issue encountered.
-            - If the student cannot clearly recall the steps or difficulties, activate secondary evidence analysis: Review the student's recent (2 weeks to 1 month prior) records for fast-but-wrong questions under the same `question_fundamental_skill`. If the sample size is sufficient (recommend >= 10 questions), analyze the specific sub-type with the highest error rate (e.g., `CR Weaken`, `RC Inference`, refer to Chapter 4 for classification).
     - **2. Fast & Correct**
         - Classification Criteria: `is_correct` == `True` AND `suspiciously_fast` == `True` (from Chapter 1 global rules).
         - Observation and Reminder (`CR` & `RC`):
@@ -215,32 +260,41 @@
     - **3. Normal Time & Wrong** 
         - Classification Criteria: `is_correct` == `False` AND `is_normal_time` == `True`.
         - Potential Causes (Diagnostic Parameters) (`CR`):
-            - `` `CR_READING_DIFFICULTY_STEM` ``
-            - `` `CR_QUESTION_UNDERSTANDING_MISINTERPRETATION` ``
-            - `` `CR_REASONING_CHAIN_ERROR` ``
-            - `` `CR_REASONING_ABSTRACTION_DIFFICULTY` ``
-            - `` `CR_REASONING_PREDICTION_ERROR` ``
-            - `` `CR_REASONING_CORE_ISSUE_ID_DIFFICULTY` ``
-            - `` `CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY` ``
-            - `` `CR_AC_ANALYSIS_RELEVANCE_ERROR` ``
-            - `` `CR_AC_ANALYSIS_DISTRACTOR_CONFUSION` ``
-            - `` `CR_METHOD_TYPE_SPECIFIC_ERROR` `` (Specify question type)
-            - `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered, specify the skill involved)
+            - `` `CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP` ``
+            - `` `CR_REASONING_ERROR_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` ``
+            - `` `CR_REASONING_ERROR_PREDICTION_DIRECTION` ``
+            - `` `CR_REASONING_ERROR_CORE_ISSUE_IDENTIFICATION` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT` ``
+            - `` `CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION` ``
+            - `` `CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE` `` (Specify question type)
+            - `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` (If SFE triggered, specify the skill involved)
         - Potential Causes (Diagnostic Parameters) (`RC`):
-            - `` `RC_READING_VOCAB_BOTTLENECK` ``
-            - `` `RC_READING_SENTENCE_STRUCTURE_DIFFICULTY` ``
-            - `` `RC_READING_PASSAGE_STRUCTURE_DIFFICULTY` ``
-            - `` `RC_READING_DOMAIN_KNOWLEDGE_GAP` ``
-            - `` `RC_READING_PRECISION_INSUFFICIENT` ``
-            - `` `RC_READING_INFO_LOCATION_ERROR` ``
-            - `` `RC_READING_KEYWORD_LOGIC_OMISSION` ``
-            - `` `RC_LOCATION_ERROR_INEFFICIENCY` `` 
-            - `` `RC_REASONING_INFERENCE_WEAKNESS` ``
-            - `` `RC_AC_ANALYSIS_DIFFICULTY` ``
-            - `` `RC_METHOD_TYPE_SPECIFIC_ERROR` `` (Specify question type)
-            - `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered, specify the skill involved)
+            - `` `RC_READING_COMPREHENSION_ERROR_VOCAB` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING` ``
+            - `` `RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT` ``
+            - `` `RC_LOCATION_SKILL_ERROR_LOCATION` ``
+            - `` `RC_REASONING_ERROR_INFERENCE` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_VOCAB` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_SYNTAX` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_LOGIC` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_DOMAIN` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION` ``
+            - `` `RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING` `` (Specify question type)
+            - `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` (If SFE triggered, specify the skill involved)
         - Primary Diagnostic Actions:
-            - Check the `special_focus_error` flag; if triggered, prioritize the `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` parameter.
+            - Check the `special_focus_error` flag; if triggered, prioritize the `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` parameter.
             - Ask the student to recall the specific obstacle or reason for the error.
             - If recall is unclear or the reason is uncertain, activate secondary evidence analysis: Review recent records for normally-timed wrong questions under the same `question_fundamental_skill`. If the sample size is sufficient (recommend >= 10 questions), analyze the sub-type with the highest error rate (e.g., `CR Assumption`, `RC Main Idea`, refer to Chapter 4 for classification).
             - Trigger Qualitative Analysis: If the student cannot confirm the obstacle/error corresponding to the diagnostic parameter, and the teacher/consultant cannot narrow down to the most likely cause based on existing info, prompt the student to provide detailed solving steps, verbal walkthroughs, etc., for further analysis.
@@ -251,32 +305,101 @@
     - **5. Slow & Wrong**
         - Classification Criteria: `is_correct` == `False` AND `is_slow` == `True`.
         - Potential Causes (Diagnostic Parameters) (`CR`):
-            - `` `CR_READING_TIME_EXCESSIVE` ``
-            - `` `CR_REASONING_TIME_EXCESSIVE` ``
-            - `` `CR_AC_ANALYSIS_TIME_EXCESSIVE` ``
-            - *(May also include root cause parameters from "Normal Time & Wrong", like `` `CR_REASONING_CHAIN_ERROR` ``, needs judgment based on context)*
-            - `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered, specify the skill involved)
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_VOCAB` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_SYNTAX` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_LOGIC` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_DOMAIN` ``
+            - `` `CR_REASONING_DIFFICULTY_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` ``
+            - `` `CR_REASONING_DIFFICULTY_PREDICTION_DIRECTION_MISSING` ``
+            - `` `CR_REASONING_DIFFICULTY_CORE_ISSUE_IDENTIFICATION` ``
+            - `` `CR_REASONING_DIFFICULTY_CHOICE_RELEVANCE_JUDGEMENT` ``
+            - `` `CR_REASONING_DIFFICULTY_STRONG_DISTRACTOR_CHOICE_ANALYSIS` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_VOCAB` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_SYNTAX` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_LOGIC` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_DOMAIN` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_STEM_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP` ``
+            - `` `CR_REASONING_ERROR_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` ``
+            - `` `CR_REASONING_ERROR_PREDICTION_DIRECTION` ``
+            - `` `CR_REASONING_ERROR_CORE_ISSUE_IDENTIFICATION` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_VOCAB` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_LOGIC` ``
+            - `` `CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN` ``
+            - `` `CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT` ``
+            - `` `CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION` ``
+            - `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` (If SFE triggered, specify the skill involved)
         - Potential Causes (Diagnostic Parameters) (`RC`):
-            - `` `RC_READING_SPEED_SLOW_FOUNDATIONAL` ``
-            - `` `RC_METHOD_INEFFICIENT_READING` ``
-            - `` `RC_LOCATION_TIME_EXCESSIVE` ``
-            - `` `RC_REASONING_TIME_EXCESSIVE` ``
-            - `` `RC_AC_ANALYSIS_TIME_EXCESSIVE` ``
-            - *(May also include root cause parameters from "Normal Time & Wrong", like `` `RC_READING_PASSAGE_STRUCTURE_DIFFICULTY` ``, needs judgment based on context)*
-            - `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` (If SFE triggered, specify the skill involved)
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_VOCAB_BOTTLENECK` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_LONG_DIFFICULT_SENTENCE_ANALYSIS` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_PASSAGE_STRUCTURE_GRASP_UNCLEAR` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_SPECIFIC_DOMAIN_BACKGROUND_KNOWLEDGE_LACK` ``
+            - `` `RC_QUESTION_UNDERSTANDING_DIFFICULTY_FOCUS_POINT_GRASP` ``
+            - `` `RC_LOCATION_SKILL_DIFFICULTY_INEFFICIENCY` ``
+            - `` `RC_REASONING_DIFFICULTY_INFERENCE_SPEED_SLOW` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_VOCAB` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_SYNTAX` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_LOGIC` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS` ``
+            - `` `RC_METHOD_DIFFICULTY_SPECIFIC_QUESTION_TYPE_HANDLING` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_VOCAB` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE` ``
+            - `` `RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING` ``
+            - `` `RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT` ``
+            - `` `RC_LOCATION_SKILL_ERROR_LOCATION` ``
+            - `` `RC_REASONING_ERROR_INFERENCE` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_VOCAB` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_SYNTAX` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_LOGIC` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_DOMAIN` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT` ``
+            - `` `RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION` ``
+            - `` `RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING` ``
+            - `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` (If SFE triggered, specify the skill involved)
         - Primary Diagnostic Actions:
-            - Check the `special_focus_error` flag; if triggered, prioritize the `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` `` parameter.
+            - Check the `special_focus_error` flag; if triggered, prioritize the `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` `` parameter.
             - Ask the student to recall the specific obstacle: Which step took the longest?
             - If the student cannot recall the specific type or obstacle clearly, activate secondary evidence analysis: Review recent records for slow-but-wrong questions under the same `question_fundamental_skill`. If the sample size is sufficient (recommend >= 10 questions), analyze the sub-type with the highest error rate (e.g., `CR Strengthen`, `RC Detail`, refer to Chapter 4 for classification).
             - Trigger Qualitative Analysis: Same trigger conditions as for "Normal Time & Wrong".
     - **6. Slow & Correct**
         - Classification Criteria: `is_correct` == `True` AND `is_slow` == `True`.
         - Potential Causes (Diagnostic Parameters) (`CR` & `RC`):
-            - `` `EFFICIENCY_BOTTLENECK_[AREA]` `` (Specify the bottleneck AREA: READING, REASONING, LOCATION, AC_ANALYSIS)
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_VOCAB` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_SYNTAX` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_LOGIC` ``
+            - `` `CR_STEM_UNDERSTANDING_DIFFICULTY_DOMAIN` ``
+            - `` `CR_REASONING_DIFFICULTY_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` ``
+            - `` `CR_REASONING_DIFFICULTY_PREDICTION_DIRECTION_MISSING` ``
+            - `` `CR_REASONING_DIFFICULTY_CORE_ISSUE_IDENTIFICATION` ``
+            - `` `CR_REASONING_DIFFICULTY_CHOICE_RELEVANCE_JUDGEMENT` ``
+            - `` `CR_REASONING_DIFFICULTY_STRONG_DISTRACTOR_CHOICE_ANALYSIS` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_VOCAB` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_SYNTAX` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_LOGIC` ``
+            - `` `CR_CHOICE_UNDERSTANDING_DIFFICULTY_DOMAIN` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_VOCAB_BOTTLENECK` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_LONG_DIFFICULT_SENTENCE_ANALYSIS` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_PASSAGE_STRUCTURE_GRASP_UNCLEAR` ``
+            - `` `RC_READING_COMPREHENSION_DIFFICULTY_SPECIFIC_DOMAIN_BACKGROUND_KNOWLEDGE_LACK` ``
+            - `` `RC_QUESTION_UNDERSTANDING_DIFFICULTY_FOCUS_POINT_GRASP` ``
+            - `` `RC_LOCATION_SKILL_DIFFICULTY_INEFFICIENCY` ``
+            - `` `RC_REASONING_DIFFICULTY_INFERENCE_SPEED_SLOW` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_VOCAB` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_SYNTAX` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_LOGIC` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT` ``
+            - `` `RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS` ``
+            - `` `RC_METHOD_DIFFICULTY_SPECIFIC_QUESTION_TYPE_HANDLING` ``
             - *(If the question's `question_difficulty` is genuinely high, being slow might be reasonable)*
-        - Primary Diagnostic Actions:
-            - Ask the student to recall the efficiency bottleneck: Although correct, which step took significantly longer than expected?
-            - Trigger Qualitative Analysis: If the student cannot clearly identify the efficiency bottleneck, consider activating qualitative analysis to explore potential speed improvements.
 
 4.  **Auxiliary Diagnostic Tools and Explanations**
     - **Secondary Evidence Application:**
@@ -531,7 +654,7 @@
 **3. Core Problem Diagnosis**
 
 *   (Summarize key findings from Chapter 3 in natural language: **Based on the diagnostic parameters generated (e.g., `` `CR_REASONING_CHAIN_ERROR` ``, `` `RC_READING_SENTENCE_STRUCTURE_DIFFICULTY` ``), use their English descriptions from Appendix A.** Explain the most common error types and reasons in `CR` and `RC`.)
-*   (Prioritize Mention) (If the diagnosis includes `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``, emphasize here: "*Of particular note, errors occurred on some foundational or medium-difficulty questions within mastered skill areas, indicating potential instability in applying these concepts or skills.*")
+*   (Prioritize Mention) (If the diagnosis includes `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` ``, emphasize here: "*Of particular note, errors occurred on some foundational or medium-difficulty questions within mastered skill areas, indicating potential instability in applying these concepts or skills.*")
 
 **4. Pattern Observation**
 
@@ -546,6 +669,7 @@
 *   (Clearly and completely list the **Practice Plan** generated in Chapter 7, aggregated by skill.)
 *   (The plan includes: **Macroscopic Recommendations** for skills triggering the override rule, and **Case-Specific Recommendations** for other identified issues.)
 *   (Case-specific recommendations specify the skill/topic, recommended **Practice Difficulty (Y)**, **Starting Practice Time Limit (Z)**, and the final target time.)
+*   (In the plan, recommendations related to `special_focus_error` (corresponding to parameter `` `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` ``) will be **prioritized or specially annotated** (e.g., with "*Fundamental mastery unstable*").)
 *   (In the plan, recommendations related to `special_focus_error` (corresponding to parameter `` `FOUNDATIONAL_MASTERY_INSTABILITY_SFE` ``) will be **prioritized or specially annotated** (e.g., with "*Fundamental mastery unstable*").)
 *   (The plan includes relevant **Excessive Time Alerts (Volume Alerts)**, indicating the need for sufficient practice volume.)
 *   (If foundational reading ability training was recommended, it will be integrated here.)
@@ -624,58 +748,91 @@
 
 # **Appendix A: Diagnostic Parameter Tags and Descriptions**
 
-| English Parameter                          | Chinese Description (中文描述)                         |
-|--------------------------------------------|----------------------------------------------------|
-| **CR - Reading Comprehension**                |                                                    |
-| `CR_READING_BASIC_OMISSION`                   | CR 閱讀理解: 基礎理解疏漏                           |
-| `CR_READING_DIFFICULTY_STEM`                  | CR 閱讀理解: 題幹理解障礙 (關鍵詞/句式/邏輯/領域)     |
-| `CR_READING_TIME_EXCESSIVE`                   | CR 閱讀理解: 閱讀耗時過長                         |
-| **CR - Question Understanding**               |                                                    |
-| `CR_QUESTION_UNDERSTANDING_MISINTERPRETATION` | CR 題目理解: 提問要求把握錯誤                       |
-| **CR - Reasoning Deficiencies**             |                                                    |
-| `CR_REASONING_CHAIN_ERROR`                    | CR 推理障礙: 邏輯鏈分析錯誤 (前提/結論/關係)           |
-| `CR_REASONING_ABSTRACTION_DIFFICULTY`         | CR 推理障礙: 抽象邏輯/術語理解困難                   |
-| `CR_REASONING_PREDICTION_ERROR`               | CR 推理障礙: 預判方向錯誤或缺失                     |
-| `CR_REASONING_TIME_EXCESSIVE`                 | CR 推理障礙: 邏輯思考耗時過長                     |
-| `CR_REASONING_CORE_ISSUE_ID_DIFFICULTY`       | CR 推理障礙: 核心議題識別困難                       |
-| **CR - Answer Choice Analysis**             |                                                    |
-| `CR_AC_ANALYSIS_UNDERSTANDING_DIFFICULTY`     | CR 選項辨析: 選項本身理解困難                       |
-| `CR_AC_ANALYSIS_RELEVANCE_ERROR`              | CR 選項辨析: 選項相關性判斷錯誤                     |
-| `CR_AC_ANALYSIS_DISTRACTOR_CONFUSION`         | CR 選項辨析: 強干擾選項混淆                         |
-| `CR_AC_ANALYSIS_TIME_EXCESSIVE`               | CR 選項辨析: 選項篩選耗時過長                     |
-| **CR - Method Application**                  |                                                    |
-| `CR_METHOD_PROCESS_DEVIATION`                 | CR 方法應用: 未遵循標準流程                         |
-| `CR_METHOD_TYPE_SPECIFIC_ERROR`               | CR 方法應用: 特定題型方法錯誤/不熟 (需註明題型)       |
-| **RC - Reading Comprehension**                |                                                    |
-| `RC_READING_INFO_LOCATION_ERROR`              | RC 閱讀理解: 關鍵信息定位/理解錯誤                 |
-| `RC_READING_KEYWORD_LOGIC_OMISSION`           | RC 閱讀理解: 忽略關鍵詞/邏輯                       |
-| `RC_READING_VOCAB_BOTTLENECK`                 | RC 閱讀理解: 詞彙量瓶頸                             |
-| `RC_READING_SENTENCE_STRUCTURE_DIFFICULTY`    | RC 閱讀理解: 長難句解析困難                         |
-| `RC_READING_PASSAGE_STRUCTURE_DIFFICULTY`     | RC 閱讀理解: 篇章結構把握不清                       |
-| `RC_READING_DOMAIN_KNOWLEDGE_GAP`             | RC 閱讀理解: 特定領域背景知識缺乏                   |
-| `RC_READING_SPEED_SLOW_FOUNDATIONAL`          | RC 閱讀理解: 閱讀速度慢 (基礎問題)                   |
-| `RC_READING_PRECISION_INSUFFICIENT`           | RC 閱讀精度不足 (精讀/定位問題)                     |
-| **RC - Reading Method**                       |                                                    |
-| `RC_METHOD_INEFFICIENT_READING`               | RC 閱讀方法: 閱讀方法效率低 (過度精讀)               |
-| `RC_METHOD_TYPE_SPECIFIC_ERROR`               | RC 方法應用: 特定題型方法錯誤/不熟 (需註明題型)       |
-| **RC - Question Understanding**               |                                                    |
-| `RC_QUESTION_UNDERSTANDING_MISINTERPRETATION` | RC 題目理解: 提問焦點把握錯誤                       |
-| **RC - Location Skills**                      |                                                    |
-| `RC_LOCATION_ERROR_INEFFICIENCY`              | RC 定位能力: 定位錯誤/效率低下                      |
-| `RC_LOCATION_TIME_EXCESSIVE`                  | RC 定位能力: 定位效率低下 (反覆定位)                 |
-| **RC - Reasoning Deficiencies**             |                                                    |
-| `RC_REASONING_INFERENCE_WEAKNESS`             | RC 推理障礙: 推理能力不足 (預判/細節/語氣)             |
-| `RC_REASONING_TIME_EXCESSIVE`                 | RC 推理障礙: 深度思考耗時過長                     |
-| **RC - Answer Choice Analysis**             |                                                    |
-| `RC_AC_ANALYSIS_DIFFICULTY`                   | RC 選項辨析: 選項理解/辨析困難 (含義/對應)             |
-| `RC_AC_ANALYSIS_TIME_EXCESSIVE`               | RC 選項辨析: 選項篩選耗時過長                     |
-| **Foundational Mastery (CR & RC)**            |                                                    |
-| `FOUNDATIONAL_MASTERY_INSTABILITY_SFE`        | 基礎掌握: 應用不穩定 (Special Focus Error)          |
-| **Efficiency Issues (CR & RC)**               |                                                    |
-| `EFFICIENCY_BOTTLENECK_[AREA]`                | 效率問題: [具體障礙] 導致效率低下 (需指明 Area: READING, REASONING, LOCATION, AC_ANALYSIS)     |
-| **Behavioral Patterns**                       |                                                    |
+| English Parameter (Parameter)                          | Chinese Description (Chinese Description)                         |
+|-----------------------------------------------|----------------------------------------------------|
+| `FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE` | 基礎掌握: 應用不穩定 (Special Focus Error)          |
+| `BEHAVIOR_PATTERN_FAST_GUESSING_HASTY`        | 行為模式: 過快疑似猜題/倉促                     |
+| `DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED`   | 數據無效：用時過短（受時間壓力影響）                  |
+| **CR - Stem Understanding Errors**            | **CR 題幹理解錯誤**                                  |
+| `CR_STEM_UNDERSTANDING_ERROR_QUESTION_REQUIREMENT_GRASP` | CR 題幹理解錯誤：提問要求把握錯誤                 |
+| `CR_STEM_UNDERSTANDING_ERROR_VOCAB`           | CR 題幹理解錯誤：詞彙                             |
+| `CR_STEM_UNDERSTANDING_ERROR_SYNTAX`          | CR 題幹理解錯誤：句式                             |
+| `CR_STEM_UNDERSTANDING_ERROR_LOGIC`           | CR 題幹理解錯誤：邏輯                             |
+| `CR_STEM_UNDERSTANDING_ERROR_DOMAIN`          | CR 題幹理解錯誤：領域                             |
+| **CR - Reasoning Errors**                     | **CR 推理錯誤**                                    |
+| `CR_REASONING_ERROR_LOGIC_CHAIN_ANALYSIS_PREMISE_CONCLUSION_RELATIONSHIP` | CR 推理錯誤: 邏輯鏈分析錯誤 (前提與結論關係)        |
+| `CR_REASONING_ERROR_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` | CR 推理錯誤: 抽象邏輯/術語理解錯誤                  |
+| `CR_REASONING_ERROR_PREDICTION_DIRECTION`     | CR 推理錯誤: 預判方向錯誤                         |
+| `CR_REASONING_ERROR_CORE_ISSUE_IDENTIFICATION` | CR 推理錯誤: 核心議題識別錯誤                      |
+| `CR_REASONING_ERROR_CHOICE_RELEVANCE_JUDGEMENT` | CR 推理錯誤: 選項相關性判斷錯誤                   |
+| `CR_REASONING_ERROR_STRONG_DISTRACTOR_CHOICE_CONFUSION` | CR 推理錯誤: 強干擾選項混淆                       |
+| **CR - Choice Understanding Errors**          | **CR 選項理解錯誤**                                |
+| `CR_CHOICE_UNDERSTANDING_ERROR_VOCAB`         | CR 選項理解錯誤: 選項詞彙理解錯誤                   |
+| `CR_CHOICE_UNDERSTANDING_ERROR_SYNTAX`        | CR 選項理解錯誤: 選項句式理解錯誤                   |
+| `CR_CHOICE_UNDERSTANDING_ERROR_LOGIC`         | CR 選項理解錯誤: 選項邏輯理解錯誤                   |
+| `CR_CHOICE_UNDERSTANDING_ERROR_DOMAIN`        | CR 選項理解錯誤: 選項領域理解錯誤                   |
+| **CR - Specific Question Type Weakness**      | **CR 特定題型弱點**                                |
+| `CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE` | CR 特定題型弱點: (需註明題型)                      |
+| **CR - Stem Understanding Difficulties**      | **CR 題幹理解障礙**                                |
+| `CR_STEM_UNDERSTANDING_DIFFICULTY_VOCAB`      | CR 題幹理解障礙：詞彙                             |
+| `CR_STEM_UNDERSTANDING_DIFFICULTY_SYNTAX`     | CR 題幹理解障礙：句式                             |
+| `CR_STEM_UNDERSTANDING_DIFFICULTY_LOGIC`      | CR 題幹理解障礙：邏輯                             |
+| `CR_STEM_UNDERSTANDING_DIFFICULTY_DOMAIN`     | CR 題幹理解障礙：領域                             |
+| **CR - Reasoning Difficulties**               | **CR 推理障礙**                                    |
+| `CR_REASONING_DIFFICULTY_ABSTRACT_LOGIC_TERMINOLOGY_UNDERSTANDING` | CR 推理障礙: 抽象邏輯/術語理解困難               |
+| `CR_REASONING_DIFFICULTY_PREDICTION_DIRECTION_MISSING` | CR 推理障礙: 預判方向缺失                         |
+| `CR_REASONING_DIFFICULTY_CORE_ISSUE_IDENTIFICATION` | CR 推理障礙: 核心議題識別困難                      |
+| `CR_REASONING_DIFFICULTY_CHOICE_RELEVANCE_JUDGEMENT` | CR 推理障礙: 選項相關性判斷困難                   |
+| `CR_REASONING_DIFFICULTY_STRONG_DISTRACTOR_CHOICE_ANALYSIS` | CR 推理障礙: 強干擾選項辨析困難                   |
+| **CR - Choice Understanding Difficulties**    | **CR 選項理解障礙**                                |
+| `CR_CHOICE_UNDERSTANDING_DIFFICULTY_VOCAB`    | CR 選項理解障礙: 選項詞彙理解困難                   |
+| `CR_CHOICE_UNDERSTANDING_DIFFICULTY_SYNTAX`   | CR 選項理解障礙: 選項句式理解困難                   |
+| `CR_CHOICE_UNDERSTANDING_DIFFICULTY_LOGIC`    | CR 選項理解障礙: 選項邏輯理解困難                   |
+| `CR_CHOICE_UNDERSTANDING_DIFFICULTY_DOMAIN`   | CR 選項理解障礙: 選項領域理解困難                   |
+| **RC - Reading Comprehension Errors**         | **RC 閱讀理解錯誤**                                |
+| `RC_READING_COMPREHENSION_ERROR_VOCAB`        | RC 閱讀理解錯誤: 詞彙理解錯誤                       |
+| `RC_READING_COMPREHENSION_ERROR_LONG_DIFFICULT_SENTENCE_ANALYSIS` | RC 閱讀理解錯誤: 長難句解析錯誤                   |
+| `RC_READING_COMPREHENSION_ERROR_PASSAGE_STRUCTURE` | RC 閱讀理解錯誤: 篇章結構理解錯誤                  |
+| `RC_READING_COMPREHENSION_ERROR_KEY_INFO_LOCATION_UNDERSTANDING` | RC 閱讀理解錯誤: 關鍵信息定位/理解錯誤             |
+| **RC - Question Understanding Errors**        | **RC 題目理解錯誤**                                |
+| `RC_QUESTION_UNDERSTANDING_ERROR_FOCUS_POINT` | RC 題目理解錯誤: 提問焦點理解錯誤                   |
+| **RC - Location Skill Errors**                | **RC 定位能力錯誤**                                |
+| `RC_LOCATION_SKILL_ERROR_LOCATION`            | RC 定位能力錯誤: 定位錯誤                         |
+| **RC - Reasoning Errors**                     | **RC 推理錯誤**                                    |
+| `RC_REASONING_ERROR_INFERENCE`                | RC 推理錯誤: 推理錯誤                             |
+| **RC - Choice Analysis Errors**               | **RC 選項辨析錯誤**                                |
+| `RC_CHOICE_ANALYSIS_ERROR_VOCAB`              | RC 選項辨析錯誤: 選項詞彙理解錯誤                   |
+| `RC_CHOICE_ANALYSIS_ERROR_SYNTAX`             | RC 選項辨析錯誤: 選項句式理解錯誤                   |
+| `RC_CHOICE_ANALYSIS_ERROR_LOGIC`              | RC 選項辨析錯誤: 選項邏輯理解錯誤                   |
+| `RC_CHOICE_ANALYSIS_ERROR_DOMAIN`             | RC 選項辨析錯誤: 選項領域理解錯誤                   |
+| `RC_CHOICE_ANALYSIS_ERROR_RELEVANCE_JUDGEMENT` | RC 選項辨析錯誤: 選項相關性判斷錯誤                 |
+| `RC_CHOICE_ANALYSIS_ERROR_STRONG_DISTRACTOR_CONFUSION` | RC 選項辨析錯誤: 強干擾選項混淆                     |
+| **RC - Method Errors**                        | **RC 方法錯誤**                                    |
+| `RC_METHOD_ERROR_SPECIFIC_QUESTION_TYPE_HANDLING` | RC 方法錯誤: 特定題型處理錯誤                      |
+| **RC - Reading Comprehension Difficulties**   | **RC 閱讀理解障礙**                                |
+| `RC_READING_COMPREHENSION_DIFFICULTY_VOCAB_BOTTLENECK` | RC 閱讀理解障礙: 詞彙量瓶頸                       |
+| `RC_READING_COMPREHENSION_DIFFICULTY_LONG_DIFFICULT_SENTENCE_ANALYSIS` | RC 閱讀理解障礙: 長難句解析困難                 |
+| `RC_READING_COMPREHENSION_DIFFICULTY_PASSAGE_STRUCTURE_GRASP_UNCLEAR` | RC 閱讀理解障礙: 篇章結構把握不清                |
+| `RC_READING_COMPREHENSION_DIFFICULTY_SPECIFIC_DOMAIN_BACKGROUND_KNOWLEDGE_LACK` | RC 閱讀理解障礙: 特定領域背景知識缺乏             |
+| **RC - Question Understanding Difficulties**  | **RC 題目理解障礙**                                |
+| `RC_QUESTION_UNDERSTANDING_DIFFICULTY_FOCUS_POINT_GRASP` | RC 題目理解障礙: 提問焦點把握困難                 |
+| **RC - Location Skill Difficulties**          | **RC 定位能力障礙**                                |
+| `RC_LOCATION_SKILL_DIFFICULTY_INEFFICIENCY`   | RC 定位能力障礙: 定位效率低下                     |
+| **RC - Reasoning Difficulties**               | **RC 推理障礙**                                    |
+| `RC_REASONING_DIFFICULTY_INFERENCE_SPEED_SLOW` | RC 推理障礙: 推理速度緩慢                        |
+| **RC - Choice Analysis Difficulties**         | **RC 選項辨析障礙**                                |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_VOCAB`         | RC 選項辨析障礙: 選項詞彙理解困難                   |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_SYNTAX`        | RC 選項辨析障礙: 選項句式理解困難                   |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_LOGIC`         | RC 選項辨析障礙: 選項邏輯理解困難                   |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_DOMAIN`        | RC 選項辨析障礙: 選項領域理解困難                   |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_RELEVANCE_JUDGEMENT` | RC 選項辨析障礙: 選項相關性判斷困難               |
+| `RC_CHOICE_ANALYSIS_DIFFICULTY_STRONG_DISTRACTOR_ANALYSIS` | RC 選項辨析障礙: 強干擾選項辨析困難                 |
+| **RC - Method Difficulties**                  | **RC 方法障礙**                                    |
+| `RC_METHOD_DIFFICULTY_SPECIFIC_QUESTION_TYPE_HANDLING` | RC 方法障礙: 特定題型處理困難                    |
+| **Behavioral Patterns (Not in summary but defined in Chapter 5)** | **行為模式 (摘要中未包含但在第五章定義)**                 |
 | `BEHAVIOR_EARLY_RUSHING_FLAG_RISK`            | 行為模式: 前期作答過快 (< 1.0 min, 注意 flag for review 風險) |
 | `BEHAVIOR_CARELESSNESS_ISSUE`                 | 行為模式: 粗心問題 (快而錯比例 > 25%)                    |
-| `BEHAVIOR_GUESSING_HASTY`                     | 行為模式: 過快疑似猜題/倉促                     |
+| **Efficiency Issues (Not in summary but defined in Chapter 3)** | **效率問題 (摘要中未包含但在第三章定義)**                 |
+| `EFFICIENCY_BOTTLENECK_[AREA]`                | 效率問題: [具體障礙] 導致效率低下 (需指明 Area: READING, REASONING, LOCATION, AC_ANALYSIS)     |
 
 (End of document)

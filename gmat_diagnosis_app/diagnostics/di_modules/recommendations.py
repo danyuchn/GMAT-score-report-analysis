@@ -53,8 +53,19 @@ def generate_di_recommendations(df_diagnosed, override_results, domain_tags, tim
             q_type, domain = name
             if pd.isna(q_type) or pd.isna(domain): continue # Skip if type or domain is NaN
 
-            # Check if all questions in this group are correct and not overtime
-            if not group_df.empty and not ((group_df['is_correct'] == False) | (group_df['overtime'] == True)).any():
+            # 按照文檔第五章標準：首先篩選有效題目
+            valid_questions = group_df[group_df.get('is_invalid', False) == False]
+            if valid_questions.empty:
+                continue  # 如果沒有有效題目，跳過此組合
+            
+            # 條件一：所有有效題目必須全部正確 
+            condition1_all_correct = valid_questions['is_correct'].all()
+            
+            # 條件二：所有有效題目必須全部無超時
+            condition2_no_overtime = ~valid_questions['overtime'].any()
+            
+            # 同時滿足兩個條件才豁免
+            if condition1_all_correct and condition2_no_overtime:
                 exempted_type_domain_combinations.add((q_type, domain))
 
     # Macro Recommendations
@@ -135,14 +146,27 @@ def generate_di_recommendations(df_diagnosed, override_results, domain_tags, tim
                         # Calculate max_z_minutes for MSR using group logic
                         if 'msr_group_id' in group_df.columns and 'msr_group_total_time' in df_diagnosed.columns:
                             triggering_group_ids = group_df['msr_group_id'].unique()
-                            group_times = df_diagnosed[df_diagnosed['msr_group_id'].isin(triggering_group_ids)]['msr_group_total_time']
-                            if group_times.notna().any():
-                                max_group_time_minutes = group_times.max()
-                                if pd.notna(max_group_time_minutes):
-                                    calculated_z_agg = math.floor(max_group_time_minutes * 2) / 2.0
-                                    max_z_minutes = max(calculated_z_agg, 6.0) # Apply 6.0 min floor
-                                else: max_z_minutes = 6.0
-                            else: max_z_minutes = 6.0
+                            # 過濾掉NaN的group_id
+                            triggering_group_ids = [gid for gid in triggering_group_ids if pd.notna(gid)]
+                            
+                            if triggering_group_ids:
+                                group_times = df_diagnosed[df_diagnosed['msr_group_id'].isin(triggering_group_ids)]['msr_group_total_time']
+                                valid_group_times = group_times.dropna()
+                                
+                                if len(valid_group_times) > 0:
+                                    max_group_time_minutes = valid_group_times.max()
+                                    if pd.notna(max_group_time_minutes) and max_group_time_minutes > 0:
+                                        calculated_z_agg = math.floor(max_group_time_minutes * 2) / 2.0
+                                        max_z_minutes = max(calculated_z_agg, 6.0) # Apply 6.0 min floor
+                                    else: 
+                                        logging.warning(f"[DI Case Reco MSR] Invalid max_group_time_minutes for MSR ({q_type}, {domain}). Defaulting Z to 6.0 min.")
+                                        max_z_minutes = 6.0
+                                else: 
+                                    logging.warning(f"[DI Case Reco MSR] No valid group times found for MSR ({q_type}, {domain}). Defaulting Z to 6.0 min.")
+                                    max_z_minutes = 6.0
+                            else:
+                                logging.warning(f"[DI Case Reco MSR] No valid group IDs found for MSR ({q_type}, {domain}). Defaulting Z to 6.0 min.")
+                                max_z_minutes = 6.0
                         else: 
                             logging.warning(f"[DI Case Reco MSR] Missing msr_group_id or msr_group_total_time for MSR ({q_type}, {domain}). Defaulting Z to 6.0 min.")
                             max_z_minutes = 6.0

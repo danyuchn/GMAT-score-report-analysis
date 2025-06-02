@@ -510,6 +510,14 @@ def process_question_type(q_type_df, q_type, avg_times, max_diffs, ch1_threshold
         )
         processed_df.at[idx, 'time_performance_category'] = time_category
         
+        # Special MSR reading time check (independent of other diagnostic logic)
+        if q_type == 'Multi-source reasoning' and row.get('is_first_msr_q', False):
+            msr_reading_time = row.get('msr_reading_time', 0)
+            if pd.notna(msr_reading_time) and msr_reading_time > 1.5:  # MSR_READING_THRESHOLD
+                msr_reading_tag = 'DI_MSR_READING_COMPREHENSION_BARRIER'
+                if msr_reading_tag not in current_params:
+                    current_params.append(msr_reading_tag)
+        
         # Only process diagnostic logic for VALID rows
         if not is_invalid:
             # 1. Check for Systematic Foundational Error (SFE)
@@ -521,7 +529,7 @@ def process_question_type(q_type_df, q_type, avg_times, max_diffs, ch1_threshold
                 
                 if pd.notna(max_correct_diff) and q_difficulty < max_correct_diff:
                     processed_df.at[idx, 'is_sfe'] = True
-                    sfe_tag = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE'
+                    sfe_tag = 'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE'
                     if sfe_tag not in current_params:
                         current_params.insert(0, sfe_tag)
             
@@ -751,10 +759,10 @@ def calculate_override_conditions(processed_df, q_type):
     overtime_rate = overtime_count / total_valid if total_valid > 0 else 0.0
     
     # Check override thresholds
-    error_threshold = 0.4  # 40%
-    overtime_threshold = 0.3  # 30%
+    override_threshold_error = 0.5  # 50%
+    override_threshold_overtime = 0.5  # 50%
     
-    if error_rate >= error_threshold or overtime_rate >= overtime_threshold:
+    if error_rate >= override_threshold_error or overtime_rate >= override_threshold_overtime:
         override_info['override_triggered'] = True
         override_info['triggering_error_rate'] = error_rate
         override_info['triggering_overtime_rate'] = overtime_rate
@@ -912,8 +920,8 @@ def check_foundation_override(df, type_metrics):
         overtime_rate = valid_df['overtime'].mean()
         
         # Override threshold logic (simplified)
-        override_threshold_error = 0.4  # 40%
-        override_threshold_overtime = 0.3  # 30%
+        override_threshold_error = 0.5  # 50%
+        override_threshold_overtime = 0.5  # 50%
         
         override_triggered = (error_rate >= override_threshold_error or 
                             overtime_rate >= override_threshold_overtime)
