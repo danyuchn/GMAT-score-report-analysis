@@ -419,7 +419,7 @@ Correct:
 ### 修復內容:
 
 **1. 實現完整的 `process_question_type` 函數**:
-✅ 添加時間表現分類計算邏輯 (Fast & Wrong, Slow & Correct等)
+✅ 添加時間表現分類計算邏輯 (Fast & Wrong, Normal Time & Wrong, Slow & Wrong, Slow & Correct等)
 ✅ 實現SFE (Systematic Foundational Error) 檢測
 ✅ 添加基於時間和難度的診斷參數分配
 
@@ -930,4 +930,100 @@ if triggering_group_ids:
 - 豁免規則按照文檔標準先篩選有效題目，再檢查兩個條件
 - MSR錯誤處理增加NaN過濾、數據有效性檢查、詳細警告
 - 保持6.0分鐘的默認回退值，確保MSR建議生成不會失敗
-</rewritten_file>
+
+## 三科診斷報告語言切換即時更新修復 (2025-01-30)
+
+**Status: COMPLETED ✅**
+
+Successfully implemented real-time language switching for diagnostic reports in all three subjects (Q, V, DI).
+
+### 問題描述:
+用戶反映三個科目的文字診斷報告在i18n語言切換後沒有即時更新，需要重新生成報告才會顯示新語言。
+
+### 根本原因:
+診斷報告的內容在分析完成時生成為完整的文字字符串，並存儲在`st.session_state.report_dict`中。這些內容是固定字符串而非動態翻譯鍵，因此語言切換時不會自動更新。
+
+### 修復過程:
+
+**1. 創建報告重新生成機制**
+
+在`gmat_diagnosis_app/utils/report_regeneration.py`中實現了完整的報告重新生成邏輯：
+
+Mistake: 診斷報告使用固定文字存儲，語言切換時不會更新
+Wrong:
+```python
+# 語言切換時只更新i18n系統，報告內容不變
+if selected_language != current_lang:
+    st.session_state.current_language = selected_language
+    set_language(selected_language)
+    st.rerun()
+```
+
+Correct:
+```python
+# 語言切換時重新生成診斷報告
+if selected_language != current_lang:
+    st.session_state.current_language = selected_language
+    set_language(selected_language)
+    
+    # Re-generate diagnostic reports if analysis is complete
+    if st.session_state.get("diagnosis_complete", False) and st.session_state.get("processed_df") is not None:
+        from gmat_diagnosis_app.utils.report_regeneration import regenerate_reports_for_language_switch
+        regenerate_reports_for_language_switch()
+    
+    st.rerun()
+```
+
+**2. 實現完整的重新生成函數**
+
+```python
+def regenerate_reports_for_language_switch():
+    """
+    Regenerate diagnostic reports when language is switched.
+    Re-runs the diagnosis logic on existing processed data to get reports in the new language.
+    """
+    # 重新獲取處理過的數據
+    df_final = st.session_state.get("processed_df")
+    
+    # 恢復時間壓力設定
+    time_pressure_map = {}
+    for subject in SUBJECTS:
+        time_pressure_key = f"{subject.lower()}_time_pressure"
+        # ... 恢復邏輯 ...
+    
+    # 重新生成每個科目的報告
+    temp_report_dict = {}
+    for subject in SUBJECTS:
+        if subject == 'Q':
+            subj_results, subj_report, df_subj_diagnosed = diagnose_q(df_subj)
+        elif subject == 'DI':
+            subj_results, subj_report, df_subj_diagnosed = run_di_diagnosis_processed(df_subj, time_pressure)
+        elif subject == 'V':
+            subj_results, subj_report, df_subj_diagnosed = run_v_diagnosis_processed(df_subj, time_pressure, v_avg_time_per_type)
+        
+        temp_report_dict[subject] = final_report_for_subject
+    
+    # 更新session state
+    st.session_state.report_dict = temp_report_dict
+    
+    # 重新生成AI綜合報告（如有）
+    if st.session_state.get('master_key'):
+        consolidated_report = generate_ai_consolidated_report(temp_report_dict, st.session_state.master_key)
+        st.session_state.consolidated_report = consolidated_report
+```
+
+### 修復效果:
+1. ✅ 三個科目診斷報告支持即時語言切換
+2. ✅ 語言切換時自動重新生成報告內容
+3. ✅ 保持原有診斷邏輯和數據完整性
+4. ✅ AI綜合報告也會重新生成（如適用）
+5. ✅ 用戶體驗改善：無需重新分析即可看到新語言報告
+
+### 技術實現:
+- 在語言切換邏輯中檢測是否已有診斷結果
+- 如有結果則調用報告重新生成函數
+- 重新生成過程復用原有診斷邏輯，確保一致性
+- 保持時間壓力設定和其他分析參數
+- 支持OpenAI報告總結功能的重新生成
+
+**用戶影響:** 現在用戶可以在查看結果時隨時切換語言，診斷報告會立即以新語言顯示，大幅提升了多語言使用體驗。

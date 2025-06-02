@@ -597,6 +597,12 @@ def main():
             from gmat_diagnosis_app.i18n import set_language
             set_language(selected_language)
             
+            # Re-generate diagnostic reports if analysis is complete
+            if st.session_state.get("diagnosis_complete", False) and st.session_state.get("processed_df") is not None:
+                # Import the regeneration function
+                from gmat_diagnosis_app.utils.report_regeneration import regenerate_reports_for_language_switch
+                regenerate_reports_for_language_switch()
+            
             success_msg = translate('language_updated') + " / Language updated!" if selected_language == 'zh-TW' else "Language updated! / " + translate('language_updated')
             st.success(success_msg)
             st.rerun()  # Trigger rerun to apply language changes
