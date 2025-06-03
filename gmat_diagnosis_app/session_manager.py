@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 from gmat_diagnosis_app.i18n import set_language, get_language, translate as t
 from gmat_diagnosis_app.utils.secondary_evidence_utils import generate_dynamic_secondary_evidence_suggestions
+import logging
 
 def init_session_state():
     """Initialize session state variables with default values"""
@@ -63,7 +64,6 @@ def init_session_state():
     if 'chat_history' in st.session_state and 'chat_history_backup' in st.session_state:
         # 如果備份中有更多消息，使用備份恢復
         if len(st.session_state.chat_history_backup) > len(st.session_state.chat_history):
-            import logging
             logging.info(f"從備份恢復聊天歷史 (備份長度: {len(st.session_state.chat_history_backup)}, 當前長度: {len(st.session_state.chat_history)})")
             st.session_state.chat_history = st.session_state.chat_history_backup.copy()
     
@@ -111,7 +111,6 @@ def ensure_chat_history_persistence():
         
     # 如果備份存在且比當前歷史更長，則恢復備份
     if 'chat_history_backup' in st.session_state and len(st.session_state.chat_history_backup) > len(st.session_state.chat_history):
-        import logging
         logging.info(f"恢復聊天歷史: 從備份中恢復了 {len(st.session_state.chat_history_backup)} 條消息")
         st.session_state.chat_history = st.session_state.chat_history_backup.copy()
     
@@ -148,6 +147,79 @@ def check_global_diagnostic_tag_warning(processed_df):
     valid_df = processed_df.copy()
     if 'is_invalid' in processed_df.columns:
         valid_df = processed_df[~processed_df['is_invalid'].fillna(False)]
+    
+    if valid_df.empty:
+        return warning_info
+    
+    total_questions = len(valid_df)
+    total_tags = 0
+    
+    # Count diagnostic tags per question
+    for _, row in valid_df.iterrows():
+        tags = row.get('diagnostic_params_list', '')
+        if isinstance(tags, list):
+            # If it's already a list, count non-empty items
+            tag_count = len([tag for tag in tags if tag and str(tag).strip()])
+            total_tags += tag_count
+        elif isinstance(tags, str) and tags.strip():
+            # If it's a string, split by comma and count non-empty tags
+            tag_count = len([tag.strip() for tag in tags.split(',') if tag.strip()])
+            total_tags += tag_count
+    
+    # Calculate average tags per question
+    avg_tags_per_question = total_tags / total_questions if total_questions > 0 else 0
+    
+    warning_info.update({
+        'avg_tags_per_question': avg_tags_per_question,
+        'total_questions': total_questions,
+        'total_tags': total_tags
+    })
+    
+    # Check if warning should be triggered (average > 3 tags per question)
+    if avg_tags_per_question > 3.0:
+        warning_info['triggered'] = True
+        
+        # Generate dynamic subject-specific secondary evidence suggestions
+        # based on actual diagnostic parameters instead of hardcoded translations
+        dynamic_suggestions = generate_dynamic_secondary_evidence_suggestions(valid_df)
+        warning_info['secondary_evidence_suggestions'] = dynamic_suggestions
+    
+    return warning_info
+
+def check_global_diagnostic_tag_warning_realtime():
+    """
+    實時檢查診斷標籤警告，優先使用修剪後的editable_diagnostic_df
+    如果不存在則使用原始的processed_df
+    
+    Returns:
+        dict: Warning information including trigger status and suggestions
+    """
+    warning_info = {
+        'triggered': False,
+        'avg_tags_per_question': 0.0,
+        'total_questions': 0,
+        'total_tags': 0,
+        'secondary_evidence_suggestions': {}
+    }
+    
+    # 優先使用修剪後的診斷數據表
+    if hasattr(st.session_state, 'editable_diagnostic_df') and st.session_state.editable_diagnostic_df is not None and not st.session_state.editable_diagnostic_df.empty:
+        df_to_check = st.session_state.editable_diagnostic_df
+        logging.info("使用修剪後的診斷數據計算警告標準")
+    elif st.session_state.processed_df is not None and not st.session_state.processed_df.empty:
+        df_to_check = st.session_state.processed_df
+        logging.info("使用原始診斷數據計算警告標準")
+    else:
+        return warning_info
+    
+    # Check if diagnostic_params_list column exists
+    if 'diagnostic_params_list' not in df_to_check.columns:
+        return warning_info
+    
+    # Filter out invalid data (questions marked as invalid)
+    valid_df = df_to_check.copy()
+    if 'is_invalid' in df_to_check.columns:
+        valid_df = df_to_check[~df_to_check['is_invalid'].fillna(False)]
     
     if valid_df.empty:
         return warning_info

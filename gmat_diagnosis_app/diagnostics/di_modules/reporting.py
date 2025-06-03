@@ -304,115 +304,115 @@ def generate_di_summary_report(di_results):
     report_lines.append("")
 
 
-    # --- IV. 後續行動與深度反思指引 ---
-    report_lines.append(f"**{t('subsequent_action_and_reflection_guide')}**")
-    report_lines.append("")
+    # --- IV. 後續行動與深度反思指引 --- (暫時註解掉不顯示)
+    # report_lines.append(f"**{t('subsequent_action_and_reflection_guide')}**")
+    # report_lines.append("")
 
-    # A. 檢視練習記錄 (二級證據參考)
-    report_lines.append(f"* **A. {t('review_practice_record_secondary_evidence')}**")
-    if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
-        report_lines.append(f"    * {t('di_review_practice_purpose')}")
-        report_lines.append(f"    * {t('di_review_practice_method')}")
+    # # A. 檢視練習記錄 (二級證據參考)
+    # report_lines.append(f"* **A. {t('review_practice_record_secondary_evidence')}**")
+    # if diagnosed_df is not None and not diagnosed_df.empty and 'is_correct' in diagnosed_df and 'overtime' in diagnosed_df:
+    #     report_lines.append(f"    * {t('di_review_practice_purpose')}")
+    #     report_lines.append(f"    * {t('di_review_practice_method')}")
 
-        core_issue_texts_for_review = []
-        if sfe_triggered: core_issue_texts_for_review.append(t(sfe_code))
-        if 'top_other_params_codes' in locals() and top_other_params_codes: # Use already defined list
-             core_issue_texts_for_review.extend([t(p) for p in top_other_params_codes])
+    #     core_issue_texts_for_review = []
+    #     if sfe_triggered: core_issue_texts_for_review.append(t(sfe_code))
+    #     if 'top_other_params_codes' in locals() and top_other_params_codes: # Use already defined list
+    #          core_issue_texts_for_review.extend([t(p) for p in top_other_params_codes])
         
-        # Generate review guidance text
-        filtered_core_issues_for_review = [issue for issue in core_issue_texts_for_review if issue != t('di_invalid_data_tag')]
+    #     # Generate review guidance text
+    #     filtered_core_issues_for_review = [issue for issue in core_issue_texts_for_review if issue != t('di_invalid_data_tag')]
 
-        if filtered_core_issues_for_review:
-             report_lines.append(f"    * **{t('key_focus')}：** {t('review_focus_core_issues')}")
-             for issue in filtered_core_issues_for_review:
-                 report_lines.append(f"        * {issue}")
-        else:
-            report_lines.append(f"    * **{t('key_focus')}：** {t('review_focus_general_errors')}")
+    #     if filtered_core_issues_for_review:
+    #          report_lines.append(f"    * **{t('key_focus')}：** {t('review_focus_core_issues')}")
+    #          for issue in filtered_core_issues_for_review:
+    #              report_lines.append(f"        * {issue}")
+    #     else:
+    #         report_lines.append(f"    * **{t('key_focus')}：** {t('review_focus_general_errors')}")
 
-        report_lines.append(f"    * **{t('note')}：** {t('insufficient_sample_note')}")
-    else:
-        report_lines.append(f"    * {t('no_secondary_evidence_needed')}")
-    report_lines.append("")
-
-
-    # B. 引導性反思提示 (針對特定題型與表現)
-    report_lines.append(f"* **B. {t('guided_reflection_prompts_specific')}**")
-    reflection_prompts_data = [] # Store tuples of (time_perf, domain, q_type, params_by_category)
-
-    if diagnosed_df is not None and not diagnosed_df.empty:
-        valid_df_reflection = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy() # Renamed
-        problem_df_reflection = valid_df_reflection[
-            (valid_df_reflection['is_correct'] == False) | (valid_df_reflection['overtime'] == True)
-        ].copy() # Renamed
-
-        required_cols = ['question_type', 'content_domain', 'time_performance_category', 'diagnostic_params']
-        if all(col in problem_df_reflection.columns for col in required_cols) and not problem_df_reflection.empty:
-            # Ensure consistent sorting for reproducibility if needed, though order might not matter for final output
-            # sorted_problem_df = problem_df_reflection.sort_values(by=['content_domain', 'question_type', 'time_performance_category'])
-            # combined_groups = sorted_problem_df.groupby(['time_performance_category', 'content_domain', 'question_type'], sort=False)
-            combined_groups = problem_df_reflection.groupby(['time_performance_category', 'content_domain', 'question_type'])
+    #     report_lines.append(f"    * **{t('note')}：** {t('insufficient_sample_note')}")
+    # else:
+    #     report_lines.append(f"    * {t('no_secondary_evidence_needed')}")
+    # report_lines.append("")
 
 
-            for (time_perf, domain, q_type), group in combined_groups:
-                if time_perf in ['Normal Time & Correct', 'Fast & Correct', t('Normal Time & Correct'), t('Fast & Correct')]: # Check both Eng and Zh
-                    continue
+    # # B. 引導性反思提示 (針對特定題型與表現)
+    # report_lines.append(f"* **B. {t('guided_reflection_prompts_specific')}**")
+    # reflection_prompts_data = [] # Store tuples of (time_perf, domain, q_type, params_by_category)
 
-                all_diagnostic_params_group = [] # Renamed
-                for params_list in group['diagnostic_params']:
-                    if isinstance(params_list, list):
-                        all_diagnostic_params_group.extend(p for p in params_list if p != t('di_invalid_data_tag')) # Filter invalid tag
+    # if diagnosed_df is not None and not diagnosed_df.empty:
+    #     valid_df_reflection = diagnosed_df[~diagnosed_df.get('is_invalid', False)].copy() # Renamed
+    #     problem_df_reflection = valid_df_reflection[
+    #         (valid_df_reflection['is_correct'] == False) | (valid_df_reflection['overtime'] == True)
+    #     ].copy() # Renamed
 
-                if all_diagnostic_params_group:
-                    unique_params = sorted(list(set(all_diagnostic_params_group))) # Sort for consistent order
-                    params_by_category = {}
-                    # Use DI_PARAM_CATEGORY_ORDER for sorting categories
-                    for category_eng in DI_PARAM_CATEGORY_ORDER:
-                        params_in_cat = []
-                        for param in unique_params:
-                            if DI_PARAM_TO_CATEGORY.get(param) == category_eng:
-                                params_in_cat.append(param)
-                        if params_in_cat:
-                             # Ensure params within a category are also sorted if desired
-                            params_by_category[t(category_eng)] = sorted([t(p) for p in params_in_cat])
+    #     required_cols = ['question_type', 'content_domain', 'time_performance_category', 'diagnostic_params']
+    #     if all(col in problem_df_reflection.columns for col in required_cols) and not problem_df_reflection.empty:
+    #         # Ensure consistent sorting for reproducibility if needed, though order might not matter for final output
+    #         # sorted_problem_df = problem_df_reflection.sort_values(by=['content_domain', 'question_type', 'time_performance_category'])
+    #         # combined_groups = sorted_problem_df.groupby(['time_performance_category', 'content_domain', 'question_type'], sort=False)
+    #         combined_groups = problem_df_reflection.groupby(['time_performance_category', 'content_domain', 'question_type'])
 
 
-                    if params_by_category: # Only add if there are categorized params
-                         reflection_prompts_data.append({
-                            "time_perf_zh": t(time_perf),
-                            "domain_zh": t(domain),
-                            "q_type_zh": t(q_type),
-                            "categories": params_by_category
-                        })
+    #         for (time_perf, domain, q_type), group in combined_groups:
+    #             if time_perf in ['Normal Time & Correct', 'Fast & Correct', t('Normal Time & Correct'), t('Fast & Correct')]: # Check both Eng and Zh
+    #                 continue
+
+    #             all_diagnostic_params_group = [] # Renamed
+    #             for params_list in group['diagnostic_params']:
+    #                 if isinstance(params_list, list):
+    #                     all_diagnostic_params_group.extend(p for p in params_list if p != t('di_invalid_data_tag')) # Filter invalid tag
+
+    #             if all_diagnostic_params_group:
+    #                 unique_params = sorted(list(set(all_diagnostic_params_group))) # Sort for consistent order
+    #                 params_by_category = {}
+    #                 # Use DI_PARAM_CATEGORY_ORDER for sorting categories
+    #                 for category_eng in DI_PARAM_CATEGORY_ORDER:
+    #                     params_in_cat = []
+    #                     for param in unique_params:
+    #                         if DI_PARAM_TO_CATEGORY.get(param) == category_eng:
+    #                             params_in_cat.append(param)
+    #                     if params_in_cat:
+    #                          # Ensure params within a category are also sorted if desired
+    #                         params_by_category[t(category_eng)] = sorted([t(p) for p in params_in_cat])
+
+
+    #                 if params_by_category: # Only add if there are categorized params
+    #                      reflection_prompts_data.append({
+    #                         "time_perf_zh": t(time_perf),
+    #                         "domain_zh": t(domain),
+    #                         "q_type_zh": t(q_type),
+    #                         "categories": params_by_category
+    #                     })
     
-    if not reflection_prompts_data:
-        report_lines.append(f"    * {t('no_reflection_patterns_needed')}")
-    else:
-        for idx, prompt_data in enumerate(reflection_prompts_data):
-            report_lines.append(f"    * **{idx + 1}. {prompt_data['domain_zh']} {prompt_data['q_type_zh']} ({prompt_data['time_perf_zh']})**")
-            report_lines.append(f"        * **{t('reflection_direction')}：**")
-            for category_zh, params_zh_list in prompt_data['categories'].items():
-                report_lines.append(f"            * 【{category_zh}】：{', '.join(params_zh_list)}")
-            report_lines.append("") # Space after each reflection item block
-    report_lines.append("")
+    # if not reflection_prompts_data:
+    #     report_lines.append(f"    * {t('no_reflection_patterns_needed')}")
+    # else:
+    #     for idx, prompt_data in enumerate(reflection_prompts_data):
+    #         report_lines.append(f"    * **{idx + 1}. {prompt_data['domain_zh']} {prompt_data['q_type_zh']} ({prompt_data['time_perf_zh']})**")
+    #         report_lines.append(f"        * **{t('reflection_direction')}：**")
+    #         for category_zh, params_zh_list in prompt_data['categories'].items():
+    #             report_lines.append(f"            * 【{category_zh}】：{', '.join(params_zh_list)}")
+    #         report_lines.append("") # Space after each reflection item block
+    # report_lines.append("")
 
 
-    # --- V. 尋求進階協助 (質化分析) ---
-    report_lines.append(f"**{t('seek_advanced_assistance_qualitative')}**")
-    report_lines.append("")
-    # Condition for showing this suggestion (can be adjusted)
-    # Using a simplified condition based on existence of any core issues previously identified
-    # or specific complex params.
-    show_qualitative_suggestion = False
-    if sfe_triggered or top_other_params_codes: # If any core issues were listed
-        show_qualitative_suggestion = True
-    elif any(p in all_triggered_params for p in ['DI_LOGICAL_REASONING_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_MULTI_SOURCE_INTEGRATION_ERROR_MSR']):
-        show_qualitative_suggestion = True
+    # --- V. 尋求進階協助 (質化分析) --- (暫時註解掉不顯示)
+    # report_lines.append(f"**{t('seek_advanced_assistance_qualitative')}**")
+    # report_lines.append("")
+    # # Condition for showing this suggestion (can be adjusted)
+    # # Using a simplified condition based on existence of any core issues previously identified
+    # # or specific complex params.
+    # show_qualitative_suggestion = False
+    # if sfe_triggered or top_other_params_codes: # If any core issues were listed
+    #     show_qualitative_suggestion = True
+    # elif any(p in all_triggered_params for p in ['DI_LOGICAL_REASONING_ERROR', 'DI_READING_COMPREHENSION_ERROR', 'DI_MULTI_SOURCE_INTEGRATION_ERROR_MSR']):
+    #     show_qualitative_suggestion = True
         
-    if show_qualitative_suggestion:
-        report_lines.append(f"* **{t('suggestion')}：** {t('qualitative_analysis_suggestion')}")
-    else:
-        report_lines.append(f"* {t('analysis_clear_note')}")
-    report_lines.append("")
+    # if show_qualitative_suggestion:
+    #     report_lines.append(f"* **{t('suggestion')}：** {t('qualitative_analysis_suggestion')}")
+    # else:
+    #     report_lines.append(f"* {t('analysis_clear_note')}")
+    # report_lines.append("")
 
 
     # Tool/AI Prompt Recommendations (remains commented out as per original logic)

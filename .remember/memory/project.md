@@ -32,104 +32,117 @@ This file stores user preferences and custom rules for the GMAT Score Report Ana
 - Supports CSV/JSON export functionality
 - 7 GMAT subjects supported: CR, DS, GT, MSR, PS, RC, TPA
 
-## GUI Design Preferences - Modern UI Implementation (Updated 2025-01-30)
+## GUI Design Preferences - Day/Night Theme System (Updated 2025-06-03)
 
 ### Design Philosophy
-- **Minimalist Aesthetics**: Clean, uncluttered interface with focus on functionality
-- **Glassmorphism Effects**: Semi-transparent backgrounds with backdrop-filter blur
-- **Harmonious Color Palette**: Professional blue-gray gradient backgrounds with consistent theming
-- **Micro-animations**: Subtle fade-in and slide-up animations for better UX
+- **Simple Contrast**: Clear black and white theme system for optimal readability
+- **User Control**: Day/night theme switching based on user preference
+- **High Accessibility**: Maximum contrast ratios for better visibility
+- **Minimal Complexity**: Clean, straightforward design without unnecessary visual noise
 
-### Updated Color System (New Harmonious Palette)
-- **Primary**: #2563eb (Blue) - Professional and trustworthy
-- **Primary Light**: #3b82f6 (Lighter Blue) - For gradients and hover states
-- **Primary Dark**: #1d4ed8 (Darker Blue) - For pressed/active states
-- **Secondary**: #059669 (Emerald Green) - For success and download actions
-- **Accent**: #0891b2 (Cyan) - For gradients and highlights
-- **Warning**: #d97706 (Amber) - For cautionary elements
-- **Error**: #dc2626 (Red) - For error states
-- **Success**: #16a34a (Green) - For success states
-- **Neutral scales**: Slate colors from 50-900 with proper contrast ratios
-- **Surface Colors**: Semi-transparent variants for glassmorphism effects
+### Theme System Requirements
+- **白天模式 (Day Mode)**: 白底黑字 (White background, black text)
+  - Primary background: Pure white (#ffffff)
+  - Primary text: Pure black (#000000)
+  - Clean, professional appearance suitable for daytime use
+  
+- **晚上模式 (Night Mode)**: 黑底白字 (Black background, white text)  
+  - Primary background: Pure black (#000000)
+  - Primary text: Pure white (#ffffff)
+  - Comfortable for low-light environments and extended use
 
-### Background System
-- **Main Background**: Multi-stop gradient from dark slate to light slate
-- **Surface Primary**: rgba(248, 250, 252, 0.95) - Main content cards
-- **Surface Secondary**: rgba(241, 245, 249, 0.9) - Secondary elements
-- **Surface Accent**: rgba(226, 232, 240, 0.8) - Accent elements
+### Updated Color System (Day/Night Themes)
+#### Light Theme (Day Mode):
+- **Background Primary**: #ffffff (Pure white)
+- **Background Secondary**: #f8f9fa (Light gray)
+- **Background Tertiary**: #e9ecef (Lighter gray)
+- **Text Primary**: #000000 (Pure black)
+- **Text Secondary**: #212529 (Dark gray)
+- **Text Muted**: #6c757d (Medium gray)
+- **Accent Color**: #007bff (Professional blue)
+- **Borders**: #dee2e6 (Light gray borders)
+
+#### Dark Theme (Night Mode):
+- **Background Primary**: #000000 (Pure black)
+- **Background Secondary**: #1a1a1a (Dark gray)
+- **Background Tertiary**: #2a2a2a (Lighter dark gray)
+- **Text Primary**: #ffffff (Pure white)
+- **Text Secondary**: #e0e0e0 (Light gray)
+- **Text Muted**: #b0b0b0 (Medium gray)
+- **Accent Color**: #4a90e2 (Softer blue for dark backgrounds)
+- **Borders**: #404040 (Dark gray borders)
 
 ### Typography
 - Primary font: Inter (Google Fonts)
 - Monospace: JetBrains Mono
 - Font weights: 300, 400, 500, 600, 700
-- Optimized for readability and accessibility
+- High contrast text for optimal readability in both themes
 
-### Component Library
-- **modern_gui_styles.py**: Centralized styling module with updated color system
-- **create_modern_header()**: Glassmorphism header with blue-cyan gradient text
-- **create_section_header()**: Consistent section headers with icons
-- **create_status_card()**: Color-coded status indicators (success, warning, error, info)
-- **create_metric_card()**: Statistics display cards with icons
-- **create_feature_grid()**: Responsive grid layout for features
-- **create_progress_bar()**: Modern progress indicators
+### Component Library - Theme Aware
+- **modern_gui_styles.py**: Centralized styling module with day/night theme support
+- **initialize_theme()**: Main function to set up theme system with toggle
+- **create_theme_toggle()**: Theme switching button (🌙/☀️)
+- **apply_modern_css()**: Theme-aware CSS application
+- **get_theme_css()**: Dynamic CSS generation based on theme mode
+- **create_modern_header()**: Theme-compatible headers
+- **create_status_card()**: Theme-aware status indicators
+- **create_metric_card()**: Statistics cards with theme support
+
+### Theme Switching Features
+- **Toggle Button**: Right-side theme switch with sun/moon icons
+- **Real-time Switching**: Instant theme change with st.rerun()
+- **State Persistence**: Theme preference saved in session state
+- **Smooth Transitions**: CSS transitions for all theme changes
+- **Complete Coverage**: All UI elements support both themes
 
 ### Layout System
-- **Responsive Design**: Mobile-first approach with CSS Grid and Flexbox
-- **Card-based Layout**: Consistent padding, margins, and border-radius
-- **Backdrop Effects**: Blur effects with rgba transparency
-- **Shadow System**: Consistent shadow depths using slate color base
+- **Theme-Aware Design**: All components adapt to current theme
+- **Card-based Layout**: Clean card system with theme-appropriate backgrounds
+- **Consistent Spacing**: Same layout principles across both themes
+- **Responsive Design**: Mobile-friendly with proper theme switching
 
 ### Interactive Elements
-- **Buttons**: Blue gradient backgrounds with hover animations
-- **Form Controls**: Enhanced input styling with focus states using blue accent
-- **Charts**: Plotly integration with consistent theming
-- **Navigation**: Modern tab system with hover effects
-- **Transitions**: Smooth 0.2s transitions for all interactive elements
+- **Buttons**: Theme-appropriate colors with proper contrast
+- **Form Controls**: High contrast inputs for both light and dark modes
+- **Navigation**: Clear tab system with theme-aware styling
+- **Charts**: Plotly integration with theme compatibility
 
-### Performance Optimizations
-- **CSS Variables**: Consistent theming and easy maintenance
-- **Modular Components**: Reusable UI building blocks
-- **Lightweight Animations**: Performant transitions and effects
-- **Streamlit Integration**: Seamless integration with Streamlit framework
+### Accessibility Features
+- **High Contrast**: Maximum readability with pure black/white text
+- **WCAG Compliance**: Meets accessibility standards for both themes
+- **Color Blind Friendly**: Clear contrast without relying on color alone
+- **Eye Strain Reduction**: Dark mode for low-light usage
 
-### Color Design Update Log (2025-01-30)
-**Previous Issues Addressed:**
-- Eliminated jarring purple/white alternating colors
-- Removed harsh contrasts that users found unharmonious
-- Replaced with professional blue-gray palette
-
-**New Color Implementation:**
-- Harmonious blue-based primary colors (#2563eb spectrum)
-- Slate-based neutral colors for better text readability
-- Softer gradients using multi-stop slate progression
-- Professional appearance suitable for educational applications
-- Better accessibility with improved contrast ratios
-
-**User Feedback Integration:**
-- Responded to feedback about ugly colors and lack of harmony
-- Implemented more professional and visually pleasing color scheme
-- Maintained glassmorphism effects while improving color coordination
-
-### Updated Files with Modern Design
-1. **modern_gui_styles.py**: Core styling module with new harmonious color system
-2. **gmat_study_planner_gui.py**: Updated main GUI with modern components
-3. **gmat_route_tool_gui.py**: Modernized route tool interface
-4. **demo_modern_gui.py**: Design showcase and component demonstration
+### User Experience Principles
+- **User Choice**: Let users select their preferred theme
+- **Context Awareness**: Day mode for bright environments, night mode for dark
+- **Consistency**: Same functionality across both themes
+- **Performance**: Lightweight theme switching without page reload
 
 ### Implementation Notes
-- All legacy purple/white CSS removed and replaced with blue-gray system
-- Consistent icon usage throughout the interface
-- Improved accessibility with proper color contrast
-- Enhanced user feedback with status cards and progress indicators
-- Unified visual language across all components using harmonious palette
+- All legacy complex color schemes removed
+- Focus on functionality over visual complexity
+- Theme state managed through Streamlit session state
+- CSS variables used for efficient theme switching
+- Complete rewrite of styling system for simplicity
 
 ### Best Practices Established
-- Use create_* functions for consistency
-- Apply modern-card classes for content containers
-- Implement proper spacing with margin/padding utilities
-- Maintain color consistency through CSS variables
-- Include animations with fade-in and slide-up classes
-- Use harmonious color relationships to avoid visual discord
+- Use initialize_theme() at app start
+- Implement theme toggle in app header/sidebar
+- Test all components in both themes
+- Maintain high contrast ratios
+- Keep theme switching smooth and responsive
+- Prioritize readability over visual effects
+
+## Previous GUI Design History (Archive)
+
+### Pre-2025-06-03 Design (DEPRECATED)
+- Used complex blue-gray gradient systems
+- Glassmorphism effects with multiple color layers
+- Fixed color scheme without user control
+- Harmonious but potentially overwhelming color palette
+
+**Reason for Change**: User explicitly requested simple "白底黑字" (white background, black text) for day and "黑底白字" (black background, white text) for night, indicating preference for high contrast, simple themes over complex visual designs.
 
 ## GMAT Diagnosis Specific Rules
 - Never modify diagnostic logic or numerical values

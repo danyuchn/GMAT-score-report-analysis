@@ -61,9 +61,9 @@ TRANSLATIONS = {
     'Q_READING_COMPREHENSION_ERROR': "Q Reading Comprehension Error: Text Understanding",
     'Q_CONCEPT_APPLICATION_ERROR': "Q Concept Application Error: Mathematical Concept/Formula Application",
     'Q_CALCULATION_ERROR': "Q Calculation Error: Mathematical Calculation",
-    'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': "Q Foundation Mastery: Application Instability (Special Focus Error)",
-    'Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "Behavioral Pattern: Early Stage Too Fast (Flag risk)",
-    'Q_BEHAVIOR_CARELESSNESS_ISSUE': "Behavioral Pattern: Carelessness Issue (High fast-wrong ratio)",
+    'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': "Q Foundation Mastery: Application Instability (Special Focus Error) (For reference only, no trimming needed)",
+    'Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "Behavioral Pattern: Early Stage Too Fast (Flag risk) (For reference only, no trimming needed)",
+    'Q_BEHAVIOR_CARELESSNESS_ISSUE': "Behavioral Pattern: Carelessness Issue (High fast-wrong ratio) (For reference only, no trimming needed)",
     'Q_READING_COMPREHENSION_DIFFICULTY': "Q Reading Comprehension Difficulty: Text Understanding Difficulty",
     'Q_CONCEPT_APPLICATION_DIFFICULTY': "Q Concept Application Difficulty: Mathematical Concept/Formula Application Difficulty",
     'Q_CALCULATION_DIFFICULTY': "Q Calculation Difficulty: Mathematical Calculation Difficulty",
@@ -77,8 +77,8 @@ TRANSLATIONS = {
     'Q_EFFICIENCY_BOTTLENECK_CALCULATION': "Q Efficiency Bottleneck: Calculation Speed",
     
     # Behavioral pattern variants (without Q_ prefix)
-    'BEHAVIOR_CARELESSNESS_ISSUE': "Behavioral Pattern: Carelessness Issue (High fast-wrong ratio)",
-    'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "Behavioral Pattern: Early Stage Too Fast (Flag risk)",
+    'BEHAVIOR_CARELESSNESS_ISSUE': "Behavioral Pattern: Carelessness Issue (High fast-wrong ratio) (For reference only, no trimming needed)",
+    'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "Behavioral Pattern: Early Stage Too Fast (Flag risk) (For reference only, no trimming needed)",
     
     # Skill names (if needed for translation)
     'Unknown Skill': "Unknown Skill",
@@ -234,10 +234,10 @@ TRANSLATIONS = {
     'DI_CALCULATION_ERROR__MATH': "DI Calculation Error (Math): Mathematical Calculation",
     'DI_MULTI_SOURCE_INTEGRATION_ERROR': "DI Multi-Source Integration (MSR): Cross-page/Source Information Integration Barrier",
     'DI_MSR_READING_COMPREHENSION_BARRIER': "DI MSR Reading Barrier: Excessive Overall Reading Time for the Group",
-    'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE': "DI Foundation Mastery: Application Instability (Special Focus Error)",
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE': "DI Foundation Mastery: Application Instability (Special Focus Error) (For reference only, no trimming needed)",
     'DI_BEHAVIOR_CARELESSNESS_DETAIL_OMISSION': "DI Behavior: Carelessness - Detail Omission/Misreading",
-    'DI_BEHAVIOR_CARELESSNESS_ISSUE': "DI Behavior: Carelessness - Overall High Fast-Wrong Rate",
-    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "DI Behavior: Early Test Phase Too Fast Risk",
+    'DI_BEHAVIOR_CARELESSNESS_ISSUE': "DI Behavior: Carelessness - Overall High Fast-Wrong Rate (For reference only, no trimming needed)",
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "DI Behavior: Early Test Phase Too Fast Risk (For reference only, no trimming needed)",
     
     # DI Diagnostic Parameters - Difficulty Types (Slow & Wrong / Slow & Correct)
     'DI_READING_COMPREHENSION_DIFFICULTY__MULTI_SOURCE_INTEGRATION': "DI Reading Comprehension Difficulty: Cross-page/Source Information Integration Difficulty",
@@ -435,9 +435,9 @@ TRANSLATIONS = {
     'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY': "RC Reading Passage Structure Difficulty: Passage structure understanding difficulty",
     'RC_READING_INFO_LOCATION_ERROR': "RC Reading Information Location Error: Information location mistake",
     'RC_READING_KEYWORD_LOGIC_OMISSION': "RC Reading Keyword Logic Omission: Keyword logic oversight",
-    'RC_READING_SPEED_GOOD_GROUP_PERFORMANCE': "RC Reading Speed Good: Group performance good",
-    'RC_READING_SPEED_ACCEPTABLE_GROUP_PERFORMANCE': "RC Reading Speed Acceptable: Group performance acceptable",
-    'RC_READING_SPEED_POOR_GROUP_PERFORMANCE': "RC Reading Speed Poor: Group performance poor",
+    'RC_READING_SPEED_GOOD_GROUP_PERFORMANCE': "RC Reading Speed Good: Group performance good (For reference only, no trimming needed)",
+    'RC_READING_SPEED_ACCEPTABLE_GROUP_PERFORMANCE': "RC Reading Speed Acceptable: Group performance acceptable (For reference only, no trimming needed)",
+    'RC_READING_SPEED_POOR_GROUP_PERFORMANCE': "RC Reading Speed Poor: Group performance poor (For reference only, no trimming needed)",
     'RC_REASONING_INFERENCE_WEAKNESS': "RC Reasoning Inference Weakness: Reasoning inference capability insufficient",
     'RC_REASONING_TIME_EXCESSIVE': "RC Reasoning Time Excessive: Reasoning efficiency issue",
     'RC_LOCATION_TIME_EXCESSIVE': "RC Location Time Excessive: Information location efficiency issue",
@@ -447,16 +447,16 @@ TRANSLATIONS = {
     'RC_QUESTION_UNDERSTANDING_MISINTERPRETATION': "RC Question Understanding Misinterpretation: Question requirement understanding error",
     'RC_AC_ANALYSIS_DIFFICULTY': "RC Answer Choice Analysis Difficulty: Answer choice analysis difficulty",
     'RC_AC_ANALYSIS_TIME_EXCESSIVE': "RC Answer Choice Analysis Time Excessive: Answer choice analysis efficiency issue",
-    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MINOR_ISSUE': "RC Timing Individual Question Efficiency Minor Issue: Individual question timing efficiency minor issue",
-    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MODERATE_ISSUE': "RC Timing Individual Question Efficiency Moderate Issue: Individual question timing efficiency moderate issue",
-    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MAJOR_ISSUE': "RC Timing Individual Question Efficiency Major Issue: Individual question timing efficiency major issue",
-    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_SEVERE_ISSUE': "RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue",
-    'RC_CHOICE_ANALYSIS_EFFICIENCY_MINOR_ISSUE': "RC Choice Analysis Efficiency Minor Issue: Choice analysis efficiency minor issue",
-    'RC_CHOICE_ANALYSIS_EFFICIENCY_MODERATE_ISSUE': "RC Choice Analysis Efficiency Moderate Issue: Choice analysis efficiency moderate issue",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MINOR_ISSUE': "RC Timing Individual Question Efficiency Minor Issue: Individual question timing efficiency minor issue (For reference only, no trimming needed)",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MODERATE_ISSUE': "RC Timing Individual Question Efficiency Moderate Issue: Individual question timing efficiency moderate issue (For reference only, no trimming needed)",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MAJOR_ISSUE': "RC Timing Individual Question Efficiency Major Issue: Individual question timing efficiency major issue (For reference only, no trimming needed)",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_SEVERE_ISSUE': "RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue (For reference only, no trimming needed)",
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MINOR_ISSUE': "RC Choice Analysis Efficiency Minor Issue: Choice analysis efficiency minor issue (For reference only, no trimming needed)",
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MODERATE_ISSUE': "RC Choice Analysis Efficiency Moderate Issue: Choice analysis efficiency moderate issue (For reference only, no trimming needed)",
     
     # V Diagnostic Parameters - Common/Foundational
-    'FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE': "Foundational Mastery Application Instability (SFE): Mastered skill application instability",
-    'FOUNDATIONAL_MASTERY_INSTABILITY_SFE': "Foundational Mastery Instability (SFE): Basic skill mastery instability",
+    'FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE': "Foundational Mastery Application Instability (SFE): Mastered skill application instability (For reference only, no trimming needed)",
+    'FOUNDATIONAL_MASTERY_INSTABILITY_SFE': "Foundational Mastery Instability (SFE): Basic skill mastery instability (For reference only, no trimming needed)",
     'EFFICIENCY_BOTTLENECK_READING': "Efficiency Bottleneck: Reading Speed",
     'EFFICIENCY_BOTTLENECK_REASONING': "Efficiency Bottleneck: Reasoning Thinking",
     'EFFICIENCY_BOTTLENECK_LOCATION': "Efficiency Bottleneck: Information Location",
@@ -694,13 +694,13 @@ TRANSLATIONS = {
     'Invalid/Excluded': "Invalid/Excluded",
 
     # New English translation keys for failing Chinese strings
-    'rc_timing_individual_question_efficiency_severe_issue_full': "RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue",
+    'rc_timing_individual_question_efficiency_severe_issue_full': "RC Timing Individual Question Efficiency Severe Issue: Individual question timing efficiency severe issue (For reference only, no trimming needed)",
     'carelessness_issue_high_fast_wrong_ratio': "Carelessness Issue (High fast-wrong ratio)",
-    'rc_reading_speed_poor_group_performance_poor': "RC Reading Speed Poor: Group performance poor",
+    'rc_reading_speed_poor_group_performance_poor': "RC Reading Speed Poor: Group performance poor (For reference only, no trimming needed)",
 
     # Fixed behavioral patterns translations - ENGLISH TRANSLATIONS
-    'behavioral_pattern_carelessness_full': "Behavioral Pattern: Carelessness Issue (High fast-wrong ratio)",
-    'application_instability_sfe': "Application Instability (**SFE**): Mastered skill application instability",
+    'behavioral_pattern_carelessness_full': "Behavioral Pattern: Carelessness Issue (High fast-wrong ratio) (For reference only, no trimming needed)",
+    'application_instability_sfe': "Application Instability (**SFE**): Mastered skill application instability (For reference only, no trimming needed)",
 
     # Additional app.py specific translations
     'tutorial_title': "Tutorial Guide 📖",
@@ -1081,7 +1081,7 @@ including updated content from the "Edit Diagnostic Labels" tab (if you have edi
     
     # Tag trimming assistant
     'tag_trimming_assistant_title': "Tag Trimming Assistant",
-    'tag_trimming_assistant_description': "This tool helps you filter out 1-2 most relevant core tags from a long list of original diagnostic tags based on your specific description of the question. Please paste the original tags below and briefly describe the difficulties you encountered with this question or your test experience.",
+    'tag_trimming_assistant_description': "This tool helps you filter out 1-2 most relevant core tags from a long list of original diagnostic tags based on your specific description of the question. Please paste the original tags below and briefly describe the difficulties you encountered with this question or your test experience. (This feature can be used directly without entering a master key)",
     'tag_trimming_original_tags_label': "Original Diagnostic Tags (Please paste directly, e.g.: TagA, TagB, TagC)",
     'tag_trimming_user_description_label': "Your description of the question or difficulties encountered (e.g.: hesitated when comparing options, couldn't understand what the question was asking, spent a long time locating)",
     'tag_trimming_request_button': "Request AI Trimming Suggestions",
@@ -1288,8 +1288,8 @@ including updated content from the "Edit Diagnostic Labels" tab (if you have edi
     'DI_DATA_EXTRACTION_ERROR': "DI Data Extraction (GT): Data extraction error from charts",
     'DI_INFORMATION_EXTRACTION_INFERENCE_ERROR': "DI Information Extraction/Inference (GT/MSR Non-Math): Information location/inference error",
     'DI_QUESTION_TYPE_SPECIFIC_ERROR': "DI Question Type Specific Error (e.g., MSR Non-Math subtypes)",
-    'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE': "DI Foundation Mastery: Application Instability (Special Focus Error)",
-    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "DI Behavior: Early Test Phase Too Fast Risk",
+    'DI_FOUNDATIONAL_MASTERY_INSTABILITY__SFE': "DI Foundation Mastery: Application Instability (Special Focus Error) (For reference only, no trimming needed)",
+    'DI_BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "DI Behavior: Early Test Phase Too Fast Risk (For reference only, no trimming needed)",
     'DI_EFFICIENCY_BOTTLENECK_LOGIC': "DI Efficiency Bottleneck: Logic Reasoning Speed",
     'DI_EFFICIENCY_BOTTLENECK_GRAPH_TABLE': "DI Efficiency Bottleneck: Graph/Table Reading Speed",
     'DI_EFFICIENCY_BOTTLENECK_INTEGRATION': "DI Efficiency Bottleneck: Multi-Source Integration Speed",

@@ -10,7 +10,7 @@ from gmat_diagnosis_app.diagnostics.v_modules.constants import INVALID_DATA_TAG_
 # --- V Appendix A Translation ---
 APPENDIX_A_TRANSLATION_V = {
     # --- Diagnostic Tags from verbal_diagnostic_tags_summary.md ---
-    'FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE': "基礎掌握: 應用不穩定",
+    'FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE': "基礎掌握: 應用不穩定（純註記，無需修剪）",
     'BEHAVIOR_GUESSING_HASTY': "行為模式: 過快疑似猜題/倉促",
     'DATA_INVALID_SHORT_TIME_PRESSURE_AFFECTED': "數據無效：用時過短",
 
@@ -100,19 +100,19 @@ APPENDIX_A_TRANSLATION_V = {
     'EFFICIENCY_BOTTLENECK_REASONING': "效率問題: 推理分析環節導致效率低下",
     'EFFICIENCY_BOTTLENECK_LOCATION': "效率問題: 信息定位環節導致效率低下",
     'EFFICIENCY_BOTTLENECK_AC_ANALYSIS': "效率問題: 選項辨析環節導致效率低下",
-    'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "行為模式: 前期作答過快 (Flag risk)",
-    'BEHAVIOR_CARELESSNESS_ISSUE': "行為模式: 粗心問題 (快而錯比例高)",
+    'BEHAVIOR_EARLY_RUSHING_FLAG_RISK': "行為模式: 前期作答過快 (Flag risk)（純註記，無需修剪）",
+    'BEHAVIOR_CARELESSNESS_ISSUE': "行為模式: 粗心問題 (快而錯比例高)（純註記，無需修剪）",
 
     # --- RC整組表現相關診斷參數翻譯 ---
-    'RC_READING_SPEED_GOOD_GROUP_PERFORMANCE': "RC 閱讀速度: 整組表現良好",
-    'RC_READING_SPEED_ACCEPTABLE_GROUP_PERFORMANCE': "RC 閱讀速度: 整組表現尚可",
-    'RC_READING_SPEED_POOR_GROUP_PERFORMANCE': "RC 閱讀速度: 整組表現不佳",
-    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MINOR_ISSUE': "RC 時間管理: 單題效率輕微問題",
-    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MODERATE_ISSUE': "RC 時間管理: 單題效率中度問題",
-    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MAJOR_ISSUE': "RC 時間管理: 單題效率嚴重問題",
-    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_SEVERE_ISSUE': "RC 時間管理: 單題效率極嚴重問題",
-    'RC_CHOICE_ANALYSIS_EFFICIENCY_MINOR_ISSUE': "RC 選項辨析: 效率輕微問題",
-    'RC_CHOICE_ANALYSIS_EFFICIENCY_MODERATE_ISSUE': "RC 選項辨析: 效率中度問題",
+    'RC_READING_SPEED_GOOD_GROUP_PERFORMANCE': "RC 閱讀速度: 整組表現良好（純註記，無需修剪）",
+    'RC_READING_SPEED_ACCEPTABLE_GROUP_PERFORMANCE': "RC 閱讀速度: 整組表現尚可（純註記，無需修剪）",
+    'RC_READING_SPEED_POOR_GROUP_PERFORMANCE': "RC 閱讀速度: 整組表現不佳（純註記，無需修剪）",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MINOR_ISSUE': "RC 時間管理: 單題效率輕微問題（純註記，無需修剪）",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MODERATE_ISSUE': "RC 時間管理: 單題效率中度問題（純註記，無需修剪）",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_MAJOR_ISSUE': "RC 時間管理: 單題效率嚴重問題（純註記，無需修剪）",
+    'RC_TIMING_INDIVIDUAL_QUESTION_EFFICIENCY_SEVERE_ISSUE': "RC 時間管理: 單題效率極嚴重問題（純註記，無需修剪）",
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MINOR_ISSUE': "RC 選項辨析: 效率輕微問題（純註記，無需修剪）",
+    'RC_CHOICE_ANALYSIS_EFFICIENCY_MODERATE_ISSUE': "RC 選項辨析: 效率中度問題（純註記，無需修剪）",
 
     # --- VDOC Defined Core Fundamental Skills --- (Preserved)
     'Plan/Construct': "Plan/Construct",

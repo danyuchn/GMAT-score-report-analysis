@@ -704,20 +704,29 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
     if not user_description.strip():
         return "錯誤：使用者描述不能為空。"
     
-    # 驗證master key並獲取有效的客戶端
-    if not client and api_key:
-        if not validate_master_key(api_key):
-            logging.warning("提供的管理金鑰無效。無法執行標籤修剪。")
-            return "錯誤：提供的管理金鑰無效。"
-        elif not api_key_env:
+    # 修改驗證邏輯：如果api_key為空，直接使用環境變量的API key
+    if not api_key:
+        # 直接使用環境變量中的API key，無需master_key驗證
+        if not api_key_env:
             logging.warning("環境變量中未設置OPENAI_API_KEY。無法執行標籤修剪。")
             return "錯誤：系統未配置OpenAI API金鑰。請聯絡系統管理員。"
-        else:
-            # 臨時初始化客戶端用於此次請求
-            temp_client = openai.OpenAI(api_key=api_key_env)
+        # 直接初始化客戶端用於此次請求
+        temp_client = openai.OpenAI(api_key=api_key_env)
     else:
-        # 使用已初始化的客戶端
-        temp_client = client
+        # 如果提供了api_key，進行原有的master_key驗證邏輯
+        if not client and api_key:
+            if not validate_master_key(api_key):
+                logging.warning("提供的管理金鑰無效。無法執行標籤修剪。")
+                return "錯誤：提供的管理金鑰無效。"
+            elif not api_key_env:
+                logging.warning("環境變量中未設置OPENAI_API_KEY。無法執行標籤修剪。")
+                return "錯誤：系統未配置OpenAI API金鑰。請聯絡系統管理員。"
+            else:
+                # 臨時初始化客戶端用於此次請求
+                temp_client = openai.OpenAI(api_key=api_key_env)
+        else:
+            # 使用已初始化的客戶端
+            temp_client = client
 
     if temp_client is None:
         logging.warning("無法初始化OpenAI客戶端。無法執行標籤修剪。")

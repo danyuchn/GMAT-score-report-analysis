@@ -20,6 +20,7 @@ from gmat_diagnosis_app.utils.secondary_evidence_utils import (
     get_question_type_specific_guidance,
     get_time_performance_specific_guidance
 )
+from gmat_diagnosis_app.session_manager import check_global_diagnostic_tag_warning_realtime
 
 # --- Force Logging Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s') # UNCOMMENTED
@@ -626,30 +627,15 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
 
     return "\n".join(report_parts)
 
-def display_enhanced_secondary_evidence_expander():
-    """Display enhanced secondary evidence search guidance based on actual diagnostic parameters."""
+def display_enhanced_secondary_evidence_expander_in_edit_tab():
+    """Display enhanced secondary evidence search guidance in edit tab using tab container."""
+    # Get data from session state (same logic as original function)
+    valid_df = st.session_state.get('original_processed_df', pd.DataFrame())
     
-    # Get dataframes from session state
-    processed_df = st.session_state.get('processed_df')
-    original_processed_df = st.session_state.get('original_processed_df')
-    
-    # Check if we have any valid data
-    if (processed_df is None or processed_df.empty) and (original_processed_df is None or original_processed_df.empty):
+    if valid_df.empty:
         return
     
-    # Use processed_df if available, otherwise fall back to original_processed_df
-    df_to_analyze = processed_df if processed_df is not None and not processed_df.empty else original_processed_df
-    
-    if df_to_analyze is None or df_to_analyze.empty:
-        return
-    
-    # Generate specific combination guidance (similar to guided reflection prompts in reports)
     specific_combinations = {}
-    
-    # Filter out invalid data
-    valid_df = df_to_analyze.copy()
-    if 'is_invalid' in df_to_analyze.columns:
-        valid_df = df_to_analyze[~df_to_analyze['is_invalid'].fillna(False)]
     
     if not valid_df.empty:
         subjects_in_data = valid_df['Subject'].unique() if 'Subject' in valid_df.columns else []
@@ -670,8 +656,7 @@ def display_enhanced_secondary_evidence_expander():
                 group_cols = ['question_fundamental_skill', 'question_type', 'time_performance_category']
                 available_cols = [col for col in group_cols if col in subject_df.columns]
                 
-                if len(available_cols) >= 2:  # At least 2 dimensions available
-                    # Focus on problematic combinations (wrong or slow)
+                if len(available_cols) >= 2:
                     problem_df = subject_df[
                         (~subject_df['is_correct']) | 
                         (subject_df['time_performance_category'].isin(['Slow & Correct', 'Slow & Wrong', 'Normal Time & Wrong', 'Fast & Wrong']))
@@ -685,30 +670,25 @@ def display_enhanced_secondary_evidence_expander():
                         
                         for _, row in combinations.iterrows():
                             question_numbers = row.get('question_position', [])
-                            if question_numbers:  # Only show if there are actual question numbers
+                            if question_numbers:
                                 skill = row.get('question_fundamental_skill', '未知技能')
-                                qtype = row.get('question_type', '未知題型') 
+                                qtype = row.get('question_type', '未知題型')
                                 time_perf = row.get('time_performance_category', '未知表現')
                                 
-                                # Generate reflection prompt in the style of diagnostic reports
-                                reflection_prompt = f"找尋【{skill}】【{qtype}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並反思自己是否有："
+                                reflection_prompt = f"找尋【{skill}】【{qtype}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並修剪"
                                 
-                                # Extract diagnostic parameters for this combination
-                                diagnostic_params = row.get('diagnostic_params_list', [])
-                                if diagnostic_params:
-                                    unique_params = list(set([str(p).strip() for p in diagnostic_params if p and str(p).strip()]))
-                                    params_text = '、'.join(unique_params)  # Show all params, remove [:3] limit
-                                    params_text += '。'  # Remove "等問題" suffix, just add period
+                                # Format question numbers for display and add trimming guidance
+                                if len(question_numbers) == 1:
+                                    question_list = f"第{question_numbers[0]}題"
+                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
                                 else:
-                                    params_text = '相關錯誤類型。'  # Remove "等問題" from fallback text
-                                
-                                # Format question numbers for display
-                                question_list = ', '.join([f"第{q}題" for q in question_numbers])
+                                    question_list = '、'.join([f"第{q}題" for q in question_numbers])
+                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
                                 
                                 specific_combinations[subject].append({
                                     'prompt': reflection_prompt,
-                                    'details': params_text,
-                                    'questions': question_list
+                                    'details': trimming_guidance,
+                                    'questions': ''  # No separate question display needed
                                 })
             
             elif subject == 'V':
@@ -734,23 +714,20 @@ def display_enhanced_secondary_evidence_expander():
                                 skill = row.get('question_fundamental_skill', '未知技能')
                                 time_perf = row.get('time_performance_category', '未知表現')
                                 
-                                reflection_prompt = f"找尋【{skill}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並反思自己是否有："
+                                reflection_prompt = f"找尋【{skill}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並修剪"
                                 
-                                diagnostic_params = row.get('diagnostic_params_list', [])
-                                if diagnostic_params:
-                                    unique_params = list(set([str(p).strip() for p in diagnostic_params if p and str(p).strip()]))
-                                    params_text = '、'.join(unique_params)  # Show all params, remove [:3] limit
-                                    params_text += '。'  # Remove "等問題" suffix, just add period
+                                # Format question numbers for display and add trimming guidance
+                                if len(question_numbers) == 1:
+                                    question_list = f"第{question_numbers[0]}題"
+                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
                                 else:
-                                    params_text = '相關錯誤類型。'  # Remove "等問題" from fallback text
-                                
-                                # Format question numbers for display
-                                question_list = ', '.join([f"第{q}題" for q in question_numbers])
+                                    question_list = '、'.join([f"第{q}題" for q in question_numbers])
+                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
                                 
                                 specific_combinations[subject].append({
                                     'prompt': reflection_prompt,
-                                    'details': params_text,
-                                    'questions': question_list
+                                    'details': trimming_guidance,
+                                    'questions': ''  # No separate question display needed
                                 })
             
             elif subject == 'DI':
@@ -777,26 +754,23 @@ def display_enhanced_secondary_evidence_expander():
                                 qtype = row.get('question_type', '未知題型')
                                 time_perf = row.get('time_performance_category', '未知表現')
                                 
-                                reflection_prompt = f"找尋【{domain}】【{qtype}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並反思自己是否有："
+                                reflection_prompt = f"找尋【{domain}】【{qtype}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並修剪"
                                 
-                                diagnostic_params = row.get('diagnostic_params_list', [])
-                                if diagnostic_params:
-                                    unique_params = list(set([str(p).strip() for p in diagnostic_params if p and str(p).strip()]))
-                                    params_text = '、'.join(unique_params)  # Show all params, remove [:3] limit
-                                    params_text += '。'  # Remove "等問題" suffix, just add period
+                                # Format question numbers for display and add trimming guidance
+                                if len(question_numbers) == 1:
+                                    question_list = f"第{question_numbers[0]}題"
+                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
                                 else:
-                                    params_text = '相關錯誤類型。'  # Remove "等問題" from fallback text
-                                
-                                # Format question numbers for display
-                                question_list = ', '.join([f"第{q}題" for q in question_numbers])
+                                    question_list = '、'.join([f"第{q}題" for q in question_numbers])
+                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
                                 
                                 specific_combinations[subject].append({
                                     'prompt': reflection_prompt,
-                                    'details': params_text,
-                                    'questions': question_list
+                                    'details': trimming_guidance,
+                                    'questions': ''  # No separate question display needed
                                 })
     
-    # Display the main expander
+    # Display the main expander in edit tab
     with st.expander("🔍 各科二級證據查找重點", expanded=False):
         # Display specific reflection prompts (based on diagnostic report guided reflection logic)
         if specific_combinations and any(specific_combinations.values()):
@@ -810,7 +784,8 @@ def display_enhanced_secondary_evidence_expander():
                     for i, combo in enumerate(combinations, 1):
                         st.markdown(f"**{i}. {combo['prompt']}**")
                         st.markdown(f"   {combo['details']}")
-                        st.markdown(f"   *（涉及題目：{combo['questions']}）*")
+                        if combo['questions']:  # Only show if questions exist (for backward compatibility)
+                            st.markdown(f"   *（涉及題目：{combo['questions']}）*")
                         st.markdown("")
                     
                     st.markdown("---")
@@ -828,21 +803,43 @@ def display_global_tag_warning():
     
     avg_tags = warning_info.get('avg_tags_per_question', 0.0)
     
-    # Display warning container
+    # Display warning container with detailed guidance
     with st.container():
         st.markdown(
-f"""<div style="background-color: #fff3cd; border: 1px solid #ffeb3b; border-radius: 8px; padding: 16px; margin-bottom: 20px; border-left: 5px solid #ff9800;">
-<h4 style="color: #ff6f00; margin-top: 0;">⚠️ {t('global_tag_warning_title')}</h4>
-<p style="margin-bottom: 16px;">{t('global_tag_warning_message').format(avg_tags)}</p>
-<h5 style="color: #ff6f00; margin-bottom: 12px;">💡 {t('global_tag_warning_action_title')}</h5>
-<div style="margin-bottom: 12px;">
-<strong style="color: #333;">{t('global_tag_warning_primary_action')}</strong><br>
-{t('global_tag_warning_primary_desc')}
-</div>
-<div style="margin-bottom: 12px;">
-<strong style="color: #333;">{t('global_tag_warning_secondary_action')}</strong><br>
-{t('global_tag_warning_secondary_desc')}
-</div>
+f"""<div style="background-color: var(--background-color, #fff3cd); border: 1px solid var(--border-color, #ffc107); border-radius: 8px; padding: 16px; margin-bottom: 20px; border-left: 5px solid var(--accent-color, #ff9800); color: var(--text-color, #333);">
+<h4 style="color: var(--warning-header-color, #ff6f00); margin-top: 0;">⚠️ {t('global_tag_warning_title')}</h4>
+<p style="margin-bottom: 16px; color: var(--text-color, #333);">{t('global_tag_warning_message').format(avg_tags)}</p>
+
+<style>
+:root {{
+    --background-color: #fff3cd;
+    --border-color: #ffc107;
+    --accent-color: #ff9800;
+    --text-color: #333;
+    --warning-header-color: #ff6f00;
+}}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {{
+    :root {{
+        --background-color: #2d1810;
+        --border-color: #8B4513;
+        --accent-color: #D2691E;
+        --text-color: #e0e0e0;
+        --warning-header-color: #FFB347;
+    }}
+}}
+
+/* Streamlit dark theme detection */
+[data-theme="dark"] :root,
+.stApp[data-theme="dark"] :root {{
+    --background-color: #2d1810;
+    --border-color: #8B4513;
+    --accent-color: #D2691E;
+    --text-color: #e0e0e0;
+    --warning-header-color: #FFB347;
+}}
+</style>
 </div>""",
             unsafe_allow_html=True
         )
@@ -858,7 +855,7 @@ def display_results():
         return
 
     # Display global diagnostic tag warning at the top
-    display_global_tag_warning()
+    # display_global_tag_warning()  # MOVED TO EDIT TAGS TAB
 
     tab_titles = [t('display_results_total_tab')]
     if st.session_state.get("consolidated_report_text"):
@@ -965,6 +962,89 @@ def display_results():
 
                 tabs[edit_tab_index].markdown(f"**{t('edit_tags_description')}**")
                 
+                # 添加詳細的標籤類型說明和修剪指導
+                tabs[edit_tab_index].markdown("""
+### 🏷️ 標籤類型說明：
+
+• **錯誤類（Error）**：表示在正常或快速時間內做錯，通常是理解偏差或方法錯誤  
+• **困難類（Difficulty）**：表示雖然最終可能做對/錯，但過程中遇到明顯阻礙，花費較長時間
+
+### 📋 正確使用流程：
+
+1. **系統提供可能標籤範圍**
+2. **結合考試回憶確認實際遇到的困難**
+3. **移除不符合實際情況的標籤**
+4. **必要時參考考前做題記錄作為二級證據**
+
+### ✂️ 修剪建議：
+
+**理想標籤數量：** 每題 1-2 個最相關的核心標籤
+
+**修剪原則：**
+• 優先保留最直接對應實際困難的標籤
+• 移除不確定或模糊的標籤
+• 避免保留意義重疊的標籤
+
+### 💡 建議行動
+
+**主要方法：回憶與修剪**  
+請回想考試時每題實際遇到的具體困難，然後在「編輯診斷標籤」頁面中移除不符合真實情況的標籤。
+
+**輔助方法：二級證據分析**  
+如果無法清楚回憶考試狀況或有疑問，可以檢視考前2-4週的做題數據作為「二級證據」，以下是各科建議的查找重點：
+
+---
+                """)
+                
+                # Display diagnostic tag warning and secondary evidence suggestions in edit tab
+                display_global_tag_warning_in_edit_tab = check_global_diagnostic_tag_warning_realtime()
+                
+                if display_global_tag_warning_in_edit_tab.get('triggered', False):
+                    avg_tags = display_global_tag_warning_in_edit_tab.get('avg_tags_per_question', 0.0)
+                    
+                    # Display warning container in edit tab with detailed guidance and improved styling
+                    tabs[edit_tab_index].markdown(
+f"""<div style="background-color: var(--background-color, #fff3cd); border: 1px solid var(--border-color, #ffc107); border-radius: 8px; padding: 16px; margin-bottom: 20px; border-left: 5px solid var(--accent-color, #ff9800); color: var(--text-color, #333);">
+<h4 style="color: var(--warning-header-color, #ff6f00); margin-top: 0;">⚠️ {t('global_tag_warning_title')}</h4>
+<p style="margin-bottom: 16px; color: var(--text-color, #333);">{t('global_tag_warning_message').format(avg_tags)}</p>
+
+<style>
+:root {{
+    --background-color: #fff3cd;
+    --border-color: #ffc107;
+    --accent-color: #ff9800;
+    --text-color: #333;
+    --warning-header-color: #ff6f00;
+}}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {{
+    :root {{
+        --background-color: #2d1810;
+        --border-color: #8B4513;
+        --accent-color: #D2691E;
+        --text-color: #e0e0e0;
+        --warning-header-color: #FFB347;
+    }}
+}}
+
+/* Streamlit dark theme detection */
+[data-theme="dark"] :root,
+.stApp[data-theme="dark"] :root {{
+    --background-color: #2d1810;
+    --border-color: #8B4513;
+    --accent-color: #D2691E;
+    --text-color: #e0e0e0;
+    --warning-header-color: #FFB347;
+}}
+</style>
+</div>""",
+                        unsafe_allow_html=True
+                    )
+                
+                # Display secondary evidence suggestions expander in edit tab
+                display_enhanced_secondary_evidence_expander_in_edit_tab()
+                
                 tag_trimming_expander = tabs[edit_tab_index].expander(t('tag_trimming_assistant_title'), expanded=False)
                 tag_trimming_expander.markdown(t('tag_trimming_assistant_description'), unsafe_allow_html=True)
 
@@ -982,16 +1062,15 @@ def display_results():
                 if tag_trimming_expander.button(t('tag_trimming_request_button'), key="trim_tags_button"):
                     if not original_tags_input.strip() or not user_description_input.strip():
                         tag_trimming_expander.warning(t('tag_trimming_input_required'))
-                    elif not st.session_state.get('master_key'):
-                        tag_trimming_expander.error(t('tag_trimming_master_key_error'))
                     else:
                         with st.spinner(t('tag_trimming_ai_processing')):
-                            master_key = st.session_state.master_key
+                            # 移除master_key檢查，直接使用OpenAI API
+                            # 傳遞空字符串作為api_key，trim_diagnostic_tags_with_openai函數內部會處理
                             try:
                                 trimmed_suggestion = trim_diagnostic_tags_with_openai(
                                     original_tags_input,
                                     user_description_input,
-                                    master_key
+                                    ""  # 傳遞空字符串，讓函數內部直接使用環境變量的API key
                                 )
                                 st.session_state.trimmed_tags_suggestion = trimmed_suggestion
                             except Exception as e:

@@ -340,18 +340,15 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     practice_lines = generate_report_section6(recommendations, sfe_triggered)
     report_lines.extend(practice_lines)
     
-    # 4. 後續行動與深度反思指引
-    report_lines.append("### IV. 後續行動與深度反思指導")
-    report_lines.append("")
+    # 4. 後續行動與深度反思指引 - 暫時註解掉不顯示
+    # report_lines.append("### IV. 後續行動與深度反思指導")
+    # report_lines.append("")
     
-    action_lines = generate_report_section7(triggered_params_translated, sfe_skills_involved, df_final)
-    report_lines.extend(action_lines)
-    
-    # 5. 尋求高級協助
-    report_lines.append("### V. 尋求高級協助（定性分析）")
-    report_lines.append("")
-    report_lines.append("如果您對報告中識別的某些問題仍感困惑，可嘗試提供2-3道相關錯題，並附上詳細解題過程和思考實例，供顧問進行更深入的案例分析。")
-    report_lines.append("")
+    # 5. 尋求高級協助 - 暫時註解掉不顯示
+    # report_lines.append("### V. 尋求高級協助（定性分析）")
+    # report_lines.append("")
+    # report_lines.append("如果您對報告中識別的某些問題仍感困惑，可嘗試提供2-3道相關錯題，並附上詳細解題過程和思考實例，供顧問進行更深入的案例分析。")
+    # report_lines.append("")
     
     # --- Final cleanup and assembly ---
     # Ensure no leading/trailing empty lines in the final report sections

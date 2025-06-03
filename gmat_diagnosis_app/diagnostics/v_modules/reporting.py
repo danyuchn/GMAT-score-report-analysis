@@ -309,214 +309,214 @@ def generate_v_summary_report(v_diagnosis_results):
         report_lines.append(f"    * {t('v_no_practice_recommendations')}")
     report_lines.append("") # Spacing after major section III
 
-    # --- IV. 後續行動與深度反思指引 --- (Matches DI: IV)
-    report_lines.append(t('v_subsequent_action_and_deep_reflection'))
-    report_lines.append("")
+    # --- IV. 後續行動與深度反思指引 --- (暫時註解掉不顯示)
+    # report_lines.append(t('v_subsequent_action_and_deep_reflection'))
+    # report_lines.append("")
 
-    # A. 檢視練習記錄 (二級證據參考) (Matches DI: IV.A, from V's "二級證據參考建議")
-    report_lines.append(t('v_review_practice_record'))
-    # Extracting original pieces for this section from V's "後續行動建議"
-    # Note: qualitative_analysis_trigger and secondary_evidence_trigger were set earlier
-    # diagnosed_df_ch3_raw is available
+    # # A. 檢視練習記錄 (二級證據參考) (Matches DI: IV.A, from V's "二級證據參考建議")
+    # report_lines.append(t('v_review_practice_record'))
+    # # Extracting original pieces for this section from V's "後續行動建議"
+    # # Note: qualitative_analysis_trigger and secondary_evidence_trigger were set earlier
+    # # diagnosed_df_ch3_raw is available
     
-    # Mimic DI structure: Purpose, Method, Focus, Note
-    report_lines.append(f"    * {t('v_purpose_explanation')}") # Added Purpose like DI
-    report_lines.append(f"    * {t('v_method_explanation')}") # Adapted V's text
+    # # Mimic DI structure: Purpose, Method, Focus, Note
+    # report_lines.append(f"    * {t('v_purpose_explanation')}") # Added Purpose like DI
+    # report_lines.append(f"    * {t('v_method_explanation')}") # Adapted V's text
 
-    # Focus (Core issues)
-    core_issue_text_for_review = [] # Re-calculate for this section's focus
-    # Based on V's original logic for "二級證據參考建議"
-    # The original V code re-extracts diagnostic_labels for this. We maintain that by re-extracting relevant params.
-    # The original V's "core_issue_text" for this part was:
+    # # Focus (Core issues)
+    # core_issue_text_for_review = [] # Re-calculate for this section's focus
+    # # Based on V's original logic for "二級證據參考建議"
+    # # The original V code re-extracts diagnostic_labels for this. We maintain that by re-extracting relevant params.
+    # # The original V's "core_issue_text" for this part was:
+    # # for param_code in ['CR_REASONING_CHAIN_ERROR', 'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY']:
+    # #     if translate_v(param_code) in diagnostic_labels: # diagnostic_labels was populated from all params in diagnosed_df_ch3_raw
+    # #         core_issue_text_for_review.append(translate_v(param_code))
+    # # if sfe_triggered_overall:
+    # #     core_issue_text_for_review.append(translate_v('FOUNDATIONAL_MASTERY_INSTABILITY_SFE'))
+    # # This requires `diagnostic_labels` to be defined. Let's define it as it was in V for this part.
+    # current_diagnostic_labels_for_review = set()
+    # if diagnosed_df_ch3_raw is not None and 'diagnostic_params' in diagnosed_df_ch3_raw.columns:
+    #     all_params_temp = []
+    #     for params_list_temp in diagnosed_df_ch3_raw['diagnostic_params']:
+    #         if isinstance(params_list_temp, list): all_params_temp.extend(params_list_temp)
+    #     for param_temp in all_params_temp:
+    #         if isinstance(param_temp, str): current_diagnostic_labels_for_review.add(t(param_temp))
+    
     # for param_code in ['CR_REASONING_CHAIN_ERROR', 'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY']:
-    #     if translate_v(param_code) in diagnostic_labels: # diagnostic_labels was populated from all params in diagnosed_df_ch3_raw
-    #         core_issue_text_for_review.append(translate_v(param_code))
-    # if sfe_triggered_overall:
-    #     core_issue_text_for_review.append(translate_v('FOUNDATIONAL_MASTERY_INSTABILITY_SFE'))
-    # This requires `diagnostic_labels` to be defined. Let's define it as it was in V for this part.
-    current_diagnostic_labels_for_review = set()
-    if diagnosed_df_ch3_raw is not None and 'diagnostic_params' in diagnosed_df_ch3_raw.columns:
-        all_params_temp = []
-        for params_list_temp in diagnosed_df_ch3_raw['diagnostic_params']:
-            if isinstance(params_list_temp, list): all_params_temp.extend(params_list_temp)
-        for param_temp in all_params_temp:
-            if isinstance(param_temp, str): current_diagnostic_labels_for_review.add(t(param_temp))
+    #     if t(param_code) in current_diagnostic_labels_for_review:
+    #         core_issue_text_for_review.append(t(param_code))
+    # if sfe_triggered_overall: # sfe_triggered_overall is already determined
+    #      if t('FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE') not in core_issue_text_for_review: # Avoid duplicate
+    #         core_issue_text_for_review.append(t('FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE'))
+
+    # if core_issue_text_for_review:
+    #     report_lines.append(f"    * {t('v_key_focus_issues')}") # Adapted
+    #     for issue_text in core_issue_text_for_review:
+    #          report_lines.append(f"        * {issue_text}") # DI style list for issues
+    # else: # Fallback if no specific core issues identified for this section
+    #     report_lines.append(f"    * {t('v_key_focus_general')}")
+
+
+    # report_lines.append(f"    * {t('v_insufficient_sample_note')}") # Adapted V's text
+    # # Fallback from V if no data for this
+    # if diagnosed_df_ch3_raw is None or diagnosed_df_ch3_raw.empty: # Original V check for this part
+    #     report_lines.clear() # Clear previous lines for this sub-section if no data
+    #     report_lines.append(t('v_review_practice_record')) # Re-add title
+    #     report_lines.append(f"    * {t('v_no_secondary_evidence')}")
+    # report_lines.append("")
+
+    # # B. 引導性反思提示 (針對特定技能與表現) (Matches DI: IV.B, from V's "引導反思")
+    # report_lines.append(t('v_guided_reflection'))
+    # # This is V's "NEW LOGIC FOR GUIDED REFLECTION"
+    # # Replicating V's logic for extracting skills_list, time_performances_list, diagnostic_labels_list, categorized_labels
+    # fundamental_skills_reflect = set()
+    # time_performances_reflect = set()
+    # if diagnosed_df_ch3_raw is not None and not diagnosed_df_ch3_raw.empty:
+    #     if 'question_fundamental_skill' in diagnosed_df_ch3_raw.columns:
+    #         valid_skills = diagnosed_df_ch3_raw['question_fundamental_skill'].dropna().unique()
+    #         for skill in valid_skills:
+    #             if isinstance(skill, str) and skill != 'Unknown Skill': fundamental_skills_reflect.add(skill)
+    #     if 'time_performance_category' in diagnosed_df_ch3_raw.columns:
+    #         valid_perfs = diagnosed_df_ch3_raw['time_performance_category'].dropna().unique()
+    #         for perf in valid_perfs:
+    #             if isinstance(perf, str) and perf != 'Unknown': time_performances_reflect.add(perf)
     
-    for param_code in ['CR_REASONING_CHAIN_ERROR', 'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY']:
-        if t(param_code) in current_diagnostic_labels_for_review:
-            core_issue_text_for_review.append(t(param_code))
-    if sfe_triggered_overall: # sfe_triggered_overall is already determined
-         if t('FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE') not in core_issue_text_for_review: # Avoid duplicate
-            core_issue_text_for_review.append(t('FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE'))
-
-    if core_issue_text_for_review:
-        report_lines.append(f"    * {t('v_key_focus_issues')}") # Adapted
-        for issue_text in core_issue_text_for_review:
-             report_lines.append(f"        * {issue_text}") # DI style list for issues
-    else: # Fallback if no specific core issues identified for this section
-        report_lines.append(f"    * {t('v_key_focus_general')}")
-
-
-    report_lines.append(f"    * {t('v_insufficient_sample_note')}") # Adapted V's text
-    # Fallback from V if no data for this
-    if diagnosed_df_ch3_raw is None or diagnosed_df_ch3_raw.empty: # Original V check for this part
-        report_lines.clear() # Clear previous lines for this sub-section if no data
-        report_lines.append(t('v_review_practice_record')) # Re-add title
-        report_lines.append(f"    * {t('v_no_secondary_evidence')}")
-    report_lines.append("")
-
-    # B. 引導性反思提示 (針對特定技能與表現) (Matches DI: IV.B, from V's "引導反思")
-    report_lines.append(t('v_guided_reflection'))
-    # This is V's "NEW LOGIC FOR GUIDED REFLECTION"
-    # Replicating V's logic for extracting skills_list, time_performances_list, diagnostic_labels_list, categorized_labels
-    fundamental_skills_reflect = set()
-    time_performances_reflect = set()
-    if diagnosed_df_ch3_raw is not None and not diagnosed_df_ch3_raw.empty:
-        if 'question_fundamental_skill' in diagnosed_df_ch3_raw.columns:
-            valid_skills = diagnosed_df_ch3_raw['question_fundamental_skill'].dropna().unique()
-            for skill in valid_skills:
-                if isinstance(skill, str) and skill != 'Unknown Skill': fundamental_skills_reflect.add(skill)
-        if 'time_performance_category' in diagnosed_df_ch3_raw.columns:
-            valid_perfs = diagnosed_df_ch3_raw['time_performance_category'].dropna().unique()
-            for perf in valid_perfs:
-                if isinstance(perf, str) and perf != 'Unknown': time_performances_reflect.add(perf)
+    # skills_list_reflect = sorted(list(fundamental_skills_reflect))
+    # time_performances_list_reflect = sorted(list(time_performances_reflect))
     
-    skills_list_reflect = sorted(list(fundamental_skills_reflect))
-    time_performances_list_reflect = sorted(list(time_performances_reflect))
-    
-    reflection_prompts_generated = False
-    prompt_idx = 1 # Moved prompt_idx initialization outside the loops
+    # reflection_prompts_generated = False
+    # prompt_idx = 1 # Moved prompt_idx initialization outside the loops
 
-    if skills_list_reflect and time_performances_list_reflect and diagnosed_df_ch3_raw is not None and not diagnosed_df_ch3_raw.empty:
-        filtered_time_performances_reflect = [perf for perf in time_performances_list_reflect if perf not in ['Fast & Correct', 'Normal Time & Correct']]
+    # if skills_list_reflect and time_performances_list_reflect and diagnosed_df_ch3_raw is not None and not diagnosed_df_ch3_raw.empty:
+    #     filtered_time_performances_reflect = [perf for perf in time_performances_list_reflect if perf not in ['Fast & Correct', 'Normal Time & Correct']]
         
-        category_order_reflect = [
-            t('v_cr_reasoning_barrier'), t('v_cr_method_application'), t('v_cr_choice_analysis'), 
-            t('v_cr_reading_comprehension'), t('v_cr_question_understanding'),
-            t('v_rc_reading_comprehension'), t('v_rc_method'), t('v_foundational_mastery'), 
-            t('v_efficiency_issues'), t('v_data_invalid'), t('v_behavioral_patterns'), t('v_other_issues')
-        ]
+    #     category_order_reflect = [
+    #         t('v_cr_reasoning_barrier'), t('v_cr_method_application'), t('v_cr_choice_analysis'), 
+    #         t('v_cr_reading_comprehension'), t('v_cr_question_understanding'),
+    #         t('v_rc_reading_comprehension'), t('v_rc_method'), t('v_foundational_mastery'), 
+    #         t('v_efficiency_issues'), t('v_data_invalid'), t('v_behavioral_patterns'), t('v_other_issues')
+    #     ]
         
-        for skill_reflect in skills_list_reflect:
-            for time_perf_reflect in filtered_time_performances_reflect:
-                # Filter dataframe for the current skill and time_performance combination
-                current_combo_df = diagnosed_df_ch3_raw[
-                    (diagnosed_df_ch3_raw['question_fundamental_skill'] == skill_reflect) &
-                    (diagnosed_df_ch3_raw['time_performance_category'] == time_perf_reflect)
-                ]
+    #     for skill_reflect in skills_list_reflect:
+    #         for time_perf_reflect in filtered_time_performances_reflect:
+    #             # Filter dataframe for the current skill and time_performance combination
+    #             current_combo_df = diagnosed_df_ch3_raw[
+    #                 (diagnosed_df_ch3_raw['question_fundamental_skill'] == skill_reflect) &
+    #                 (diagnosed_df_ch3_raw['time_performance_category'] == time_perf_reflect)
+    #             ]
 
-                if current_combo_df.empty: # Skip if no data for this specific combo
-                    continue
+    #             if current_combo_df.empty: # Skip if no data for this specific combo
+    #                 continue
 
-                # Extract and translate diagnostic params specific to this combo
-                combo_diagnostic_params_raw = []
-                if 'diagnostic_params' in current_combo_df.columns:
-                    for params_list in current_combo_df['diagnostic_params']:
-                        if isinstance(params_list, list):
-                            combo_diagnostic_params_raw.extend(p for p in params_list if p != INVALID_DATA_TAG_V and isinstance(p, str))
+    #             # Extract and translate diagnostic params specific to this combo
+    #             combo_diagnostic_params_raw = []
+    #             if 'diagnostic_params' in current_combo_df.columns:
+    #                 for params_list in current_combo_df['diagnostic_params']:
+    #                     if isinstance(params_list, list):
+    #                         combo_diagnostic_params_raw.extend(p for p in params_list if p != INVALID_DATA_TAG_V and isinstance(p, str))
                 
-                if not combo_diagnostic_params_raw: # No specific (non-invalid) params for this combo
-                    continue
+    #             if not combo_diagnostic_params_raw: # No specific (non-invalid) params for this combo
+    #                 continue
                 
-                combo_diagnostic_labels_translated = {t(p) for p in set(combo_diagnostic_params_raw)}
+    #             combo_diagnostic_labels_translated = {t(p) for p in set(combo_diagnostic_params_raw)}
 
-                # Categorize these specific translated labels
-                categorized_labels_for_combo = {}
-                for label_translated in combo_diagnostic_labels_translated:
-                    category = None
-                    if t('v_cr_reasoning_barrier') in label_translated: category = t('v_cr_reasoning_barrier')
-                    elif t('v_cr_method_application') in label_translated: category = t('v_cr_method_application')
-                    elif t('v_cr_choice_analysis') in label_translated: category = t('v_cr_choice_analysis')
-                    elif t('v_cr_reading_comprehension') in label_translated: category = t('v_cr_reading_comprehension')
-                    elif t('v_cr_question_understanding') in label_translated: category = t('v_cr_question_understanding')
-                    elif t('v_rc_reading_comprehension') in label_translated: category = t('v_rc_reading_comprehension')
-                    elif t('v_rc_method') in label_translated: category = t('v_rc_method')
-                    elif t('v_foundational_mastery') in label_translated: category = t('v_foundational_mastery')
-                    elif t('v_efficiency_issues') in label_translated: category = t('v_efficiency_issues')
-                    # No need to check for INVALID_DATA_TAG_V here as it was filtered out from combo_diagnostic_params_raw
-                    elif t('v_behavioral_patterns') in label_translated: category = t('v_behavioral_patterns')
-                    else: category = t('v_other_issues')
-                    if category not in categorized_labels_for_combo: categorized_labels_for_combo[category] = []
-                    categorized_labels_for_combo[category].append(label_translated)
+    #             # Categorize these specific translated labels
+    #             categorized_labels_for_combo = {}
+    #             for label_translated in combo_diagnostic_labels_translated:
+    #                 category = None
+    #                 if t('v_cr_reasoning_barrier') in label_translated: category = t('v_cr_reasoning_barrier')
+    #                 elif t('v_cr_method_application') in label_translated: category = t('v_cr_method_application')
+    #                 elif t('v_cr_choice_analysis') in label_translated: category = t('v_cr_choice_analysis')
+    #                 elif t('v_cr_reading_comprehension') in label_translated: category = t('v_cr_reading_comprehension')
+    #                 elif t('v_cr_question_understanding') in label_translated: category = t('v_cr_question_understanding')
+    #                 elif t('v_rc_reading_comprehension') in label_translated: category = t('v_rc_reading_comprehension')
+    #                 elif t('v_rc_method') in label_translated: category = t('v_rc_method')
+    #                 elif t('v_foundational_mastery') in label_translated: category = t('v_foundational_mastery')
+    #                 elif t('v_efficiency_issues') in label_translated: category = t('v_efficiency_issues')
+    #                 # No need to check for INVALID_DATA_TAG_V here as it was filtered out from combo_diagnostic_params_raw
+    #                 elif t('v_behavioral_patterns') in label_translated: category = t('v_behavioral_patterns')
+    #                 else: category = t('v_other_issues')
+    #                 if category not in categorized_labels_for_combo: categorized_labels_for_combo[category] = []
+    #                 categorized_labels_for_combo[category].append(label_translated)
 
-                if not categorized_labels_for_combo: # If after categorization, no relevant labels found
-                    continue
+    #             if not categorized_labels_for_combo: # If after categorization, no relevant labels found
+    #                 continue
 
-                # 將時間表現標籤翻譯成中文
-                time_perf_translated = t(time_perf_reflect)
+    #             # 將時間表現標籤翻譯成中文
+    #             time_perf_translated = t(time_perf_reflect)
                 
-                report_lines.append(f"    {prompt_idx}. {skill_reflect} ({time_perf_translated})")
-                report_lines.append(f"        {t('v_reflection_direction')}")
+    #             report_lines.append(f"    {prompt_idx}. {skill_reflect} ({time_perf_translated})")
+    #             report_lines.append(f"        {t('v_reflection_direction')}")
                 
-                # Add an empty line before categories to prevent Markdown from interpreting as code block
-                report_lines.append("")
+    #             # Add an empty line before categories to prevent Markdown from interpreting as code block
+    #             report_lines.append("")
                 
-                # Create lines for each category separately (no longer using categories_for_this_prompt_text list)
-                category_lines_added = False
-                category_lines = []  # 用來收集所有類別行
+    #             # Create lines for each category separately (no longer using categories_for_this_prompt_text list)
+    #             category_lines_added = False
+    #             category_lines = []  # 用來收集所有類別行
                 
-                for category_reflect_key in category_order_reflect:
-                    if category_reflect_key in categorized_labels_for_combo and categorized_labels_for_combo[category_reflect_key]:
-                        # 針對此類別的標籤做排序
-                        sorted_labels = sorted([
-                            l.replace(f'{category_reflect_key}: ', '').replace(category_reflect_key, '').strip('【】')
-                            for l in categorized_labels_for_combo[category_reflect_key]
-                        ])
+    #             for category_reflect_key in category_order_reflect:
+    #                 if category_reflect_key in categorized_labels_for_combo and categorized_labels_for_combo[category_reflect_key]:
+    #                     # 針對此類別的標籤做排序
+    #                     sorted_labels = sorted([
+    #                         l.replace(f'{category_reflect_key}: ', '').replace(category_reflect_key, '').strip('【】')
+    #                         for l in categorized_labels_for_combo[category_reflect_key]
+    #                     ])
                         
-                        # 將排序好的標籤以【】包圍並以、連接
-                        labels_in_category_text = "、".join([f"【{label}】" for label in sorted_labels])
+    #                     # 將排序好的標籤以【】包圍並以、連接
+    #                     labels_in_category_text = "、".join([f"【{label}】" for label in sorted_labels])
                         
-                        if labels_in_category_text:
-                            # 每個類別獨立成行，放入臨時列表
-                            category_lines.append(f"        【{category_reflect_key}】：{labels_in_category_text}")
-                            category_lines_added = True
+    #                     if labels_in_category_text:
+    #                         # 每個類別獨立成行，放入臨時列表
+    #                         category_lines.append(f"        【{category_reflect_key}】：{labels_in_category_text}")
+    #                         category_lines_added = True
                 
-                # 收集好所有類別行後，用兩個換行符加入報告
-                if category_lines:
-                    # 將所有類別行以雙換行符連接，確保每行在輸出中正確分開
-                    joined_categories = "\n\n".join(category_lines)
-                    report_lines.append(joined_categories)
-                    reflection_prompts_generated = True
-                    report_lines.append("")  # 確保與結尾「等問題」有一行空白
-                    report_lines.append(f"        {t('v_problems_conclusion')}")
-                    report_lines.append("") 
-                    prompt_idx +=1
-                # If no categories_for_this_prompt_text, this combo won't be added, handled by outer continue statements
+    #             # 收集好所有類別行後，用兩個換行符加入報告
+    #             if category_lines:
+    #                 # 將所有類別行以雙換行符連接，確保每行在輸出中正確分開
+    #                 joined_categories = "\n\n".join(category_lines)
+    #                 report_lines.append(joined_categories)
+    #                 reflection_prompts_generated = True
+    #                 report_lines.append("")  # 確保與結尾「等問題」有一行空白
+    #                 report_lines.append(f"        {t('v_problems_conclusion')}")
+    #                 report_lines.append("") 
+    #                 prompt_idx +=1
+    #             # If no categories_for_this_prompt_text, this combo won't be added, handled by outer continue statements
 
-    if not reflection_prompts_generated:
-        report_lines.append(f"    * {t('v_default_reflection_prompt')}")
-    report_lines.append("") # Spacing after major section IV
+    # if not reflection_prompts_generated:
+    #     report_lines.append(f"    * {t('v_default_reflection_prompt')}")
+    # report_lines.append("") # Spacing after major section IV
 
-    # --- V. 尋求進階協助 (質化分析) --- (Matches DI: V, from V's "質化分析建議")
-    report_lines.append(t('v_seek_advanced_assistance'))
-    report_lines.append("")
-    # V's logic for qualitative_analysis_trigger
-    # Re-evaluate based on original V logic:
-    # qualitative_analysis_trigger was set if time_cat in ['Normal Time & Wrong', 'Slow & Wrong', 'Slow & Correct']
-    # AND (complex_params were present OR time_cat == 'Slow & Correct')
-    # This is complex to re-evaluate here without the full row-wise iteration.
-    # For simplicity and to maintain original information, we can use the `qualitative_analysis_trigger`
-    # that would have been set by the original logic flow if we were to run it.
-    # However, `qualitative_analysis_trigger` was not directly passed into this function, it was calculated inside.
-    # Let's use a simplified condition like DI, based on presence of certain complex issues or SFE.
-    show_qualitative_suggestion_v = False
-    complex_params_codes_v = {
-        'CR_REASONING_CHAIN_ERROR', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY',
-        'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY',
-        'RC_REASONING_INFERENCE_WEAKNESS'
-    }
-    if sfe_triggered_overall or any(p in triggered_params_all for p in complex_params_codes_v):
-        show_qualitative_suggestion_v = True
-    # Additionally, V original logic also triggered qualitative for any 'Slow & Correct'
-    if diagnosed_df_ch3_raw is not None and not diagnosed_df_ch3_raw.empty and 'time_performance_category' in diagnosed_df_ch3_raw.columns:
-        if (diagnosed_df_ch3_raw['time_performance_category'] == 'Slow & Correct').any():
-             show_qualitative_suggestion_v = True
+    # --- V. 尋求進階協助 (質化分析) --- (暫時註解掉不顯示)
+    # report_lines.append(t('v_seek_advanced_assistance'))
+    # report_lines.append("")
+    # # V's logic for qualitative_analysis_trigger
+    # # Re-evaluate based on original V logic:
+    # # qualitative_analysis_trigger was set if time_cat in ['Normal Time & Wrong', 'Slow & Wrong', 'Slow & Correct']
+    # # AND (complex_params were present OR time_cat == 'Slow & Correct')
+    # # This is complex to re-evaluate here without the full row-wise iteration.
+    # # For simplicity and to maintain original information, we can use the `qualitative_analysis_trigger`
+    # # that would have been set by the original logic flow if we were to run it.
+    # # However, `qualitative_analysis_trigger` was not directly passed into this function, it was calculated inside.
+    # # Let's use a simplified condition like DI, based on presence of certain complex issues or SFE.
+    # show_qualitative_suggestion_v = False
+    # complex_params_codes_v = {
+    #     'CR_REASONING_CHAIN_ERROR', 'CR_REASONING_CORE_ISSUE_ID_DIFFICULTY',
+    #     'RC_READING_SENTENCE_STRUCTURE_DIFFICULTY', 'RC_READING_PASSAGE_STRUCTURE_DIFFICULTY',
+    #     'RC_REASONING_INFERENCE_WEAKNESS'
+    # }
+    # if sfe_triggered_overall or any(p in triggered_params_all for p in complex_params_codes_v):
+    #     show_qualitative_suggestion_v = True
+    # # Additionally, V original logic also triggered qualitative for any 'Slow & Correct'
+    # if diagnosed_df_ch3_raw is not None and not diagnosed_df_ch3_raw.empty and 'time_performance_category' in diagnosed_df_ch3_raw.columns:
+    #     if (diagnosed_df_ch3_raw['time_performance_category'] == 'Slow & Correct').any():
+    #          show_qualitative_suggestion_v = True
 
-    if show_qualitative_suggestion_v:
-        report_lines.append(f"    * {t('v_qualitative_analysis_suggestion')}")
-    else:
-        report_lines.append(f"    * {t('v_analysis_clear_note')}")
-    report_lines.append("")
+    # if show_qualitative_suggestion_v:
+    #     report_lines.append(f"    * {t('v_qualitative_analysis_suggestion')}")
+    # else:
+    #     report_lines.append(f"    * {t('v_analysis_clear_note')}")
+    # report_lines.append("")
 
     # --- Section for AI Tool Recommendations (Commented out to match DI's handling in summary) ---
     # This part is handled by generate_v_ai_tool_recommendations, which is usually called separately.
