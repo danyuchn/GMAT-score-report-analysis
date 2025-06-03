@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """Manages session state for the GMAT Diagnosis App."""
 import streamlit as st
-from gmat_diagnosis_app.i18n import set_language, get_language
+import pandas as pd
+from gmat_diagnosis_app.i18n import set_language, get_language, translate as t
+from gmat_diagnosis_app.utils.secondary_evidence_utils import generate_dynamic_secondary_evidence_suggestions
 
 def init_session_state():
     """Initialize session state variables with default values"""
@@ -44,7 +46,9 @@ def init_session_state():
         'ai_prompts_need_regeneration': False,
         # --- Language State ---
         'current_language': 'zh-TW', # Default to Traditional Chinese
-        'language_changed': False # Track if language has been changed
+        'language_changed': False, # Track if language has been changed
+        # --- Global Tag Warning State ---
+        'global_tag_warning': {'triggered': False}, # Global diagnostic tag warning state
     }
     
     for key, value in defaults.items():
@@ -114,6 +118,75 @@ def ensure_chat_history_persistence():
     # 每次調用時都更新備份
     st.session_state.chat_history_backup = st.session_state.chat_history.copy()
 
+def check_global_diagnostic_tag_warning(processed_df):
+    """
+    Check if the average number of diagnostic tags per question exceeds 3.
+    Generate global warning and secondary evidence suggestions if needed.
+    
+    Args:
+        processed_df (pd.DataFrame): The processed dataframe with diagnostic tags
+        
+    Returns:
+        dict: Warning information including trigger status and suggestions
+    """
+    warning_info = {
+        'triggered': False,
+        'avg_tags_per_question': 0.0,
+        'total_questions': 0,
+        'total_tags': 0,
+        'secondary_evidence_suggestions': {}
+    }
+    
+    if processed_df is None or processed_df.empty:
+        return warning_info
+    
+    # Check if diagnostic_params_list column exists
+    if 'diagnostic_params_list' not in processed_df.columns:
+        return warning_info
+    
+    # Filter out invalid data (questions marked as invalid)
+    valid_df = processed_df.copy()
+    if 'is_invalid' in processed_df.columns:
+        valid_df = processed_df[~processed_df['is_invalid'].fillna(False)]
+    
+    if valid_df.empty:
+        return warning_info
+    
+    total_questions = len(valid_df)
+    total_tags = 0
+    
+    # Count diagnostic tags per question
+    for _, row in valid_df.iterrows():
+        tags = row.get('diagnostic_params_list', '')
+        if isinstance(tags, list):
+            # If it's already a list, count non-empty items
+            tag_count = len([tag for tag in tags if tag and str(tag).strip()])
+            total_tags += tag_count
+        elif isinstance(tags, str) and tags.strip():
+            # If it's a string, split by comma and count non-empty tags
+            tag_count = len([tag.strip() for tag in tags.split(',') if tag.strip()])
+            total_tags += tag_count
+    
+    # Calculate average tags per question
+    avg_tags_per_question = total_tags / total_questions if total_questions > 0 else 0
+    
+    warning_info.update({
+        'avg_tags_per_question': avg_tags_per_question,
+        'total_questions': total_questions,
+        'total_tags': total_tags
+    })
+    
+    # Check if warning should be triggered (average > 3 tags per question)
+    if avg_tags_per_question > 3.0:
+        warning_info['triggered'] = True
+        
+        # Generate dynamic subject-specific secondary evidence suggestions
+        # based on actual diagnostic parameters instead of hardcoded translations
+        dynamic_suggestions = generate_dynamic_secondary_evidence_suggestions(valid_df)
+        warning_info['secondary_evidence_suggestions'] = dynamic_suggestions
+    
+    return warning_info
+
 # Helper function to update session state after analysis (called from diagnosis_manager.py)
 # This is not part of the original file, but it's a good place to ensure original_processed_df is set.
 # We'll call this from diagnosis_manager.py instead of directly modifying session state there.
@@ -121,8 +194,14 @@ def set_analysis_results(processed_df, report_dict, final_thetas, theta_plots, c
     st.session_state.processed_df = processed_df
     if processed_df is not None:
         st.session_state.original_processed_df = processed_df.copy() # Save a copy for reset
+        
+        # Check for global diagnostic tag warning
+        tag_warning = check_global_diagnostic_tag_warning(processed_df)
+        st.session_state.global_tag_warning = tag_warning
     else:
         st.session_state.original_processed_df = None
+        st.session_state.global_tag_warning = {'triggered': False}
+        
     st.session_state.report_dict = report_dict
     st.session_state.final_thetas = final_thetas
     st.session_state.theta_plots = theta_plots

@@ -11,6 +11,216 @@ Correct:
 [Insert corrected code or logic]
 ```
 
+## 引導性反思提示診斷標籤完整顯示 (2025-06-03)
+
+**Status: COMPLETED ✅**
+
+### 問題描述:
+用戶要求修改引導性反思提示（針對具體組合）中的診斷標籤顯示方式：
+1. 不要用「...等問題」的表述
+2. 不要只列出前幾個標籤（之前限制為3個）
+3. 要列出所有相關的診斷標籤
+
+### 修正前的錯誤實施:
+```python
+# 在Q科、V科、DI科的反思提示生成中
+diagnostic_params = row.get('diagnostic_params_list', [])
+if diagnostic_params:
+    unique_params = list(set([str(p).strip() for p in diagnostic_params if p and str(p).strip()]))
+    params_text = '、'.join(unique_params[:3])  # 限制只顯示前3個
+    if len(unique_params) > 3:
+        params_text += ' 等問題。'  # 超過3個時加上"等問題"
+    else:
+        params_text += ' 等問題。'  # 3個以內也加上"等問題"
+else:
+    params_text = '相關錯誤類型等問題。'  # 後備文字也有"等問題"
+```
+
+### 修正後的正確實施:
+```python
+# 在Q科、V科、DI科的反思提示生成中
+diagnostic_params = row.get('diagnostic_params_list', [])
+if diagnostic_params:
+    unique_params = list(set([str(p).strip() for p in diagnostic_params if p and str(p).strip()]))
+    params_text = '、'.join(unique_params)  # 顯示所有標籤，移除[:3]限制
+    params_text += '。'  # 移除"等問題"後綴，只加句號
+else:
+    params_text = '相關錯誤類型。'  # 後備文字也移除"等問題"
+```
+
+### 修改的檔案位置:
+- **檔案**: `gmat_diagnosis_app/ui/results_display.py`
+- **函數**: `display_enhanced_secondary_evidence_expander()`
+- **修改行數**: 3個section (Q科、V科、DI科) 各約10行
+
+### 修改效果:
+**修改前顯示**:
+```
+找尋【代數】【Problem Solving】的考前做題紀錄，找尋【Slow & Wrong】的題目，檢討並反思自己是否有：
+概念應用錯誤、計算錯誤、粗心問題 等問題。
+（涉及題目：第3題, 第7題, 第15題）
+```
+
+**修改後顯示**:
+```
+找尋【代數】【Problem Solving】的考前做題紀錄，找尋【Slow & Wrong】的題目，檢討並反思自己是否有：
+概念應用錯誤、計算錯誤、粗心問題、時間管理問題、基礎技能不熟練、題目理解錯誤。
+（涉及題目：第3題, 第7題, 第15題）
+```
+
+### 學習重點:
+1. **完整信息提供**: 不應為了簡潔而省略重要的診斷信息
+2. **用戶需求優先**: 用戶明確要求顯示所有標籤時應完全滿足
+3. **文字表述準確**: 避免使用「等問題」這類模糊表述，直接列出具體內容
+4. **一致性修改**: 需要在所有相關section（Q科、V科、DI科）中保持一致的修改
+
+### 影響範圍:
+- ✅ Q科引導性反思提示：完整顯示所有診斷標籤
+- ✅ V科引導性反思提示：完整顯示所有診斷標籤  
+- ✅ DI科引導性反思提示：完整顯示所有診斷標籤
+- ✅ 移除所有「等問題」後綴表述
+- ✅ 保持原有的具體題目編號顯示功能
+
+此修改讓用戶可以獲得更完整、更具體的診斷標籤信息，有助於進行更精確的二級證據查找和反思。
+
+## 全局診斷標籤警告功能實施 (2025-01-30)
+
+**Status: COMPLETED ✅ - 問題修正**
+
+### 問題發現與修正:
+
+**問題**: 用戶反應沒有看到全局警告顯示
+
+**根本原因**: `check_global_diagnostic_tag_warning` 函數中檢查的欄位名稱錯誤
+
+**錯誤實施**:
+```python
+# 檢查錯誤的欄位名稱
+if 'diagnostic_tags' not in processed_df.columns:
+    return warning_info
+
+tags = row.get('diagnostic_tags', '')
+```
+
+**正確實施**:
+```python
+# 檢查正確的欄位名稱
+if 'diagnostic_params_list' not in processed_df.columns:
+    return warning_info
+
+tags = row.get('diagnostic_params_list', '')
+# 還要處理 list 和 string 兩種資料型態
+if isinstance(tags, list):
+    tag_count = len([tag for tag in tags if tag and str(tag).strip()])
+elif isinstance(tags, str) and tags.strip():
+    tag_count = len([tag.strip() for tag in tags.split(',') if tag.strip()])
+```
+
+### HTML顯示問題修復 (2025-06-03 追加):
+
+**問題**: 全局警告顯示HTML代碼而不是正確渲染的內容
+
+**根本原因一**: 翻譯文字中包含markdown格式標記（`**粗體**`），但這些標記被放入HTML `<strong>` 標籤中時沒有被處理，導致顯示原始markdown代碼
+
+**根本原因二**: HTML字串中的縮排太多，被Streamlit誤識別為代碼塊
+
+**錯誤實施**:
+```python
+# 1. 翻譯文字包含markdown格式
+'global_tag_warning_primary_action': "**主要方法：回憶與修剪**",
+'global_tag_warning_secondary_action': "**輔助方法：二級證據分析**",
+
+# 2. HTML模板有過多縮排
+st.markdown(
+    f"""
+    <div style="
+        background-color: #fff3cd; 
+        border: 1px solid #ffeb3b; 
+        border-radius: 8px; 
+        padding: 16px; 
+        margin-bottom: 20px;
+        border-left: 5px solid #ff9800;
+    ">
+        <h4 style="color: #ff6f00; margin-top: 0;">⚠️ {t('global_tag_warning_title')}</h4>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+# 結果: 顯示HTML代碼而不是渲染內容
+```
+
+**正確實施**:
+```python
+# 1. 移除翻譯文字中的markdown格式標記
+'global_tag_warning_primary_action': "主要方法：回憶與修剪",
+'global_tag_warning_secondary_action': "輔助方法：二級證據分析",
+
+# 2. 移除HTML字串中的多餘縮排，使用單行格式
+st.markdown(
+f"""<div style="background-color: #fff3cd; border: 1px solid #ffeb3b; border-radius: 8px; padding: 16px; margin-bottom: 20px; border-left: 5px solid #ff9800;">
+<h4 style="color: #ff6f00; margin-top: 0;">⚠️ {t('global_tag_warning_title')}</h4>
+<p style="margin-bottom: 16px;">{t('global_tag_warning_message').format(avg_tags)}</p>
+</div>""",
+    unsafe_allow_html=True
+)
+# 結果: 正確渲染HTML內容
+```
+
+### 修正後的功能狀態:
+
+**1. 觸發邏輯正確**: 當平均每題診斷標籤數量 > 3 時觸發警告 ✅
+
+**2. 資料處理正確**: 能正確處理 `diagnostic_params_list` 欄位的 list 和 string 格式 ✅
+
+**3. 顯示位置正確**: 警告顯示在結果頁面最頂部 (`display_results()` 函數開始) ✅
+
+**4. UI 樣式完整**: 橙色警告容器、可摺疊的二級證據建議 ✅
+
+**5. HTML渲染正確**: 警告內容正確顯示，無HTML代碼洩漏 ✅
+
+**6. 測試驗證**: 
+- 平均4個標籤/題 → 觸發警告 ✅
+- 平均2個標籤/題 → 不觸發警告 ✅
+- HTML內容正確渲染 ✅
+
+### 學習重點:
+
+1. **欄位名稱一致性**: 確保所有函數中使用的欄位名稱與實際資料表結構一致
+2. **資料型態處理**: 診斷標籤欄位可能是 list 或 string 格式，需要兩種都處理
+3. **功能測試**: 實施後必須進行端到端測試以確認觸發條件正確
+4. **格式標記一致性**: 翻譯文字不應包含與目標顯示格式衝突的標記
+5. **HTML與Markdown混用**: 當使用HTML顯示時，翻譯文字應該是純文字，讓HTML處理格式
+
+### 當前狀態:
+全局警告功能已完全修正並正常運作。用戶現在應該能在分析完成後，如果平均診斷標籤數量超過3個，在結果頁面頂部看到正確渲染的醒目警告提示和修剪指導。
+
+### 翻譯載入問題的解決 (2025-01-30 追加):
+
+**問題**: 全局警告顯示翻譯鍵值而不是翻譯文本（如顯示 `global_tag_warning_title` 而不是 "⚠️ 診斷標籤過多警告"）
+
+**原因**: 翻譯系統緩存問題，新添加的翻譯字串沒有被正確載入
+
+**解決方案**:
+```bash
+# 1. 停止應用程式
+pkill -f "streamlit.*app.py"
+
+# 2. 清除翻譯模組緩存
+rm -rf gmat_diagnosis_app/i18n/__pycache__ gmat_diagnosis_app/i18n/translations/__pycache__
+
+# 3. 重新啟動應用程式
+python -m streamlit run gmat_diagnosis_app/app.py
+```
+
+**驗證**:
+- 翻譯系統載入1057個翻譯字串 ✅
+- `global_tag_warning_title` 正確翻譯為 "⚠️ 診斷標籤過多警告" ✅
+
+### 關鍵學習:
+1. **模組緩存影響**: Python 模組緩存可能導致新翻譯字串無法載入
+2. **完整重啟需求**: 修改翻譯文件後需要完全重啟應用程式並清除緩存
+3. **測試方法**: 可以通過直接調用翻譯函數來驗證翻譯是否正確載入
+
 ## GMAT Documentation.tex DI Logic Alignment Project (2025-06-01)
 
 **Status: COMPLETED ✅**
@@ -1536,3 +1746,323 @@ zip_file.writestr(
 4. ✅ 提供離線閱讀和分享的便利性
 
 **用戶影響:** 現在用戶可以獲得一個更方便的綜合文字報告，包含所有三科的診斷結果，適合打印、分享或與教師討論使用。
+
+## 二級證據提示邏輯動態化改進 (2025-06-03)
+
+**Status: COMPLETED ✅ - 動態二級證據建議實施**
+
+### 問題背景:
+
+**問題**: 用戶要求參考三個科目診斷報告中的二級證據提示邏輯，將expander「各科二級證據查找重點」中的硬編碼建議改為根據題型/領域/時間表現觸發映射的診斷標籤邏輯。
+
+**改進目標**: 
+1. 不要硬編碼的通用建議文字
+2. 根據實際診斷參數動態生成具體的查找重點
+3. 提供更精確、更有針對性的二級證據分析指導
+
+### 實施內容:
+
+**1. 創建動態二級證據工具函數**:
+```python
+# 新建檔案: gmat_diagnosis_app/utils/secondary_evidence_utils.py
+- get_diagnostic_param_mapping(): 診斷參數到重點領域的映射
+- generate_dynamic_secondary_evidence_suggestions(): 基於實際診斷參數生成建議
+- get_question_type_specific_guidance(): 題型特定指導
+- get_time_performance_specific_guidance(): 時間表現特定指導
+```
+
+**2. 修改全局警告系統**:
+```python
+# 修改檔案: gmat_diagnosis_app/session_manager.py
+- check_global_diagnostic_tag_warning() 函數
+- 從硬編碼翻譯字串改為動態建議生成
+- 整合 generate_dynamic_secondary_evidence_suggestions()
+```
+
+**3. 增強結果顯示功能**:
+```python
+# 修改檔案: gmat_diagnosis_app/ui/results_display.py
+- 新增 display_enhanced_secondary_evidence_expander() 函數
+- 修改 display_global_tag_warning() 使用增強的expander
+- 提供三層指導結構：
+  * 基於診斷結果的具體建議
+  * 按題型查找的詳細指導
+  * 按時間表現查找的指導
+  * 具體問題組合分析（最優先建議）
+```
+
+### 功能特點:
+
+**1. 診斷參數映射覆蓋範圍**:
+- Q科: 12個診斷參數（粗心、概念應用、計算錯誤、文字理解、基礎掌握等）
+- V科: 6個診斷參數（CR邏輯鏈、RC詞彙/句式/推理、基礎掌握等）
+- DI科: 10個診斷參數（文字理解、圖表解讀、數學概念、邏輯推理、MSR效率、基礎掌握等）
+
+**2. 動態建議生成邏輯**:
+- 從 processed_df 提取實際診斷參數
+- 按科目分組並去重診斷參數
+- 根據參數映射生成重點領域和查找策略
+- 添加科目特定的一般性指導
+- 包含樣本數量提醒
+
+**3. 增強的expander功能**:
+- **基於診斷結果的具體建議**: 根據實際觸發的診斷參數生成
+- **詳細查找指導**: 按科目展開的三層結構
+  * 按題型查找: 結合內容領域的題型特定指導
+  * 按時間表現查找: 針對問題時間表現類別的指導
+  * 具體組合分析: 顯示實際出現問題的具體組合（題型+領域+時間表現）
+
+**4. 智能顯示邏輯**:
+- 即使沒有觸發全局警告，也會顯示增強的expander
+- 過濾掉正確的時間表現類別（Fast & Correct, Normal Time & Correct）
+- 優先顯示具體問題組合，並標註題目數量
+
+### 技術優勢:
+
+**1. 非硬編碼設計**:
+- 所有建議都基於實際數據動態生成
+- 診斷參數映射可輕鬆擴展和修改
+- 支援未來新增診斷參數
+
+**2. 三科一致性**:
+- 遵循Q、V、DI三科診斷報告中的二級證據邏輯
+- 整合題型、內容領域、時間表現三個維度
+- 符合診斷框架文檔的分析方法
+
+**3. 用戶體驗**:
+- 漸進式展開的信息層次
+- 優先顯示最具體、最有針對性的建議
+- 包含實際問題組合和題目數量統計
+
+### 修正前後對比:
+
+**修正前**:
+```python
+# 硬編碼的科目建議
+if subject == 'Q':
+    warning_info['secondary_evidence_suggestions'][subject] = t('global_tag_secondary_evidence_q')
+elif subject == 'V':
+    warning_info['secondary_evidence_suggestions'][subject] = t('global_tag_secondary_evidence_v')
+elif subject == 'DI':
+    warning_info['secondary_evidence_suggestions'][subject] = t('global_tag_secondary_evidence_di')
+```
+
+**修正後**:
+```python
+# 動態生成基於實際診斷參數的建議
+dynamic_suggestions = generate_dynamic_secondary_evidence_suggestions(valid_df)
+warning_info['secondary_evidence_suggestions'] = dynamic_suggestions
+
+# 同時提供增強的expander，包含：
+# - 基於診斷結果的具體建議
+# - 按題型查找的詳細指導  
+# - 按時間表現查找的指導
+# - 具體問題組合分析
+```
+
+### 當前狀態:
+動態二級證據提示邏輯已完全實施並整合到現有系統中。用戶現在可以看到：
+1. 基於實際診斷參數的具體二級證據查找建議
+2. 按題型、時間表現、具體組合的分層指導
+3. 實際問題組合的優先建議與統計信息
+
+該功能完全取代了硬編碼的通用建議，提供了更精確、更有針對性的二級證據分析指導。
+
+## DataFrame 布爾值檢查錯誤修正 (2025-06-03)
+
+**Status: COMPLETED ✅ - DataFrame 布爾值錯誤已修正**
+
+### 錯誤詳情:
+
+**問題**: 在 `display_enhanced_secondary_evidence_expander` 函數中出現 `ValueError: The truth value of a DataFrame is ambiguous` 錯誤
+
+**錯誤原因**: 
+```python
+if not st.session_state.get('processed_df') and not st.session_state.get('original_processed_df'):
+```
+當 `st.session_state.get()` 返回 DataFrame 時，`not DataFrame` 會導致布爾值模糊錯誤。
+
+**解決方案**:
+```python
+# Wrong approach
+if not st.session_state.get('processed_df') and not st.session_state.get('original_processed_df'):
+
+# Correct approach  
+processed_df = st.session_state.get('processed_df')
+original_processed_df = st.session_state.get('original_processed_df')
+
+if (processed_df is None or processed_df.empty) and (original_processed_df is None or original_processed_df.empty):
+```
+
+**教訓**: 在檢查 pandas DataFrame 的存在性時，應該：
+1. 先將 DataFrame 賦值給變數
+2. 明確檢查 `is None` 和 `.empty` 
+3. 避免直接對 DataFrame 使用布爾運算符
+
+**修改檔案**: `gmat_diagnosis_app/ui/results_display.py` 的 `display_enhanced_secondary_evidence_expander` 函數
+
+## Streamlit 嵌套 Expander 錯誤修正 (2025-06-03)
+
+**Status: COMPLETED ✅ - 嵌套 expander 錯誤已修正**
+
+### 錯誤詳情:
+
+**問題**: `StreamlitAPIException: Expanders may not be nested inside other expanders.`
+
+**錯誤原因**: 在 `display_enhanced_secondary_evidence_expander` 函數中，已經在一個主要的 expander 內部（"🔍 各科二級證據查找重點"），然後又嘗試創建子 expanders。
+
+**解決方案**: 
+1. 保留主要的 expander 
+2. 將原本的嵌套 expanders 改為使用 `st.columns()` 進行水平佈局
+3. 使用 markdown 標題和項目符號來組織內容層次
+
+**修改前**:
+```python
+with st.expander("🔍 各科二級證據查找重點", expanded=False):
+    # 主要內容
+    with st.expander(f"{subject}科按題型查找", expanded=False):  # ❌ 嵌套 expander
+        # 子內容
+```
+
+**修改後**:
+```python
+with st.expander("🔍 各科二級證據查找重點", expanded=False):
+    # 主要內容
+    col1, col2, col3 = st.columns(3)  # ✅ 使用 columns 代替嵌套 expander
+    with col1:
+        st.markdown(f"**{subject}科按題型查找:**")
+        # 子內容
+```
+
+**教訓**: 
+1. Streamlit 不允許 expander 嵌套
+2. 使用 `st.columns()` 或 `st.container()` 來組織複雜的佈局結構
+3. 用 markdown 標題和格式化來替代嵌套 expanders 的層次感
+
+**修改檔案**: `gmat_diagnosis_app/ui/results_display.py` 的 `display_enhanced_secondary_evidence_expander` 函數
+
+## 二級證據查找重點功能簡化 (2025-06-03)
+
+**Status: COMPLETED ✅ - 功能已簡化為只包含具體組合**
+
+### 修改需求:
+
+**用戶要求**: 詳細查找指導中只需要有具體組合，邏輯是參考各科文字報告中的引導反思提示。
+
+### 實施內容:
+
+**簡化前**: 包含三個部分
+1. 按題型查找
+2. 按時間表現查找  
+3. 具體組合分析
+
+**簡化後**: 只保留具體組合分析，並參考各科診斷報告的引導反思邏輯
+
+**新的實施邏輯**:
+```python
+# Q科: 按【基礎技能】【題型】【時間表現】組合
+reflection_prompt = f"找尋【{skill}】【{qtype}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並反思自己是否有："
+
+# V科: 按【基礎技能】【時間表現】組合  
+reflection_prompt = f"找尋【{skill}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並反思自己是否有："
+
+# DI科: 按【內容領域】【題型】【時間表現】組合
+reflection_prompt = f"找尋【{domain}】【{qtype}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並反思自己是否有："
+```
+
+**參考來源**: 
+- Q科診斷報告中的 "引導性反思提示 (針對特定技能與表現)"
+- V科診斷報告中的 "引導性反思提示" 
+- DI科診斷報告中的 "引導性反思提示 (針對特定題型與表現)"
+
+**顯示格式**:
+- 每個組合顯示具體的反思提示
+- 包含該組合涉及的診斷參數
+- 顯示涉及的題目數量
+
+**修改檔案**: `gmat_diagnosis_app/ui/results_display.py` 的 `display_enhanced_secondary_evidence_expander` 函數
+
+## 二級證據查找重點顯示具體題目序號 (2025-06-03)
+
+**Status: COMPLETED ✅ - 改為顯示具體題目序號**
+
+### 修改需求:
+
+**用戶要求**: 現在顯示的是「涉及N題」（N是題目數量），但是想要具體到涉及第幾題（題目序號），這樣才能讓考生精確知道自己要去修剪哪題的診斷標籤。
+
+### 實施內容:
+
+**修改前**:
+```python
+'question_position': 'count'  # 計算題目數量
+# 顯示：*（涉及 3 題）*
+```
+
+**修改後**:
+```python
+'question_position': lambda x: sorted(list(x))  # 收集具體題目序號
+question_list = ', '.join([f"第{q}題" for q in question_numbers])
+# 顯示：*（涉及題目：第5題, 第12題, 第18題）*
+```
+
+### 功能改進:
+
+1. **精確定位**: 考生能明確知道要檢視哪些具體題目
+2. **便於修剪**: 可以精確到具體題目進行診斷標籤修剪
+3. **排序顯示**: 題目序號按升序排列，便於查找
+4. **清晰格式**: 使用「第X題」的格式，符合中文表達習慣
+
+### 顯示格式範例:
+
+```
+1. 找尋【代數】【PURE】的考前做題紀錄，找尋【Fast & Wrong】的題目，檢討並反思自己是否有：
+   概念應用錯誤、計算錯誤、粗心問題等問題。
+   *（涉及題目：第3題, 第7題, 第15題）*
+
+2. 找尋【幾何】【REAL】的考前做題紀錄，找尋【Slow & Wrong】的題目，檢討並反思自己是否有：
+   文字理解問題、概念應用錯誤等問題。
+   *（涉及題目：第11題, 第22題）*
+```
+
+**修改檔案**: `gmat_diagnosis_app/ui/results_display.py` 的 `display_enhanced_secondary_evidence_expander` 函數
+
+## 移除通用動態建議文字 (2025-06-03)
+
+**Status: COMPLETED ✅ - 已移除通用建議文字**
+
+### 修改需求:
+
+**用戶要求**: 刪除「基於您的診斷結果的具體建議」這一段文字，包括Q科、V科、DI科的通用建議。
+
+### 移除的內容:
+
+**刪除的文字段落**:
+```
+基於您的診斷結果的具體建議
+Q科二級證據重點（基於您的診斷結果）：
+- 特別注意：對比REAL和PURE題型的表現差異
+- 注意：樣本數量少於10題時，統計參考價值有限
+
+V科二級證據重點（基於您的診斷結果）：
+- 特別注意：區分CR和RC題型的不同問題模式
+- 注意：樣本數量少於10題時，統計參考價值有限
+
+DI科二級證據重點（基於您的診斷結果）：
+- 特別注意：分析不同題型（DS、TPA、GT、MSR）的錯誤集中點
+- MSR題組：重點關注閱讀效率與時間分配問題
+- 注意：樣本數量少於10題時，統計參考價值有限
+```
+
+### 修改內容:
+
+1. **移除顯示邏輯**: 刪除了顯示 `dynamic_suggestions` 的部分
+2. **移除生成邏輯**: 刪除了 `generate_dynamic_secondary_evidence_suggestions()` 的調用
+3. **簡化結構**: 現在只顯示「引導性反思提示（針對具體組合）」
+
+### 簡化後的結構:
+
+現在 `🔍 各科二級證據查找重點` expander 只包含：
+- 引導性反思提示（針對具體組合）
+- 具體的題目序號和診斷參數
+
+**修改檔案**: `gmat_diagnosis_app/ui/results_display.py` 的 `display_enhanced_secondary_evidence_expander` 函數

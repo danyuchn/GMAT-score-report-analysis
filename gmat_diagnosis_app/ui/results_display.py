@@ -15,6 +15,11 @@ from gmat_diagnosis_app.ui.chat_interface import display_chat_interface
 from gmat_diagnosis_app.services.openai_service import trim_diagnostic_tags_with_openai
 import logging
 import traceback # Added for more detailed error logging in download
+from gmat_diagnosis_app.utils.secondary_evidence_utils import (
+    generate_dynamic_secondary_evidence_suggestions,
+    get_question_type_specific_guidance,
+    get_time_performance_specific_guidance
+)
 
 # --- Force Logging Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s') # UNCOMMENTED
@@ -621,12 +626,239 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
 
     return "\n".join(report_parts)
 
+def display_enhanced_secondary_evidence_expander():
+    """Display enhanced secondary evidence search guidance based on actual diagnostic parameters."""
+    
+    # Get dataframes from session state
+    processed_df = st.session_state.get('processed_df')
+    original_processed_df = st.session_state.get('original_processed_df')
+    
+    # Check if we have any valid data
+    if (processed_df is None or processed_df.empty) and (original_processed_df is None or original_processed_df.empty):
+        return
+    
+    # Use processed_df if available, otherwise fall back to original_processed_df
+    df_to_analyze = processed_df if processed_df is not None and not processed_df.empty else original_processed_df
+    
+    if df_to_analyze is None or df_to_analyze.empty:
+        return
+    
+    # Generate specific combination guidance (similar to guided reflection prompts in reports)
+    specific_combinations = {}
+    
+    # Filter out invalid data
+    valid_df = df_to_analyze.copy()
+    if 'is_invalid' in df_to_analyze.columns:
+        valid_df = df_to_analyze[~df_to_analyze['is_invalid'].fillna(False)]
+    
+    if not valid_df.empty:
+        subjects_in_data = valid_df['Subject'].unique() if 'Subject' in valid_df.columns else []
+        
+        for subject in subjects_in_data:
+            if subject not in ['Q', 'V', 'DI']:
+                continue
+                
+            subject_df = valid_df[valid_df['Subject'] == subject]
+            specific_combinations[subject] = []
+            
+            # Generate specific combinations based on the logic from diagnostic reports
+            # This follows the "引導性反思提示" pattern from the reports
+            
+            # For each subject, group by meaningful combinations and generate reflection prompts
+            if subject == 'Q':
+                # Q科: 按【基礎技能】【題型】【時間表現】組合
+                group_cols = ['question_fundamental_skill', 'question_type', 'time_performance_category']
+                available_cols = [col for col in group_cols if col in subject_df.columns]
+                
+                if len(available_cols) >= 2:  # At least 2 dimensions available
+                    # Focus on problematic combinations (wrong or slow)
+                    problem_df = subject_df[
+                        (~subject_df['is_correct']) | 
+                        (subject_df['time_performance_category'].isin(['Slow & Correct', 'Slow & Wrong', 'Normal Time & Wrong', 'Fast & Wrong']))
+                    ] if 'is_correct' in subject_df.columns and 'time_performance_category' in subject_df.columns else subject_df
+                    
+                    if not problem_df.empty:
+                        combinations = problem_df.groupby(available_cols, observed=False, dropna=False).agg({
+                            'diagnostic_params_list': lambda x: [param for sublist in x if isinstance(sublist, list) for param in sublist] if 'diagnostic_params_list' in problem_df.columns else [],
+                            'question_position': lambda x: sorted(list(x))  # Collect specific question numbers
+                        }).reset_index()
+                        
+                        for _, row in combinations.iterrows():
+                            question_numbers = row.get('question_position', [])
+                            if question_numbers:  # Only show if there are actual question numbers
+                                skill = row.get('question_fundamental_skill', '未知技能')
+                                qtype = row.get('question_type', '未知題型') 
+                                time_perf = row.get('time_performance_category', '未知表現')
+                                
+                                # Generate reflection prompt in the style of diagnostic reports
+                                reflection_prompt = f"找尋【{skill}】【{qtype}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並反思自己是否有："
+                                
+                                # Extract diagnostic parameters for this combination
+                                diagnostic_params = row.get('diagnostic_params_list', [])
+                                if diagnostic_params:
+                                    unique_params = list(set([str(p).strip() for p in diagnostic_params if p and str(p).strip()]))
+                                    params_text = '、'.join(unique_params)  # Show all params, remove [:3] limit
+                                    params_text += '。'  # Remove "等問題" suffix, just add period
+                                else:
+                                    params_text = '相關錯誤類型。'  # Remove "等問題" from fallback text
+                                
+                                # Format question numbers for display
+                                question_list = ', '.join([f"第{q}題" for q in question_numbers])
+                                
+                                specific_combinations[subject].append({
+                                    'prompt': reflection_prompt,
+                                    'details': params_text,
+                                    'questions': question_list
+                                })
+            
+            elif subject == 'V':
+                # V科: 按【基礎技能】【時間表現】組合 (similar to V report logic)
+                group_cols = ['question_fundamental_skill', 'time_performance_category']
+                available_cols = [col for col in group_cols if col in subject_df.columns]
+                
+                if len(available_cols) >= 2:
+                    problem_df = subject_df[
+                        (~subject_df['is_correct']) | 
+                        (subject_df['time_performance_category'].isin(['Slow & Correct', 'Slow & Wrong', 'Normal Time & Wrong', 'Fast & Wrong']))
+                    ] if 'is_correct' in subject_df.columns and 'time_performance_category' in subject_df.columns else subject_df
+                    
+                    if not problem_df.empty:
+                        combinations = problem_df.groupby(available_cols, observed=False, dropna=False).agg({
+                            'diagnostic_params_list': lambda x: [param for sublist in x if isinstance(sublist, list) for param in sublist] if 'diagnostic_params_list' in problem_df.columns else [],
+                            'question_position': lambda x: sorted(list(x))  # Collect specific question numbers
+                        }).reset_index()
+                        
+                        for _, row in combinations.iterrows():
+                            question_numbers = row.get('question_position', [])
+                            if question_numbers:
+                                skill = row.get('question_fundamental_skill', '未知技能')
+                                time_perf = row.get('time_performance_category', '未知表現')
+                                
+                                reflection_prompt = f"找尋【{skill}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並反思自己是否有："
+                                
+                                diagnostic_params = row.get('diagnostic_params_list', [])
+                                if diagnostic_params:
+                                    unique_params = list(set([str(p).strip() for p in diagnostic_params if p and str(p).strip()]))
+                                    params_text = '、'.join(unique_params)  # Show all params, remove [:3] limit
+                                    params_text += '。'  # Remove "等問題" suffix, just add period
+                                else:
+                                    params_text = '相關錯誤類型。'  # Remove "等問題" from fallback text
+                                
+                                # Format question numbers for display
+                                question_list = ', '.join([f"第{q}題" for q in question_numbers])
+                                
+                                specific_combinations[subject].append({
+                                    'prompt': reflection_prompt,
+                                    'details': params_text,
+                                    'questions': question_list
+                                })
+            
+            elif subject == 'DI':
+                # DI科: 按【內容領域】【題型】【時間表現】組合 (similar to DI report logic)
+                group_cols = ['content_domain', 'question_type', 'time_performance_category']
+                available_cols = [col for col in group_cols if col in subject_df.columns]
+                
+                if len(available_cols) >= 2:
+                    problem_df = subject_df[
+                        (~subject_df['is_correct']) | 
+                        (subject_df['time_performance_category'].isin(['Slow & Correct', 'Slow & Wrong', 'Normal Time & Wrong', 'Fast & Wrong']))
+                    ] if 'is_correct' in subject_df.columns and 'time_performance_category' in subject_df.columns else subject_df
+                    
+                    if not problem_df.empty:
+                        combinations = problem_df.groupby(available_cols, observed=False, dropna=False).agg({
+                            'diagnostic_params_list': lambda x: [param for sublist in x if isinstance(sublist, list) for param in sublist] if 'diagnostic_params_list' in problem_df.columns else [],
+                            'question_position': lambda x: sorted(list(x))  # Collect specific question numbers
+                        }).reset_index()
+                        
+                        for _, row in combinations.iterrows():
+                            question_numbers = row.get('question_position', [])
+                            if question_numbers:
+                                domain = row.get('content_domain', '未知領域')
+                                qtype = row.get('question_type', '未知題型')
+                                time_perf = row.get('time_performance_category', '未知表現')
+                                
+                                reflection_prompt = f"找尋【{domain}】【{qtype}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並反思自己是否有："
+                                
+                                diagnostic_params = row.get('diagnostic_params_list', [])
+                                if diagnostic_params:
+                                    unique_params = list(set([str(p).strip() for p in diagnostic_params if p and str(p).strip()]))
+                                    params_text = '、'.join(unique_params)  # Show all params, remove [:3] limit
+                                    params_text += '。'  # Remove "等問題" suffix, just add period
+                                else:
+                                    params_text = '相關錯誤類型。'  # Remove "等問題" from fallback text
+                                
+                                # Format question numbers for display
+                                question_list = ', '.join([f"第{q}題" for q in question_numbers])
+                                
+                                specific_combinations[subject].append({
+                                    'prompt': reflection_prompt,
+                                    'details': params_text,
+                                    'questions': question_list
+                                })
+    
+    # Display the main expander
+    with st.expander("🔍 各科二級證據查找重點", expanded=False):
+        # Display specific reflection prompts (based on diagnostic report guided reflection logic)
+        if specific_combinations and any(specific_combinations.values()):
+            st.markdown("### 引導性反思提示（針對具體組合）")
+            st.markdown("*以下是基於您實際表現的具體查找建議，參考各科診斷報告的引導反思邏輯：*")
+            
+            for subject, combinations in specific_combinations.items():
+                if combinations:
+                    st.markdown(f"#### {subject}科具體反思指導")
+                    
+                    for i, combo in enumerate(combinations, 1):
+                        st.markdown(f"**{i}. {combo['prompt']}**")
+                        st.markdown(f"   {combo['details']}")
+                        st.markdown(f"   *（涉及題目：{combo['questions']}）*")
+                        st.markdown("")
+                    
+                    st.markdown("---")
+        else:
+            st.info("暫無足夠的診斷數據生成具體的二級證據建議。")
+
+def display_global_tag_warning():
+    """Display global diagnostic tag warning if triggered."""
+    warning_info = st.session_state.get('global_tag_warning', {'triggered': False})
+    
+    if not warning_info.get('triggered', False):
+        # Even if warning is not triggered, still show the enhanced expander if data is available
+        display_enhanced_secondary_evidence_expander()
+        return
+    
+    avg_tags = warning_info.get('avg_tags_per_question', 0.0)
+    
+    # Display warning container
+    with st.container():
+        st.markdown(
+f"""<div style="background-color: #fff3cd; border: 1px solid #ffeb3b; border-radius: 8px; padding: 16px; margin-bottom: 20px; border-left: 5px solid #ff9800;">
+<h4 style="color: #ff6f00; margin-top: 0;">⚠️ {t('global_tag_warning_title')}</h4>
+<p style="margin-bottom: 16px;">{t('global_tag_warning_message').format(avg_tags)}</p>
+<h5 style="color: #ff6f00; margin-bottom: 12px;">💡 {t('global_tag_warning_action_title')}</h5>
+<div style="margin-bottom: 12px;">
+<strong style="color: #333;">{t('global_tag_warning_primary_action')}</strong><br>
+{t('global_tag_warning_primary_desc')}
+</div>
+<div style="margin-bottom: 12px;">
+<strong style="color: #333;">{t('global_tag_warning_secondary_action')}</strong><br>
+{t('global_tag_warning_secondary_desc')}
+</div>
+</div>""",
+            unsafe_allow_html=True
+        )
+    
+    # Display enhanced secondary evidence suggestions instead of the basic ones
+    display_enhanced_secondary_evidence_expander()
+
 # --- Display Results Function (Moved from app.py) ---
 def display_results():
     """Displays all diagnostic results in separate tabs."""
     if not st.session_state.get("diagnosis_complete", False) and not st.session_state.get("original_processed_df") :
         st.info(t('display_results_no_analysis'))
         return
+
+    # Display global diagnostic tag warning at the top
+    display_global_tag_warning()
 
     tab_titles = [t('display_results_total_tab')]
     if st.session_state.get("consolidated_report_text"):

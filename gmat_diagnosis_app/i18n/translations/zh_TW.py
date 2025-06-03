@@ -1295,6 +1295,23 @@ TRANSLATIONS = {
     'edit_tags_old_ai_prompt': "這些是基於之前變更的建議。若需最新建議，請再次套用變更。",
     'ai_chat_no_key': "請在側邊欄輸入有效的管理金鑰以啟用 AI 問答功能。",
 
+    # Global diagnostic label warning translations
+    'global_tag_warning_title': "診斷標籤過多警告",
+    'global_tag_warning_message': "分析顯示平均每題診斷標籤量為 {:.1f} 個（超過建議的3個標籤）。建議您檢討模考情況並根據真實遇到的問題修剪診斷標籤，以獲得更客製化、精確的做題指導。",
+    'global_tag_warning_action_title': "建議行動",
+    'global_tag_warning_primary_action': "主要方法：回憶與修剪",
+    'global_tag_warning_primary_desc': "請回想考試時每題實際遇到的具體困難，然後在「編輯診斷標籤」頁面中移除不符合真實情況的標籤。",
+    'global_tag_warning_secondary_action': "輔助方法：二級證據分析",
+    'global_tag_warning_secondary_desc': "如果無法清楚回憶考試狀況或有疑問，可以檢視考前2-4週的做題數據作為「二級證據」，以下是各科建議的查找重點：",
+    
+    # Secondary evidence suggestions by subject
+    'global_tag_secondary_evidence_q': "**Q科二級證據重點：**\n- 查找相同基礎技能（如代數、幾何等）的錯題記錄\n- 分析是否重複出現相同類型的計算錯誤或概念混淆\n- 確認是文字理解問題還是數學概念問題",
+    'global_tag_secondary_evidence_v': "**V科二級證據重點：**\n- CR題：查找相同題型（如削弱、加強等）的錯誤模式\n- RC題：分析是閱讀理解障礙還是題目分析問題\n- 確認詞彙、句式、邏輯理解的具體困難點",
+    'global_tag_secondary_evidence_di': "**DI科二級證據重點：**\n- 按題型（DS、TPA、GT、MSR）分析錯誤集中點\n- 按內容領域（數學相關/非數學相關）檢視表現差異\n- MSR題組：特別關注閱讀效率與時間分配問題",
+    
+    'global_tag_warning_footer': "透過精確的診斷標籤修剪，您將獲得更有針對性的練習建議和學習指導。",
+    'global_tag_no_warning': "診斷標籤數量合理，無需特別修剪。",
+
     # Input tabs translations
     'input_tabs_upload_header': "1. 上傳或貼上各科成績單",
     'input_tabs_upload_info': "提示：上傳的 CSV 檔案大小請勿超過 {}MB。貼上的資料沒有此限制。",
@@ -1406,4 +1423,4 @@ TRANSLATIONS = {
     'DI_EFFICIENCY_BOTTLENECK_INTEGRATION': "DI 效率瓶頸: 多源整合速度",
     
     # DI Diagnostic Parameters - Difficulty Types (Slow & Wrong / Slow & Correct)
-} 
+}
