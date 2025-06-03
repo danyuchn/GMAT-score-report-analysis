@@ -8,7 +8,7 @@ V診斷模塊的建議生成功能
 import numpy as np
 import pandas as pd
 # Use i18n system instead of the old translation function
-from gmat_diagnosis_app.i18n import translate as t
+from gmat_diagnosis_app.i18n import t
 
 
 def generate_v_recommendations(v_diagnosis_results, exempted_skills):
@@ -46,9 +46,7 @@ def generate_v_recommendations(v_diagnosis_results, exempted_skills):
     for skill in sorted(list(all_skills_found)): # Iterate over all skills found in data
         if skill in exempted_skills:
             skill_display_name = t(skill)
-            exempt_text = f"針對【{skill_display_name}】技能，在本次測試中表現穩定（所有相關題目均正確且未超時），已豁免相關練習建議。"
-            # Replace with translation key
-            exempt_text = t('v_skill_exemption_note').format(skill_display_name)
+            exempt_text = f"{t('v_recommendation_targeting_skill')}【{skill_display_name}】{t('v_recommendation_skill_stable_performance')}。"
             exemption_recommendations.append({
                 'type': 'exemption', 
                 'text': exempt_text, 
@@ -70,9 +68,7 @@ def generate_v_recommendations(v_diagnosis_results, exempted_skills):
         # 1. Handle Override Rule
         if is_overridden and skill not in processed_macro_skills:
             skill_display_name = t(skill) # Translate skill name
-            macro_rec_text = f"針對【{skill_display_name}】技能，由於整體錯誤率偏高 (根據第六章分析)，建議全面鞏固基礎，可從中低難度題目開始系統性練習，掌握核心方法。"
-            # Replace with translation key
-            macro_rec_text = t('v_macro_consolidation_advice').format(skill_display_name)
+            macro_rec_text = f"{t('v_recommendation_targeting_skill')}【{skill_display_name}】{t('v_recommendation_skill_consolidation')}。"
             skill_recs_list.append({'type': 'macro', 'text': macro_rec_text, 'priority': 0})
             processed_macro_skills.add(skill)
 
@@ -130,31 +126,20 @@ def generate_v_recommendations(v_diagnosis_results, exempted_skills):
 
                     # 確定這項技能的最終聚合起始練習限時，取該技能下所有題目計算出的 Z_individual 中的最大值
                     max_z_minutes = max(z_minutes_list) if z_minutes_list else target_time_minutes
-                    z_text = f"{max_z_minutes:.1f} 分鐘"
-                    target_time_text = f"{target_time_minutes:.1f} 分鐘" # Use the calculated target time
-                    # Replace with translation keys
-                    z_text = t('v_minutes_format').format(max_z_minutes)
-                    target_time_text = t('v_minutes_format').format(target_time_minutes)
+                    z_text = f"{max_z_minutes:.1f} {t('di_recommendation_minute')}"
+                    target_time_text = f"{target_time_minutes:.1f} {t('di_recommendation_minute')}" # Use the calculated target time
 
                     # Check for SFE within the group
                     group_sfe = skill_rows['is_sfe'].any() if 'is_sfe' in skill_rows.columns else False
-                    sfe_prefix = "**基礎掌握不穩** - " if group_sfe else ""
-                    # Replace with translation key
-                    sfe_prefix = t('v_foundation_instability_prefix') if group_sfe else ""
+                    sfe_prefix = t("v_foundation_instability_marker") if group_sfe else ""
                     skill_display_name = t(skill) # Translate skill name
 
                     # Construct recommendation text
-                    case_rec_text = f"{sfe_prefix}針對【{skill_display_name}】建議練習【{y_grade}】難度題目，起始練習限時建議為【{z_text}】(最終目標時間: {target_time_text})。"
-                    # Replace with translation key
-                    case_rec_text = t('v_practice_recommendation_template').format(
-                        sfe_prefix, skill_display_name, y_grade, z_text, target_time_text
-                    )
+                    case_rec_text = f"{sfe_prefix}{t('v_recommendation_targeting_skill')}【{skill_display_name}】{t('v_recommendation_practice_suggestion')}【{y_grade}】{t('v_recommendation_difficulty_initial_time')}【{z_text}】({t('v_recommendation_final_target_time')}: {target_time_text})。"
 
                     # Add overlong alert if needed
                     if max_z_minutes - target_time_minutes > 2.0:
-                        case_rec_text += " **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效**"
-                        # Replace with translation key
-                        case_rec_text += f" {t('v_practice_volume_warning')}"
+                        case_rec_text += f" **{t('v_recommendation_excessive_time_warning')}**"
 
                     # Determine priority
                     priority = 1 if group_sfe else 2

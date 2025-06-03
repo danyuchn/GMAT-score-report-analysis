@@ -6,8 +6,11 @@ Q診斷模塊的報告生成功能
 """
 
 import pandas as pd
+import numpy as np
+import logging
+from collections import Counter
 # Use i18n system instead of the old translation function
-from gmat_diagnosis_app.i18n import translate as t
+from gmat_diagnosis_app.i18n import t
 from gmat_diagnosis_app.diagnostics.q_modules.utils import format_rate, map_difficulty_to_label
 from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMMENDATIONS
 
@@ -15,15 +18,15 @@ from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMME
 def generate_report_section3(triggered_params_translated, sfe_triggered, sfe_skills_involved):
     """Generates Section 3: Core Issue Diagnosis."""
     lines = []
-    lines.append("**B. 高頻潛在問題**")
+    lines.append(t("q_report_high_frequency_issues"))
     sfe_param_translated = t('Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE')
 
     if sfe_triggered:
-        sfe_note = f"特別值得注意的是，在已掌握技能領域的基礎或中等難度題目上出現錯誤（**{sfe_param_translated}**），"
+        sfe_note = f"{t('q_report_sfe_note_prefix')}{sfe_param_translated}{t('q_report_sfe_note_suffix')}"
         if sfe_skills_involved:
-            sfe_note += f"涉及技能：{', '.join(sorted(list(sfe_skills_involved)))}，顯示這些知識點應用存在穩定性問題。"
+            sfe_note += f"{t('q_report_sfe_skills_involved')}{'，'.join(sorted(list(sfe_skills_involved)))}{t('q_report_sfe_stability_issue')}"
         else:
-            sfe_note += "顯示基礎掌握存在穩定性問題。"
+            sfe_note += t("q_report_basic_stability_issue")
         lines.append(sfe_note)
         lines.append("")
 
@@ -38,31 +41,31 @@ def generate_report_section3(triggered_params_translated, sfe_triggered, sfe_ski
     param_eff_calc = t('Q_EFFICIENCY_BOTTLENECK_CALCULATION')
 
     if param_careless_detail in triggered_params_translated:
-        core_issue_summary.append(f"粗心傾向是失分原因（**{param_careless_detail}**）。")
+        core_issue_summary.append(f"{t('q_report_carelessness_core_issue')}{param_careless_detail}**){t('q_report_period_end')}")
     if (param_concept_app in triggered_params_translated or param_problem_under in triggered_params_translated) and not sfe_triggered:
          related_issues = []
          if param_concept_app in triggered_params_translated: related_issues.append(f"**{param_concept_app}**")
          if param_problem_under in triggered_params_translated: related_issues.append(f"**{param_problem_under}**")
-         core_issue_summary.append(f"概念理解存在問題：{'或'.join(related_issues)}。")
+         core_issue_summary.append(f"{t('q_report_concept_understanding_issue')}{t('q_report_or_connector').join(related_issues)}{t('q_report_period_end')}")
     if param_calculation in triggered_params_translated:
-        core_issue_summary.append(f"計算錯誤也是失分原因之一（**{param_calculation}**）。")
+        core_issue_summary.append(f"{t('q_report_calculation_core_issue')}{param_calculation}**){t('q_report_period_end')}")
     if param_reading_comp in triggered_params_translated:
-        core_issue_summary.append(f"Real題目的文字信息理解可能存在障礙（**{param_reading_comp}**）。")
+        core_issue_summary.append(f"{t('q_report_reading_comprehension_issue')}{param_reading_comp}**){t('q_report_period_end')}")
 
     efficiency_params_triggered = {p for p in triggered_params_translated if p in [param_eff_reading, param_eff_concept, param_eff_calc]}
     if efficiency_params_triggered:
         efficiency_contexts = []
-        if param_eff_reading in efficiency_params_triggered: efficiency_contexts.append("閱讀Real題目")
-        if param_eff_concept in efficiency_params_triggered: efficiency_contexts.append("概念思考")
-        if param_eff_calc in efficiency_params_triggered: efficiency_contexts.append("計算過程")
-        core_issue_summary.append(f"在{'、'.join(efficiency_contexts)}環節耗時較多（{', '.join([f'**{p}**' for p in sorted(list(efficiency_params_triggered))])}）。")
+        if param_eff_reading in efficiency_params_triggered: efficiency_contexts.append(t("q_report_reading_real_context"))
+        if param_eff_concept in efficiency_params_triggered: efficiency_contexts.append(t("q_report_concept_thinking_context"))
+        if param_eff_calc in efficiency_params_triggered: efficiency_contexts.append(t("q_report_calculation_process_context"))
+        core_issue_summary.append(f"{t('q_report_efficiency_issues_prefix')}{t('q_report_and_connector').join(efficiency_contexts)}{t('q_report_efficiency_issues_suffix')}{'， '.join([f'**{p}**' for p in sorted(list(efficiency_params_triggered))])}{t('q_report_closing_paren')}{t('q_report_period_end')}")
 
     if core_issue_summary:
         for line in core_issue_summary:
             lines.append(line)
             lines.append("")
     elif not sfe_triggered:
-        lines.append("未識別出明顯的核心問題模式。")
+        lines.append(t("q_report_no_obvious_core_issues"))
         lines.append("")
     return lines
 
@@ -70,19 +73,19 @@ def generate_report_section3(triggered_params_translated, sfe_triggered, sfe_ski
 def generate_report_section4(ch5_patterns):
     """Generates Section 4: Pattern Observation."""
     lines = []
-    lines.append("**C. 特殊行為模式觀察**")
+    lines.append(t("q_report_pattern_observation"))
     pattern_found = False
     param_early_rush = t('Q_BEHAVIOR_EARLY_RUSHING_FLAG_RISK')
     param_careless_issue = t('Q_BEHAVIOR_CARELESSNESS_ISSUE')
 
     if ch5_patterns.get('early_rushing_flag', False):
-        lines.append(f"考試初期部分題目答題節奏偏快，建議保持穩定的答題節奏以避免潛在的\"標記復查\"風險。（**{param_early_rush}**）")
+        lines.append(f"{t('q_report_early_rushing_advice')}{param_early_rush}**){t('q_report_closing_paren')}")
         pattern_found = True
     if ch5_patterns.get('carelessness_issue_flag', False):
-        lines.append(f"快速答錯比例較高（{ch5_patterns.get('fast_wrong_rate', 0):.1%}），存在粗心傾向。（**{param_careless_issue}**）")
+        lines.append(f"{t('q_report_carelessness_pattern')}{ch5_patterns.get('fast_wrong_rate', 0):.1%}{t('q_report_carelessness_tendency')}{param_careless_issue}**){t('q_report_closing_paren')}")
         pattern_found = True
     if not pattern_found:
-        lines.append("未發現特殊行為模式。")
+        lines.append(t("q_report_no_special_patterns"))
     lines.append("")
     return lines
 
@@ -90,13 +93,13 @@ def generate_report_section4(ch5_patterns):
 def generate_report_section5(ch6_override):
     """Generates Section 5: Foundational Consolidation Hint."""
     lines = []
-    lines.append("**A. 優先鞏固技能**")
+    lines.append(t("q_report_prioritize_skills"))
     override_skills_list = [skill for skill, data in ch6_override.items() if data.get('triggered', False)]
     if override_skills_list:
         skill_text = ', '.join(sorted(override_skills_list))
-        lines.append(f"對於 {skill_text} 這些核心技能，由於整體表現顯示有明顯提升空間，建議優先進行系統性基礎鞏固，而非僅針對個別錯題。")
+        lines.append(f"{t('q_report_regarding')} {skill_text} {t('q_report_core_skills_improvement')}。")
     else:
-        lines.append("當前未發現需要優先全面基礎鞏固的技能領域。")
+        lines.append(t("q_report_foundational_consolidation"))
     lines.append("")
     return lines
 
@@ -104,16 +107,16 @@ def generate_report_section5(ch6_override):
 def generate_report_section6(q_recommendations, sfe_triggered):
     """Generates Section 6: Practice Plan Presentation."""
     lines = []
-    lines.append("**B. 整體練習方向**")
+    lines.append(t("q_report_practice_direction"))
     if sfe_triggered:
-        lines.append("（註：涉及\"Foundation Mastery Instability\"的建議以優先級列出）")
+        lines.append(t("q_report_sfe_priority_note"))
         lines.append("")
     
     if q_recommendations:
         for rec in q_recommendations: # Assumes q_recommendations is already formatted list of strings
             lines.append(rec)
     else:
-        lines.append("暫無具體練習建議。")
+        lines.append(t("q_report_no_practice_suggestions"))
     lines.append("")
     return lines
 
@@ -121,17 +124,17 @@ def generate_report_section6(q_recommendations, sfe_triggered):
 def generate_report_section7(triggered_params_translated, sfe_skills_involved, df_diagnosed):
     """Generates Section 7: Follow-up Action Guidance."""
     lines = []
-    lines.append("**A. 練習記錄回顧（次要證據參考）**")
+    lines.append(t("q_report_practice_record_review"))
     
     # 確保有可用的數據
     if df_diagnosed is not None and not df_diagnosed.empty:
-        lines.append("目的：當您無法準確回憶具體錯誤原因、涉及知識點，或需要更客觀數據確認問題模式時。")
+        lines.append(t("q_report_purpose_explanation"))
         lines.append("")
-        lines.append("方法：建議按照以下指導反思回顧近期練習記錄，整理相關錯題或超時題目。")
+        lines.append(t("q_report_method_explanation"))
         lines.append("")
         
         # 重點關注核心問題
-        lines.append("重點關注：題目是否重複涉及報告第III部分指出的核心問題：")
+        lines.append(t("q_report_focus_core_issues"))
         core_issues = [t("Q_CARELESSNESS_DETAIL_OMISSION"), t("Q_CONCEPT_APPLICATION_ERROR"), t("Q_CALCULATION_ERROR"), t("Q_READING_COMPREHENSION_ERROR")]
         if sfe_skills_involved:
             core_issues.append(t("Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE"))
@@ -139,14 +142,14 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
         for issue in core_issues:
             lines.append(f"- {issue}")
         lines.append("")
-        lines.append("**注意**：如果樣本不足，請注意在接下來的練習中收集，以便更準確地識別問題。")
+        lines.append(t("q_report_sample_insufficient_note"))
     else:
-        lines.append("目前缺乏足夠的診斷數據進行次要證據分析。")
+        lines.append(t("q_report_insufficient_data"))
     
     lines.append("")
     
     # --- Reflection Prompts ---
-    lines.append("**B. 引導反思提示（針對具體技能與表現）**")
+    lines.append(t("q_report_reflection_prompts"))
     lines.append("")
     
     # 從診斷數據中提取基本信息，用於生成反思提示
@@ -196,19 +199,19 @@ def generate_report_section7(triggered_params_translated, sfe_skills_involved, d
                     
                     if unique_params:
                         # 生成引導反思提示
-                        lines.append(f"**{skill} {q_type} 練習記錄反思**")
-                        lines.append(f"尋找考前練習記錄中的{time_perf_zh}題目，回顧並反思是否存在以下問題類型：")
+                        lines.append(f"**{skill} {q_type} {t('practice_record_reflection')}**")
+                        lines.append(t("find_practice_records").format(time_perf=time_perf_zh))
                         params_display = ', '.join(unique_params[:3])  # 限制顯示數量避免過長
                         if len(unique_params) > 3:
-                            params_display += " 等問題。"
+                            params_display += f" {t('q_report_problems_suffix')}。"
                         else:
-                            params_display += " 等問題。"
+                            params_display += f" {t('q_report_problems_suffix')}。"
                         lines.append(params_display)
                         lines.append("")
     
     # 如果沒有生成任何反思提示，添加默認提示
-    if not any("練習記錄反思" in line for line in lines[-10:]):
-        lines.append("建議回顧近期練習記錄，特別關注錯題的共同特徵和問題類型。")
+    if not any(t('practice_record_reflection') in line for line in lines[-10:]):
+        lines.append(t("review_recent_practice"))
         lines.append("")
 
     return lines
@@ -220,8 +223,8 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     Combines all the diagnostics into a comprehensive yet readable report.
     """
     report_lines = []
-    report_lines.append("# Q Section Diagnostic Report Details")
-    report_lines.append("## Q部分診斷報告詳情（基於用戶數據與模擬難度分析）")
+    report_lines.append(f"# {t('q_report_main_title')}")
+    report_lines.append(f"## {t('q_report_subtitle_details')}")
     report_lines.append("")
     
     # 獲取各章節的診斷結果
@@ -260,43 +263,50 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     valid_score_rate = round((correct_valid_q / manual_valid_q * 100) if manual_valid_q > 0 else 0, 1)
     
     # 1. 報告總覽與即時反饋
-    report_lines.append("### I. 報告概覽與即時反饋")
+    report_lines.append(t("q_report_section1_title"))
     report_lines.append("")
     
     # A. 作答時間與策略評估
-    report_lines.append("**A. 答題時間與策略評估**")
+    report_lines.append(t("q_report_subsection_a_time"))
     time_pressure = ch1_results.get('time_pressure_status', False)
-    time_pressure_text = "是" if time_pressure else "否"
+    time_pressure_text = t("yes_chinese") if time_pressure else t("no_chinese")
     overtime_threshold = ch1_results.get('overtime_threshold_used', 2.5)
-    report_lines.append(f"- 時間壓力狀態：{time_pressure_text}")
-    report_lines.append(f"- 使用超時閾值：{overtime_threshold}分鐘")
+    report_lines.append(f"- {t('q_report_time_pressure_status')}：{time_pressure_text}")
+    report_lines.append(t("overtime_threshold_format").format(threshold=overtime_threshold))
     report_lines.append("")
     
     # B. 重要註記
-    report_lines.append("**B. 重要提醒**")
+    report_lines.append(t("q_report_subsection_b_notes"))
     if manual_invalid_q > 0:
-        report_lines.append(f"- 手動標記無效數據數量：{manual_invalid_q} ({'{:.1f}'.format(manual_invalid_q / total_q * 100 if total_q > 0 else 0)}%)")
-    report_lines.append(f"- 有效答題正確率（基於手動無效排除）：{valid_score_rate}% ({correct_valid_q}/{manual_valid_q})")
+        report_lines.append(t("manual_invalid_count_format").format(
+            count=manual_invalid_q, 
+            percentage='{:.1f}'.format(manual_invalid_q / total_q * 100 if total_q > 0 else 0)
+        ))
+    report_lines.append(t("valid_score_rate_format").format(
+        rate=valid_score_rate, 
+        correct=correct_valid_q, 
+        total=manual_valid_q
+    ))
     report_lines.append("")
     
     # 2. 核心表現分析
-    report_lines.append("### II. 核心表現分析")
+    report_lines.append(t("q_report_section2_title"))
     report_lines.append("")
     
     # A. 內容領域表現概覽
-    report_lines.append("**A. 內容領域表現概覽**")
-    report_lines.append("按題目類型（Real vs Pure）分析：")
+    report_lines.append(t("q_report_subsection_a_content"))
+    report_lines.append(t("question_type_analysis"))
     
     if ch2_flags.get('poor_real', False):
-        report_lines.append("Real題型表現較差")
+        report_lines.append(t("real_poor_performance"))
     elif ch2_flags.get('poor_pure', False):
-        report_lines.append("Pure題型表現較差")
+        report_lines.append(t("pure_poor_performance"))
     elif ch2_flags.get('slow_real', False):
-        report_lines.append("Real題型速度較慢")
+        report_lines.append(t("real_slow_performance"))
     elif ch2_flags.get('slow_pure', False):
-        report_lines.append("Pure題型速度較慢")
+        report_lines.append(t("pure_slow_performance"))
     else:
-        report_lines.append("Real題型與Pure題型表現無顯著差異")
+        report_lines.append(t("no_significant_difference"))
     
     report_lines.append("")
     
@@ -330,7 +340,7 @@ def generate_q_summary_report(results, recommendations, df_final, triggered_para
     report_lines.extend(pattern_lines)
     
     # 3. 練習建議與基礎鞏固
-    report_lines.append("### III. 練習建議與基礎鞏固")
+    report_lines.append(t("q_report_section3_title"))
     report_lines.append("")
     
     consolidation_lines = generate_report_section5(ch6_override)

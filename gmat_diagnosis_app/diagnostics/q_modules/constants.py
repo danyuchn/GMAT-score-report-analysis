@@ -6,6 +6,7 @@ Q診斷模塊的常量和參數映射
 """
 
 # 從統一常數檔案匯入共通常數
+from gmat_diagnosis_app.i18n import t
 from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
 
 # --- Q-Specific Constants ---
@@ -27,7 +28,7 @@ OVERTIME_THRESHOLDS = {
     False: 3.0  # 低壓力
 }
 
-INVALID_DATA_TAG_Q = "數據無效：用時過短（受時間壓力影響）"
+INVALID_DATA_TAG_Q = t("q_invalid_data_tag")
 
 # 參數分配規則字典
 PARAM_ASSIGNMENT_RULES = {

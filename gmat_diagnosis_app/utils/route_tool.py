@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple
 import pandas as pd
 import logging
 import re
+from gmat_diagnosis_app.i18n import translate as t
 
 
 class DiagnosisRouterTool:
@@ -836,19 +837,19 @@ class DiagnosisRouterTool:
         for tag, count in sorted_tags:
             commands = self.route_diagnosis_tag(tag, subject)
             
-            recommendation_text = f"**{tag}** (出現{count}次):\n"
+            recommendation_text = f"**{tag}** ({t('appeared_times')}{count}{t('times_suffix')}):\n"
             
             if commands:
                 # 顯示所有對應的指令，不進行過濾
                 for command in commands:
-                    description = self.command_descriptions.get(command, "描述暫未提供")
+                    description = self.command_descriptions.get(command, t('description_not_provided'))
                     recommendation_text += f"- **{command}**: {description}\n"
             elif tag.startswith('BEHAVIOR_'):
                 # 行為標籤的特殊處理
-                recommendation_text += "- *此為行為模式標籤，無需特定工具練習，建議注意答題習慣的調整*\n"
+                recommendation_text += f"- *{t('behavior_tag_no_practice')}*\n"
             else:
                 # 無法匹配的標籤
-                recommendation_text += "- *暫無對應的工具推薦，建議諮詢教學專家*\n"
+                recommendation_text += f"- *{t('no_tool_recommendation')}*\n"
             
             recommendations.append(recommendation_text)
         

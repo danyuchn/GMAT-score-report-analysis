@@ -5,6 +5,7 @@ V診斷模塊的常量
 """
 
 # 從統一常數檔案匯入共通常數
+from gmat_diagnosis_app.i18n import t
 from gmat_diagnosis_app.constants.thresholds import COMMON_TIME_CONSTANTS
 
 # --- V-Specific Constants ---
@@ -53,7 +54,7 @@ RC_GROUP_TARGET_TIMES = {
 V_INVALID_TIME_ABANDONED = 0.5 # minutes (as per V-Doc Ch1 Invalid rule)
 V_INVALID_TIME_HASTY_MIN = 1.0 # minutes (as per V-Doc Ch1 Invalid rule)
 HASTY_GUESSING_THRESHOLD_MINUTES = 0.5 # minutes (Used for BEHAVIOR_GUESSING_HASTY tag in Ch3)
-INVALID_DATA_TAG_V = "數據無效：用時過短（受時間壓力影響）"
+INVALID_DATA_TAG_V = t("v_invalid_data_tag")
 
 # Map fundamental skills (expected in data) to broader error categories for Chapter 3
 V_SKILL_TO_ERROR_CATEGORY = {

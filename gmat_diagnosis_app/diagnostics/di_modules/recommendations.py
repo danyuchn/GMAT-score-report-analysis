@@ -8,7 +8,7 @@ import numpy as np
 import math
 import logging
 
-from gmat_diagnosis_app.i18n import translate as t
+from gmat_diagnosis_app.i18n import t
 from .utils import grade_difficulty_di, format_rate
 
 
@@ -97,11 +97,11 @@ def generate_di_recommendations(df_diagnosed, override_results, domain_tags, tim
 
             y_agg = override_info.get('Y_agg', '未知難度')
             z_agg = override_info.get('Z_agg')
-            z_agg_text = f"{z_agg:.1f} 分鐘" if pd.notna(z_agg) else "未知限時"
+            z_agg_text = f"{z_agg:.1f} {t('di_recommendation_minute')}" if pd.notna(z_agg) else "未知限時"
             error_rate_str = format_rate(override_info.get('triggering_error_rate', 0.0))
             overtime_rate_str = format_rate(override_info.get('triggering_overtime_rate', 0.0))
             rec_text = f"**宏觀建議 ({q_type}):** 由於整體表現有較大提升空間 (錯誤率 {error_rate_str} 或 超時率 {overtime_rate_str}), "
-            rec_text += f"建議全面鞏固 **{q_type}** 題型的基礎，可從 **{y_agg}** 難度題目開始系統性練習，掌握核心方法，建議限時 **{z_agg_text}**。"
+            rec_text += f"{t('di_recommendation_comprehensive_consolidation')} **{q_type}** {t('di_recommendation_question_type_foundation')} **{y_agg}** {t('di_recommendation_difficulty_practice')} **{z_agg_text}**。"
             recommendations_by_type[q_type].append({'type': 'macro', 'text': rec_text, 'question_type': q_type})
             processed_override_types.add(q_type)
 
@@ -215,20 +215,20 @@ def generate_di_recommendations(df_diagnosed, override_results, domain_tags, tim
                          logging.warning(f"[DI Case Reco] target_time_minutes was None for ({q_type}, {domain}) before text generation. Falling back to default: {target_time_minutes}")
 
                     # --- Generate Recommendation Text ---                    
-                    z_text = f"{max_z_minutes:.1f} 分鐘" # Initial suggested time text
-                    target_time_text = f"{target_time_minutes:.1f} 分鐘" # Final target time text
+                    z_text = f"{max_z_minutes:.1f} {t('di_recommendation_minute')}" # Initial suggested time text
+                    target_time_text = f"{target_time_minutes:.1f} {t('di_recommendation_minute')}" # Final target time text
                     group_sfe = group_df['is_sfe'].any()
                     diag_params_codes = set().union(*[s for s in group_df['diagnostic_params'] if isinstance(s, list)]) # More concise set union
                     # Note: diag_params_codes collected but not currently used in recommendation text
 
                     problem_desc = "錯誤或超時"
-                    sfe_prefix = "*基礎掌握不穩* " if group_sfe else ""
+                    sfe_prefix = t("di_foundation_instability_marker") if group_sfe else ""
                     translated_domain = t(domain) # Translate domain
 
-                    rec_text = f"{sfe_prefix}針對 **{translated_domain}** 領域的 **{q_type}** 題目 ({problem_desc})，"
-                    rec_text += f"建議練習 **{y_grade}** 難度題目，起始練習限時建議為 **{z_text}** (最終目標時間: {target_time_text})。"
+                    rec_text = f"{sfe_prefix}{t('di_recommendation_targeting')} **{translated_domain}** {t('di_recommendation_domain')} **{q_type}** {t('di_recommendation_question')} ({problem_desc})，"
+                    rec_text += f"{t('di_recommendation_practice')} **{y_grade}** {t('di_recommendation_difficulty_initial_time')} **{z_text}** ({t('di_recommendation_final_target_time')}: {target_time_text})。"
                     if max_z_minutes - target_time_minutes > 2.0:
-                        rec_text += " **注意：起始限時遠超目標，需加大練習量以確保逐步限時有效。**"
+                        rec_text += f" **{t('di_recommendation_excessive_time_warning')}。**"
 
                     if q_type in recommendations_by_type:
                          recommendations_by_type[q_type].append({

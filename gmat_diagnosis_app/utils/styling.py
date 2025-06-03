@@ -11,6 +11,7 @@ from gmat_diagnosis_app.constants.config import (
 import logging
 import streamlit as st
 import re
+from gmat_diagnosis_app.i18n import translate as t
 
 def apply_styles(row):
     """Applies styling for invalid rows, incorrect answers, and overtime."""
@@ -109,7 +110,8 @@ def format_diagnostic_report(report_text):
     report_text = re.sub(r'^\*\*([A-Z]\. [^*\n]+)\*\*', r'**\1**', report_text, flags=re.MULTILINE)
     
     # 3. 處理中文標題格式
-    report_text = re.sub(r'^\*\*([一二三四五六七八九十]+、[^*\n]+)\*\*', r'**\1**', report_text, flags=re.MULTILINE)
+    chinese_numbers_pattern = f'([{t("chinese_numbers")}]+、[^*\\n]+)'
+    report_text = re.sub(f'^\\*\\*{chinese_numbers_pattern}\\*\\*', r'**\1**', report_text, flags=re.MULTILINE)
     
     # 4. 統一bullet point格式 - 只保留必要的列表項目
     # 將多層縮排的 * 轉換為適當的 - 格式
@@ -189,12 +191,18 @@ def format_diagnostic_report(report_text):
     report_text = '\n'.join(processed_lines)
     
     # 6. 改善重要資訊的強調格式
-    report_text = re.sub(r'時間壓力狀態：(.+)', r'**時間壓力狀態：** \1', report_text)
-    report_text = re.sub(r'有效答題正確率.*?：(.+)', r'**有效答題正確率：** \1', report_text)
-    report_text = re.sub(r'使用超時閾值：(.+)', r'**超時閾值：** \1', report_text)
+    time_pressure_status = t('time_pressure_status')
+    effective_accuracy_rate = t('effective_accuracy_rate')
+    timeout_threshold_prefix = t('timeout_threshold_prefix')
+    timeout_threshold = t('timeout_threshold')
+    
+    report_text = re.sub(f'{time_pressure_status}：(.+)', f'**{time_pressure_status}：** \\1', report_text)
+    report_text = re.sub(f'{effective_accuracy_rate}.*?：(.+)', f'**{effective_accuracy_rate}：** \\1', report_text)
+    report_text = re.sub(f'{timeout_threshold_prefix}：(.+)', f'**{timeout_threshold}：** \\1', report_text)
     
     # 7. 改善技能名稱的格式化
-    report_text = re.sub(r'^(\*\*技能：)([^*]+)(\*\*)', r'\1\2\3', report_text, flags=re.MULTILINE)
+    skill_prefix = t('skill_prefix')
+    report_text = re.sub(f'^(\\*\\*{skill_prefix}：)([^*]+)(\\*\\*)', r'\1\2\3', report_text, flags=re.MULTILINE)
     
     # 8. 改善數據呈現
     report_text = re.sub(r'(\d+\.?\d*%)( \([^)]+\))', r'**\1**\2', report_text)
@@ -207,11 +215,21 @@ def format_diagnostic_report(report_text):
     report_text = re.sub(r'SFE', '**SFE**', report_text)
     
     # 11. 改善分數和百分位
-    report_text = re.sub(r'(\d{3,4})分', r'**\1分**', report_text)
-    report_text = re.sub(r'第(\d+)百分位', r'第**\1**百分位', report_text)
+    score_suffix = t('score_suffix')
+    percentile_prefix = t('percentile_prefix')
+    percentile_suffix = t('percentile_suffix')
+    
+    report_text = re.sub(f'(\\d{{3,4}}){score_suffix}', f'**\\1{score_suffix}**', report_text)
+    
+    # Handle different language formats for percentile
+    if percentile_prefix:  # For Chinese: 第X百分位
+        report_text = re.sub(f'{percentile_prefix}(\\d+){percentile_suffix}', f'{percentile_prefix}**\\1**{percentile_suffix}', report_text)
+    else:  # For English: Xth percentile
+        report_text = re.sub(f'(\\d+)(?:st|nd|rd|th) {percentile_suffix}', f'**\\1**th {percentile_suffix}', report_text)
     
     # 12. 改善數據高亮
-    report_text = re.sub(r'(錯誤率|超時率|正確率).*?(\d+\.?\d*%)', r'\1：**\2**', report_text)
+    error_timeout_accuracy_pattern = t('error_rate_timeout_rate_accuracy_rate')
+    report_text = re.sub(f'({error_timeout_accuracy_pattern}).*?(\\d+\\.?\\d*%)', r'\1：**\2**', report_text)
     
     # 13. 移除所有代碼塊格式（包含中文、英文、數字、符號等）
     report_text = re.sub(r'```([^`]*)```', r'\1', report_text, flags=re.DOTALL)
@@ -226,11 +244,15 @@ def format_diagnostic_report(report_text):
     report_text = re.sub(r'(\n#{1,3}[^\n]+)\n([^\n])', r'\1\n\n\2', report_text)
     
     # 16. 改善注意事項格式
-    report_text = re.sub(r'\*\*(重要註記|重要提醒|注意事項|注意)\*\*', r'> **\1**', report_text)
+    important_keywords = t('important_note_reminder_attention')
+    report_text = re.sub(f'\\*\\*({important_keywords})\\*\\*', r'> **\1**', report_text)
     
     # 17. 改善數字統計的顯示
-    report_text = re.sub(r'(\d+) 題', r'**\1** 題', report_text)
-    report_text = re.sub(r'(\d+\.?\d*) 分鐘', r'**\1** 分鐘', report_text)
+    question_suffix = t('question_suffix')
+    minute_suffix = t('minute_suffix')
+    
+    report_text = re.sub(f'(\\d+) {question_suffix}', f'**\\1** {question_suffix}', report_text)
+    report_text = re.sub(f'(\\d+\\.?\\d*) {minute_suffix}', f'**\\1** {minute_suffix}', report_text)
     
     # 18. 清理多餘空行但保持適當間距
     report_text = re.sub(r'\n{3,}', '\n\n', report_text)
@@ -244,7 +266,8 @@ def format_diagnostic_report(report_text):
     report_text = re.sub(r'`', '', report_text)
     
     # 21. 處理「（註：...）」格式的特殊說明
-    report_text = re.sub(r'（註：([^）]+)）', r'*（註：\1）*', report_text)
+    note_prefix = t('note_prefix')
+    report_text = re.sub(f'（{note_prefix}：([^）]+)）', f'*（{note_prefix}：\\1）*', report_text)
     
     return report_text.strip()
 

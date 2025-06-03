@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import logging # 引入 logging 模組
 
+# Import translation function
+from gmat_diagnosis_app.i18n import translate as t
+
 # Import subject-specific diagnosis runners
 from gmat_diagnosis_app.diagnostics.q_diagnostic import run_q_diagnosis
 from gmat_diagnosis_app.diagnostics.v_diagnostic import run_v_diagnosis
@@ -48,11 +51,11 @@ def run_diagnosis(df):
     required_cols = ['question_position', 'is_correct', 'question_difficulty', 'question_time', 'question_type', 'question_fundamental_skill', 'Subject']
     if not isinstance(df, pd.DataFrame):
          logging.error("Invalid input: Input is not a pandas DataFrame.")
-         return "錯誤：輸入數據格式無效。", pd.DataFrame()
+         return t("data_input_format_invalid"), pd.DataFrame()
 
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
-        error_msg = f"錯誤：輸入數據缺少必要的欄位：{', '.join(missing_cols)}。請檢查上傳的 Excel 文件。"
+        error_msg = t("data_input_missing_columns").format(', '.join(missing_cols))
         logging.error(f"Invalid input DataFrame. Missing required columns: {missing_cols}")
         return error_msg, pd.DataFrame()
 
@@ -68,7 +71,7 @@ def run_diagnosis(df):
         df_processed['is_correct'] = df_processed['is_correct'].astype(bool)
     except Exception as e:
         logging.error(f"Error during data type conversion: {e}")
-        return f"錯誤：數據類型轉換失敗：{e}", pd.DataFrame()
+        return t("data_type_conversion_failed").format(e), pd.DataFrame()
 
     # --- Initialize internal columns ---
     df_processed['is_invalid'] = False
@@ -221,7 +224,7 @@ def run_diagnosis(df):
 
         except Exception as e:
             logging.error(f"Error during {subject_code} diagnosis: {e}", exc_info=True) # Log traceback
-            subject_report_dict[subject_code] = f"{subject_code} 科目診斷出錯: {e}"
+            subject_report_dict[subject_code] = t("diagnosis_error").format(subject_code, e)
 
     # === Concatenate results ===
     df_final_processed = pd.DataFrame() # Initialize as empty DataFrame
@@ -243,10 +246,10 @@ def run_diagnosis(df):
         except Exception as e:
             logging.error(f"Error during concatenation of diagnosis results: {e}", exc_info=True)
             # Decide how to return: maybe reports generated so far + empty df
-            return subject_report_dict, pd.DataFrame(f"錯誤：合併診斷結果時出錯: {e}")
+            return subject_report_dict, pd.DataFrame(t("concatenation_error").format(e))
     elif not subject_report_dict: # No dfs processed AND no reports (likely indicates no data passed initial checks)
         logging.warning("No data processed by any subject module and no reports generated.")
-        return "錯誤：沒有任何科目數據能夠成功處理。", pd.DataFrame()
+        return t("no_data_processed"), pd.DataFrame()
     else: # No dfs processed, but maybe reports (e.g., errors occurred) exist
         logging.warning("No processed dataframes available to concatenate. Check reports for errors.")
         # Return any reports generated (likely errors) and an empty DataFrame

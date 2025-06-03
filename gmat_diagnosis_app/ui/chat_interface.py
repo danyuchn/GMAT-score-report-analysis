@@ -186,13 +186,13 @@ def _debug_show_chat_history(session_state):
             st.text(t('chat_debug_no_history'))
         
 def check_chat_conditions(session_state):
-    """檢查是否滿足顯示聊天的條件"""
+    """Check if conditions are met to display chat"""
     if session_state.master_key and session_state.diagnosis_complete:
         return True
     return False
 
 def display_chat_history(session_state):
-    """顯示聊天歷史"""
+    """Display chat history"""
     # 使用 Streamlit 原生的 st.chat_message
     for i, message in enumerate(session_state.chat_history):
         role = message["role"]

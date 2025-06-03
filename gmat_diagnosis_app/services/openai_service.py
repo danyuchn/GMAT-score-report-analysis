@@ -10,6 +10,7 @@ from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 import os
 from ..utils.rate_limiter import get_client_ip, check_rate_limit # Import rate limiting functions
+from ..i18n import translate as t # Import translation function
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -275,10 +276,10 @@ def generate_ai_consolidated_report(report_dict, api_key):
 
     # Define the system prompt emphasizing strict extraction and formatting
     system_prompt = """You are an assistant that extracts specific sections from GMAT diagnostic reports and consolidates them into a single, structured document.
-Your task is to identify and extract ONLY the sections related to '練習建議' (Practice Suggestions) and '後續行動' (Next Steps, including reflection and secondary evidence gathering) for each subject (Q, V, DI) from the provided text.
+Your task is to identify and extract ONLY the sections related to '{t('openai_practice_suggestion')}' (Practice Suggestions) and '{t('openai_subsequent_action')}' (Next Steps, including reflection and secondary evidence gathering) for each subject (Q, V, DI) from the provided text.
 
 **CRITICAL INSTRUCTIONS:**
-1.  **Strict Extraction:** Only extract text explicitly under '練習建議' or '後續行動' headings or clearly discussing these topics.
+1.  **Strict Extraction:** Only extract text explicitly under '{t('openai_practice_suggestion')}' or '{t('openai_subsequent_action')}' headings or clearly discussing these topics.
 2.  **Subject Separation:** Keep the extracted information strictly separated under standardized headings for each subject: "## Q 科目建議與行動", "## V 科目建議與行動", "## DI 科目建議與行動".
 3.  **Complete Information:** Transfer ALL original text, data, details, parenthetical notes, specific question numbers, difficulty codes, time limits, percentages, scores, etc., accurately and completely. DO NOT SUMMARIZE OR OMIT ANY DETAILS.
 4.  **Standardized Formatting:** Use Markdown format. Use Level-2 headings (##) for each subject as specified above. Use bullet points or numbered lists within each subject section as they appear in the original text, or to improve readability if appropriate, but maintain all original content.
@@ -491,7 +492,7 @@ def _get_dataframe_context(session_state, max_rows=100):
         if len(df_context) > max_rows:
             logging.info(f"數據行數超過限制 ({len(df_context)} > {max_rows})，只取前 {max_rows} 行")
             df_context_str = df_context.head(max_rows).to_markdown(index=False)
-            df_context_str += f"\n... (只顯示前 {max_rows} 行，共 {len(df_context)} 行)"
+            df_context_str += f"\n... ({t('openai_showing_first')} {max_rows} {t('openai_rows_total')} {len(df_context)} {t('openai_rows')})"
         else:
             logging.info(f"轉換全部 {len(df_context)} 行數據為 markdown 格式")
             df_context_str = df_context.to_markdown(index=False)
@@ -756,7 +757,7 @@ def trim_diagnostic_tags_with_openai(original_tags_str: str, user_description: s
 - 不要添加任何解釋、引言或額外的客套話，只需提供建議的標籤或上述明確的提示。
 """
     
-    user_content = f"原始診斷標籤：\n{original_tags_str}\n\n使用者描述：\n{user_description}"
+    user_content = f"{t('openai_original_diagnostic_tags')}：\n{original_tags_str}\n\n{t('openai_user_description')}：\n{user_description}"
 
     try:
         logging.info("Calling OpenAI ChatCompletion for tag trimming with model gpt-4.1-mini.")

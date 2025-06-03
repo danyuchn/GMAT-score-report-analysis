@@ -15,7 +15,7 @@ from gmat_diagnosis_app.constants.config import (
 from gmat_diagnosis_app.i18n import translate as t
 
 def setup_input_tabs(preprocess_helpers_module):
-    """設置輸入標籤頁，處理數據輸入和驗證"""
+    """Setup input tabs for data input and validation"""
     st.header(t('input_tabs_upload_header'))
     st.info(t('input_tabs_upload_info').format(MAX_FILE_SIZE_BYTES // (1024*1024)))
 
@@ -261,13 +261,13 @@ def combine_input_data(input_dfs, SUBJECTS):
             
             # Basic check after concat
             if df_combined_input is None or df_combined_input.empty:
-                st.error("合併後的資料為空")
+                st.error(t("merged_data_empty"))
                 df_combined_input = None  # Invalidate combination
             elif 'question_position' not in df_combined_input.columns:
-                st.error("合併後的資料缺少 'question_position' 列")
+                st.error(t("merged_data_missing_position"))
                 df_combined_input = None  # Invalidate combination
             elif df_combined_input['question_position'].isnull().any():
-                st.error("合併後的資料中 'question_position' 有空值")
+                st.error(t("merged_data_position_null"))
                 df_combined_input = None  # Invalidate combination
         except Exception as e:
             st.error(f"合併已驗證的輸入資料時發生錯誤: {e}")

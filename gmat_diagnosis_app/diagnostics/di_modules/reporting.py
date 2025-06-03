@@ -426,7 +426,7 @@ def generate_di_summary_report(di_results):
     # The try-except block for extracting stats from report_text is not part of the report content generation itself.
     # It can remain as is if used for logging/tracking.
     try:
-        total_qs_match = re.search(r'共(\d+)題', report_text) # This regex might not match new report format
+        total_qs_match = re.search(t('di_report_total_questions_regex'), report_text) # This regex might not match new report format
         # ... other stat extractions
     except Exception as e:
         logging.error(f"[DI報告追蹤] 從報告中提取數據時出錯: {e}")

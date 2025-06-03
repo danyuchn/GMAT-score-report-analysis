@@ -9,7 +9,7 @@ import pandas as pd
 from gmat_diagnosis_app.utils.route_tool import DiagnosisRouterTool
 from gmat_diagnosis_app.diagnostics.q_modules.constants import Q_TOOL_AI_RECOMMENDATIONS
 # Use i18n system instead of the old translation dictionary
-from gmat_diagnosis_app.i18n import translate as t, get_available_languages
+from gmat_diagnosis_app.i18n import t, get_available_languages
 from collections import Counter
 
 
@@ -96,7 +96,7 @@ def generate_q_ai_tool_recommendations_fallback(df_q):
     already_recommended = set()  # 用於追踪已經推薦的工具，避免重複
     
     for tag, tools, count in matched_recommendations:
-        recommendation_text = f"**{tag}** (出現{count}次):\n"
+        recommendation_text = f"**{tag}** ({t('q_ai_prompt_appeared')}{count}{t('q_ai_prompt_times')}):\n"
         
         tools_added = False
         for tool in tools:

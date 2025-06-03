@@ -35,7 +35,7 @@ def get_diagnostic_param_mapping():
         },
         'Q_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': {
             'subject': 'Q',
-            'focus': '基礎掌握不穩定',
+            'focus': t('v_foundation_instability_short'),
             'search_strategy': '查找涉及的基礎技能領域，分析基礎概念的掌握穩定性'
         },
 
@@ -114,7 +114,7 @@ def get_diagnostic_param_mapping():
         },
         'DI_FOUNDATIONAL_MASTERY_INSTABILITY_SFE': {
             'subject': 'DI',
-            'focus': '基礎掌握不穩定',
+            'focus': t('v_foundation_instability_short'),
             'search_strategy': '查找相同題型和內容領域的基礎能力應用錯誤'
         },
         'DI_BEHAVIOR__CARELESSNESS_ISSUE': {

@@ -627,6 +627,46 @@ def generate_new_diagnostic_report(df: pd.DataFrame) -> str:
 
     return "\n".join(report_parts)
 
+def display_enhanced_secondary_evidence_expander():
+    """Display enhanced secondary evidence search guidance in a general context."""
+    # Get data from session state (same logic as edit tab version but simplified)
+    valid_df = st.session_state.get('original_processed_df', pd.DataFrame())
+    
+    if valid_df.empty:
+        return
+    
+    # Display the simplified expander for general use
+    with st.expander(f"🔍 {t('results_evidence_search_focus')}", expanded=False):
+        # Provide general guidance without specific combinations
+        st.markdown(f"### {t('results_evidence_search_guidance')}")
+        st.markdown(f"*{t('results_practice_data_reference')}：*")
+        
+        if not valid_df.empty:
+            subjects_in_data = valid_df['Subject'].unique() if 'Subject' in valid_df.columns else []
+            
+            for subject in subjects_in_data:
+                if subject not in ['Q', 'V', 'DI']:
+                    continue
+                    
+                st.markdown(f"#### {subject}{t('results_subject_search_focus')}")
+                
+                if subject == 'Q':
+                    st.markdown(f"• {t('results_search_same_skills_types')}")
+                    st.markdown(f"• {t('results_focus_time_performance')}")
+                    st.markdown(f"• {t('results_check_similar_errors')}")
+                elif subject == 'V':
+                    st.markdown(f"• {t('results_search_same_skills')}")
+                    st.markdown(f"• {t('results_focus_time_performance')}")
+                    st.markdown(f"• {t('results_check_understanding_errors')}")
+                elif subject == 'DI':
+                    st.markdown(f"• {t('results_search_same_domain_types')}")
+                    st.markdown(f"• {t('results_focus_time_performance')}")
+                    st.markdown(f"• {t('results_check_analysis_errors')}")
+                
+                st.markdown("")
+        else:
+            st.info(t("no_diagnosis_data"))
+
 def display_enhanced_secondary_evidence_expander_in_edit_tab():
     """Display enhanced secondary evidence search guidance in edit tab using tab container."""
     # Get data from session state (same logic as original function)
@@ -671,19 +711,19 @@ def display_enhanced_secondary_evidence_expander_in_edit_tab():
                         for _, row in combinations.iterrows():
                             question_numbers = row.get('question_position', [])
                             if question_numbers:
-                                skill = row.get('question_fundamental_skill', '未知技能')
-                                qtype = row.get('question_type', '未知題型')
-                                time_perf = row.get('time_performance_category', '未知表現')
+                                skill = row.get('question_fundamental_skill', t('unknown_skill'))
+                                qtype = row.get('question_type', t('unknown_question_type'))
+                                time_perf = row.get('time_performance_category', t('unknown_performance'))
                                 
-                                reflection_prompt = f"找尋【{skill}】【{qtype}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並修剪"
+                                reflection_prompt = t("reflection_prompt_q_skill_type_time").format(skill, qtype, time_perf)
                                 
                                 # Format question numbers for display and add trimming guidance
                                 if len(question_numbers) == 1:
-                                    question_list = f"第{question_numbers[0]}題"
-                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
+                                    question_list = t("question_number_format").format(question_numbers[0])
+                                    trimming_guidance = t("trimming_guidance_multiple").format(question_list)
                                 else:
-                                    question_list = '、'.join([f"第{q}題" for q in question_numbers])
-                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
+                                    question_list = t("question_separator").join([t("question_number_format").format(q) for q in question_numbers])
+                                    trimming_guidance = t("trimming_guidance_multiple").format(question_list)
                                 
                                 specific_combinations[subject].append({
                                     'prompt': reflection_prompt,
@@ -711,18 +751,18 @@ def display_enhanced_secondary_evidence_expander_in_edit_tab():
                         for _, row in combinations.iterrows():
                             question_numbers = row.get('question_position', [])
                             if question_numbers:
-                                skill = row.get('question_fundamental_skill', '未知技能')
-                                time_perf = row.get('time_performance_category', '未知表現')
+                                skill = row.get('question_fundamental_skill', t('unknown_skill'))
+                                time_perf = row.get('time_performance_category', t('unknown_performance'))
                                 
-                                reflection_prompt = f"找尋【{skill}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並修剪"
+                                reflection_prompt = t("reflection_prompt_v_skill_time").format(skill, time_perf)
                                 
                                 # Format question numbers for display and add trimming guidance
                                 if len(question_numbers) == 1:
-                                    question_list = f"第{question_numbers[0]}題"
-                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
+                                    question_list = t("question_number_format").format(question_numbers[0])
+                                    trimming_guidance = t("trimming_guidance_multiple").format(question_list)
                                 else:
-                                    question_list = '、'.join([f"第{q}題" for q in question_numbers])
-                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
+                                    question_list = t("question_separator").join([t("question_number_format").format(q) for q in question_numbers])
+                                    trimming_guidance = t("trimming_guidance_multiple").format(question_list)
                                 
                                 specific_combinations[subject].append({
                                     'prompt': reflection_prompt,
@@ -750,19 +790,19 @@ def display_enhanced_secondary_evidence_expander_in_edit_tab():
                         for _, row in combinations.iterrows():
                             question_numbers = row.get('question_position', [])
                             if question_numbers:
-                                domain = row.get('content_domain', '未知領域')
-                                qtype = row.get('question_type', '未知題型')
-                                time_perf = row.get('time_performance_category', '未知表現')
+                                domain = row.get('content_domain', t('unknown_domain'))
+                                qtype = row.get('question_type', t('unknown_question_type'))
+                                time_perf = row.get('time_performance_category', t('unknown_performance'))
                                 
-                                reflection_prompt = f"找尋【{domain}】【{qtype}】的考前做題紀錄，找尋【{time_perf}】的題目，檢討並修剪"
+                                reflection_prompt = t("reflection_prompt_di_domain_type_time").format(domain, qtype, time_perf)
                                 
                                 # Format question numbers for display and add trimming guidance
                                 if len(question_numbers) == 1:
-                                    question_list = f"第{question_numbers[0]}題"
-                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
+                                    question_list = t("question_number_format").format(question_numbers[0])
+                                    trimming_guidance = t("trimming_guidance_multiple").format(question_list)
                                 else:
-                                    question_list = '、'.join([f"第{q}題" for q in question_numbers])
-                                    trimming_guidance = f"{question_list}的診斷標籤，把符合的保留，不符合的去掉，留下最相關的1-2個問題。"
+                                    question_list = t("question_separator").join([t("question_number_format").format(q) for q in question_numbers])
+                                    trimming_guidance = t("trimming_guidance_multiple").format(question_list)
                                 
                                 specific_combinations[subject].append({
                                     'prompt': reflection_prompt,
@@ -771,26 +811,26 @@ def display_enhanced_secondary_evidence_expander_in_edit_tab():
                                 })
     
     # Display the main expander in edit tab
-    with st.expander("🔍 各科二級證據查找重點", expanded=False):
+    with st.expander(t('results_evidence_search_focus'), expanded=False):
         # Display specific reflection prompts (based on diagnostic report guided reflection logic)
         if specific_combinations and any(specific_combinations.values()):
-            st.markdown("### 引導性反思提示（針對具體組合）")
-            st.markdown("*以下是基於您實際表現的具體查找建議，參考各科診斷報告的引導反思邏輯：*")
+            st.markdown(f"### {t('results_guided_reflection')}")
+            st.markdown(f"*{t('results_specific_search_suggestions')}：*")
             
             for subject, combinations in specific_combinations.items():
                 if combinations:
-                    st.markdown(f"#### {subject}科具體反思指導")
+                    st.markdown(f"#### {subject}{t('results_subject_reflection_guidance')}")
                     
                     for i, combo in enumerate(combinations, 1):
                         st.markdown(f"**{i}. {combo['prompt']}**")
                         st.markdown(f"   {combo['details']}")
                         if combo['questions']:  # Only show if questions exist (for backward compatibility)
-                            st.markdown(f"   *（涉及題目：{combo['questions']}）*")
+                            st.markdown(f"   *（{t('results_related_questions')}：{combo['questions']}）*")
                         st.markdown("")
                     
                     st.markdown("---")
         else:
-            st.info("暫無足夠的診斷數據生成具體的二級證據建議。")
+            st.info(t('no_data_for_specific_evidence'))
 
 def display_global_tag_warning():
     """Display global diagnostic tag warning if triggered."""
@@ -906,6 +946,52 @@ def display_results():
             if st.session_state.original_processed_df is None:
                 tabs[edit_tab_index].info(t('edit_tags_no_data'))
             else:
+                # Display diagnostic tag warning at the top of edit tab first
+                display_global_tag_warning_in_edit_tab = check_global_diagnostic_tag_warning_realtime()
+                
+                if display_global_tag_warning_in_edit_tab.get('triggered', False):
+                    avg_tags = display_global_tag_warning_in_edit_tab.get('avg_tags_per_question', 0.0)
+                    
+                    # Display warning container in edit tab with detailed guidance and improved styling
+                    tabs[edit_tab_index].markdown(
+f"""<div style="background-color: var(--background-color, #fff3cd); border: 1px solid var(--border-color, #ffc107); border-radius: 8px; padding: 16px; margin-bottom: 20px; border-left: 5px solid var(--accent-color, #ff9800); color: var(--text-color, #333);">
+<h4 style="color: var(--warning-header-color, #ff6f00); margin-top: 0;">{t('global_tag_warning_title')}</h4>
+<p style="margin-bottom: 16px; color: var(--text-color, #333);">{t('global_tag_warning_message').format(avg_tags)}</p>
+
+<style>
+:root {{
+    --background-color: #fff3cd;
+    --border-color: #ffc107;
+    --accent-color: #ff9800;
+    --text-color: #333;
+    --warning-header-color: #ff6f00;
+}}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {{
+    :root {{
+        --background-color: #2d1810;
+        --border-color: #8B4513;
+        --accent-color: #D2691E;
+        --text-color: #e0e0e0;
+        --warning-header-color: #FFB347;
+    }}
+}}
+
+/* Streamlit dark theme detection */
+[data-theme="dark"] :root,
+.stApp[data-theme="dark"] :root {{
+    --background-color: #2d1810;
+    --border-color: #8B4513;
+    --accent-color: #D2691E;
+    --text-color: #e0e0e0;
+    --warning-header-color: #FFB347;
+}}
+</style>
+</div>""",
+                        unsafe_allow_html=True
+                    )
+                
                 if "reset_editable_df_requested" in st.session_state and st.session_state.reset_editable_df_requested:
                     st.session_state.editable_diagnostic_df = st.session_state.original_processed_df.copy(deep=True)
                     st.session_state._editable_df_source = st.session_state.original_processed_df
@@ -962,89 +1048,45 @@ def display_results():
 
                 tabs[edit_tab_index].markdown(f"**{t('edit_tags_description')}**")
                 
-                # 添加詳細的標籤類型說明和修剪指導
+                # Updated label type explanation and trimming guidance without emojis
                 tabs[edit_tab_index].markdown("""
-### 🏷️ 標籤類型說明：
+### 標籤類型說明：
 
 • **錯誤類（Error）**：表示在正常或快速時間內做錯，通常是理解偏差或方法錯誤  
 • **困難類（Difficulty）**：表示雖然最終可能做對/錯，但過程中遇到明顯阻礙，花費較長時間
 
-### 📋 正確使用流程：
+### 正確使用流程：
 
 1. **系統提供可能標籤範圍**
 2. **結合考試回憶確認實際遇到的困難**
 3. **移除不符合實際情況的標籤**
 4. **必要時參考考前做題記錄作為二級證據**
 
-### ✂️ 修剪建議：
+### 修剪建議：
 
 **理想標籤數量：** 每題 1-2 個最相關的核心標籤
+
+考生可以使用下方下拉選單的修剪助手工具。
 
 **修剪原則：**
 • 優先保留最直接對應實際困難的標籤
 • 移除不確定或模糊的標籤
 • 避免保留意義重疊的標籤
 
-### 💡 建議行動
+### 建議行動
 
 **主要方法：回憶與修剪**  
 請回想考試時每題實際遇到的具體困難，然後在「編輯診斷標籤」頁面中移除不符合真實情況的標籤。
 
 **輔助方法：二級證據分析**  
-如果無法清楚回憶考試狀況或有疑問，可以檢視考前2-4週的做題數據作為「二級證據」，以下是各科建議的查找重點：
+下拉選單裡有二級證據分析的查找重點。如果無法清楚回憶考試狀況或有疑問，可以檢視考前2-4週的做題數據作為「二級證據」，以下是各科建議的查找重點：
 
 ---
                 """)
                 
-                # Display diagnostic tag warning and secondary evidence suggestions in edit tab
-                display_global_tag_warning_in_edit_tab = check_global_diagnostic_tag_warning_realtime()
-                
-                if display_global_tag_warning_in_edit_tab.get('triggered', False):
-                    avg_tags = display_global_tag_warning_in_edit_tab.get('avg_tags_per_question', 0.0)
-                    
-                    # Display warning container in edit tab with detailed guidance and improved styling
-                    tabs[edit_tab_index].markdown(
-f"""<div style="background-color: var(--background-color, #fff3cd); border: 1px solid var(--border-color, #ffc107); border-radius: 8px; padding: 16px; margin-bottom: 20px; border-left: 5px solid var(--accent-color, #ff9800); color: var(--text-color, #333);">
-<h4 style="color: var(--warning-header-color, #ff6f00); margin-top: 0;">⚠️ {t('global_tag_warning_title')}</h4>
-<p style="margin-bottom: 16px; color: var(--text-color, #333);">{t('global_tag_warning_message').format(avg_tags)}</p>
-
-<style>
-:root {{
-    --background-color: #fff3cd;
-    --border-color: #ffc107;
-    --accent-color: #ff9800;
-    --text-color: #333;
-    --warning-header-color: #ff6f00;
-}}
-
-/* Dark mode styles */
-@media (prefers-color-scheme: dark) {{
-    :root {{
-        --background-color: #2d1810;
-        --border-color: #8B4513;
-        --accent-color: #D2691E;
-        --text-color: #e0e0e0;
-        --warning-header-color: #FFB347;
-    }}
-}}
-
-/* Streamlit dark theme detection */
-[data-theme="dark"] :root,
-.stApp[data-theme="dark"] :root {{
-    --background-color: #2d1810;
-    --border-color: #8B4513;
-    --accent-color: #D2691E;
-    --text-color: #e0e0e0;
-    --warning-header-color: #FFB347;
-}}
-</style>
-</div>""",
-                        unsafe_allow_html=True
-                    )
-                
                 # Display secondary evidence suggestions expander in edit tab
                 display_enhanced_secondary_evidence_expander_in_edit_tab()
-                
+
                 tag_trimming_expander = tabs[edit_tab_index].expander(t('tag_trimming_assistant_title'), expanded=False)
                 tag_trimming_expander.markdown(t('tag_trimming_assistant_description'), unsafe_allow_html=True)
 
