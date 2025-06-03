@@ -24,11 +24,166 @@ This file stores user preferences and custom rules for the GMAT Score Report Ana
 - Language switching implemented in sidebar with real-time updates
 - UI elements are fully translatable via the i18n system
 
+## GMAT Diagnosis Application Structure
+- Main app: gmat_diagnosis_app/
+- Route tool integration: gmat_llm_diagnostic_tools/
+- Route tool GUI: gmat_route_tool_gui.py
+- Successfully integrated multi-select diagnostic labels with automatic routing
+- Supports CSV/JSON export functionality
+- 7 GMAT subjects supported: CR, DS, GT, MSR, PS, RC, TPA
+
+## GUI Design Preferences - Modern UI Implementation (Updated 2025-01-30)
+
+### Design Philosophy
+- **Minimalist Aesthetics**: Clean, uncluttered interface with focus on functionality
+- **Glassmorphism Effects**: Semi-transparent backgrounds with backdrop-filter blur
+- **Harmonious Color Palette**: Professional blue-gray gradient backgrounds with consistent theming
+- **Micro-animations**: Subtle fade-in and slide-up animations for better UX
+
+### Updated Color System (New Harmonious Palette)
+- **Primary**: #2563eb (Blue) - Professional and trustworthy
+- **Primary Light**: #3b82f6 (Lighter Blue) - For gradients and hover states
+- **Primary Dark**: #1d4ed8 (Darker Blue) - For pressed/active states
+- **Secondary**: #059669 (Emerald Green) - For success and download actions
+- **Accent**: #0891b2 (Cyan) - For gradients and highlights
+- **Warning**: #d97706 (Amber) - For cautionary elements
+- **Error**: #dc2626 (Red) - For error states
+- **Success**: #16a34a (Green) - For success states
+- **Neutral scales**: Slate colors from 50-900 with proper contrast ratios
+- **Surface Colors**: Semi-transparent variants for glassmorphism effects
+
+### Background System
+- **Main Background**: Multi-stop gradient from dark slate to light slate
+- **Surface Primary**: rgba(248, 250, 252, 0.95) - Main content cards
+- **Surface Secondary**: rgba(241, 245, 249, 0.9) - Secondary elements
+- **Surface Accent**: rgba(226, 232, 240, 0.8) - Accent elements
+
+### Typography
+- Primary font: Inter (Google Fonts)
+- Monospace: JetBrains Mono
+- Font weights: 300, 400, 500, 600, 700
+- Optimized for readability and accessibility
+
+### Component Library
+- **modern_gui_styles.py**: Centralized styling module with updated color system
+- **create_modern_header()**: Glassmorphism header with blue-cyan gradient text
+- **create_section_header()**: Consistent section headers with icons
+- **create_status_card()**: Color-coded status indicators (success, warning, error, info)
+- **create_metric_card()**: Statistics display cards with icons
+- **create_feature_grid()**: Responsive grid layout for features
+- **create_progress_bar()**: Modern progress indicators
+
+### Layout System
+- **Responsive Design**: Mobile-first approach with CSS Grid and Flexbox
+- **Card-based Layout**: Consistent padding, margins, and border-radius
+- **Backdrop Effects**: Blur effects with rgba transparency
+- **Shadow System**: Consistent shadow depths using slate color base
+
+### Interactive Elements
+- **Buttons**: Blue gradient backgrounds with hover animations
+- **Form Controls**: Enhanced input styling with focus states using blue accent
+- **Charts**: Plotly integration with consistent theming
+- **Navigation**: Modern tab system with hover effects
+- **Transitions**: Smooth 0.2s transitions for all interactive elements
+
+### Performance Optimizations
+- **CSS Variables**: Consistent theming and easy maintenance
+- **Modular Components**: Reusable UI building blocks
+- **Lightweight Animations**: Performant transitions and effects
+- **Streamlit Integration**: Seamless integration with Streamlit framework
+
+### Color Design Update Log (2025-01-30)
+**Previous Issues Addressed:**
+- Eliminated jarring purple/white alternating colors
+- Removed harsh contrasts that users found unharmonious
+- Replaced with professional blue-gray palette
+
+**New Color Implementation:**
+- Harmonious blue-based primary colors (#2563eb spectrum)
+- Slate-based neutral colors for better text readability
+- Softer gradients using multi-stop slate progression
+- Professional appearance suitable for educational applications
+- Better accessibility with improved contrast ratios
+
+**User Feedback Integration:**
+- Responded to feedback about ugly colors and lack of harmony
+- Implemented more professional and visually pleasing color scheme
+- Maintained glassmorphism effects while improving color coordination
+
+### Updated Files with Modern Design
+1. **modern_gui_styles.py**: Core styling module with new harmonious color system
+2. **gmat_study_planner_gui.py**: Updated main GUI with modern components
+3. **gmat_route_tool_gui.py**: Modernized route tool interface
+4. **demo_modern_gui.py**: Design showcase and component demonstration
+
+### Implementation Notes
+- All legacy purple/white CSS removed and replaced with blue-gray system
+- Consistent icon usage throughout the interface
+- Improved accessibility with proper color contrast
+- Enhanced user feedback with status cards and progress indicators
+- Unified visual language across all components using harmonious palette
+
+### Best Practices Established
+- Use create_* functions for consistency
+- Apply modern-card classes for content containers
+- Implement proper spacing with margin/padding utilities
+- Maintain color consistency through CSS variables
+- Include animations with fade-in and slide-up classes
+- Use harmonious color relationships to avoid visual discord
+
 ## GMAT Diagnosis Specific Rules
 - Never modify diagnostic logic or numerical values
 - Preserve all function call signatures
 - Keep data validation intact
 - Maintain error handling patterns
+
+## GMAT Route Tool Integration Status (2025-01-30)
+
+**Status: COMPLETED ✅**
+
+Successfully integrated the GMAT diagnostic label routing tool into the existing Streamlit GUI system:
+
+### Implementation Summary:
+1. **Route Tool GUI Module**: Created `gmat_route_tool_gui.py` with comprehensive multi-selection diagnostic label interface
+2. **Main GUI Integration**: Updated `gmat_study_planner_gui.py` to include routing tool functionality
+3. **Launch Script**: Created `run_integrated_gui.py` for easy system startup
+4. **Documentation**: Added comprehensive `README_INTEGRATED_GUI.md` with usage instructions
+
+### Key Features Implemented:
+- **Multi-Select Diagnostic Labels**: Users can select multiple diagnostic labels simultaneously
+- **Automatic Mapping**: Chinese diagnostic labels → English error codes → Training commands
+- **Detailed Descriptions**: Each training command includes description and usage occasion
+- **Batch Analysis**: Support for analyzing multiple labels at once
+- **Export Functionality**: CSV and JSON export with timestamps
+- **Responsive Interface**: Three-tab structure (Label Selection, Results Analysis, Tool Info)
+
+### Files Created/Modified:
+- `gmat_route_tool_gui.py`: New GUI module for routing tool (368 lines)
+- `gmat_study_planner_gui.py`: Updated to include routing tool in sidebar navigation
+- `run_integrated_gui.py`: New system launcher script (92 lines)
+- `README_INTEGRATED_GUI.md`: Comprehensive documentation (195 lines)
+
+### Technical Features:
+- **Category Support**: All 7 GMAT categories (CR, DS, GT, MSR, PS, RC, TPA)
+- **Dynamic UI**: Responsive two-column layout for label display
+- **Session State Management**: Preserves selections and results across tabs
+- **Error Handling**: Graceful error handling with user-friendly messages
+- **Path Management**: Automatic import path resolution for module dependencies
+
+### User Experience Features:
+- **Visual Feedback**: Progress indicators and success messages
+- **Expandable Views**: Collapsible sections for detailed result viewing
+- **Metrics Display**: Real-time statistics (subjects, labels, commands)
+- **Bilingual Support**: Chinese-English interface labels and descriptions
+
+### Integration Quality:
+✅ Seamless integration with existing GUI framework
+✅ Consistent UI/UX design patterns maintained
+✅ No disruption to existing functionality
+✅ Complete feature parity with standalone route tool
+✅ Enhanced user experience with GUI interface
+
+**Result**: The GMAT diagnostic label routing tool is now fully integrated into the Streamlit GUI system, providing users with an intuitive interface to select multiple diagnostic labels and automatically receive corresponding training command descriptions and usage occasions. The integration maintains all existing functionality while adding powerful new diagnostic capabilities.
 
 ## I18n Implementation Details
 - Language selector placed in sidebar expander at the top
