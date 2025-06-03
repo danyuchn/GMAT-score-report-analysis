@@ -11,6 +11,101 @@ Correct:
 [Insert corrected code or logic]
 ```
 
+## GMAT Documentation.tex DI Logic Alignment Project (2025-06-01)
+
+**Status: COMPLETED ✅**
+
+Successfully completed comprehensive modification of `analysis-framework/overall-doc/documentation.tex` to align with Chinese DI documentation (`analysis-framework/sec-doc-zh/gmat-di-score-logic-dustin-v1.6.md`) requirements. Work completed in 6 segments of maximum 200 lines each as requested.
+
+### Modification Summary:
+
+**Segment 1 (Lines 1-200):** Document setup and introduction - No changes needed as content was already consistent.
+
+**Segment 2 (Lines 201-400) - Chapter 0 Core Input Data:**
+- Enhanced DI-specific CSV structure requirements with `question_position` prioritization
+- Added DI section basic settings (45min, 20 questions) and question type abbreviations
+- Comprehensive DI derived data pre-processing logic:
+  - MSR reading time calculation methodology
+  - MSR group data pre-calculations (`group_total_time`, `num_q_in_group`)
+  - Average time per type calculations for filtered data
+  - First third average time calculations for invalid data judgment
+  - Max mastered difficulty per combination tracking
+- Updated implementation context and rationale for DI-specific requirements
+
+**Segment 3 (Lines 401-600) - Chapter 1 Time Strategy & Data Validity:**
+- Enhanced time pressure determination with step-by-step logic and user override
+- Detailed DI overtime thresholds:
+  - TPA: 3.0/3.5 min, GT: 3.0/3.5 min, DS: 2.0/2.5 min (based on pressure status)
+  - MSR group target times: 6.0/7.0 min
+  - MSR analysis thresholds: 1.5 min for reading and single questions
+- Advanced invalid data identification with 6 specific standards including MSR group logic
+- Sophisticated MSR overtime marking system with four-tier standards:
+  - Group overtime, reading time overtime, adjusted first question overtime, non-first question overtime
+- Updated flowchart parameter descriptions and implementation notes
+
+**Segment 4 (Lines 601-800) - Chapter 7-8 Practice Planning & Diagnostic Summary:**
+- Added DI-specific recommendation triggers including MSR groups with overtime/reading issues
+- Enhanced recommendation generation with DI MSR Groups handling
+- Detailed time limit calculation including DI MSR reading parameters (1.5 min)
+- MSR group-level time allocation recommendations (6.0-7.0 min per group)
+- Updated suggestion text construction with MSR reading strategy recommendations
+- Enhanced volume alert thresholds for DI MSR Groups (>7.0 min or reading >2.0 min)
+- Comprehensive Chapter 8 updates with DI MSR-specific elements:
+  - MSR group timing assessment and reading efficiency evaluation
+  - MSR group performance and reading efficiency patterns
+  - Reading comprehension challenges in MSR passages
+  - MSR reading pattern observations and time allocation efficiency notes
+  - MSR reading strategy consolidation recommendations
+  - MSR-specific reflection questions about reading approach and note-taking strategy
+- Enhanced implementation context with MSR group data processing
+- Updated constraint adherence to include DI-specific technical details abstraction
+
+**Segment 5 (Lines 801-1000) - Implementation Details & Conclusion:**
+- Maintained existing implementation details section
+- Confirmed conclusion content alignment with enhanced DI framework scope
+
+**Segment 6 (Lines 1001-1108) - Appendix A Diagnostic Parameter Tags:**
+- Enhanced DI-specific parameters in diagnostic tags table:
+  - Added `DI_MSR_READING_COMPREHENSION_BARRIER` for reading time issues
+  - Added `DI_MSR_TIME_ALLOCATION_ISSUE` for inefficient time distribution
+  - Expanded MSR-specific section with 5 comprehensive parameters:
+    - `DI_MSR_READING_STRATEGY_INEFFICIENCY`
+    - `DI_MSR_GROUP_TIMING_MANAGEMENT_ERROR`
+    - `DI_MSR_READING_DEPTH_VS_SPEED_IMBALANCE`
+  - Updated foundational mastery parameters for consistency
+  - Enhanced efficiency bottlenecks with MSR reading distribution parameter
+  - Added behavioral patterns including `DI_MSR_GROUP_TIME_PRESSURE_BEHAVIOR`
+
+### Technical Modifications Applied:
+
+**MSR Group Logic Integration:**
+- Comprehensive MSR reading time calculation and group-level analysis
+- Four-tier overtime marking system for MSR groups
+- Reading strategy inefficiency detection and recommendation generation
+- Time allocation optimization between reading and question answering
+
+**DI-Specific Timing Parameters:**
+- Question type specific overtime thresholds (DS: 2.0/2.5, TPA: 3.0/3.5, GT: 3.0/3.5)
+- MSR group target times with pressure adjustment (6.0/7.0 min)
+- Reading time analysis thresholds (1.5 min)
+- Volume alert thresholds for MSR groups
+
+**Enhanced Diagnostic Framework:**
+- DI content domain and MSR group ID integration
+- Derived data pre-processing for MSR analysis
+- Invalid data identification with MSR-specific standards
+- Recommendation generation with MSR reading strategy guidance
+
+### Result Quality:
+✅ All 6 segments completed with comprehensive DI logic alignment
+✅ MSR group handling fully integrated across all relevant chapters
+✅ DI-specific timing and diagnostic parameters properly implemented
+✅ Appendix diagnostic tags table enhanced with MSR-specific parameters
+✅ Natural language reporting maintained while adding DI technical depth
+✅ Framework consistency preserved across Q/V/DI sections
+
+**Final Status:** English documentation.tex now fully aligned with Chinese v1.6 DI documentation, implementing all MSR group logic, timing parameters, and diagnostic requirements specified in the source material.
+
 ## GMAT V科文檔逐章節比對與統一化修復 (2025-06-01)
 
 **Status: COMPLETED ✅**

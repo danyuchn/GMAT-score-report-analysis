@@ -180,35 +180,28 @@ This narrative provides context for the detailed methodology presented in the su
 For the analysis scripts to function correctly, the input CSV file (e.g., \texttt{testset-q.csv}) must contain specific columns with data in the expected format. While column names can sometimes be adapted during implementation, the following represents the ideal structure and data types:
 
 \begin{itemize}
-    \item \texttt{question\_id}: Unique identifier for each question (String or Integer).
-    \item \texttt{question\_time}: Response time for the question in minutes (Numeric, e.g., Float or Integer).
-    \item \texttt{is\_correct}: Indicator of correctness (Boolean: \texttt{True}/\texttt{False}, or Integer: \texttt{1}/\texttt{0}).
-    \item \texttt{question\_difficulty}: Numeric difficulty value (Numeric). The source might differ (e.g., \texttt{DI\_b}, \texttt{V\_b}), but it's mapped internally.
-    \item \texttt{question\_position}: Sequence number of the question in the test (Integer, 1-indexed).
+    \item \texttt{question\_position}: Sequence number of the question in the test (Integer, 1-indexed, serves as unique identifier).
+    \item \texttt{question\_time}: Response time for the question in minutes (Numeric, Float).
+    \item \texttt{is\_correct}: Indicator of correctness (Boolean: \texttt{True}/\texttt{False}).
+    \item \texttt{content\_domain}: Classification as 'Math Related' or 'Non-Math Related' (String, DI only).
     \item \texttt{question\_type}: Category of the question (String). Specific values depend on the section:
         \begin{itemize}
             \item Q: 'Real' or 'Pure'.
             \item DI: 'DS', 'TPA', 'MSR', or 'GT'.
             \item V: 'CR' or 'RC'.
         \end{itemize}
-    \item \texttt{question\_fundamental\_skill} (Required for Q and V): Core skill or domain tested (String, e.g., 'Rates/Ratio/Percent', 'Identify Stated Idea').
-    \item \texttt{content\_domain} (Required for DI): Classification as 'Math Related' or 'Non-Math Related' (String).
+    \item \texttt{msr\_group\_id}: MSR group identifier (Required only for MSR questions in DI section).
+    \item \texttt{question\_difficulty}: Numeric difficulty value (Numeric). The source might differ (e.g., \texttt{DI\_b}, \texttt{V\_b}), but it's mapped internally.
+    \item \texttt{question\_fundamental\_skill}: Core skill or domain tested (String, Required for Q and V, e.g., 'Rates/Ratio/Percent', 'Identify Stated Idea'). \textbf{Note: Fundamental Skills are NOT tracked for DI.}
 \end{itemize}
 
 \textbf{Overall Metrics (Derived or Input):}
 While not always direct columns, the analysis requires:
 \begin{itemize}
-    \item \texttt{total\_test\_time} (Total minutes spent).
-    \item \texttt{max\_allowed\_time} (Standard 45 minutes per section).
-    \item \texttt{total\_number\_of\_questions}.
+    \item \texttt{total\_test\_time}: Total minutes spent (45 minutes standard).
+    \item \texttt{max\_allowed\_time}: Standard 45 minutes per section.
+    \item \texttt{total\_number\_of\_questions}: 20 questions for DI, varies for Q/V.
 \end{itemize}
-
-% This section seems redundant with the previous 'Required Input CSV Structure' and 'Overall Metrics', simplifying.
-%\textbf{Common Inputs:}
-%\begin{itemize}
-%    \item \textbf{Per-Question:} Requires fields such as \texttt{question\_id} (Identifier), \texttt{question\_time} (Response Time in minutes), \texttt{is\_correct} (Correctness as Boolean), \texttt{question\_difficulty} (Numeric value, potentially section-specific source like \texttt{DI\_b} or \texttt{V\_b}), \texttt{question\_position} (Sequence number).
-%    \item \textbf{Overall:} Requires \texttt{total\_test\_time} (Total minutes), \texttt{max\_allowed\_time} (standardized at 45 minutes per section), and \texttt{total\_number\_of\_questions}.
-%\end{itemize}
 
 \textbf{Section-Specific Inputs \& Pre-processing:}
 \begin{itemize}
@@ -225,8 +218,24 @@ While not always direct columns, the analysis requires:
     \end{itemize}
     \item \textbf{Data Insights (DI):}
     \begin{itemize}
-        \item Inputs: \texttt{question\_type} ('DS', 'TPA', 'MSR', 'GT'); \texttt{content\_domain} ('Math Related'/'Non-Math Related'). Note: \texttt{Fundamental Skills} are typically not tracked for DI.
-        \item Pre-processing: Derive \texttt{average\_time\_per\_type}, \texttt{max\_correct\_difficulty\_per\_combination} (based on \texttt{question\_type} and \texttt{content\_domain}). A key step involves identifying \texttt{MSR} item sets (typically 3 questions) and estimating \texttt{msr\_reading\_time} based on the time differential between the first question and the average of the subsequent two: \texttt{reading\_time = time\_q1 - (time\_q2 + time\_q3) / 2}.
+        \item \textbf{Basic Settings:} \texttt{Max Allowed Time}: 45 minutes; \texttt{Total Number of Questions}: 20.
+        \item \textbf{Question Type Abbreviations:} \texttt{DS}: Data Sufficiency; \texttt{TPA}: Two-Part Analysis; \texttt{MSR}: Multi-Source Reasoning; \texttt{GT}: Graph \& Table.
+        \item Inputs: \texttt{question\_type} ('DS', 'TPA', 'MSR', 'GT'); \texttt{content\_domain} ('Math Related'/'Non-Math Related'); \texttt{msr\_group\_id} (required if \texttt{question\_type} is 'MSR'). \textbf{Note: Fundamental Skills are typically NOT tracked for DI.}
+        \item \textbf{DI Derived Data Pre-processing:}
+        \begin{itemize}
+            \item \textbf{MSR Reading Time (\texttt{msr\_reading\_time}):} For each MSR group, calculate reading time as: first question's \texttt{question\_time} minus average \texttt{question\_time} of all other questions in the group. This calculation is only valid when the group contains at least two questions, and the result is attached to the first question of the group. (This data will be used in Chapter 1 for MSR single question overtime judgment.)
+            \item \textbf{MSR Group Data Pre-calculation:}
+                \begin{itemize}
+                    \item \texttt{group\_total\_time}: Sum of \texttt{question\_time} for all questions in each MSR group.
+                    \item \texttt{num\_q\_in\_group}: Number of questions in each MSR group.
+                \end{itemize}
+            \item \textbf{GT Time Allocation:} No special distinction between graph viewing and answering time.
+            \item \textbf{Average Time per Type (\texttt{average\_time\_per\_type}):} Calculate average \texttt{question\_time} for each \texttt{question\_type} ('DS', 'TPA', 'MSR', 'GT') based on filtered valid data. (This data will be used in Chapter 3 for defining \texttt{is\_relatively\_fast} and Chapter 4 for carelessness rate calculation.)
+            \item \textbf{First Third Average Time per Type (\texttt{first\_third\_average\_time\_per\_type}):} For each \texttt{question\_type} ('DS', 'TPA', 'MSR', 'GT'), calculate average \texttt{question\_time} for all questions where \texttt{question\_position} $\leq$ (\texttt{Total Number of Questions} / 3). (This data will be used in Chapter 1 for invalid data judgment.)
+            \item \textbf{Max Mastered Difficulty per Combination (\texttt{max\_correct\_difficulty\_per\_combination}):} 
+            For each \texttt{question\_type} and \texttt{content\_domain} combination, \\
+            record the highest \texttt{question\_difficulty} value among all questions where \texttt{is\_correct} == \texttt{True}.
+        \end{itemize}
     \end{itemize}
     \item \textbf{Verbal (V):}
     \begin{itemize}
@@ -250,9 +259,9 @@ While not always direct columns, the analysis requires:
     \end{itemize}
 \end{itemize}
 
-\textbf{Implementation Context:} Data ingestion typically involves reading CSV files using libraries like \texttt{pandas}. Pre-processing includes data type conversion (e.g., \texttt{pd.to\_numeric}), handling missing data (\texttt{dropna}), mapping raw inputs (e.g., full question type names to abbreviations like 'CR'), renaming columns for consistency, and computing the derived metrics mentioned above. Configuration parameters (thresholds, factors) are defined constants within the implementation.
+\textbf{Implementation Context:} Data ingestion typically involves reading CSV files using libraries like \texttt{pandas}. Pre-processing includes data type conversion (e.g., \texttt{pd.to\_numeric}), handling missing data (\texttt{dropna}), mapping raw inputs (e.g., full question type names to abbreviations like 'DS'), renaming columns for consistency, and computing the derived metrics mentioned above. Configuration parameters (thresholds, factors) are defined constants within the implementation.
 
-\textbf{Rationale:} Establishes a consistent, clean, and enriched data foundation crucial for reliable and comparable diagnostics across sections.
+\textbf{Rationale:} Establishes a consistent, clean, and enriched data foundation crucial for reliable and comparable diagnostics across sections, with particular attention to DI-specific requirements such as MSR group processing and content domain classification.
 
 \subsection{Chapter 1: Overall Time Strategy and Data Validity Assessment}
 
@@ -261,31 +270,58 @@ While not always direct columns, the analysis requires:
 \textbf{Operational Logic:}
 \begin{enumerate}
     \item \textbf{Calculate Time Difference (\texttt{time\_diff}):} Computed as \texttt{max\_allowed\_time} - \texttt{total\_test\_time}.
- \item \textbf{Determine Time Pressure Status (\texttt{time\_pressure}):} This Boolean flag indicates potential time pressure during the test section. The flag is set to \texttt{True} if the overall time difference (\texttt{time\_diff}) is $\leq$ 3.0 minutes AND the time spent on any question within the final third of the section (\texttt{question\_time}) is less than 1.0 minute. Additionally, a user override option (\texttt{user\_override\_time\_pressure}) allows this flag to be set manually.
-    \item \textbf{Establish Overtime Thresholds/Rules:} These criteria are dynamically set based on the \texttt{time\_pressure} status and vary by section and question type.
+    \item \textbf{Determine Time Pressure Status (\texttt{time\_pressure}):} This Boolean flag indicates potential time pressure during the test section. 
+        \begin{itemize}
+            \item Default: \texttt{time\_pressure} = \texttt{False}.
+            \item Check end-section conditions: Find questions in the last 1/3 of the test (\texttt{last\_third\_questions}) where \texttt{question\_time} $<$ 1.0 minute (\texttt{fast\_end\_questions}).
+            \item Judgment Logic: If \texttt{time\_diff} $\leq$ 3 minutes \textbf{AND} \texttt{fast\_end\_questions} is not empty, then set \texttt{time\_pressure} = \texttt{True}.
+            \item \textbf{User Override:} If user explicitly indicates low pressure, force \texttt{time\_pressure} = \texttt{False}.
+        \end{itemize}
+    \item \textbf{Establish Overtime Thresholds/Rules (Based on \texttt{time\_pressure}):} These criteria are dynamically set based on the \texttt{time\_pressure} status and vary by section and question type.
     \begin{itemize}
         \item \textbf{Q:} A single \texttt{overtime\_threshold} (e.g., 2.5 min if \texttt{time\_pressure}, 3.0 min otherwise).
-        \item \textbf{DI:} Type-specific thresholds (e.g., \texttt{overtime\_threshold\_ds}: 2.0 min if \texttt{time\_pressure}, 2.5 otherwise; \texttt{overtime\_threshold\_tpa}: 3.0 min if \texttt{time\_pressure}, 3.5 otherwise; \texttt{overtime\_threshold\_gt}: 3.0 min if \texttt{time\_pressure}, 3.5 otherwise) and \texttt{MSR} group rules (\texttt{msr\_group\_target\_time}: 6.0 min if \texttt{time\_pressure}, 7.0 otherwise). Includes \texttt{MSR} single-question time analysis thresholds (\texttt{msr\_reading\_threshold}=1.5 min, \texttt{msr\_single\_q\_threshold}=1.5 min).
+        \item \textbf{DI:} Type-specific thresholds and MSR group rules:
+        \begin{itemize}
+            \item \textbf{TPA Overtime Threshold (\texttt{overtime\_threshold\_tpa}):} 3.0 min if \texttt{time\_pressure} == \texttt{True}; 3.5 min if \texttt{time\_pressure} == \texttt{False}.
+            \item \textbf{GT Overtime Threshold (\texttt{overtime\_threshold\_gt}):} 3.0 min if \texttt{time\_pressure} == \texttt{True}; 3.5 min if \texttt{time\_pressure} == \texttt{False}.
+            \item \textbf{DS Overtime Threshold (\texttt{overtime\_threshold\_ds}):} 2.0 min if \texttt{time\_pressure} == \texttt{True}; 2.5 min if \texttt{time\_pressure} == \texttt{False}.
+            \item \textbf{MSR Group Target Time Rules (\texttt{msr\_group\_target\_time}):} 6.0 min if \texttt{time\_pressure} == \texttt{True}; 7.0 min if \texttt{time\_pressure} == \texttt{False}.
+            \item \textbf{MSR Single Question Analysis Thresholds:}
+                \begin{itemize}
+                    \item \texttt{msr\_reading\_threshold}: 1.5 minutes (for judging if reading time is excessive).
+                    \item \texttt{msr\_single\_q\_threshold}: 1.5 minutes (for judging if single question answering time is excessive).
+                \end{itemize}
+        \end{itemize}
         \item \textbf{V:} Separate thresholds/rules for \texttt{CR} (\texttt{overtime\_threshold\_cr}: 2.0 min if \texttt{time\_pressure}, 2.5 otherwise) and \texttt{RC} (e.g., \texttt{rc\_group\_target\_time} for 3Q group: 6.0 min if \texttt{time\_pressure}, 7.0 otherwise; for 4Q group: 8.0 min if \texttt{time\_pressure}, 9.0 otherwise; \texttt{rc\_individual\_q\_threshold}=2.0 min). V also includes a preliminary check for \texttt{reading\_comprehension\_barrier\_inquiry} based on estimated \texttt{rc\_reading\_time} exceeding thresholds (e.g., >2.0 min for 3Q group, >2.5 min for 4Q group).
     \end{itemize}
-    \item \textbf{Identify Invalid Data (\texttt{is\_invalid}):} This flag identifies questions likely answered without genuine effort due to time constraints. The logic is as follows:
+    \item \textbf{Identify Invalid Data (\texttt{is\_invalid}):} This flag identifies questions likely answered without genuine effort due to time constraints.
         \begin{itemize}
-            \item \textbf{Trigger Condition:} Only executed if \texttt{time\_pressure} == \texttt{True}.
-            \item \textbf{Scope:} Only checks questions in the final third (\texttt{question\_position} $>$ \texttt{Total Number of Questions} * 2/3). % CORRECTED: Added $ sign
-            \item \textbf{Criteria Definition ("Abnormally Fast Response"):} A question (or its group for RC/MSR) is considered abnormally fast if it meets \textbf{at least one} of the following standards:
+            \item \textbf{Trigger Condition:} Only executed if \texttt{time\_pressure} == \texttt{True}. If \texttt{time\_pressure} == \texttt{False}, no questions are marked as \texttt{is\_invalid}.
+            \item \textbf{Scope:} Only checks questions in the final third (\texttt{last\_third\_questions}).
+            \item \textbf{Definition of "Abnormally Fast Response" (\texttt{abnormally\_fast\_response}) Standards (meeting any one triggers):}
                 \begin{itemize}
-                    \item Absolute Time 1: \texttt{question\_time} $<$ 0.5 minutes. % CORRECTED: Added $ sign
-                    \item Absolute Time 2: \texttt{question\_time} $<$ 1.0 minute. % CORRECTED: Added $ sign
-                    \item Relative Single Question Time: \texttt{question\_time} $<$ (Average time for that question type in the first third * 0.5). % CORRECTED: Added $ sign
-                    \item Relative Group Time (RC/MSR only): \texttt{group\_total\_time} $<$ (Average RC/MSR time in first third * Number of questions in group * 0.5). % CORRECTED: Added $ sign
+                    \item \textit{Standard 1 (Suspected abandonment):} \texttt{question\_time} $<$ 0.5 minutes.
+                    \item \textit{Standard 2 (Absolute rush):} \texttt{question\_time} $<$ 1.0 minute.
+                    \item \textit{Standard 3 (Relative single question rush - DS):} \texttt{question\_time} $<$ (\texttt{first\_third\_average\_time\_per\_type}['DS'] * 0.5).
+                    \item \textit{Standard 4 (Relative single question rush - TPA):} \texttt{question\_time} $<$ (\texttt{first\_third\_average\_time\_per\_type}['TPA'] * 0.5).
+                    \item \textit{Standard 5 (Relative single question rush - GT):} \texttt{question\_time} $<$ (\texttt{first\_third\_average\_time\_per\_type}['GT'] * 0.5).
+                    \item \textit{Standard 6 (Relative group rush - MSR):} The MSR group containing the question has \texttt{group\_total\_time} $<$ (\texttt{first\_third\_average\_time\_per\_type}['MSR'] * \texttt{num\_q\_in\_group} * 0.5).
                 \end{itemize}
-            \item \textbf{Flagging Logic:} If a question within the scope meets the trigger condition and satisfies \textit{any} of the "Abnormally Fast Response" criteria, it is flagged as \texttt{is\_invalid} = \texttt{True}.
+            \item \textbf{Marking Logic:} Within the \texttt{last\_third\_questions} scope, if a question (or its MSR group for Standard 6) meets \textbf{at least one} \texttt{abnormally\_fast\_response} standard, \textbf{and \texttt{time\_pressure} == \texttt{True}}, then mark that question as \texttt{is\_invalid} = \texttt{True}.
         \end{itemize}
     \item \textbf{Global Rule - Data Filtering and Overtime Flagging:}
     \begin{itemize}
-        \item First, apply the \texttt{is\_invalid} flag based on the logic above.
-        \item Create a filtered dataset by removing questions marked \texttt{is\_invalid}. \textbf{All subsequent analyses (Chapters 2-7) exclusively use this filtered data.}
-        \item Second, using the filtered dataset, apply the established overtime thresholds/rules to flag remaining questions with \texttt{overtime} = \texttt{True} (or section-specific variants like \texttt{group\_overtime} in V, \texttt{msr\_group\_overtime} in DI).
+        \item \textbf{Mark Overtime (\texttt{overtime}):} Based on the thresholds/rules defined in this chapter, mark \texttt{overtime} = \texttt{True} for all questions \textbf{not marked as \texttt{is\_invalid}}.
+        \item \textbf{DI-Specific MSR Overtime Marking (Four-tier Standards):}
+            \begin{itemize}
+                \item \textbf{a. Group Overtime Marking (\texttt{msr\_group\_over}):} Calculate total time (\texttt{msr\_group\_total\_time}) for each MSR group. If \texttt{msr\_group\_total\_time} $>$ \texttt{msr\_group\_target\_time}, mark \textbf{all} questions in that MSR group as \texttt{msr\_group\_over} = \texttt{True}.
+                \item \textbf{b. Reading Time Overtime Marking (\texttt{msr\_reading\_over}):} For MSR questions that are \textbf{not marked by \texttt{msr\_group\_over}} and are \textbf{first questions in their group}: if \texttt{msr\_reading\_time} $>$ \texttt{msr\_reading\_threshold} (1.5 minutes), mark \texttt{msr\_reading\_over} = \texttt{True}.
+                \item \textbf{c. Adjusted First Question Overtime Marking (\texttt{msr\_adj\_first\_over}):} For MSR questions that are \textbf{not marked by the above two conditions} and are \textbf{first questions in their group}: calculate \texttt{adjusted\_time} = \texttt{question\_time} - \texttt{msr\_reading\_time}. If \texttt{adjusted\_time} $>$ \texttt{msr\_single\_q\_threshold} (1.5 minutes), mark \texttt{msr\_adj\_first\_over} = \texttt{True}.
+                \item \textbf{d. Non-First Question Overtime Marking (\texttt{msr\_non\_first\_over}):} For MSR questions that are \textbf{not marked by \texttt{msr\_group\_over}} and are \textbf{not first questions in their group}: if \texttt{question\_time} $>$ \texttt{msr\_single\_q\_threshold} (1.5 minutes), mark \texttt{msr\_non\_first\_over} = \texttt{True}.
+                \item \textbf{e. Final \texttt{overtime} Marking:} An MSR question is finally marked as \texttt{overtime} = \texttt{True} if and only if it meets any of these conditions: \texttt{msr\_group\_over} OR \texttt{msr\_reading\_over} OR \texttt{msr\_adj\_first\_over} OR \texttt{msr\_non\_first\_over}.
+            \end{itemize}
+        \item \textbf{Create Filtered Dataset:} Remove all questions marked as \texttt{is\_invalid} = \texttt{True} from the original question data.
+        \item \textbf{Subsequent Analysis Scope:} All analysis in Chapters 2-6 is based exclusively on this filtered dataset.
     \end{itemize}
 \end{enumerate}
 
@@ -324,7 +360,7 @@ While not always direct columns, the analysis requires:
     \node[param, above = 0.5cm of pressure_cond, text width=4cm] (pressure_param) {Time Pressure Threshold: 3.0min\\ Last 1/3 Q Threshold: 1.0min};
 
     % CORRECTED: Added $ signs around > and <
-    \node[param, above = 0.5cm of invalid_check, text width=5.5cm] (invalid_param) {Trigger: \texttt{time\_pressure}=True \& Pos $>$ Tot*2/3.\\ Criteria (OR): Q time $<$ 0.5min; $<$ 1.0min;\\ $<$ 50\% avg 1st 1/3 (single);\\ $<$ 50\% avg 1st 1/3 * N (RC/MSR group)}; % MODIFIED PARAM TEXT, explicit text width
+    \node[param, above = 0.5cm of invalid_check, text width=5.5cm] (invalid_param) {Trigger: \texttt{time\_pressure}=True \& Pos $>$ Tot*2/3.\\ Criteria (OR): Q time $<$ 0.5min; $<$ 1.0min;\\ $<$ 50\% avg 1st 1/3 (single);\\ $<$ 50\% avg 1st 1/3 * N (MSR group)}; % MODIFIED PARAM TEXT, explicit text width
 
     \node[param, below = 0.5cm of overtime, text width=5cm] (overtime_params) { % Explicit text width
         \textbf{With TP} / \textbf{Without TP}:\\ % TP = Time Pressure
@@ -370,9 +406,9 @@ While not always direct columns, the analysis requires:
     \end{figure}
     % ***** END OF FIGURE CODE *****
 
-\textbf{Implementation Context:} Boolean flags (\texttt{time\_pressure}, \texttt{is\_invalid}, \texttt{overtime}) are added as columns to the \texttt{pandas} DataFrame. Thresholds are assigned to variables based on conditional logic applied to the \texttt{time\_pressure} status. Filtering is achieved via DataFrame slicing (e.g., \texttt{df\_filtered = df[$\sim$df['is\_invalid']]}). % Note: ~ is math symbol, but ok in tt
+\textbf{Implementation Context:} Boolean flags (\texttt{time\_pressure}, \texttt{is\_invalid}, \texttt{overtime}) are added as columns to the \texttt{pandas} DataFrame. Thresholds are assigned to variables based on conditional logic applied to the \texttt{time\_pressure} status. Filtering is achieved via DataFrame slicing (e.g., \texttt{df\_filtered = df[$\sim$df['is\_invalid']]}). For DI section, special handling is required for MSR questions with the four-tier overtime marking system.
 
-\textbf{Rationale:} Ensures analyses are based on reliable data reflecting genuine effort and capability, while setting context-aware standards for time efficiency. Explicitly filtering invalid data before overtime flagging prevents misinterpreting rushed guesses as slow performance.
+\textbf{Rationale:} Ensures analyses are based on reliable data reflecting genuine effort and capability, while setting context-aware standards for time efficiency. Explicitly filtering invalid data before overtime flagging prevents misinterpreting rushed guesses as slow performance. The sophisticated MSR overtime detection system accounts for the unique structure and timing requirements of Multi-Source Reasoning questions.
 
 \subsection{Chapter 2: Multi-Dimensional Performance Analysis}
 
@@ -579,16 +615,17 @@ While not always direct columns, the analysis requires:
     \begin{itemize}
         \item Individual questions flagged as incorrect (\texttt{is\_correct}==False) or correct but overtime (\texttt{is\_correct}==True AND \texttt{is\_slow}==True) based on Chapters 3 \& 4 analyses.
         \item Skills (Q/V) or Types (DI) flagged by the override rule (\texttt{skill\_override\_triggered} / \texttt{override\_triggered}) in Chapter 6.
+        \item \textbf{DI-Specific:} MSR groups with overtime or reading inefficiency issues identified in Chapter 1.
     \end{itemize}
     \item \textbf{Generate Recommendations (Iterative Process):}
     \begin{itemize}
         \item \textbf{Exemption Check:} Before generating a case-specific recommendation for a skill (Q/V) or type/domain combination (DI), check if it exhibits stable performance. This is determined by verifying if **all** valid questions within that category are **both correct AND not overtime**. If this condition is met (100\% accuracy and 100\% efficiency within valid data), the category is considered exempt, and case-specific recommendations for it are skipped. Exemption notes are recorded.
         \item \textbf{Override Check:} If a skill/type has its override flag set (\texttt{True} from Chapter 6), generate \textbf{only one Macroscopic Recommendation} for that entire skill/type, using the pre-calculated \texttt{Y\_agg} and \texttt{Z\_agg}. This recommendation emphasizes foundational practice. Mark the skill/type as processed to prevent adding further case-specific suggestions for it.
-        \item \textbf{Generate Case-Specific or Aggregated Recommendation (If not overridden or exempt):} The process varies slightly by section:
+        \item \textbf{Generate Case-Specific or Aggregated Recommendation (If not overridden or exempt):} The process varies by section:
             \begin{itemize}
                 \item \textbf{Quant (Q):} Generates an independent recommendation for \textit{each individual triggering incorrect/overtime question (trigger point)}. No aggregation is performed.
-                % CORRECTED: Changed & to \&
                 \item \textbf{Verbal (V) \& Data Insights (DI):} Generally aggregates findings. For each \texttt{fundamental\_skill} (V) or \texttt{question\_type} + \texttt{content\_domain} combination (DI) with triggers, it generates \textit{one single aggregated recommendation} covering all trigger points within that category.
+                \item \textbf{DI MSR Groups:} For MSR groups with reading or timing issues, generate MSR-specific recommendations focusing on reading strategy and time allocation.
             \end{itemize}
             The following steps detail how the parameters (Y, Z, Annotations) are determined, considering these section differences:
             \begin{enumerate}
@@ -596,12 +633,18 @@ While not always direct columns, the analysis requires:
                     \begin{itemize}
                         \item \textbf{For Q (Per Trigger Point):} Map the original question's difficulty (\texttt{D}) to the standardized 6-level label.
                         \item \textbf{For V/DI (Aggregated Group):} Find the \textit{minimum} \texttt{question\_difficulty} among all triggering questions within the skill (V) or type/domain (DI) group. Map this minimum difficulty to the standardized 6-level label.
+                        \item \textbf{For DI MSR Groups:} Use the minimum difficulty across all MSR questions in the problematic group.
                     \end{itemize}
                 \item Determine Starting Practice Time Limit (\texttt{Z}): Employs a unified calculation rule for individual triggers, but the final Z depends on aggregation:
                     \begin{itemize}
                         \item \textit{Individual Z Calculation (Base Rule for all sections):} For any given triggering question:
                             \begin{itemize}
-                                \item Define \texttt{target\_time} based on question type (Q: 2.0; DI: Type-specific e.g., DS=2.0, TPA=3.0, GT=3.0; V: CR=2.0, RC=1.5).
+                                \item Define \texttt{target\_time} based on question type:
+                                \begin{itemize}
+                                    \item Q: 2.0 min
+                                    \item DI: DS=2.0, TPA=3.0, GT=3.0, MSR\_reading=1.5 min
+                                    \item V: CR=2.0, RC=1.5 min
+                                \end{itemize}
                                 \item Calculate \texttt{base\_time} = \texttt{question\_time} - 0.5 (if \texttt{is\_slow}) else \texttt{question\_time}.
                                 \item Calculate \texttt{Z\_raw} = \texttt{floor(base\_time * 2) / 2}.
                                 \item Set Individual \texttt{Z\_indiv} = \texttt{max(Z\_raw, target\_time)}.
@@ -610,34 +653,34 @@ While not always direct columns, the analysis requires:
                             \begin{itemize}
                                 \item \textbf{For Q (Per Trigger Point):} The final \texttt{Z} is simply the \texttt{Z\_indiv} calculated for that specific trigger.
                                 \item \textbf{For V/DI (Aggregated Group):} Calculate \texttt{Z\_indiv} for \textit{all} triggering questions within the group. The final aggregated \texttt{Z} for the group recommendation is the \textit{maximum} of all these calculated \texttt{Z\_indiv} values.
+                                \item \textbf{For DI MSR Groups:} Use group-level time allocation recommendations (6.0-7.0 min per group depending on pressure status).
                             \end{itemize}
                     \end{itemize}
-                \item Construct Suggestion Text: Include skill/type/domain, brief issue description (from Ch 3/4), difficulty \texttt{Y}, time \texttt{Z}, and target time.
+                \item Construct Suggestion Text: Include skill/type/domain, brief issue description (from Ch 3/4), difficulty \texttt{Y}, time \texttt{Z}, and target time. For DI MSR groups, include reading strategy recommendations.
                 \item Apply Annotations:
                     \begin{itemize}
                         \item Prepend "\textit{Fundamental mastery potentially unstable:}" or similar if triggered by \texttt{special\_focus\_error} (from Ch 3). For V/DI, if any question in the group triggered SFE, the aggregated recommendation gets the prefix.
                         \item Append volume alert like "\textbf{(Requires increased practice volume...)}" based on section-specific rules:
-                        \newpage
                             \begin{itemize}
-                                \item \textbf{Quant (Q):} If final \texttt{Z} $>$ 4.0 min. % CORRECTED: Added $ sign
-                                % CORRECTED: Changed & to \&, added $ sign around >
+                                \item \textbf{Quant (Q):} If final \texttt{Z} $>$ 4.0 min.
                                 \item \textbf{Verbal (V) \& DI:} If final \texttt{Z} - \texttt{target\_time} $>$ 2.0 min.
+                                \item \textbf{DI MSR Groups:} If group time allocation exceeds 7.0 min or reading time exceeds 2.0 min.
                             \end{itemize}
                     \end{itemize}
             \end{enumerate}
     \end{itemize}
     \item \textbf{Organize and Finalize Output:}
     \begin{itemize}
-        \item Group all generated recommendations (macroscopic, case-specific, exemption notes) by \texttt{fundamental\_skill} (Q/V) or \texttt{question\_type} (DI).
-        \item Apply Focus Rules: Adjust recommendation text based on Chapter 2 flags (e.g., if \texttt{poor\_real} in Q, suggest higher proportion of 'Real' questions for relevant skills; similar logic for DI domains).
+        \item Group all generated recommendations (macroscopic, case-specific, exemption notes, MSR-specific) by \texttt{fundamental\_skill} (Q/V) or \texttt{question\_type} (DI).
+        \item Apply Focus Rules: Adjust recommendation text based on Chapter 2 flags (e.g., if \texttt{poor\_real} in Q, suggest higher proportion of 'Real' questions for relevant skills; if \texttt{poor\_math\_related} in DI, emphasize math-related practice).
         \item Prioritize/Highlight SFE-related recommendations within the grouped list.
-        \item Sort the final list of recommendations (e.g., by priority derived from SFE status or override status).
+        \item Sort the final list of recommendations (e.g., by priority derived from SFE status, override status, or MSR group criticality).
     \end{itemize}
 \end{enumerate}
 
-\textbf{Implementation Context:} This logic typically resides in the latter part of the main analysis function. Exemption checks require pre-calculating relevant metrics per category. Recommendation generation involves iterating through triggers or groups, applying conditional logic for exemption/override, calculating Y/Z using helper functions or inline logic based on section rules (aggregation, min/max), formatting text strings with annotations, and storing them (e.g., in a list of dictionaries). Focus rules are applied during the final organization phase. The flowchart in Figure \ref{fig:chapter7_logic} illustrates the core calculation steps for determining Y and Z for a single trigger point, which forms the basis for Q recommendations and is a pre-aggregation step for V/DI. To enhance the fluency and clarity of the generated report, AI-powered tools may optionally be utilized to assist in synthesizing the findings and recommendations into user-friendly prose.
+\textbf{Implementation Context:} This logic typically resides in the latter part of the main analysis function. Exemption checks require pre-calculating relevant metrics per category. Recommendation generation involves iterating through triggers or groups, applying conditional logic for exemption/override, calculating Y/Z using helper functions or inline logic based on section rules (aggregation, min/max), formatting text strings with annotations, and storing them (e.g., in a list of dictionaries). Focus rules are applied during the final organization phase. For DI sections, special handling is required for MSR groups including reading time analysis and group-level time allocation. The flowchart in Figure \ref{fig:chapter7_logic} illustrates the core calculation steps for determining Y and Z for a single trigger point, which forms the basis for Q recommendations and is a pre-aggregation step for V/DI. To enhance the fluency and clarity of the generated report, AI-powered tools may optionally be utilized to assist in synthesizing the findings and recommendations into user-friendly prose.
 
-\textbf{Rationale:} Provides a holistic, actionable summary translating complex quantitative diagnostics and parameterized recommendations into clear, user-friendly insights and next steps, maximizing the practical value of the analysis for the student.
+\textbf{Rationale:} Provides a holistic, actionable summary translating complex quantitative diagnostics and parameterized recommendations into clear, user-friendly insights and next steps, maximizing the practical value of the analysis for the student. For DI sections, this includes specialized MSR reading strategy guidance critical for performance improvement.
 
 % ***** FIGURE: Chapter 7 Logic *****
 \begin{figure}[htbp]
@@ -745,25 +788,25 @@ While not always direct columns, the analysis requires:
 
 \textbf{Report Structure and Content Synthesis:}
 \begin{enumerate}
-    \item \textbf{Opening Summary:} This initial section synthesizes key findings from Chapter 1, including: the assessed \texttt{time\_pressure} status (described naturally, e.g., "significant time pressure was likely experienced"), total time usage relative to the limit, and whether any data was deemed invalid due to end-section rushing (e.g., "analysis excludes X questions answered hastily at the end under pressure").
-    \item \textbf{Performance Overview:} Summarizes Chapter 2 results descriptively: Relative performance across key dimensions (Q: 'Real' vs. 'Pure'; DI: 'Math Related' vs. 'Non-Math Related', types 'DS', 'TPA', etc.; V: Skill performance, 'CR' vs. 'RC') and difficulty levels (e.g., "Errors were concentrated in the High difficulty range," "Performance on 'Math Related' DI questions was significantly weaker than 'Non-Math Related'"). Mention reading time assessment for V if flagged.
-    \item \textbf{Core Problem Diagnosis:} Translates Chapter 3 findings into narrative form: Describes primary error patterns identified (e.g., "A tendency towards calculation errors in Pure Quant questions was observed," "Difficulties in interpreting complex graph relationships under time pressure were noted in GT questions," "Logical flaws in evaluating assumptions were apparent in CR questions"). \textbf{Crucially highlights SFE findings} using descriptive language (e.g., "Particular attention is needed for errors occurring on questions below your typical mastery level in [Skill/Type], suggesting instability in applying fundamental concepts."). Includes MSR-specific time issues for DI if detected.
-    \item \textbf{Pattern Observation:} Integrates Chapter 5 alerts: Notes risks associated with early-stage rapid responses or potential carelessness if the \texttt{carelessness\_issue} flag was triggered (e.g., "A pattern of rapid, incorrect answers suggests that focusing on accuracy over speed may be beneficial").
-    \item \textbf{Foundational Consolidation Advisory:} Explicitly states which skills/types require systematic foundational work based on Chapter 6 override triggers (e.g., "Systematic review and practice of the fundamentals for [Skill/Type] is recommended due to overall performance patterns").
-    \item \textbf{Practice Plan Presentation:} Presents the full, organized list of recommendations generated in Chapter 7, ensuring clarity and including all annotations (priority, volume alerts, focus rules, exemptions) in natural language descriptions within the recommendation text itself.
+    \item \textbf{Opening Summary:} This initial section synthesizes key findings from Chapter 1, including: the assessed \texttt{time\_pressure} status (described naturally, e.g., "significant time pressure was likely experienced"), total time usage relative to the limit, and whether any data was deemed invalid due to end-section rushing (e.g., "analysis excludes X questions answered hastily at the end under pressure"). \textbf{For DI sections}, include MSR group timing assessment and reading efficiency evaluation.
+    \item \textbf{Performance Overview:} Summarizes Chapter 2 results descriptively: Relative performance across key dimensions (Q: 'Real' vs. 'Pure'; DI: 'Math Related' vs. 'Non-Math Related', types 'DS', 'TPA', 'GT'; V: Skill performance, 'CR' vs. 'RC') and difficulty levels (e.g., "Errors were concentrated in the High difficulty range," "Performance on 'Math Related' DI questions was significantly weaker than 'Non-Math Related'"). Mention reading time assessment for V if flagged. \textbf{For DI}, specifically address MSR group performance and reading efficiency patterns.
+    \item \textbf{Core Problem Diagnosis:} Translates Chapter 3 findings into narrative form: Describes primary error patterns identified (e.g., "A tendency towards calculation errors in Pure Quant questions was observed," "Difficulties in interpreting complex graph relationships under time pressure were noted in GT questions," "Reading comprehension challenges in MSR passages affected subsequent question accuracy," "Logical flaws in evaluating assumptions were apparent in CR questions"). \textbf{Crucially highlights SFE findings} using descriptive language (e.g., "Particular attention is needed for errors occurring on questions below your typical mastery level in [Skill/Type], suggesting instability in applying fundamental concepts."). \textbf{Includes MSR-specific time issues for DI} if detected, with detailed reading strategy analysis.
+    \item \textbf{Pattern Observation:} Integrates Chapter 5 alerts: Notes risks associated with early-stage rapid responses or potential carelessness if the \texttt{carelessness\_issue} flag was triggered (e.g., "A pattern of rapid, incorrect answers suggests that focusing on accuracy over speed may be beneficial"). \textbf{For DI}, includes MSR reading pattern observations and time allocation efficiency notes.
+    \item \textbf{Foundational Consolidation Advisory:} Explicitly states which skills/types require systematic foundational work based on Chapter 6 override triggers (e.g., "Systematic review and practice of the fundamentals for [Skill/Type] is recommended due to overall performance patterns"). \textbf{For DI}, includes MSR reading strategy consolidation recommendations when applicable.
+    \item \textbf{Practice Plan Presentation:} Presents the full, organized list of recommendations generated in Chapter 7, ensuring clarity and including all annotations (priority, volume alerts, focus rules, exemptions, MSR-specific guidance) in natural language descriptions within the recommendation text itself.
     \item \textbf{Guidance for Subsequent Actions:} Provides actionable next steps:
     \begin{itemize}
-        \item \textbf{Guiding Reflection Questions:} Poses targeted, open-ended questions based on the specific diagnoses to prompt student self-assessment (incorporating MSR-specific questions for DI).
-        \item \textbf{Secondary Evidence Review Suggestion:} Explains \textit{when} (e.g., uncertain recall, need pattern confirmation) and \textit{how} (e.g., review recent logs, focus on specific error types) to use past practice data.
-        \item \textbf{Qualitative Analysis Suggestion:} Explains \textit{when} (e.g., root cause remains unclear after other steps) and \textit{how} (e.g., provide detailed walkthroughs for specific problem types) to engage in deeper analysis, potentially with an advisor.
+        \item \textbf{Guiding Reflection Questions:} Poses targeted, open-ended questions based on the specific diagnoses to prompt student self-assessment. \textbf{For DI}, incorporates MSR-specific questions about reading approach, note-taking strategy, and time allocation between reading and questions.
+        \item \textbf{Secondary Evidence Review Suggestion:} Explains \textit{when} (e.g., uncertain recall, need pattern confirmation, MSR strategy unclear) and \textit{how} (e.g., review recent logs, focus on specific error types, analyze MSR reading habits) to use past practice data.
+        \item \textbf{Qualitative Analysis Suggestion:} Explains \textit{when} (e.g., root cause remains unclear after other steps, MSR reading strategy needs refinement) and \textit{how} (e.g., provide detailed walkthroughs for specific problem types, MSR reading technique demonstration) to engage in deeper analysis, potentially with an advisor.
     \end{itemize}
 \end{enumerate}
 
-\textbf{Core Constraint Adherence:} The implementation generating this chapter\'s output must rigorously avoid exposing internal variable names (e.g., \texttt{time\_pressure}, \texttt{is\_invalid}, \texttt{special\_focus\_error}), specific performance flags, numerical thresholds, or calculation details. All findings must be translated into clear, easily understandable, descriptive prose suitable for the end-user (student).
+\textbf{Core Constraint Adherence:} The implementation generating this chapter\'s output must rigorously avoid exposing internal variable names (e.g., \texttt{time\_pressure}, \texttt{is\_invalid}, \texttt{special\_focus\_error}, \texttt{msr\_group\_id}), specific performance flags, numerical thresholds, or calculation details. All findings must be translated into clear, easily understandable, descriptive prose suitable for the end-user (student). \textbf{DI-specific technical details} such as MSR group algorithms, reading time calculations, and statistical thresholds should be abstracted into user-friendly reading strategy guidance.
 
-\textbf{Implementation Context:} This is typically handled by a dedicated \texttt{generate\_report\_*} function that receives all computed metrics, flags, lists, and generated recommendation texts as arguments. It uses conditional statements (\texttt{if/else}) and formatted strings (\texttt{f-strings}) to assemble the report sections based on the presence and values of these inputs, ensuring adherence to the natural language constraint.
+\textbf{Implementation Context:} This is typically handled by a dedicated \texttt{generate\_report\_*} function that receives all computed metrics, flags, lists, and generated recommendation texts as arguments. It uses conditional statements (\texttt{if/else}) and formatted strings (\texttt{f-strings}) to assemble the report sections based on the presence and values of these inputs, ensuring adherence to the natural language constraint. \textbf{For DI sections}, special handling functions process MSR group data and convert technical timing analysis into readable reading strategy recommendations.
 
-\textbf{Rationale:} Provides a holistic, actionable summary translating complex quantitative diagnostics and parameterized recommendations into clear, user-friendly insights and next steps, maximizing the practical value of the analysis for the student.
+\textbf{Rationale:} Provides a holistic, actionable summary translating complex quantitative diagnostics and parameterized recommendations into clear, user-friendly insights and next steps, maximizing the practical value of the analysis for the student. The natural language presentation ensures accessibility while maintaining the analytical rigor of the underlying diagnostic framework. \textbf{For DI sections}, this includes making MSR reading strategy analysis accessible and actionable for students.
 
 \subsection{Illustrative Example: Simplified Question Journey}
 
@@ -888,176 +931,381 @@ Building upon the established framework and its current implementation, several 
 
 \vspace{1em} % Add some vertical space before the table
 
-% --- Start of the longtable with increased row spacing ---
+% --- Start of the longtable with single column format ---
 % Remember to have \usepackage{longtable} in your preamble
 { % Start group to limit the scope of \arraystretch
-\renewcommand{\arraystretch}{1.1} % Adjust 1.3 (e.g., to 1.2, 1.4, 1.5) to control row spacing
+\renewcommand{\arraystretch}{1.1} % Spacing for better readability
 
-\begin{longtable}{|l|p{0.45\textwidth}|} % Your specified column widths
+\begin{longtable}{|p{0.95\textwidth}|} % Single column format using most of page width
 
 % --- Header Definitions ---
 \caption{Diagnostic Parameter Tags and Descriptions}% Add caption if needed
 \label{tab:diagnostic_tags}\\ % Add label if needed for referencing
 \hline % Top line for the first page header
-\textbf{Parameter Tag} & \textbf{English Description} \\ % Header content
+\textbf{Diagnostic Parameter Tags and Descriptions} \\ % Header content
 \hline % Line below header content
 \endfirsthead % Marks the end of the header for the first page
 
 \hline % Top line for continuation page header
-\multicolumn{2}{|c|}{\tablename\ \thetable{} -- \textit{Continued from previous page}} \\ % Optional: Title for continued pages
+\tablename\ \thetable{} -- \textit{Continued from previous page} \\ % Title for continued pages
 \hline % Line below the continued title
-\textbf{Parameter Tag} & \textbf{English Description} \\ % Header content for continuation pages
-\hline % Line below header content
 \endhead % Marks the end of the header for continuation pages
 
 \hline % Line above the footer on pages before the last
-\multicolumn{2}{|r|}{\textit{Continued on next page}} \\ % Footer content for pages before the last
+\textit{Continued on next page} \\ % Footer content for pages before the last
 \endfoot % Marks the end of the footer for pages before the last
 
 \hline % Bottom line for the table on the last page
 \endlastfoot % Marks the end of the footer for the last page
 
 % --- Table Content Starts Here ---
-% Note: The \\multicolumn lines for section headers remain the same
-\multicolumn{2}{|c|}{\textbf{Reading / Comprehension / Interpretation}} \\\\
 \hline
-\texttt{Q\_READING\_COMPREHENSION\_ERROR} & Q Reading: Difficulty understanding word problem text (Real Context) \\\\
-\texttt{Q\_PROBLEM\_UNDERSTANDING\_ERROR} & Q Problem Understanding: Misinterpretation of question requirements/logic \\\\
-\texttt{DI\_READING\_COMPREHENSION\_ERROR} & DI Reading Comprehension: Error/Difficulty understanding text (Math/Non-Math) \\\\
-\texttt{DI\_GRAPH\_TABLE\_INTERPRETATION\_ERROR} & DI Graph/Table Interpretation: Error/Difficulty interpreting visual data \\\\
-% CR/RC Reading/Comprehension/Interpretation errors will be listed under specific CR/RC sections below
+\textbf{Reading / Comprehension / Interpretation} \\
 \hline
-\multicolumn{2}{|c|}{\textbf{Concept / Logic Application}} \\\\
+\texttt{Q\_READING\_COMPREHENSION\_ERROR} \\
+Q Reading: Difficulty understanding word problem text (Real Context) \\
 \hline
-\texttt{Q\_CONCEPT\_APPLICATION\_ERROR} & Q Concept Application: Error applying mathematical concepts/formulas \\\\
-\texttt{DI\_CONCEPT\_APPLICATION\_ERROR} & DI Concept Application (Math): Error applying mathematical concepts/formulas \\\\
-\texttt{DI\_LOGICAL\_REASONING\_ERROR} & DI Logical Reasoning (Non-Math): Error in inherent logical reasoning/judgment \\\\
-% CR/RC Concept/Logic Application errors will be listed under specific CR/RC sections below
+\texttt{Q\_PROBLEM\_UNDERSTANDING\_ERROR} \\
+Q Problem Understanding: Misinterpretation of question requirements/logic \\
 \hline
-\multicolumn{2}{|c|}{\textbf{Data Handling / Calculation / Location}} \\\\
+\texttt{DI\_READING\_COMPREHENSION\_ERROR} \\
+DI Reading Comprehension: Error/Difficulty understanding text (Math/Non-Math) \\
 \hline
-\texttt{Q\_CALCULATION\_ERROR} & Q Calculation: Error in mathematical computation \\\\
-\texttt{DI\_DATA\_EXTRACTION\_ERROR} & DI Data Extraction (GT): Error extracting data from graphs/tables \\\\
-\texttt{DI\_INFORMATION\_EXTRACTION\_INFERENCE\_ERROR} & DI Info Extraction/Inference (GT/MSR Non-Math): Error locating/inferring info \\\\
-\texttt{DI\_CALCULATION\_ERROR} & DI Calculation: Error in mathematical computation \\\\
-% RC Location errors will be listed under specific RC sections below
+\texttt{DI\_GRAPH\_TABLE\_INTERPRETATION\_ERROR} \\
+DI Graph/Table Interpretation: Error/Difficulty interpreting visual data \\
 \hline
-\multicolumn{2}{|c|}{\textbf{Section/Type Specific (MSR - DI Only)}} \\\\ % Changed header to be DI specific
+\texttt{DI\_MSR\_READING\_COMPREHENSION\_BARRIER} \\
+DI MSR Reading Barrier: Excessive overall reading time affecting group performance \\
 \hline
-\texttt{DI\_MULTI\_SOURCE\_INTEGRATION\_ERROR} & DI Multi-Source Integration (MSR): Error integrating info across sources \\\\
-\texttt{DI\_MSR\_READING\_COMPREHENSION\_BARRIER} & DI MSR Reading Barrier: Excessive overall reading time for the group \\\\
-\texttt{DI\_QUESTION\_TYPE\_SPECIFIC\_ERROR} & DI Question Type Specific Error (e.g., MSR Non-Math sub-type) \\\\
+\textbf{Concept / Logic Application} \\
 \hline
-\multicolumn{2}{|c|}{\textbf{Critical Reasoning (CR) - Verbal}} \\\\
+\texttt{Q\_CONCEPT\_APPLICATION\_ERROR} \\
+Q Concept Application: Error applying mathematical concepts/formulas \\
 \hline
-\multicolumn{2}{|c|}{\textit{CR Stem Understanding Errors}} \\\\
-\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_QUESTION\_REQUIREMENT\_GRASP} & CR Stem Understanding Error: Misinterpretation of question requirements \\\\
-\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_VOCAB} & CR Stem Understanding Error: Vocabulary issues in stem \\\\
-\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_SYNTAX} & CR Stem Understanding Error: Syntactical complexity in stem \\\\
-\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_LOGIC} & CR Stem Understanding Error: Logical structure of stem misunderstood \\\\
-\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_DOMAIN} & CR Stem Understanding Error: Domain-specific content in stem misunderstood \\\\
-\multicolumn{2}{|c|}{\textit{CR Reasoning Errors}} \\\\
-\texttt{CR\_REASONING\_ERROR\_LOGIC\_CHAIN\_ANALYSIS\_PREMISE\_CONCLUSION\_RELATIONSHIP} & CR Reasoning Error: Flawed analysis of premise-conclusion relationship \\\\
-\texttt{CR\_REASONING\_ERROR\_ABSTRACT\_LOGIC\_TERMINOLOGY\_UNDERSTANDING} & CR Reasoning Error: Misunderstanding of abstract logic or terminology \\\\
-\texttt{CR\_REASONING\_ERROR\_PREDICTION\_DIRECTION} & CR Reasoning Error: Incorrect prediction of answer direction \\\\
-\texttt{CR\_REASONING\_ERROR\_CORE\_ISSUE\_IDENTIFICATION} & CR Reasoning Error: Failure to identify the core issue of the argument \\\\
-\texttt{CR\_REASONING\_ERROR\_CHOICE\_RELEVANCE\_JUDGEMENT} & CR Reasoning Error: Incorrect judgment of answer choice relevance \\\\
-\texttt{CR\_REASONING\_ERROR\_STRONG\_DISTRACTOR\_CHOICE\_CONFUSION} & CR Reasoning Error: Confusion caused by strong distractor choices \\\\
-\multicolumn{2}{|c|}{\textit{CR Choice Understanding Errors}} \\\\
-\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_VOCAB} & CR Choice Understanding Error: Vocabulary issues in answer choices \\\\
-\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_SYNTAX} & CR Choice Understanding Error: Syntactical complexity in answer choices \\\\
-\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_LOGIC} & CR Choice Understanding Error: Logical structure of answer choices misunderstood \\\\
-\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_DOMAIN} & CR Choice Understanding Error: Domain-specific content in choices misunderstood \\\\
-\multicolumn{2}{|c|}{\textit{CR Specific Question Type Weakness}} \\\\
-\texttt{CR\_SPECIFIC\_QUESTION\_TYPE\_WEAKNESS\_NOTE\_TYPE} & CR Specific Question Type Weakness: (Type to be noted) \\\\
-\multicolumn{2}{|c|}{\textit{CR Stem Understanding Difficulties (Efficiency Issue / Slow Performance)}} \\\\
-\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_VOCAB} & CR Stem Understanding Difficulty: Vocabulary challenges in stem \\\\
-\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_SYNTAX} & CR Stem Understanding Difficulty: Syntactical complexity in stem causing slowdown \\\\
-\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_LOGIC} & CR Stem Understanding Difficulty: Logical structure of stem hard to grasp \\\\
-\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_DOMAIN} & CR Stem Understanding Difficulty: Domain-specific content in stem hard to grasp \\\\
-\multicolumn{2}{|c|}{\textit{CR Reasoning Difficulties (Efficiency Issue / Slow Performance)}} \\\\
-\texttt{CR\_REASONING\_DIFFICULTY\_ABSTRACT\_LOGIC\_TERMINOLOGY\_UNDERSTANDING} & CR Reasoning Difficulty: Difficulty with abstract logic or terminology \\\\
-\texttt{CR\_REASONING\_DIFFICULTY\_PREDICTION\_DIRECTION\_MISSING} & CR Reasoning Difficulty: Missing or slow prediction of answer direction \\\\
-\texttt{CR\_REASONING\_DIFFICULTY\_CORE\_ISSUE\_IDENTIFICATION} & CR Reasoning Difficulty: Difficulty identifying the core issue of the argument \\\\
-\texttt{CR\_REASONING\_DIFFICULTY\_CHOICE\_RELEVANCE\_JUDGEMENT} & CR Reasoning Difficulty: Difficulty judging answer choice relevance \\\\
-\texttt{CR\_REASONING_DIFFICULTY\_STRONG\_DISTRACTOR\_CHOICE\_ANALYSIS} & CR Reasoning Difficulty: Difficulty analyzing strong distractor choices \\\\
-\multicolumn{2}{|c|}{\textit{CR Choice Understanding Difficulties (Efficiency Issue / Slow Performance)}} \\\\
-\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_VOCAB} & CR Choice Understanding Difficulty: Vocabulary challenges in answer choices \\\\
-\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_SYNTAX} & CR Choice Understanding Difficulty: Syntactical complexity in choices causing slowdown \\\\
-\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_LOGIC} & CR Choice Understanding Difficulty: Logical structure of choices hard to grasp \\\\
-\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_DOMAIN} & CR Choice Understanding Difficulty: Domain-specific content in choices hard to grasp \\\\
+\texttt{DI\_CONCEPT\_APPLICATION\_ERROR} \\
+DI Concept Application (Math): Error applying mathematical concepts/formulas \\
 \hline
-\multicolumn{2}{|c|}{\textbf{Reading Comprehension (RC) - Verbal}} \\\\
+\texttt{DI\_LOGICAL\_REASONING\_ERROR} \\
+DI Logical Reasoning (Non-Math): Error in inherent logical reasoning/judgment \\
 \hline
-\multicolumn{2}{|c|}{\textit{RC Reading Comprehension Errors}} \\\\
-\texttt{RC\_READING\_COMPREHENSION\_ERROR\_VOCAB} & RC Reading Comprehension Error: Vocabulary misunderstanding \\\\
-\texttt{RC\_READING\_COMPREHENSION\_ERROR\_LONG\_DIFFICULT\_SENTENCE\_ANALYSIS} & RC Reading Comprehension Error: Incorrect analysis of long/difficult sentences \\\\
-\texttt{RC\_READING\_COMPREHENSION\_ERROR\_PASSAGE\_STRUCTURE} & RC Reading Comprehension Error: Misunderstanding of passage structure \\\\
-\texttt{RC\_READING\_COMPREHENSION\_ERROR\_KEY\_INFO\_LOCATION\_UNDERSTANDING} & RC Reading Comprehension Error: Incorrect location or understanding of key information \\\\
-\multicolumn{2}{|c|}{\textit{RC Question Understanding Errors}} \\\\
-\texttt{RC\_QUESTION\_UNDERSTANDING\_ERROR\_FOCUS\_POINT} & RC Question Understanding Error: Misinterpretation of the question's focus point \\\\
-\multicolumn{2}{|c|}{\textit{RC Location Skill Errors}} \\\\
-\texttt{RC\_LOCATION\_SKILL\_ERROR\_LOCATION} & RC Location Skill Error: Incorrect location of information in the passage \\\\
-\multicolumn{2}{|c|}{\textit{RC Reasoning Errors}} \\\\
-\texttt{RC\_REASONING\_ERROR\_INFERENCE} & RC Reasoning Error: Flawed inference from the passage text \\\\
-\multicolumn{2}{|c|}{\textit{RC Choice Analysis Errors}} \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_VOCAB} & RC Choice Analysis Error: Vocabulary issues in answer choices \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_SYNTAX} & RC Choice Analysis Error: Syntactical complexity in answer choices \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_LOGIC} & RC Choice Analysis Error: Logical structure of answer choices misunderstood \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_DOMAIN} & RC Choice Analysis Error: Domain-specific content in choices misunderstood \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_RELEVANCE\_JUDGEMENT} & RC Choice Analysis Error: Incorrect judgment of answer choice relevance \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_STRONG\_DISTRACTOR\_CONFUSION} & RC Choice Analysis Error: Confusion caused by strong distractor choices \\\\
-\multicolumn{2}{|c|}{\textit{RC Method Errors}} \\\\
-\texttt{RC\_METHOD\_ERROR\_SPECIFIC\_QUESTION\_TYPE\_HANDLING} & RC Method Error: Incorrect handling of specific question types \\\\
-\multicolumn{2}{|c|}{\textit{RC Reading Comprehension Difficulties (Efficiency Issue / Slow Performance)}} \\\\
-\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_VOCAB\_BOTTLENECK} & RC Reading Comprehension Difficulty: Vocabulary bottleneck \\\\
-\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_LONG\_DIFFICULT\_SENTENCE\_ANALYSIS} & RC Reading Comprehension Difficulty: Difficulty analyzing long/difficult sentences \\\\
-\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_PASSAGE\_STRUCTURE\_GRASP\_UNCLEAR} & RC Reading Comprehension Difficulty: Unclear grasp of passage structure \\\\
-\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_SPECIFIC\_DOMAIN\_BACKGROUND\_KNOWLEDGE\_LACK} & RC Reading Comprehension Difficulty: Lack of specific domain background knowledge \\\\
-\multicolumn{2}{|c|}{\textit{RC Question Understanding Difficulties (Efficiency Issue / Slow Performance)}} \\\\
-\texttt{RC\_QUESTION\_UNDERSTANDING\_DIFFICULTY\_FOCUS\_POINT\_GRASP} & RC Question Understanding Difficulty: Difficulty grasping the question's focus point \\\\
-\multicolumn{2}{|c|}{\textit{RC Location Skill Difficulties (Efficiency Issue / Slow Performance)}} \\\\
-\texttt{RC\_LOCATION\_SKILL\_DIFFICULTY\_INEFFICIENCY} & RC Location Skill Difficulty: Inefficient location of information \\\\
-\multicolumn{2}{|c|}{\textit{RC Reasoning Difficulties (Efficiency Issue / Slow Performance)}} \\\\
-\texttt{RC\_REASONING\_DIFFICULTY\_INFERENCE\_SPEED\_SLOW} & RC Reasoning Difficulty: Slow inference speed \\\\
-\multicolumn{2}{|c|}{\textit{RC Choice Analysis Difficulties (Efficiency Issue / Slow Performance)}} \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_VOCAB} & RC Choice Analysis Difficulty: Vocabulary challenges in answer choices \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_SYNTAX} & RC Choice Analysis Difficulty: Syntactical complexity in choices causing slowdown \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_LOGIC} & RC Choice Analysis Difficulty: Logical structure of choices hard to grasp \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_DOMAIN} & RC Choice Analysis Difficulty: Domain-specific content in choices hard to grasp \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_RELEVANCE\_JUDGEMENT} & RC Choice Analysis Difficulty: Difficulty judging answer choice relevance \\\\
-\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_STRONG\_DISTRACTOR\_ANALYSIS} & RC Choice Analysis Difficulty: Difficulty analyzing strong distractor choices \\\\
-\multicolumn{2}{|c|}{\textit{RC Method Difficulties (Efficiency Issue / Slow Performance)}} \\\\
-\texttt{RC\_METHOD\_DIFFICULTY\_SPECIFIC\_QUESTION\_TYPE\_HANDLING} & RC Method Difficulty: Difficulty handling specific question types \\\\
+\textbf{Data Handling / Calculation / Location} \\
 \hline
-\multicolumn{2}{|c|}{\textbf{Foundational Mastery}} \\\\
+\texttt{Q\_CALCULATION\_ERROR} \\
+Q Calculation: Error in mathematical computation \\
 \hline
-\texttt{Q\_FOUNDATIONAL\_MASTERY\_INSTABILITY\_SFE} & Q Foundational Mastery: Unstable application (Special Focus Error) \\\\
-\texttt{DI\_FOUNDATIONAL\_MASTERY\_INSTABILITY\_SFE} & DI Foundational Mastery: Unstable application (Special Focus Error) \\\\
-\texttt{FOUNDATIONAL\_MASTERY\_APPLICATION\_INSTABILITY\_SFE} & General Foundational Mastery: Application instability (Special Focus Error) \\\\
+\texttt{DI\_DATA\_EXTRACTION\_ERROR} \\
+DI Data Extraction (GT): Error extracting data from graphs/tables \\
 \hline
-\multicolumn{2}{|c|}{\textbf{Efficiency Bottlenecks (Q and DI Specific)}} \\\\ % Removed generic Verbal
+\texttt{DI\_INFORMATION\_EXTRACTION\_INFERENCE\_ERROR} \\
+DI Info Extraction/Inference (GT/MSR Non-Math): Error locating/inferring information \\
 \hline
-\texttt{Q\_EFFICIENCY\_BOTTLENECK\_READING} & Q Efficiency Bottleneck: Reading time (Real Context) \\\\
-\texttt{Q\_EFFICIENCY\_BOTTLENECK\_CONCEPT} & Q Efficiency Bottleneck: Concept recall/application time \\\\
-\texttt{Q\_EFFICIENCY\_BOTTLENECK\_CALCULATION} & Q Efficiency Bottleneck: Calculation time \\\\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_READING} & DI Efficiency Bottleneck: Reading/Comprehension time (Math/Non-Math) \\\\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_CONCEPT} & DI Efficiency Bottleneck: Concept/Formula application time (Math) \\\\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_CALCULATION} & DI Calculation: Error in mathematical computation \\\\ % This was repeated, DI calc error is different from efficiency bottleneck
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_LOGIC} & DI Efficiency Bottleneck: Logical reasoning time (Non-Math) \\\\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_GRAPH\_TABLE} & DI Efficiency Bottleneck: Graph/Table interpretation time \\\\
-\texttt{DI\_EFFICIENCY\_BOTTLENECK\_INTEGRATION} & DI Efficiency Bottleneck: Multi-source integration time (MSR) \\\\
-% Removed CR/RC excessive time tags as they are covered by "Difficulty" tags now
-% Removed EFFICIENCY_BOTTLENECK_[AREA] for V
+\texttt{DI\_CALCULATION\_ERROR} \\
+DI Calculation: Error in mathematical computation \\
 \hline
-\multicolumn{2}{|c|}{\textbf{Behavioral Patterns}} \\\\
+\texttt{DI\_MSR\_TIME\_ALLOCATION\_ISSUE} \\
+DI MSR Time Allocation: Inefficient time distribution between reading and questions \\
 \hline
-\texttt{DATA\_INVALID\_SHORT\_TIME\_PRESSURE\_AFFECTED} & Data Invalid: Short time due to time pressure affecting validity \\\\
-\texttt{Q\_CARELESSNESS\_DETAIL\_OMISSION} & Q Behavior: Carelessness - Detail omission/misread (Implied in Fast \& Wrong) \\\\
-\texttt{DI\_CARELESSNESS\_DETAIL\_OMISSION} & DI Behavior: Carelessness - Detail omission/misread (Implied in Fast \& Wrong) \\\\
-\texttt{BEHAVIOR\_CARELESSNESS\_ISSUE} & Behavior Pattern: Carelessness issue (overall high fast-wrong rate > 25\\%) \\\\
-\texttt{BEHAVIOR\_EARLY\_RUSHING\_FLAG\_RISK} & Behavior Pattern: Rushing early in section (< 1.0 min, Note flag for review risk) \\\\
-\texttt{BEHAVIOR\_PATTERN\_FAST\_GUESSING\_HASTY} & Behavior Pattern: Hasty response/fast guessing pattern \\\\
+\textbf{Section/Type Specific (MSR - DI Only)} \\
+\hline
+\texttt{DI\_MULTI\_SOURCE\_INTEGRATION\_ERROR} \\
+DI Multi-Source Integration (MSR): Error integrating information across multiple sources \\
+\hline
+\texttt{DI\_MSR\_READING\_STRATEGY\_INEFFICIENCY} \\
+DI MSR Reading Strategy: Inefficient reading approach for multi-source materials \\
+\hline
+\texttt{DI\_MSR\_GROUP\_TIMING\_MANAGEMENT\_ERROR} \\
+DI MSR Group Timing Management: Poor time management across MSR question groups \\
+\hline
+\texttt{DI\_QUESTION\_TYPE\_SPECIFIC\_ERROR} \\
+DI Question Type Specific Error (e.g., DS, TPA, GT specific weaknesses) \\
+\hline
+\texttt{DI\_MSR\_READING\_DEPTH\_VS\_SPEED\_IMBALANCE} \\
+DI MSR Reading: Imbalance between reading depth and speed requirements \\
+\hline
+\textbf{Critical Reasoning (CR) - Verbal} \\
+\hline
+\textit{CR Stem Understanding Errors} \\
+\hline
+\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_QUESTION\_REQUIREMENT\_GRASP} \\
+CR Stem Understanding Error: Misinterpretation of question requirements \\
+\hline
+\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_VOCAB} \\
+CR Stem Understanding Error: Vocabulary issues in stem \\
+\hline
+\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_SYNTAX} \\
+CR Stem Understanding Error: Syntactical complexity in stem \\
+\hline
+\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_LOGIC} \\
+CR Stem Understanding Error: Logical structure of stem misunderstood \\
+\hline
+\texttt{CR\_STEM\_UNDERSTANDING\_ERROR\_DOMAIN} \\
+CR Stem Understanding Error: Domain-specific content in stem misunderstood \\
+\hline
+\textit{CR Reasoning Errors} \\
+\hline
+\texttt{CR\_REASONING\_ERROR\_LOGIC\_CHAIN\_ANALYSIS\_PREMISE\_CONCLUSION\_RELATIONSHIP} \\
+CR Reasoning Error: Flawed analysis of premise-conclusion relationship \\
+\hline
+\texttt{CR\_REASONING\_ERROR\_ABSTRACT\_LOGIC\_TERMINOLOGY\_UNDERSTANDING} \\
+CR Reasoning Error: Misunderstanding of abstract logic or terminology \\
+\hline
+\texttt{CR\_REASONING\_ERROR\_PREDICTION\_DIRECTION} \\
+CR Reasoning Error: Incorrect prediction of answer direction \\
+\hline
+\texttt{CR\_REASONING\_ERROR\_CORE\_ISSUE\_IDENTIFICATION} \\
+CR Reasoning Error: Failure to identify the core issue of the argument \\
+\hline
+\texttt{CR\_REASONING\_ERROR\_CHOICE\_RELEVANCE\_JUDGEMENT} \\
+CR Reasoning Error: Incorrect judgment of answer choice relevance \\
+\hline
+\texttt{CR\_REASONING\_ERROR\_STRONG\_DISTRACTOR\_CHOICE\_CONFUSION} \\
+CR Reasoning Error: Confusion caused by strong distractor choices \\
+\hline
+\textit{CR Choice Understanding Errors} \\
+\hline
+\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_VOCAB} \\
+CR Choice Understanding Error: Vocabulary issues in answer choices \\
+\hline
+\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_SYNTAX} \\
+CR Choice Understanding Error: Syntactical complexity in answer choices \\
+\hline
+\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_LOGIC} \\
+CR Choice Understanding Error: Logical structure of answer choices misunderstood \\
+\hline
+\texttt{CR\_CHOICE\_UNDERSTANDING\_ERROR\_DOMAIN} \\
+CR Choice Understanding Error: Domain-specific content in choices misunderstood \\
+\hline
+\textit{CR Specific Question Type Weakness} \\
+\hline
+\texttt{CR\_SPECIFIC\_QUESTION\_TYPE\_WEAKNESS\_NOTE\_TYPE} \\
+CR Specific Question Type Weakness: (Type to be noted) \\
+\hline
+\textit{CR Stem Understanding Difficulties (Efficiency Issue / Slow Performance)} \\
+\hline
+\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_VOCAB} \\
+CR Stem Understanding Difficulty: Vocabulary challenges in stem \\
+\hline
+\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_SYNTAX} \\
+CR Stem Understanding Difficulty: Syntactical complexity in stem causing slowdown \\
+\hline
+\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_LOGIC} \\
+CR Stem Understanding Difficulty: Logical structure of stem hard to grasp \\
+\hline
+\texttt{CR\_STEM\_UNDERSTANDING\_DIFFICULTY\_DOMAIN} \\
+CR Stem Understanding Difficulty: Domain-specific content in stem hard to grasp \\
+\hline
+\textit{CR Reasoning Difficulties (Efficiency Issue / Slow Performance)} \\
+\hline
+\texttt{CR\_REASONING\_DIFFICULTY\_ABSTRACT\_LOGIC\_TERMINOLOGY\_UNDERSTANDING} \\
+CR Reasoning Difficulty: Difficulty with abstract logic or terminology \\
+\hline
+\texttt{CR\_REASONING\_DIFFICULTY\_PREDICTION\_DIRECTION\_MISSING} \\
+CR Reasoning Difficulty: Missing or slow prediction of answer direction \\
+\hline
+\texttt{CR\_REASONING\_DIFFICULTY\_CORE\_ISSUE\_IDENTIFICATION} \\
+CR Reasoning Difficulty: Difficulty identifying the core issue of the argument \\
+\hline
+\texttt{CR\_REASONING\_DIFFICULTY\_CHOICE\_RELEVANCE\_JUDGEMENT} \\
+CR Reasoning Difficulty: Difficulty judging answer choice relevance \\
+\hline
+\texttt{CR\_REASONING\_DIFFICULTY\_STRONG\_DISTRACTOR\_CHOICE\_ANALYSIS} \\
+CR Reasoning Difficulty: Difficulty analyzing strong distractor choices \\
+\hline
+\textit{CR Choice Understanding Difficulties (Efficiency Issue / Slow Performance)} \\
+\hline
+\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_VOCAB} \\
+CR Choice Understanding Difficulty: Vocabulary challenges in answer choices \\
+\hline
+\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_SYNTAX} \\
+CR Choice Understanding Difficulty: Syntactical complexity in choices causing slowdown \\
+\hline
+\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_LOGIC} \\
+CR Choice Understanding Difficulty: Logical structure of choices hard to grasp \\
+\hline
+\texttt{CR\_CHOICE\_UNDERSTANDING\_DIFFICULTY\_DOMAIN} \\
+CR Choice Understanding Difficulty: Domain-specific content in choices hard to grasp \\
+\hline
+\textbf{Reading Comprehension (RC) - Verbal} \\
+\hline
+\textit{RC Reading Comprehension Errors} \\
+\hline
+\texttt{RC\_READING\_COMPREHENSION\_ERROR\_VOCAB} \\
+RC Reading Comprehension Error: Vocabulary misunderstanding \\
+\hline
+\texttt{RC\_READING\_COMPREHENSION\_ERROR\_LONG\_DIFFICULT\_SENTENCE\_ANALYSIS} \\
+RC Reading Comprehension Error: Incorrect analysis of long/difficult sentences \\
+\hline
+\texttt{RC\_READING\_COMPREHENSION\_ERROR\_PASSAGE\_STRUCTURE} \\
+RC Reading Comprehension Error: Misunderstanding of passage structure \\
+\hline
+\texttt{RC\_READING\_COMPREHENSION\_ERROR\_KEY\_INFO\_LOCATION\_UNDERSTANDING} \\
+RC Reading Comprehension Error: Incorrect location or understanding of key information \\
+\hline
+\textit{RC Question Understanding Errors} \\
+\hline
+\texttt{RC\_QUESTION\_UNDERSTANDING\_ERROR\_FOCUS\_POINT} \\
+RC Question Understanding Error: Misinterpretation of the question's focus point \\
+\hline
+\textit{RC Location Skill Errors} \\
+\hline
+\texttt{RC\_LOCATION\_SKILL\_ERROR\_LOCATION} \\
+RC Location Skill Error: Incorrect location of information in the passage \\
+\hline
+\textit{RC Reasoning Errors} \\
+\hline
+\texttt{RC\_REASONING\_ERROR\_INFERENCE} \\
+RC Reasoning Error: Flawed inference from the passage text \\
+\hline
+\textit{RC Choice Analysis Errors} \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_VOCAB} \\
+RC Choice Analysis Error: Vocabulary issues in answer choices \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_SYNTAX} \\
+RC Choice Analysis Error: Syntactical complexity in answer choices \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_LOGIC} \\
+RC Choice Analysis Error: Logical structure of answer choices misunderstood \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_DOMAIN} \\
+RC Choice Analysis Error: Domain-specific content in choices misunderstood \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_RELEVANCE\_JUDGEMENT} \\
+RC Choice Analysis Error: Incorrect judgment of answer choice relevance \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_ERROR\_STRONG\_DISTRACTOR\_CONFUSION} \\
+RC Choice Analysis Error: Confusion caused by strong distractor choices \\
+\hline
+\textit{RC Method Errors} \\
+\hline
+\texttt{RC\_METHOD\_ERROR\_SPECIFIC\_QUESTION\_TYPE\_HANDLING} \\
+RC Method Error: Incorrect handling of specific question types \\
+\hline
+\textit{RC Reading Comprehension Difficulties (Efficiency Issue / Slow Performance)} \\
+\hline
+\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_VOCAB\_BOTTLENECK} \\
+RC Reading Comprehension Difficulty: Vocabulary bottleneck \\
+\hline
+\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_LONG\_DIFFICULT\_SENTENCE\_ANALYSIS} \\
+RC Reading Comprehension Difficulty: Difficulty analyzing long/difficult sentences \\
+\hline
+\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_PASSAGE\_STRUCTURE\_GRASP\_UNCLEAR} \\
+RC Reading Comprehension Difficulty: Unclear grasp of passage structure \\
+\hline
+\texttt{RC\_READING\_COMPREHENSION\_DIFFICULTY\_SPECIFIC\_DOMAIN\_BACKGROUND\_KNOWLEDGE\_LACK} \\
+RC Reading Comprehension Difficulty: Lack of specific domain background knowledge \\
+\hline
+\textit{RC Question Understanding Difficulties (Efficiency Issue / Slow Performance)} \\
+\hline
+\texttt{RC\_QUESTION\_UNDERSTANDING\_DIFFICULTY\_FOCUS\_POINT\_GRASP} \\
+RC Question Understanding Difficulty: Difficulty grasping the question's focus point \\
+\hline
+\textit{RC Location Skill Difficulties (Efficiency Issue / Slow Performance)} \\
+\hline
+\texttt{RC\_LOCATION\_SKILL\_DIFFICULTY\_INEFFICIENCY} \\
+RC Location Skill Difficulty: Inefficient location of information \\
+\hline
+\textit{RC Reasoning Difficulties (Efficiency Issue / Slow Performance)} \\
+\hline
+\texttt{RC\_REASONING\_DIFFICULTY\_INFERENCE\_SPEED\_SLOW} \\
+RC Reasoning Difficulty: Slow inference speed \\
+\hline
+\textit{RC Choice Analysis Difficulties (Efficiency Issue / Slow Performance)} \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_VOCAB} \\
+RC Choice Analysis Difficulty: Vocabulary challenges in answer choices \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_SYNTAX} \\
+RC Choice Analysis Difficulty: Syntactical complexity in choices causing slowdown \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_LOGIC} \\
+RC Choice Analysis Difficulty: Logical structure of choices hard to grasp \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_DOMAIN} \\
+RC Choice Analysis Difficulty: Domain-specific content in choices hard to grasp \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_RELEVANCE\_JUDGEMENT} \\
+RC Choice Analysis Difficulty: Difficulty judging answer choice relevance \\
+\hline
+\texttt{RC\_CHOICE\_ANALYSIS\_DIFFICULTY\_STRONG\_DISTRACTOR\_ANALYSIS} \\
+RC Choice Analysis Difficulty: Difficulty analyzing strong distractor choices \\
+\hline
+\textit{RC Method Difficulties (Efficiency Issue / Slow Performance)} \\
+\hline
+\texttt{RC\_METHOD\_DIFFICULTY\_SPECIFIC\_QUESTION\_TYPE\_HANDLING} \\
+RC Method Difficulty: Difficulty handling specific question types \\
+\hline
+\textbf{Foundational Mastery Instability} \\
+\hline
+\texttt{Q\_FOUNDATIONAL\_MASTERY\_APPLICATION\_INSTABILITY\_SFE} \\
+Q Foundational Mastery: Application instability (Special Focus Error) \\
+\hline
+\texttt{DI\_FOUNDATIONAL\_MASTERY\_APPLICATION\_INSTABILITY\_SFE} \\
+DI Foundational Mastery: Application instability (Special Focus Error) \\
+\hline
+\texttt{V\_FOUNDATIONAL\_MASTERY\_APPLICATION\_INSTABILITY\_SFE} \\
+V Foundational Mastery: Application instability (Special Focus Error) \\
+\hline
+\texttt{FOUNDATIONAL\_MASTERY\_APPLICATION\_INSTABILITY\_SFE} \\
+General Foundational Mastery: Application instability (Special Focus Error) \\
+\hline
+\textbf{Efficiency Bottlenecks (Time-Based Performance Issues)} \\
+\hline
+\texttt{Q\_EFFICIENCY\_BOTTLENECK\_READING} \\
+Q Efficiency Bottleneck: Reading time issues (Real Context problems) \\
+\hline
+\texttt{Q\_EFFICIENCY\_BOTTLENECK\_CONCEPT} \\
+Q Efficiency Bottleneck: Concept recall/application time \\
+\hline
+\texttt{Q\_EFFICIENCY\_BOTTLENECK\_CALCULATION} \\
+Q Efficiency Bottleneck: Calculation time \\
+\hline
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_READING} \\
+DI Efficiency Bottleneck: Reading/Comprehension time (Math/Non-Math) \\
+\hline
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_CONCEPT} \\
+DI Efficiency Bottleneck: Concept/Formula application time (Math) \\
+\hline
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_CALCULATION} \\
+DI Efficiency Bottleneck: Mathematical computation time \\
+\hline
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_LOGIC} \\
+DI Efficiency Bottleneck: Logical reasoning time (Non-Math) \\
+\hline
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_GRAPH\_TABLE} \\
+DI Efficiency Bottleneck: Graph/Table interpretation time \\
+\hline
+\texttt{DI\_EFFICIENCY\_BOTTLENECK\_INTEGRATION} \\
+DI Efficiency Bottleneck: Multi-source integration time (MSR) \\
+\hline
+\texttt{DI\_MSR\_EFFICIENCY\_BOTTLENECK\_READING\_DISTRIBUTION} \\
+DI MSR Efficiency Bottleneck: Poor reading time distribution within groups \\
+\hline
+\textbf{Behavioral Patterns and Data Quality Issues} \\
+\hline
+\texttt{DATA\_INVALID\_SHORT\_TIME\_PRESSURE\_AFFECTED} \\
+Data Invalid: Short time due to time pressure affecting validity \\
+\hline
+\texttt{Q\_CARELESSNESS\_DETAIL\_OMISSION} \\
+Q Behavior: Carelessness - Detail omission/misread (Fast \& Wrong pattern) \\
+\hline
+\texttt{DI\_CARELESSNESS\_DETAIL\_OMISSION} \\
+DI Behavior: Carelessness - Detail omission/misread (Fast \& Wrong pattern) \\
+\hline
+\texttt{V\_CARELESSNESS\_DETAIL\_OMISSION} \\
+V Behavior: Carelessness - Detail omission/misread (Fast \& Wrong pattern) \\
+\hline
+\texttt{BEHAVIOR\_CARELESSNESS\_ISSUE} \\
+Behavior Pattern: Carelessness issue (overall high fast-wrong rate > 25\%) \\
+\hline
+\texttt{BEHAVIOR\_EARLY\_RUSHING\_FLAG\_RISK} \\
+Behavior Pattern: Rushing early in section (< 1.0 min, flagging risk) \\
+\hline
+\texttt{BEHAVIOR\_PATTERN\_FAST\_GUESSING\_HASTY} \\
+Behavior Pattern: Hasty response/fast guessing pattern \\
+\hline
+\texttt{DI\_MSR\_GROUP\_TIME\_PRESSURE\_BEHAVIOR} \\
+DI MSR Behavior: Time pressure affecting group performance \\
 
 \end{longtable} % End of longtable environment
 
