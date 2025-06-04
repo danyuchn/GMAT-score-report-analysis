@@ -2,6 +2,91 @@
 
 This file stores all encountered errors and their correction methods.
 
+## GMAT診斷系統標籤定義調整 (2025-01-27)
+
+**Status: COMPLETED ✅**
+
+### 用戶需求:
+對GMAT診斷系統中的部分診斷標籤定義進行調整，以減少使用者困惑：
+
+1. **Q/DI科目中「計算錯誤/計算障礙」定義釐清** - 在鍵值後加括號補充「（公式、觀念用對但純計算過程出錯）」
+2. **「邏輯理解」定義釐清** - 在鍵值後加括號補充「（單句都讀得懂，整篇文章重點掌握錯誤或有困難）」
+3. **SFE標籤註記** - 在鍵值後加括號「（無需修改此標籤的註記）」
+4. **SFE覆蓋建議用詞調整** - 將「中低難度」改為「低難度」
+5. **題型標注說明更新** - 將「Note類型」改為「請手動標注弱點題型」
+6. **新增題型解釋附註**
+
+### 實施內容:
+
+**1. 計算錯誤/計算障礙定義釐清**:
+```python
+# 修改前:
+'DI_CALCULATION_DIFFICULTY__MATH': 'DI 計算 (數學) 障礙: 數學計算困難',
+'DI_CALCULATION_ERROR__MATH': 'DI 計算錯誤 (數學): 數學計算',
+'Q_CALCULATION_DIFFICULTY': 'Q 計算障礙：數學計算困難',
+'Q_CALCULATION_ERROR': 'Q 計算錯誤：數學計算',
+
+# 修改後:
+'DI_CALCULATION_DIFFICULTY__MATH': 'DI 計算 (數學) 障礙: 數學計算困難（公式、觀念用對但純計算過程出錯）',
+'DI_CALCULATION_ERROR__MATH': 'DI 計算錯誤 (數學): 數學計算（公式、觀念用對但純計算過程出錯）',
+'Q_CALCULATION_DIFFICULTY': 'Q 計算障礙：數學計算困難（公式、觀念用對但純計算過程出錯）',
+'Q_CALCULATION_ERROR': 'Q 計算錯誤：數學計算（公式、觀念用對但純計算過程出錯）',
+```
+
+**2. 邏輯理解定義釐清**:
+```python
+# 修改前:
+'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC': 'DI 閱讀理解障礙: 邏輯理解困難',
+'DI_READING_COMPREHENSION_ERROR__LOGIC': 'DI 閱讀理解錯誤: 邏輯理解',
+
+# 修改後:
+'DI_READING_COMPREHENSION_DIFFICULTY__LOGIC': 'DI 閱讀理解障礙: 邏輯理解困難（單句都讀得懂，整篇文章重點掌握錯誤或有困難）',
+'DI_READING_COMPREHENSION_ERROR__LOGIC': 'DI 閱讀理解錯誤: 邏輯理解（單句都讀得懂，整篇文章重點掌握錯誤或有困難）',
+```
+
+**3. SFE標籤註記更新**:
+```python
+# 修改前:
+'FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE': '基礎掌握應用不穩定 (SFE)：已掌握技能應用不穩定（純註記，無需修剪）',
+
+# 修改後:
+'FOUNDATIONAL_MASTERY_APPLICATION_INSTABILITY_SFE': '基礎掌握應用不穩定 (SFE)：已掌握技能應用不穩定（無需修改此標籤的註記）',
+```
+
+**4. 題型標注說明更新**:
+```python
+# 修改前:
+'CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE': 'CR 特定題型弱點：Note類型',
+
+# 修改後:
+'CR_SPECIFIC_QUESTION_TYPE_WEAKNESS_NOTE_TYPE': 'CR 特定題型弱點：請手動標注弱點題型',
+```
+
+**5. SFE覆蓋建議用詞調整**:
+所有「中低難度」已成功改為「低難度」
+
+**6. 新增題型解釋附註**:
+```python
+# 新增:
+'cr_question_type_note': 'CR題型說明：',
+'cr_analysis_critique_note': '- Analysis Critique（包含題型：BF/兩人對談/削弱/加強/評估）',
+'cr_plan_construction_note': '- Plan Construction（包含題型：方案、解釋、假設、推論、填空）',
+'rc_question_type_note': 'RC題型說明：',
+'rc_inferred_idea_note': '- Inferred idea（Inference, Evaluation, Application）',
+'rc_stated_idea_note': '- Stated idea（Main Idea、Supporting idea）',
+```
+
+### 修改的檔案:
+- `gmat_diagnosis_app/i18n/translations/zh_TW.py`
+- `gmat_diagnosis_app/i18n/translations/en.py`
+
+### 學習重點:
+1. **翻譯一致性**: 同時更新中英文翻譯檔案確保國際化支持
+2. **用戶體驗**: 標籤定義的明確化可大幅減少使用者困惑
+3. **系統性修改**: 一次性處理相關修改可確保完整性和一致性
+
+---
+
 ## Format
 ```
 Mistake: [Short Description]
