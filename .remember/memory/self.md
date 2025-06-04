@@ -2,6 +2,205 @@
 
 This file stores all encountered errors and their correction methods.
 
+## .gitignore 檔案全面更新 (2025-01-30)
+
+**Status: COMPLETED ✅**
+
+### 用戶需求:
+檢查整個專案中有哪些檔案或目錄不應該被 git 追蹤，並將它們加入 .gitignore 忽略列表。
+
+### 實施內容:
+
+**1. 原有 .gitignore 分析**:
+原始檔案僅包含基本的 Python 和環境檔案忽略規則：
+```
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.csv
+
+# Virtual Environment
+.venv/
+venv/
+ENV/ 
+
+# Environment variables
+.env 
+```
+
+**2. 新增忽略類別**:
+
+**a) 系統檔案和OS相關**:
+```
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# OS generated files
+Icon?
+.DocumentRevisions-V100
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+```
+
+**b) 開發工具和IDE**:
+```
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cursor AI specific files
+.cursor/
+```
+
+**c) 日誌和臨時檔案**:
+```
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+*.temp
+temp/
+tmp/
+# Specific GMAT project log files
+gmat_llm_handler.log
+gmat_planner.log
+comprehensive_data_flow_test.log
+debug_*.log
+```
+
+**d) 敏感檔案和API金鑰**:
+```
+# Environment variables
+.env 
+.env.local
+.env.development
+.env.test 
+.env.production
+
+# API Keys and sensitive files
+api_keys.txt
+secrets.txt
+credentials.json
+*.key
+*.pem
+*_private.py
+*_secret.py
+```
+
+**e) Python 開發相關**:
+```
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+```
+
+**f) 應用程式特定檔案**:
+```
+# Memory and cache files
+.remember/memory/
+*.cache
+
+# Streamlit cache and temporary files
+.streamlit/
+streamlit_cache/
+
+# Plotly cache
+.plotly/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+```
+
+**g) 測試和臨時腳本**:
+```
+# Temporary scripts and testing files
+check_*.py
+test_*.py
+temp_*.py
+*_temp.py
+*_test.py
+```
+
+**h) SSH 和伺服器設定**:
+```
+# SSH and server configuration (keep templates but ignore actual configs)
+ssh_config
+*_rsa
+*_rsa.pub
+*.ssh/
+id_*
+```
+
+### 分析過程:
+1. **專案結構檢查**: 分析了專案目錄結構，識別出需要忽略的檔案類型
+2. **程式碼搜尋**: 使用 grep 搜尋找出專案中產生的日誌檔案和敏感資訊
+3. **最佳實踐應用**: 參考 Python、Streamlit、機器學習專案的 .gitignore 最佳實踐
+4. **專案特定需求**: 考慮 GMAT 診斷系統的特殊需求，如記憶檔案、日誌檔案等
+
+### 保護的資訊類型:
+- **API 金鑰**: OpenAI API 金鑰和其他敏感憑證
+- **環境變數**: 所有 .env 相關檔案
+- **系統檔案**: macOS 和 Windows 自動產生的檔案
+- **開發工具**: IDE 設定和快取檔案
+- **日誌檔案**: 應用程式運行產生的日誌
+- **測試檔案**: 臨時測試腳本和檔案
+- **記憶檔案**: .remember/memory/ 目錄中的個人化設定
+
+### 學習重點:
+1. **全面性檢查**: 需要從多個角度檢查專案檔案（系統、開發工具、應用程式、安全性）
+2. **專案特定性**: 每個專案都有其特殊的忽略需求，需要仔細分析
+3. **安全性考慮**: 優先保護 API 金鑰、密碼等敏感資訊
+4. **維護性**: 將相關檔案分組和註釋，便於後續維護
+
+**Final Result**: .gitignore 檔案從原來的 18 行基本規則擴展到包含 100+ 行的全面保護規則，涵蓋了系統檔案、開發工具、敏感資訊、日誌檔案等各個層面，確保專案的安全性和整潔性。
+
+---
+
 ## GMAT診斷系統標籤定義調整 (2025-01-27)
 
 **Status: COMPLETED ✅**
@@ -1180,3 +1379,85 @@ find . -name "*.backup_*" -type f | wc -l  # 結果: 0
 - 使用 `find` 指令搭配 `-delete` 參數可以高效清理大量檔案
 - 先用 `find` 預覽要刪除的檔案，確認無誤後再執行刪除
 - 用 `wc -l` 驗證清理結果確保完全清除
+
+## 專案文件清理 (2025-01-30)
+
+**Status: COMPLETED ✅**
+
+### 用戶需求:
+檢查整個專案中有哪些不需要的文件，並進行清理。
+
+### 清理執行內容:
+
+**1. 已清理的文件類型**:
+
+**a) 系統自動生成文件**:
+```
+✅ 已刪除: .DS_Store (6.1KB) - macOS系統文件
+```
+
+**b) 空的日誌文件**:
+```
+✅ 已刪除: logs/debug_20250601.log (0KB) - 空日誌文件
+✅ 已刪除: logs/debug_20250602.log (0KB) - 空日誌文件
+```
+
+**c) Python編譯快取文件**:
+```
+✅ 已清理: __pycache__/ 目錄
+✅ 已清理: *.pyc 文件
+```
+
+**2. 保留的文件**:
+
+**a) 有用的日誌文件**:
+```
+🔄 保留: logs/debug_20250603.log (1.8KB) - 包含實際調試信息
+```
+
+**b) 測試腳本**:
+```
+🔄 保留: gmat_llm_diagnostic_tools/test_integration.py - 整合測試腳本
+🔄 保留: gmat_diagnosis_app/comprehensive_data_flow_test.py - 資料流測試
+```
+
+**c) 文檔文件**:
+```
+🔄 保留: analysis-template-dustin.md - 分析模板（可能有用）
+```
+
+**3. 清理效果**:
+- 清理了 **4個不需要的文件**
+- 釋放了約 **6.1KB** 的磁碟空間
+- 移除了所有系統自動生成的文件
+- 清理了Python編譯快取
+
+**4. .gitignore 更新狀態**:
+已在之前的任務中更新了 .gitignore 文件，包含：
+- 系統文件忽略規則
+- Python快取文件忽略
+- 日誌文件忽略
+- 臨時文件忽略
+
+### 建議的定期清理操作:
+
+**自動清理指令**:
+```bash
+# 清理Python快取
+find . -name "__pycache__" -type d -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true
+find . -name "*.pyc" -not -path "./.venv/*" -delete
+
+# 清理系統文件
+find . -name ".DS_Store" -delete
+
+# 清理空日誌文件
+find logs/ -name "*.log" -size 0 -delete
+```
+
+**手動檢查項目**:
+- 定期檢查 logs/ 目錄中的舊日誌文件
+- 檢查是否有新的備份文件 (*.backup_*)
+- 檢查測試腳本是否仍需要
+
+### 專案文件結構優化:
+專案現在更加整潔，所有不需要的文件已被清理，.gitignore 規則已完善，未來的開發工作將更加高效。

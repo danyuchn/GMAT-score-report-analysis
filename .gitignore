@@ -12,6 +12,149 @@ ENV/
 
 # Environment variables
 .env 
-# 忽略CSV數據文件
+.env.local
+.env.development
+.env.test 
+.env.production
+
+# API Keys and sensitive files
+api_keys.txt
+secrets.txt
+credentials.json
+*.key
+*.pem
+*_private.py
+*_secret.py
+
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+*.temp
+temp/
+tmp/
+# Specific GMAT project log files
+gmat_llm_handler.log
+gmat_planner.log
+comprehensive_data_flow_test.log
+debug_*.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Memory and cache files
+.remember/memory/
+*.cache
+
+# Docker related (if not needed for sharing)
+.docker/
+
+# Personal notes and temporary documentation
+notes/
+personal_notes/
+todo.txt
+TODO.md
+
+# Data files that shouldn't be tracked
+*.xlsx
+*.xls
+*.json
 gmat_diagnosis_app/gmat_performance_data.csv
 gmat_diagnosis_app/student_subjective_reports.csv
+
+# Backup files
+*.bak
+*.backup
+
+# OS generated files
+Icon?
+.DocumentRevisions-V100
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Network folder files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temporary scripts and testing files
+check_*.py
+test_*.py
+temp_*.py
+*_temp.py
+*_test.py
+
+# Streamlit cache and temporary files
+.streamlit/
+streamlit_cache/
+
+# Plotly cache
+.plotly/
+
+# SSH and server configuration (keep templates but ignore actual configs)
+ssh_config
+*_rsa
+*_rsa.pub
+*.ssh/
+id_*
+
+# Cursor AI specific files
+.cursor/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
