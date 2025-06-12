@@ -1314,123 +1314,133 @@ f"""<div style="background-color: var(--background-color, #fff3cd); border: 1px 
                         if st.session_state.get('has_unsaved_changes', False):
                             tabs[edit_tab_index].warning(t('edit_tags_unsaved_warning'), icon="⚠️")
                         elif st.session_state.get('changes_saved', False):
-                            try:
-                                df_to_export = st.session_state.editable_diagnostic_df.copy() # Start with internal names
-                                logging.info(f"[Download Edited] Initial columns: {df_to_export.columns.tolist()}")
+                            # Check diagnostic tag warning before allowing download
+                            tag_warning = check_global_diagnostic_tag_warning_realtime()
+                            if tag_warning['triggered']:
+                                # Block download and show warning
+                                tabs[edit_tab_index].error(
+                                    t('download_blocked_too_many_tags_message').format(tag_warning['avg_tags_per_question']),
+                                    icon="🚫"
+                                )
+                                tabs[edit_tab_index].info(t('download_blocked_secondary_evidence_link'))
+                            else:
+                                try:
+                                    df_to_export = st.session_state.editable_diagnostic_df.copy() # Start with internal names
+                                    logging.info(f"[Download Edited] Initial columns: {df_to_export.columns.tolist()}")
 
-                                # --- Merge Logic (Operates on internal names) ---
-                                if 'question_difficulty' not in df_to_export.columns and 'all_subjects_df_for_diagnosis' in st.session_state and not st.session_state.all_subjects_df_for_diagnosis.empty:
-                                    source_df = st.session_state.all_subjects_df_for_diagnosis
-                                    merge_keys = ['Subject', 'question_position']
-                                    logging.info(f"[Download Edited] Attempting merge. Source df columns: {source_df.columns.tolist()}")
-                                    
-                                    source_has_keys = all(key in source_df.columns for key in merge_keys)
-                                    target_has_keys = all(key in df_to_export.columns for key in merge_keys)
-                                    source_has_difficulty = 'question_difficulty' in source_df.columns
-                                    
-                                    logging.info(f"[Download Edited] Merge Check: source_has_keys={source_has_keys}, target_has_keys={target_has_keys}, source_has_difficulty={source_has_difficulty}")
+                                    # --- Merge Logic (Operates on internal names) ---
+                                    if 'question_difficulty' not in df_to_export.columns and 'all_subjects_df_for_diagnosis' in st.session_state and not st.session_state.all_subjects_df_for_diagnosis.empty:
+                                        source_df = st.session_state.all_subjects_df_for_diagnosis
+                                        merge_keys = ['Subject', 'question_position']
+                                        logging.info(f"[Download Edited] Attempting merge. Source df columns: {source_df.columns.tolist()}")
+                                        
+                                        source_has_keys = all(key in source_df.columns for key in merge_keys)
+                                        target_has_keys = all(key in df_to_export.columns for key in merge_keys)
+                                        source_has_difficulty = 'question_difficulty' in source_df.columns
+                                        
+                                        logging.info(f"[Download Edited] Merge Check: source_has_keys={source_has_keys}, target_has_keys={target_has_keys}, source_has_difficulty={source_has_difficulty}")
 
-                                    if source_has_keys and target_has_keys and source_has_difficulty:
-                                        try:
-                                            if 'question_position' in merge_keys:
-                                                if df_to_export['question_position'].dtype != source_df['question_position'].dtype:
-                                                    logging.warning(f"[Download Edited] Type mismatch for 'question_position': {df_to_export['question_position'].dtype} vs {source_df['question_position'].dtype}. Attempting coercion.")
-                                                    try:
-                                                        df_to_export['question_position'] = pd.to_numeric(df_to_export['question_position'], errors='coerce').astype('Int64')
-                                                        source_df_temp = source_df.copy()
-                                                        source_df_temp['question_position'] = pd.to_numeric(source_df_temp['question_position'], errors='coerce').astype('Int64')
-                                                        source_df_for_merge = source_df_temp
-                                                        logging.info("[Download Edited] Coerced 'question_position' to Int64 for merge.")
-                                                    except Exception as e:
-                                                        logging.error(f"[Download Edited] Failed to coerce 'question_position' to a common type: {e}")
+                                        if source_has_keys and target_has_keys and source_has_difficulty:
+                                            try:
+                                                if 'question_position' in merge_keys:
+                                                    if df_to_export['question_position'].dtype != source_df['question_position'].dtype:
+                                                        logging.warning(f"[Download Edited] Type mismatch for 'question_position': {df_to_export['question_position'].dtype} vs {source_df['question_position'].dtype}. Attempting coercion.")
+                                                        try:
+                                                            df_to_export['question_position'] = pd.to_numeric(df_to_export['question_position'], errors='coerce').astype('Int64')
+                                                            source_df_temp = source_df.copy()
+                                                            source_df_temp['question_position'] = pd.to_numeric(source_df_temp['question_position'], errors='coerce').astype('Int64')
+                                                            source_df_for_merge = source_df_temp
+                                                            logging.info("[Download Edited] Coerced 'question_position' to Int64 for merge.")
+                                                        except Exception as e:
+                                                            logging.error(f"[Download Edited] Failed to coerce 'question_position' to a common type: {e}")
+                                                            source_df_for_merge = source_df
+                                                    else:
                                                         source_df_for_merge = source_df
-                                                else:
-                                                    source_df_for_merge = source_df
-                                            else: 
-                                                 source_df_for_merge = source_df
+                                                else: 
+                                                     source_df_for_merge = source_df
 
-                                            difficulty_to_merge = source_df_for_merge[merge_keys + ['question_difficulty']].drop_duplicates(subset=merge_keys)
-                                            df_to_export = pd.merge(df_to_export, difficulty_to_merge, on=merge_keys, how='left')
-                                            logging.info(f"[Download Edited] Successfully merged 'question_difficulty'. Columns after merge: {df_to_export.columns.tolist()}")
-                                        except Exception as e:
-                                            logging.error(f"[Download Edited] Failed to merge 'question_difficulty': {e}")
+                                                difficulty_to_merge = source_df_for_merge[merge_keys + ['question_difficulty']].drop_duplicates(subset=merge_keys)
+                                                df_to_export = pd.merge(df_to_export, difficulty_to_merge, on=merge_keys, how='left')
+                                                logging.info(f"[Download Edited] Successfully merged 'question_difficulty'. Columns after merge: {df_to_export.columns.tolist()}")
+                                            except Exception as e:
+                                                logging.error(f"[Download Edited] Failed to merge 'question_difficulty': {e}")
+                                        else:
+                                            logging.warning("[Download Edited] Merge prerequisites not met. 'question_difficulty' or merge keys missing.")
                                     else:
-                                        logging.warning("[Download Edited] Merge prerequisites not met. 'question_difficulty' or merge keys missing.")
-                                else:
-                                    logging.info("[Download Edited] Merge not needed or not possible.")
+                                        logging.info("[Download Edited] Merge not needed or not possible.")
 
-                                # --- Prepare final map and select columns based on internal names AFTER merge ---
-                                # Create translated excel_map dynamically
-                                translated_excel_column_map = {
-                                    "Subject": t("column_subject"),
-                                    "question_position": t("column_question_number"),
-                                    "question_type": t("column_question_type"),
-                                    "question_fundamental_skill": t("column_tested_ability"),
-                                    "question_difficulty": t("column_simulated_difficulty"),
-                                    "question_time": t("column_response_time_minutes"),
-                                    "time_performance_category": t("column_time_performance"),
-                                    "content_domain": t("column_content_domain"),
-                                    "diagnostic_params_list": t("column_diagnostic_tags"),
-                                    "is_correct": t("column_is_correct"),
-                                    "is_sfe": t("column_is_sfe"),
-                                    "is_invalid": t("column_is_invalid"),
-                                    "overtime": "overtime_flag",  # Internal flag for Excel styling, will be hidden by to_excel
-                                }
-                                
-                                final_internal_columns_to_export = [
-                                    internal_name
-                                    for internal_name in translated_excel_column_map.keys() # Use defined export order/keys
-                                    if internal_name in df_to_export.columns # Check if column exists after merge
-                                ]
-                                df_to_export_final = df_to_export[final_internal_columns_to_export].copy() # Select final columns with internal names
+                                    # --- Prepare final map and select columns based on internal names AFTER merge ---
+                                    # Create translated excel_map dynamically
+                                    translated_excel_column_map = {
+                                        "Subject": t("column_subject"),
+                                        "question_position": t("column_question_number"),
+                                        "question_type": t("column_question_type"),
+                                        "question_fundamental_skill": t("column_tested_ability"),
+                                        "question_difficulty": t("column_simulated_difficulty"),
+                                        "question_time": t("column_response_time_minutes"),
+                                        "time_performance_category": t("column_time_performance"),
+                                        "content_domain": t("column_content_domain"),
+                                        "diagnostic_params_list": t("column_diagnostic_tags"),
+                                        "is_correct": t("column_is_correct"),
+                                        "is_sfe": t("column_is_sfe"),
+                                        "is_invalid": t("column_is_invalid"),
+                                        "overtime": "overtime_flag",  # Internal flag for Excel styling, will be hidden by to_excel
+                                    }
+                                    
+                                    final_internal_columns_to_export = [
+                                        internal_name
+                                        for internal_name in translated_excel_column_map.keys() # Use defined export order/keys
+                                        if internal_name in df_to_export.columns # Check if column exists after merge
+                                    ]
+                                    df_to_export_final = df_to_export[final_internal_columns_to_export].copy() # Select final columns with internal names
 
-                                # Create the map only for the selected columns
-                                excel_column_map_for_export_final = {
-                                    internal_name: translated_excel_column_map[internal_name]
-                                    for internal_name in final_internal_columns_to_export
-                                }
-                                logging.info(f"[Download Edited] Final internal columns selected: {final_internal_columns_to_export}")
-                                logging.info(f"[Download Edited] Final map for to_excel: {excel_column_map_for_export_final}")
+                                    # Create the map only for the selected columns
+                                    excel_column_map_for_export_final = {
+                                        internal_name: translated_excel_column_map[internal_name]
+                                        for internal_name in final_internal_columns_to_export
+                                    }
+                                    logging.info(f"[Download Edited] Final internal columns selected: {final_internal_columns_to_export}")
+                                    logging.info(f"[Download Edited] Final map for to_excel: {excel_column_map_for_export_final}")
 
-                                # --- Data Type Conversion / Formatting (before to_excel) ---
-                                # Convert lists to strings
-                                if 'diagnostic_params_list' in df_to_export_final.columns:
-                                    df_to_export_final['diagnostic_params_list'] = df_to_export_final['diagnostic_params_list'].apply(
-                                        lambda x: ", ".join(map(str, x)) if isinstance(x, list) else x
+                                    # --- Data Type Conversion / Formatting (before to_excel) ---
+                                    # Convert lists to strings
+                                    if 'diagnostic_params_list' in df_to_export_final.columns:
+                                        df_to_export_final['diagnostic_params_list'] = df_to_export_final['diagnostic_params_list'].apply(
+                                            lambda x: ", ".join(map(str, x)) if isinstance(x, list) else x
+                                        )
+                                    # Ensure boolean-like columns are strings if needed by to_excel formatting logic
+                                    for bool_col in ['is_correct', 'is_sfe', 'is_invalid']:
+                                         if bool_col in df_to_export_final.columns:
+                                              df_to_export_final[bool_col] = df_to_export_final[bool_col].astype(str)
+                                    # NOTE: Numeric formatting (e.g., difficulty, time) is handled within to_excel based on the map
+
+                                    # --- Call to_excel with internal names and the map ---
+                                    excel_bytes = to_excel(df_to_export_final, excel_column_map_for_export_final)
+
+                                    # Create combined download with Excel and Markdown reports
+                                    # Get current report dict from session state
+                                    report_dict = st.session_state.get('report_dict', {})
+                                    
+                                    # Create zip with both Excel and MD files
+                                    zip_bytes = create_combined_download_zip(
+                                        df_to_export_final, 
+                                        excel_column_map_for_export_final, 
+                                        report_dict
                                     )
-                                # Ensure boolean-like columns are strings if needed by to_excel formatting logic
-                                for bool_col in ['is_correct', 'is_sfe', 'is_invalid']:
-                                     if bool_col in df_to_export_final.columns:
-                                          df_to_export_final[bool_col] = df_to_export_final[bool_col].astype(str)
-                                # NOTE: Numeric formatting (e.g., difficulty, time) is handled within to_excel based on the map
 
-                                # --- Call to_excel with internal names and the map ---
-                                excel_bytes = to_excel(df_to_export_final, excel_column_map_for_export_final)
-
-                                # Create combined download with Excel and Markdown reports
-                                # Get current report dict from session state
-                                report_dict = st.session_state.get('report_dict', {})
-                                
-                                # Create zip with both Excel and MD files
-                                zip_bytes = create_combined_download_zip(
-                                    df_to_export_final, 
-                                    excel_column_map_for_export_final, 
-                                    report_dict
-                                )
-
-                                # Trigger download
-                                today_str = pd.Timestamp.now().strftime('%Y%m%d')
-                                st.download_button(
-                                    label=t('edit_tags_download_button_combined_label'), # Updated label for combined download
-                                    data=zip_bytes,
-                                    file_name=f"{today_str}_GMAT_edited_data_and_reports.zip",
-                                    mime="application/zip",
-                                    key="actual_download_combined_button_col3_rerun", # Use a different key
-                                    use_container_width=True
-                                )
-                            except Exception as e:
-                                st.error(t('download_excel_error').format(e))
-                                logging.error(t('download_excel_error_details').format(traceback.format_exc()))
+                                    # Trigger download
+                                    today_str = pd.Timestamp.now().strftime('%Y%m%d')
+                                    st.download_button(
+                                        label=t('edit_tags_download_button_combined_label'), # Updated label for combined download
+                                        data=zip_bytes,
+                                        file_name=f"{today_str}_GMAT_edited_data_and_reports.zip",
+                                        mime="application/zip",
+                                        key="actual_download_combined_button_col3_rerun", # Use a different key
+                                        use_container_width=True
+                                    )
+                                except Exception as e:
+                                    st.error(t('download_excel_error').format(e))
+                                    logging.error(t('download_excel_error_details').format(traceback.format_exc()))
                         else:
                             st.warning(t('changes_not_saved_download_warning'), icon="⚠️")
 
